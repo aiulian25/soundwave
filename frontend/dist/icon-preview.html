@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundWave PWA Icons Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+        .icon-card {
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            background: #f9f9f9;
+        }
+        .icon-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border-color: #1976d2;
+        }
+        .icon-wrapper {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+        .icon-card img {
+            display: block;
+            margin: 0 auto;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+        .icon-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+        .icon-size {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .section-title {
+            font-size: 1.8em;
+            color: #333;
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #1976d2;
+        }
+        .special-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        .badge {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            margin-top: 5px;
+            font-weight: 600;
+        }
+        .maskable {
+            background: #ff9800;
+        }
+        .apple {
+            background: #000;
+        }
+        .stats {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 40px;
+            text-align: center;
+        }
+        .stats h3 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+        .stat-item {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 SoundWave</h1>
+        <p class="subtitle">PWA Icon Set - All Sizes Generated</p>
+
+        <h2 class="section-title">Standard Icons (Any Purpose)</h2>
+        <div class="grid">
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-72x72.png" alt="72x72" width="72" height="72">
+                </div>
+                <div class="icon-label">Small</div>
+                <div class="icon-size">72×72 pixels</div>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-96x96.png" alt="96x96" width="96" height="96">
+                </div>
+                <div class="icon-label">Medium</div>
+                <div class="icon-size">96×96 pixels</div>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-128x128.png" alt="128x128" width="128" height="128">
+                </div>
+                <div class="icon-label">Large</div>
+                <div class="icon-size">128×128 pixels</div>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-144x144.png" alt="144x144" width="144" height="144">
+                </div>
+                <div class="icon-label">X-Large</div>
+                <div class="icon-size">144×144 pixels</div>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-152x152.png" alt="152x152" width="152" height="152">
+                </div>
+                <div class="icon-label">iOS</div>
+                <div class="icon-size">152×152 pixels</div>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-192x192.png" alt="192x192" width="192" height="192">
+                </div>
+                <div class="icon-label">Standard HD</div>
+                <div class="icon-size">192×192 pixels</div>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-384x384.png" alt="384x384" width="192" height="192">
+                </div>
+                <div class="icon-label">Retina</div>
+                <div class="icon-size">384×384 pixels</div>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-512x512.png" alt="512x512" width="192" height="192">
+                </div>
+                <div class="icon-label">Ultra HD</div>
+                <div class="icon-size">512×512 pixels</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Platform-Specific Icons</h2>
+        <div class="special-grid">
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-192x192-maskable.png" alt="192x192 Maskable" width="192" height="192">
+                </div>
+                <div class="icon-label">Android Maskable</div>
+                <div class="icon-size">192×192 pixels</div>
+                <span class="badge maskable">Maskable</span>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/icon-512x512-maskable.png" alt="512x512 Maskable" width="192" height="192">
+                </div>
+                <div class="icon-label">Android HD Maskable</div>
+                <div class="icon-size">512×512 pixels</div>
+                <span class="badge maskable">Maskable</span>
+            </div>
+            <div class="icon-card">
+                <div class="icon-wrapper">
+                    <img src="/img/icons/apple-touch-icon.png" alt="Apple Touch Icon" width="180" height="180">
+                </div>
+                <div class="icon-label">Apple Touch Icon</div>
+                <div class="icon-size">180×180 pixels</div>
+                <span class="badge apple">iOS</span>
+            </div>
+        </div>
+
+        <div class="stats">
+            <h3>📊 Icon Set Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">11</div>
+                    <div class="stat-label">Total Icons</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">8</div>
+                    <div class="stat-label">Standard Sizes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">2</div>
+                    <div class="stat-label">Maskable Icons</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">1</div>
+                    <div class="stat-label">Apple Icon</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">~500KB</div>
+                    <div class="stat-label">Total Size</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">✅</div>
+                    <div class="stat-label">PWA Ready</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; color: #666;">
+            <p>✨ All icons generated from official SoundWave logo</p>
+            <p style="margin-top: 10px;">🎯 Optimized for all platforms: Android, iOS, Desktop</p>
+        </div>
+    </div>
+</body>
+</html>

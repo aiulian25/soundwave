@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <!-- Primary Meta Tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="title" content="SoundWave - Music Streaming & YouTube Archive" />
+    <meta name="description" content="Multi-tenant YouTube music streaming platform with local file support, offline playback, and advanced audio features" />
+    <meta name="keywords" content="music, streaming, youtube, audio, offline, pwa, soundwave" />
+    <meta name="author" content="SoundWave" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Soundwave" />
+    <meta name="application-name" content="Soundwave" />
+    <meta name="theme-color" content="#1976d2" />
+    <meta name="msapplication-TileColor" content="#1976d2" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- ID3 Tag Reader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/icons/icon-72x72.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/img/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/img/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/img/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/img/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/img/icon-512x512.png" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://soundwave.app/" />
+    <meta property="og:title" content="SoundWave - Music Streaming & YouTube Archive" />
+    <meta property="og:description" content="Multi-tenant YouTube music streaming platform with local file support, offline playback, and advanced audio features" />
+    <meta property="og:image" content="/img/icon-512x512.png" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://soundwave.app/" />
+    <meta property="twitter:title" content="SoundWave - Music Streaming & YouTube Archive" />
+    <meta property="twitter:description" content="Multi-tenant YouTube music streaming platform with local file support, offline playback, and advanced audio features" />
+    <meta property="twitter:image" content="/img/icon-512x512.png" />
+    
+    <title>SoundWave - Music Streaming & YouTube Archive</title>
+    
+    <!-- Preconnect to API -->
+    <link rel="preconnect" href="/api" />
+  </head>
+  <body>
+    <noscript>
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h1>JavaScript Required</h1>
+        <p>SoundWave requires JavaScript to be enabled. Please enable JavaScript in your browser settings.</p>
+      </div>
+    </noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

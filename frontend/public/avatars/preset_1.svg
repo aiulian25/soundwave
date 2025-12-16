@@ -1,0 +1,11 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="#6366F1"/>
+  
+  <!-- Music note -->
+  <g fill="white">
+    <circle cx="90" cy="140" r="15"/>
+    <rect x="102" y="90" width="8" height="65" rx="4"/>
+    <path d="M 110 90 Q 130 85 135 75 Q 138 68 135 65 Q 132 62 125 65 L 110 72 Z"/>
+  </g>
+</svg>

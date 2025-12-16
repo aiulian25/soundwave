@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Django
+*.log
+db.sqlite3
+media/
+staticfiles/
+
+# Node
+node_modules/
+# frontend/dist/  # Include dist for GitHub deployment
+.pnpm-debug.log*
+
+# Docker
+audio/
+cache/
+es/
+redis/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reference/Documentation
+tubearchivist-develop/

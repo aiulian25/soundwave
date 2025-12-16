@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768">
+  <rect width="768" height="768" fill="#A8D5D8"/>
+  <circle cx="384" cy="330" r="135" fill="none" stroke="#0F4C75" stroke-width="12"/>
+  <circle cx="384" cy="330" r="110" fill="none" stroke="#0F4C75" stroke-width="12"/>
+  <path d="M 385 230 Q 405 240 385 250 Q 405 255 385 270 Q 410 275 385 290" fill="none" stroke="#00C8C8" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="384" cy="330" r="80" fill="none" stroke="#00C8C8" stroke-width="10"/>
+  <path fill="#0F4C75" d="M 350 305 L 350 355 L 410 330 Z"/>
+  <rect x="220" y="310" width="12" height="40" rx="6" fill="#00C8C8"/>
+  <rect x="245" y="295" width="12" height="70" rx="6" fill="#00C8C8"/>
+  <rect x="270" y="285" width="12" height="90" rx="6" fill="#0F4C75"/>
+  <rect x="510" y="310" width="12" height="40" rx="6" fill="#00C8C8"/>
+  <rect x="535" y="295" width="12" height="70" rx="6" fill="#00C8C8"/>
+  <rect x="560" y="285" width="12" height="90" rx="6" fill="#0F4C75"/>
+  <text x="384" y="550" font-family="Arial, sans-serif" font-size="80" font-weight="bold" text-anchor="middle" fill="#0F4C75">sound</text>
+  <text x="384" y="550" font-family="Arial, sans-serif" font-size="80" font-weight="bold" text-anchor="middle" fill="#00C8C8" dx="160">wave</text>
+</svg>

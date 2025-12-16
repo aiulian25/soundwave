@@ -1,0 +1,383 @@
+/* PWA-specific styles for touch targets and mobile optimization */
+
+/* Ensure all interactive elements meet minimum touch target size (36x36px for compact UI) */
+button,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.MuiButton-root,
+.MuiIconButton-root,
+.MuiChip-root,
+.MuiSwitch-root {
+  min-height: 36px;
+  min-width: 36px;
+}
+
+/* Improve touch feedback */
+button:active,
+a:active,
+.MuiButton-root:active,
+.MuiIconButton-root:active {
+  opacity: 0.7;
+  transition: opacity 0.1s;
+}
+
+/* Prevent text selection on double-tap (better UX on mobile) */
+* {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in content areas */
+p,
+span,
+div[contenteditable],
+input,
+textarea,
+.MuiTypography-root,
+.selectable {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Safe area insets for notched devices */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+}
+
+/* Optimize scrolling on iOS */
+.scrollable,
+.MuiBox-root[style*="overflow"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Prevent zoom on input focus (iOS) */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+
+/* Loading skeleton animations */
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.skeleton {
+  animation: shimmer 1.2s ease-in-out infinite;
+  background: linear-gradient(
+    to right,
+    #eeeeee 8%,
+    #dddddd 18%,
+    #eeeeee 33%
+  );
+  background-size: 800px 104px;
+}
+
+/* PWA install banner */
+.pwa-install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--primary-color, #1976d2);
+  color: white;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 9999;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  transform: translateY(100%);
+  transition: transform 0.3s ease-in-out;
+}
+
+.pwa-install-banner.visible {
+  transform: translateY(0);
+}
+
+/* Offline indicator */
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #ff9800;
+  color: white;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+  z-index: 10000;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Pull to refresh indicator */
+.ptr-indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100%);
+  padding: 10px 20px;
+  background: var(--primary-color, #1976d2);
+  color: white;
+  border-radius: 0 0 8px 8px;
+  transition: transform 0.3s ease-out;
+  z-index: 9998;
+}
+
+.ptr-indicator.visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Responsive utilities */
+@media (max-width: 600px) {
+  /* Reduce padding on mobile */
+  .MuiContainer-root {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* Stack elements vertically on small screens */
+  .responsive-stack {
+    flex-direction: column !important;
+  }
+
+  /* Full width buttons on mobile */
+  .responsive-button {
+    width: 100% !important;
+  }
+}
+
+/* Dark mode specific PWA styles */
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background: linear-gradient(
+      to right,
+      #333333 8%,
+      #444444 18%,
+      #333333 33%
+    );
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Reduce header height in landscape */
+  header,
+  .MuiAppBar-root {
+    min-height: 48px !important;
+  }
+
+  /* Adjust spacing */
+  .MuiContainer-root {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  button,
+  .MuiButton-root {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus visible styles for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--primary-color, #1976d2);
+  outline-offset: 2px;
+}
+
+/* Native app-like scrolling */
+html,
+body {
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbars in PWA mode while keeping functionality */
+@media (display-mode: standalone) {
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Splash screen styles */
+.splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--background-color, #121212);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  transition: opacity 0.3s ease-out;
+}
+
+.splash-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-logo {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 24px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+/* Installation prompt styles */
+.install-prompt {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 320px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.install-prompt-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+}
+
+.install-prompt-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #212121;
+}
+
+.install-prompt-description {
+  font-size: 14px;
+  color: #757575;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.install-prompt-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: stretch;
+}
+
+.install-prompt-button {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.install-prompt-button-primary {
+  background: var(--primary-color, #1976d2);
+  color: white;
+}
+
+.install-prompt-button-primary:active {
+  transform: scale(0.98);
+}
+
+.install-prompt-button-secondary {
+  background: #f5f5f5;
+  color: #424242;
+}
+
+/* Audio player PWA optimizations */
+.audio-player-pwa {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--background-paper, #1e1e1e);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 1300;
+}
+
+/* Make media controls work with media session API */
+audio,
+video {
+  width: 100%;
+}
+
+/* Optimize touch gestures for swipe actions */
+.swipeable {
+  touch-action: pan-y;
+}
+
+.swipeable-horizontal {
+  touch-action: pan-x;
+}

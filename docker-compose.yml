@@ -1,0 +1,54 @@
+#version: '3.8'
+
+services:
+  soundwave:
+    container_name: soundwave
+    build: .
+    ports:
+      - "8889:8888"
+    volumes:
+      - ./audio:/app/audio
+      - ./cache:/app/cache
+      - ./data:/app/data
+      - ./backend/staticfiles:/app/backend/staticfiles
+    environment:
+      - SW_HOST=http://localhost:8889
+      - SW_USERNAME=admin
+      - SW_PASSWORD=soundwave
+      - ELASTIC_PASSWORD=soundwave
+      - REDIS_HOST=soundwave-redis
+      - TZ=UTC
+      - ES_URL=http://soundwave-es:9200
+    depends_on:
+      - soundwave-es
+      - soundwave-redis
+    restart: unless-stopped
+
+  soundwave-es:
+    image: bbilly1/tubearchivist-es
+    container_name: soundwave-es
+    restart: unless-stopped
+    environment:
+      - "ELASTIC_PASSWORD=soundwave"
+      - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "xpack.security.enabled=true"
+    volumes:
+      - ./es:/usr/share/elasticsearch/data
+    expose:
+      - "9200"
+
+  soundwave-redis:
+    image: redis:alpine
+    container_name: soundwave-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - ./redis:/data
+
+volumes:
+  audio:
+  cache:
+  es:
+  redis:

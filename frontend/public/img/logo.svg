@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768" width="768" height="768">
+  <!-- Background circle -->
+  <circle cx="384" cy="384" r="384" fill="#A8DADC"/>
+  
+  <!-- Sound wave lines - left -->
+  <rect x="190" y="340" width="12" height="60" rx="6" fill="#4ECDC4"/>
+  <rect x="210" y="355" width="12" height="30" rx="6" fill="#4ECDC4"/>
+  <rect x="230" y="345" width="12" height="50" rx="6" fill="#4ECDC4"/>
+  
+  <!-- Outer circle - cyan -->
+  <circle cx="384" cy="320" r="110" fill="none" stroke="#4ECDC4" stroke-width="16"/>
+  
+  <!-- Middle circle - dark blue -->
+  <circle cx="384" cy="320" r="85" fill="none" stroke="#1D3557" stroke-width="12"/>
+  
+  <!-- Inner circle - cyan -->
+  <circle cx="384" cy="320" r="65" fill="#A8DADC" stroke="#4ECDC4" stroke-width="10"/>
+  
+  <!-- Play button -->
+  <path d="M 370 300 L 370 340 L 405 320 Z" fill="#1D3557"/>
+  
+  <!-- Sound wave lines - right -->
+  <rect x="526" y="345" width="12" height="50" rx="6" fill="#4ECDC4"/>
+  <rect x="546" y="355" width="12" height="30" rx="6" fill="#4ECDC4"/>
+  <rect x="566" y="340" width="12" height="60" rx="6" fill="#4ECDC4"/>
+  
+  <!-- Text "soundwave" curved -->
+  <path id="curve" d="M 180 420 Q 384 500 588 420" fill="none"/>
+  <text font-family="Arial, sans-serif" font-size="80" font-weight="700" fill="#1D3557">
+    <textPath href="#curve" startOffset="12%">
+      sound
+    </textPath>
+  </text>
+  <text font-family="Arial, sans-serif" font-size="80" font-weight="700" fill="#4ECDC4">
+    <textPath href="#curve" startOffset="50%">
+      wave
+    </textPath>
+  </text>
+</svg>
