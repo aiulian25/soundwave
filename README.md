@@ -38,37 +38,59 @@
 - Dual-core CPU (quad-core recommended)
 - Storage space for your audio library
 
-## 🚀 Quick Start
+## 🚀 Quick Start (For End Users)
 
-### 1. Clone the Repository
+### Option 1: Pull Pre-Built Image (Recommended)
 
+**1. Download docker-compose.yml**
 ```bash
-git clone https://github.com/yourusername/soundwave.git
-cd soundwave
+wget https://raw.githubusercontent.com/aiulian25/soundwave/main/docker-compose.yml
 ```
 
-### 2. Create Environment File
-
+**2. Create .env file**
 ```bash
-cp .env.example .env
-# Edit .env if you want to change default credentials
-# Default: admin / soundwave
+cat > .env << EOF
+SW_HOST=http://localhost:8889
+SW_USERNAME=admin
+SW_PASSWORD=soundwave
+ELASTIC_PASSWORD=soundwave
+REDIS_HOST=soundwave-redis
+TZ=UTC
+EOF
 ```
 
-### 3. Start the Application
-
+**3. Start SoundWave**
 ```bash
 docker compose up -d
 ```
 
-That's it! The application will:
-- Pull/build all necessary images
-- Start ElasticSearch and Redis
-- Start the SoundWave application
-- Run database migrations automatically
-
 **Access:** http://localhost:8889  
-**Default credentials:** admin / soundwave
+**Login:** admin / soundwave
+
+The pre-built image is hosted on Docker Hub at `aiulian25/soundwave:latest`
+
+### Option 2: Build From Source (For Developers)
+
+**1. Clone the Repository**
+```bash
+git clone https://github.com/aiulian25/soundwave.git
+cd soundwave
+```
+
+**2. Build Frontend**
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+**3. Start with Docker**
+```bash
+# Edit docker-compose.yml to use "build: ." instead of "image: aiulian25/soundwave:latest"
+docker compose build
+docker compose up -d
+```
 
 ### First-Time Setup
 

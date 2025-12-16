@@ -3,7 +3,7 @@
 services:
   soundwave:
     container_name: soundwave
-    build: .
+    image: aiulian25/soundwave:latest
     ports:
       - "8889:8888"
     volumes:
