@@ -33,8 +33,12 @@ services:
       - "discovery.type=single-node"
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - "xpack.security.enabled=true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
-      - ./es:/usr/share/elasticsearch/data
+      - es_data:/usr/share/elasticsearch/data
     expose:
       - "9200"
 
@@ -45,10 +49,8 @@ services:
     expose:
       - "6379"
     volumes:
-      - ./redis:/data
+      - redis_data:/data
 
 volumes:
-  audio:
-  cache:
-  es:
-  redis:
+  es_data:
+  redis_data:
