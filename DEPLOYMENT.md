@@ -36,13 +36,15 @@ That's it! 🎉
 ## What This Does
 
 The Docker Compose file:
-- ✅ Pulls pre-built image from Docker Hub (`aiulian25/soundwave:latest`)
+- ✅ Pulls pre-built image from GitHub Container Registry (`ghcr.io/aiulian25/soundwave:latest`)
 - ✅ Starts ElasticSearch for search functionality
 - ✅ Starts Redis for task queue
 - ✅ Automatically runs migrations
 - ✅ Creates admin user
 
 **No npm, no build, no compilation needed!**
+
+> **Note**: If the image pull fails (image not published yet), see the "Building Locally" section below.
 
 ---
 
@@ -117,16 +119,37 @@ docker compose up -d
 
 ---
 
-## For Developers
+## Building Locally
 
-If you want to build from source:
+If the pre-built image is not available (not published yet or want latest code):
+
+**Prerequisites**: Node.js 18+ and npm
+
 ```bash
+# Clone repository
 git clone https://github.com/aiulian25/soundwave.git
 cd soundwave
-cd frontend && npm install && npm run build && cd ..
+
+# Build frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Build Docker image and start
 docker compose build
 docker compose up -d
 ```
+
+Alternatively, uncomment the `build:` section in docker-compose.yml and it will build automatically:
+```yaml
+# In docker-compose.yml, uncomment:
+build:
+  context: .
+  dockerfile: Dockerfile
+```
+
+Then run: `docker compose up -d --build`
 
 ---
 
