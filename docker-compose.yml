@@ -4,11 +4,11 @@ services:
   soundwave:
     container_name: soundwave
     # Option 1: Pull from GitHub Container Registry (recommended for users)
-    # image: ghcr.io/aiulian25/soundwave:main
+    image: ghcr.io/aiulian25/soundwave:main
     # Option 2: Build locally (uncomment if pulling fails or for development)
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     ports:
       - "8889:8888"
     volumes:
