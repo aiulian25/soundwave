@@ -146,19 +146,27 @@ REST_FRAMEWORK = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8889",
-    "http://127.0.0.1:8889",
-    "http://192.168.50.71:8889",
-]
+CORS_ALLOWED_ORIGINS_ENV = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if CORS_ALLOWED_ORIGINS_ENV:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ALLOWED_ORIGINS_ENV.split(',')]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:8889",
+        "http://127.0.0.1:8889",
+        "http://192.168.50.71:8889",
+    ]
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF settings for development cross-origin access
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8889",
-    "http://127.0.0.1:8889",
-    "http://192.168.50.71:8889",
-]
+CSRF_TRUSTED_ORIGINS_ENV = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if CSRF_TRUSTED_ORIGINS_ENV:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_TRUSTED_ORIGINS_ENV.split(',')]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8889",
+        "http://127.0.0.1:8889",
+        "http://192.168.50.71:8889",
+    ]
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SAMESITE = 'Lax'
