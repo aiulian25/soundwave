@@ -1,0 +1,280 @@
+"""ID3 tagging service using mutagen"""
+import os
+import logging
+from mutagen.mp4 import MP4, MP4Cover
+from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TDRC, TRCK, TCON, TXXX
+from mutagen.flac import FLAC, Picture
+from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
+
+
+class ID3TagService:
+    """Service for reading and writing ID3 tags"""
+    
+    @staticmethod
+    def read_tags(file_path: str) -> Dict[str, Any]:
+        """
+        Read ID3 tags from audio file
+        
+        Args:
+            file_path: Path to audio file
+            
+        Returns:
+            Dictionary with tag information
+        """
+        try:
+            if not os.path.exists(file_path):
+                logger.error(f"File not found: {file_path}")
+                return {}
+            
+            ext = os.path.splitext(file_path)[1].lower()
+            tags = {}
+            
+            if ext == '.m4a' or ext == '.mp4':
+                audio = MP4(file_path)
+                tags = {
+                    'title': audio.get('\xa9nam', [''])[0],
+                    'artist': audio.get('\xa9ART', [''])[0],
+                    'album': audio.get('\xa9alb', [''])[0],
+                    'album_artist': audio.get('aART', [''])[0],
+                    'year': audio.get('\xa9day', [''])[0],
+                    'genre': audio.get('\xa9gen', [''])[0],
+                    'track_number': audio.get('trkn', [(0, 0)])[0][0],
+                    'disc_number': audio.get('disk', [(0, 0)])[0][0],
+                    'duration': audio.info.length if audio.info else 0,
+                    'bitrate': audio.info.bitrate if audio.info else 0,
+                    'has_cover': 'covr' in audio,
+                }
+            
+            elif ext == '.mp3':
+                audio = ID3(file_path)
+                tags = {
+                    'title': str(audio.get('TIT2', '')),
+                    'artist': str(audio.get('TPE1', '')),
+                    'album': str(audio.get('TALB', '')),
+                    'album_artist': str(audio.get('TPE2', '')),
+                    'year': str(audio.get('TDRC', '')),
+                    'genre': str(audio.get('TCON', '')),
+                    'track_number': str(audio.get('TRCK', '')).split('/')[0] if audio.get('TRCK') else '',
+                    'disc_number': str(audio.get('TPOS', '')).split('/')[0] if audio.get('TPOS') else '',
+                    'has_cover': 'APIC:' in audio or any(k.startswith('APIC') for k in audio.keys()),
+                }
+            
+            elif ext == '.flac':
+                audio = FLAC(file_path)
+                tags = {
+                    'title': audio.get('title', [''])[0],
+                    'artist': audio.get('artist', [''])[0],
+                    'album': audio.get('album', [''])[0],
+                    'album_artist': audio.get('albumartist', [''])[0],
+                    'year': audio.get('date', [''])[0],
+                    'genre': audio.get('genre', [''])[0],
+                    'track_number': audio.get('tracknumber', [''])[0],
+                    'disc_number': audio.get('discnumber', [''])[0],
+                    'duration': audio.info.length if audio.info else 0,
+                    'has_cover': len(audio.pictures) > 0,
+                }
+            
+            return tags
+            
+        except Exception as e:
+            logger.error(f"Error reading tags from {file_path}: {e}")
+            return {}
+    
+    @staticmethod
+    def write_tags(file_path: str, tags: Dict[str, Any]) -> bool:
+        """
+        Write ID3 tags to audio file
+        
+        Args:
+            file_path: Path to audio file
+            tags: Dictionary with tag information
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if not os.path.exists(file_path):
+                logger.error(f"File not found: {file_path}")
+                return False
+            
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            if ext == '.m4a' or ext == '.mp4':
+                audio = MP4(file_path)
+                
+                if 'title' in tags:
+                    audio['\xa9nam'] = tags['title']
+                if 'artist' in tags:
+                    audio['\xa9ART'] = tags['artist']
+                if 'album' in tags:
+                    audio['\xa9alb'] = tags['album']
+                if 'album_artist' in tags:
+                    audio['aART'] = tags['album_artist']
+                if 'year' in tags:
+                    audio['\xa9day'] = str(tags['year'])
+                if 'genre' in tags:
+                    audio['\xa9gen'] = tags['genre']
+                if 'track_number' in tags:
+                    audio['trkn'] = [(int(tags['track_number']), 0)]
+                if 'disc_number' in tags:
+                    audio['disk'] = [(int(tags['disc_number']), 0)]
+                
+                audio.save()
+            
+            elif ext == '.mp3':
+                try:
+                    audio = ID3(file_path)
+                except:
+                    audio = ID3()
+                
+                if 'title' in tags:
+                    audio['TIT2'] = TIT2(encoding=3, text=tags['title'])
+                if 'artist' in tags:
+                    audio['TPE1'] = TPE1(encoding=3, text=tags['artist'])
+                if 'album' in tags:
+                    audio['TALB'] = TALB(encoding=3, text=tags['album'])
+                if 'year' in tags:
+                    audio['TDRC'] = TDRC(encoding=3, text=str(tags['year']))
+                if 'genre' in tags:
+                    audio['TCON'] = TCON(encoding=3, text=tags['genre'])
+                if 'track_number' in tags:
+                    audio['TRCK'] = TRCK(encoding=3, text=str(tags['track_number']))
+                
+                audio.save(file_path)
+            
+            elif ext == '.flac':
+                audio = FLAC(file_path)
+                
+                if 'title' in tags:
+                    audio['title'] = tags['title']
+                if 'artist' in tags:
+                    audio['artist'] = tags['artist']
+                if 'album' in tags:
+                    audio['album'] = tags['album']
+                if 'album_artist' in tags:
+                    audio['albumartist'] = tags['album_artist']
+                if 'year' in tags:
+                    audio['date'] = str(tags['year'])
+                if 'genre' in tags:
+                    audio['genre'] = tags['genre']
+                if 'track_number' in tags:
+                    audio['tracknumber'] = str(tags['track_number'])
+                if 'disc_number' in tags:
+                    audio['discnumber'] = str(tags['disc_number'])
+                
+                audio.save()
+            
+            logger.info(f"Successfully wrote tags to {file_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error writing tags to {file_path}: {e}")
+            return False
+    
+    @staticmethod
+    def embed_cover_art(file_path: str, image_data: bytes, mime_type: str = 'image/jpeg') -> bool:
+        """
+        Embed cover art into audio file
+        
+        Args:
+            file_path: Path to audio file
+            image_data: Image binary data
+            mime_type: MIME type of image
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if not os.path.exists(file_path):
+                logger.error(f"File not found: {file_path}")
+                return False
+            
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            if ext == '.m4a' or ext == '.mp4':
+                audio = MP4(file_path)
+                
+                if mime_type == 'image/png':
+                    cover_format = MP4Cover.FORMAT_PNG
+                else:
+                    cover_format = MP4Cover.FORMAT_JPEG
+                
+                audio['covr'] = [MP4Cover(image_data, imageformat=cover_format)]
+                audio.save()
+            
+            elif ext == '.mp3':
+                try:
+                    audio = ID3(file_path)
+                except:
+                    audio = ID3()
+                
+                audio['APIC'] = APIC(
+                    encoding=3,
+                    mime=mime_type,
+                    type=3,  # Cover (front)
+                    desc='Cover',
+                    data=image_data
+                )
+                audio.save(file_path)
+            
+            elif ext == '.flac':
+                audio = FLAC(file_path)
+                
+                picture = Picture()
+                picture.type = 3  # Cover (front)
+                picture.mime = mime_type
+                picture.desc = 'Cover'
+                picture.data = image_data
+                
+                audio.clear_pictures()
+                audio.add_picture(picture)
+                audio.save()
+            
+            logger.info(f"Successfully embedded cover art in {file_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error embedding cover art in {file_path}: {e}")
+            return False
+    
+    @staticmethod
+    def extract_cover_art(file_path: str) -> Optional[bytes]:
+        """
+        Extract cover art from audio file
+        
+        Args:
+            file_path: Path to audio file
+            
+        Returns:
+            Image binary data or None
+        """
+        try:
+            if not os.path.exists(file_path):
+                return None
+            
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            if ext == '.m4a' or ext == '.mp4':
+                audio = MP4(file_path)
+                covers = audio.get('covr', [])
+                if covers:
+                    return bytes(covers[0])
+            
+            elif ext == '.mp3':
+                audio = ID3(file_path)
+                for key in audio.keys():
+                    if key.startswith('APIC'):
+                        return audio[key].data
+            
+            elif ext == '.flac':
+                audio = FLAC(file_path)
+                if audio.pictures:
+                    return audio.pictures[0].data
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting cover art from {file_path}: {e}")
+            return None

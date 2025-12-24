@@ -22,10 +22,10 @@ node_modules/
 .pnpm-debug.log*
 
 # Docker
-audio/
-cache/
-es/
-redis/
+/audio/
+/cache/
+/es/
+/redis/
 
 # Environment
 .env
