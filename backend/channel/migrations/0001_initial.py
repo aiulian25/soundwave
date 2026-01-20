@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('user', '0002_add_smart_shuffle_and_crossfade'),
+        ('user', '0001_initial'),
     ]
 
     operations = [
