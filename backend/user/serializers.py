@@ -50,7 +50,6 @@ class UserConfigSerializer(serializers.ModelSerializer):
         fields = [
             'theme', 'volume', 'repeat_mode', 'shuffle_enabled',
             'smart_shuffle_enabled', 'smart_shuffle_history_size',
-            'crossfade_enabled', 'crossfade_duration',
             'visualizer_theme', 'visualizer_enabled', 'visualizer_glow',
             'audio_quality', 'items_per_page', 'prefetch_enabled',
             'extra_settings', 'updated_at'
