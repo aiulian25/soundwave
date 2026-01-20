@@ -1,16 +1,33 @@
 #!/bin/bash
 
-set -e
+# Don't exit on error - we handle errors ourselves
+set +e
 
 echo "Starting SoundWave..."
 
-# Wait for ElasticSearch
+# Wait for ElasticSearch with better health check
 echo "Waiting for ElasticSearch..."
-until curl -s -u elastic:$ELASTIC_PASSWORD $ES_URL/_cluster/health > /dev/null; do
-    echo "ElasticSearch is unavailable - sleeping"
+ES_RETRIES=0
+ES_MAX_RETRIES=30
+while [ $ES_RETRIES -lt $ES_MAX_RETRIES ]; do
+    ES_HEALTH=$(curl -s -u elastic:$ELASTIC_PASSWORD $ES_URL/_cluster/health 2>/dev/null)
+    if [ $? -eq 0 ] && echo "$ES_HEALTH" | grep -q '"status"'; then
+        ES_STATUS=$(echo "$ES_HEALTH" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+        if [ "$ES_STATUS" = "green" ] || [ "$ES_STATUS" = "yellow" ]; then
+            echo "ElasticSearch is up! (status: $ES_STATUS)"
+            break
+        fi
+        echo "ElasticSearch status: $ES_STATUS - waiting..."
+    else
+        echo "ElasticSearch is unavailable - sleeping"
+    fi
     sleep 3
+    ES_RETRIES=$((ES_RETRIES + 1))
 done
-echo "ElasticSearch is up!"
+
+if [ $ES_RETRIES -eq $ES_MAX_RETRIES ]; then
+    echo "WARNING: ElasticSearch may not be fully ready, continuing anyway..."
+fi
 
 # Wait for Redis
 echo "Waiting for Redis..."
@@ -26,25 +43,39 @@ python manage.py makemigrations
 
 # Run migrations with error handling
 echo "=== Running migrations ==="
-if ! python manage.py migrate 2>&1; then
-    echo "=== Migration failed, attempting to fix... ==="
-    # Try to fake-apply problematic migrations and remigrate
-    python manage.py migrate --fake-initial 2>/dev/null || true
-    python manage.py migrate 2>&1 || {
-        echo "=== Migration still failing. Resetting migration state... ==="
-        # Last resort: clear migration history for user app and re-run
+python manage.py migrate 2>&1
+MIGRATE_EXIT=$?
+
+if [ $MIGRATE_EXIT -ne 0 ]; then
+    echo "=== Migration failed (exit code: $MIGRATE_EXIT), attempting to fix... ==="
+    
+    # First try: fake-initial for initial migrations
+    echo "Trying --fake-initial..."
+    python manage.py migrate --fake-initial 2>&1
+    
+    if [ $? -ne 0 ]; then
+        echo "=== Still failing. Resetting all migration state... ==="
+        # Clear all migration history and start fresh
         python manage.py shell << 'FIXMIG'
 from django.db import connection
 cursor = connection.cursor()
-# Check if django_migrations table exists
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='django_migrations';")
-if cursor.fetchone():
-    # Remove user migrations that may be incorrectly marked
-    cursor.execute("DELETE FROM django_migrations WHERE app='user';")
-    print("Cleared user migration history")
+try:
+    # Check what tables exist
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = [row[0] for row in cursor.fetchall()]
+    print(f"Existing tables: {tables}")
+    
+    if 'django_migrations' in tables:
+        # Clear problematic migration records
+        cursor.execute("DELETE FROM django_migrations WHERE app IN ('user', 'channel', 'audio', 'playlist', 'download', 'stats');")
+        connection.commit()
+        print("Cleared app migration history")
+except Exception as e:
+    print(f"Error during fix: {e}")
 FIXMIG
-        python manage.py migrate
-    }
+        # Try migration again
+        python manage.py migrate 2>&1
+    fi
 fi
 echo "=== Migrations complete ==="
 
