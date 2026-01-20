@@ -245,7 +245,7 @@ class PWAManager {
     }
 
     await this.registration.showNotification(title, {
-      icon: '/img/icon-192x192.png',
+      icon: '/img/icons/icon-192x192.png',
       badge: '/img/icon-72x72.png',
       ...options,
     });

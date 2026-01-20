@@ -47,6 +47,7 @@ import {
   CloudDownload as DownloadIcon,
 } from '@mui/icons-material';
 import api from '../api/client';
+import ScrollToTop from '../components/ScrollToTop';
 
 interface LocalAudio {
   id: number;
@@ -634,6 +635,8 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
           </Button>
         </DialogActions>
       </Dialog>
+      
+      <ScrollToTop />
     </Box>
   );
 };

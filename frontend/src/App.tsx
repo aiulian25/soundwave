@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, IconButton, Typography, useMediaQuery, useTheme } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -9,17 +9,22 @@ import LibraryPage from './pages/LibraryPage';
 import SearchPage from './pages/SearchPage';
 import FavoritesPage from './pages/FavoritesPage';
 import ChannelsPage from './pages/ChannelsPage';
+import ChannelDetailPage from './pages/ChannelDetailPage';
 import PlaylistsPage from './pages/PlaylistsPage';
 import PlaylistDetailPage from './pages/PlaylistDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import LocalFilesPage from './pages/LocalFilesPageNew';
 import AdminUsersPage from './pages/AdminUsersPage';
 import OfflineManagerPage from './pages/OfflineManagerPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import AdminRoute from './components/AdminRoute';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Player from './components/Player';
 import PWAPrompts from './components/PWAPrompts';
+import { useSmartShuffle } from './hooks/useSmartShuffle';
+import { useIntelligentPrefetch } from './hooks/useIntelligentPrefetch';
+import { useSettings } from './context/SettingsContext';
 import type { Audio } from './types';
 
 function App() {
@@ -32,12 +37,41 @@ function App() {
   const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
+  
+  // Get settings from context (may not be available if not authenticated)
+  const settingsContext = (() => {
+    try {
+      return useSettings();
+    } catch {
+      return null;
+    }
+  })();
+  
+  // Smart shuffle hook with settings
+  const smartShuffle = useSmartShuffle({
+    historySize: settingsContext?.settings?.smart_shuffle_history_size ?? 10,
+    enabled: settingsContext?.settings?.smart_shuffle_enabled ?? true,
+  });
+
+  // Intelligent prefetch hook for caching upcoming tracks
+  const prefetch = useIntelligentPrefetch({
+    enabled: settingsContext?.settings?.prefetch_enabled !== false && isAuthenticated,
+    queue,
+    currentIndex: currentQueueIndex,
+    currentAudio,
+    isPlaying,
+    shuffleEnabled: settingsContext?.settings?.shuffle_enabled ?? false,
+  });
 
   useEffect(() => {
     // Check if user is already logged in
     const token = localStorage.getItem('token');
     if (token) {
       setIsAuthenticated(true);
+      // Load user settings on app load if already authenticated
+      if (settingsContext?.loadSettings) {
+        settingsContext.loadSettings();
+      }
     }
   }, []);
 
@@ -48,8 +82,28 @@ function App() {
     }
   }, [currentAudio]);
 
+  // Handle favorite toggle from player
+  const handlePlayerFavoriteToggle = (audioId: number, isFavorite: boolean) => {
+    if (currentAudio && currentAudio.id === audioId) {
+      setCurrentAudio({
+        ...currentAudio,
+        is_favorite: isFavorite
+      });
+    }
+  };
+
+  // Handle track selection from related tracks
+  const handleRelatedTrackSelect = (audio: Audio) => {
+    setCurrentAudio(audio);
+    setIsPlaying(true);
+  };
+
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
+    // Load user settings after login
+    if (settingsContext?.loadSettings) {
+      settingsContext.loadSettings();
+    }
   };
 
   const handleLogout = async () => {
@@ -78,13 +132,49 @@ function App() {
     setMobileDrawerOpen(!mobileDrawerOpen);
   };
 
-  const playNext = () => {
-    if (queue.length > 0 && currentQueueIndex < queue.length - 1) {
+  // Add current track to play history when it starts playing
+  useEffect(() => {
+    if (currentAudio && isPlaying) {
+      smartShuffle.addToHistory(currentAudio.id);
+    }
+  }, [currentAudio?.id, isPlaying]);
+
+  const playNext = useCallback(() => {
+    if (queue.length === 0) return;
+    
+    const shuffleEnabled = settingsContext?.settings?.shuffle_enabled ?? false;
+    const smartShuffleEnabled = settingsContext?.settings?.smart_shuffle_enabled ?? true;
+    
+    // Smart shuffle mode
+    if (shuffleEnabled && smartShuffleEnabled) {
+      const result = smartShuffle.getSmartShuffledNext(queue, currentQueueIndex);
+      if (result) {
+        setCurrentQueueIndex(result.index);
+        setCurrentAudio(result.audio);
+        return;
+      }
+    }
+    
+    // Regular shuffle (random)
+    if (shuffleEnabled && !smartShuffleEnabled) {
+      const availableIndices = queue
+        .map((_, i) => i)
+        .filter(i => i !== currentQueueIndex);
+      if (availableIndices.length > 0) {
+        const randomIdx = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+        setCurrentQueueIndex(randomIdx);
+        setCurrentAudio(queue[randomIdx]);
+        return;
+      }
+    }
+    
+    // Normal sequential playback
+    if (currentQueueIndex < queue.length - 1) {
       const nextIndex = currentQueueIndex + 1;
       setCurrentQueueIndex(nextIndex);
       setCurrentAudio(queue[nextIndex]);
     }
-  };
+  }, [queue, currentQueueIndex, settingsContext?.settings?.shuffle_enabled, settingsContext?.settings?.smart_shuffle_enabled, smartShuffle]);
 
   const playPrevious = () => {
     if (queue.length > 0 && currentQueueIndex > 0) {
@@ -157,8 +247,10 @@ function App() {
             <Route path="/library" element={<LibraryPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/favorites" element={<FavoritesPage setCurrentAudio={setCurrentAudio} />} />
             <Route path="/channels" element={<ChannelsPage />} />
+            <Route path="/channels/:channelId" element={<ChannelDetailPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/playlists" element={<PlaylistsPage />} />
             <Route path="/playlists/:playlistId" element={<PlaylistDetailPage setCurrentAudio={setAudioWithQueue} />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/local-files" element={<LocalFilesPage setCurrentAudio={setCurrentAudio} />} />
             <Route path="/offline" element={<OfflineManagerPage />} />
             <Route path="/settings" element={<SettingsPage />} />
@@ -183,15 +275,16 @@ function App() {
           }}
         >
           <Player 
-            key={currentAudio.id} 
             audio={currentAudio} 
             isPlaying={isPlaying} 
             setIsPlaying={setIsPlaying} 
             onClose={() => setCurrentAudio(null)}
             onNext={playNext}
             onPrevious={playPrevious}
-            hasNext={currentQueueIndex < queue.length - 1}
+            hasNext={settingsContext?.settings?.shuffle_enabled ? queue.length > 1 : currentQueueIndex < queue.length - 1}
             hasPrevious={currentQueueIndex > 0}
+            onFavoriteToggle={handlePlayerFavoriteToggle}
+            onTrackSelect={handleRelatedTrackSelect}
           />
         </Box>
       )}
@@ -232,15 +325,16 @@ function App() {
             }}
           >
             <Player 
-              key={currentAudio.id} 
               audio={currentAudio} 
               isPlaying={isPlaying} 
               setIsPlaying={setIsPlaying} 
               onClose={() => setCurrentAudio(null)}
               onNext={playNext}
               onPrevious={playPrevious}
-              hasNext={currentQueueIndex < queue.length - 1}
+              hasNext={settingsContext?.settings?.shuffle_enabled ? queue.length > 1 : currentQueueIndex < queue.length - 1}
               hasPrevious={currentQueueIndex > 0}
+              onFavoriteToggle={handlePlayerFavoriteToggle}
+              onTrackSelect={handleRelatedTrackSelect}
             />
           </Box>
 

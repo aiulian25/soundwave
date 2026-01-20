@@ -39,7 +39,7 @@ class MediaSessionManager {
         type: 'image/png',
       },
       {
-        src: '/img/icon-192x192.png',
+        src: '/img/icons/icon-192x192.png',
         sizes: '192x192',
         type: 'image/png',
       },
@@ -54,7 +54,7 @@ class MediaSessionManager {
         type: 'image/png',
       },
       {
-        src: '/img/icon-512x512.png',
+        src: '/img/icons/icon-512x512.png',
         sizes: '512x512',
         type: 'image/png',
       },

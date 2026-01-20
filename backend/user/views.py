@@ -271,21 +271,29 @@ class UserConfigView(APIView):
 
     def get(self, request):
         """Get user configuration"""
-        # TODO: Implement user config storage
-        config = {
-            'theme': 'dark',
-            'items_per_page': 50,
-            'audio_quality': 'best'
-        }
+        from user.models import UserConfig
+        
+        # Get or create user config
+        config, created = UserConfig.objects.get_or_create(user=request.user)
         serializer = UserConfigSerializer(config)
         return Response(serializer.data)
 
     def post(self, request):
         """Update user configuration"""
-        serializer = UserConfigSerializer(data=request.data)
+        from user.models import UserConfig
+        
+        # Get or create user config
+        config, created = UserConfig.objects.get_or_create(user=request.user)
+        
+        # Update config
+        serializer = UserConfigSerializer(config, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        # TODO: Store user config
-        return Response(serializer.data)
+        serializer.save()
+        
+        return Response({
+            'message': 'Settings saved successfully',
+            'config': serializer.data
+        })
 
 
 class TwoFactorStatusView(APIView):

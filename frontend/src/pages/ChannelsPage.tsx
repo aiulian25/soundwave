@@ -1,30 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
   Button,
-  Card,
-  CardContent,
-  CardActions,
   Grid,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  Avatar,
-  Chip,
-  IconButton,
   Alert,
-  LinearProgress,
+  Snackbar,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
   YouTube as YouTubeIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
+  DeleteSweep as DeleteSweepIcon,
+  RestartAlt as ResetIcon,
 } from '@mui/icons-material';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
 import { channelAPI } from '../api/client';
+import { fetchAllChannels } from '../utils/fetchAll';
+import { useSettings } from '../context/SettingsContext';
+import ScrollToTop from '../components/ScrollToTop';
+import ChannelCard from '../components/ChannelCard';
+import SortableItem from '../components/SortableItem';
+import { useSortableItems } from '../hooks/useSortableItems';
 
 interface Channel {
   id: number;
@@ -44,17 +62,43 @@ interface Channel {
 }
 
 export default function ChannelsPage() {
+  const navigate = useNavigate();
+  const { getExtraSetting, updateExtraSetting } = useSettings();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [channelUrl, setChannelUrl] = useState('');
   const [error, setError] = useState('');
+  const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [pendingTasks, setPendingTasks] = useState<string[]>([]);
+
+  // Drag and drop sorting with backend persistence
+  const getChannelId = useCallback((channel: Channel) => channel.channel_id, []);
+  const { sortedItems: sortedChannels, handleDragEnd, resetOrder, hasCustomOrder } = useSortableItems({
+    items: channels,
+    storageKey: 'soundwave-channel-order',
+    getItemId: getChannelId,
+    getExtraSetting,
+    updateExtraSetting,
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const loadChannels = async () => {
     try {
-      const response = await channelAPI.list();
-      // Handle both array response and paginated object response
-      const data = Array.isArray(response.data) ? response.data : (response.data?.results || response.data?.data || []);
+      const data = await fetchAllChannels();
       setChannels(data);
     } catch (err) {
       console.error('Failed to load channels:', err);
@@ -66,17 +110,46 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     loadChannels();
-  }, []);
+    
+    // Auto-refresh channels every 10 seconds if there are pending tasks
+    const interval = setInterval(() => {
+      if (pendingTasks.length > 0) {
+        loadChannels();
+      }
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [pendingTasks]);
 
   const handleSubscribe = async () => {
     setError('');
+    setSubscribing(true);
     try {
-      await channelAPI.subscribe({ url: channelUrl });
+      const response = await channelAPI.subscribe({ url: channelUrl });
+      const taskId = response.data?.task_id;
+      const message = response.data?.message || 'Channel subscription started';
+      
+      // Extract channel name from URL for better UX
+      const urlMatch = channelUrl.match(/@([^/?]+)/);
+      const channelName = urlMatch ? `@${urlMatch[1]}` : 'channel';
+      
+      setSuccessMessage(`✓ Subscribing to ${channelName}... Downloading channel info and videos in background.`);
       setChannelUrl('');
       setOpenDialog(false);
-      loadChannels();
+      
+      // Add task to pending list
+      if (taskId) {
+        setPendingTasks(prev => [...prev, taskId]);
+      }
+      
+      // Reload channels after a short delay to show the new channel
+      setTimeout(() => {
+        loadChannels();
+      }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to subscribe to channel');
+      setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to subscribe to channel');
+    } finally {
+      setSubscribing(false);
     }
   };
 
@@ -91,151 +164,173 @@ export default function ChannelsPage() {
     }
   };
 
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toString();
-  };
-
-  const getStatusColor = (status: string): 'default' | 'primary' | 'success' | 'error' | 'warning' => {
-    switch (status) {
-      case 'syncing': return 'primary';
-      case 'success': return 'success';
-      case 'failed': return 'error';
-      case 'stale': return 'warning';
-      default: return 'default';
+  const handleBulkDelete = async () => {
+    if (selectedChannels.size === 0) return;
+    
+    if (!confirm(`Are you sure you want to unsubscribe from ${selectedChannels.size} channel(s)?`)) return;
+    
+    try {
+      // Delete all selected channels
+      await Promise.all(
+        Array.from(selectedChannels).map(channelId => channelAPI.unsubscribe(channelId))
+      );
+      setSelectedChannels(new Set());
+      setSelectionMode(false);
+      loadChannels();
+    } catch (err) {
+      console.error('Failed to bulk delete:', err);
     }
   };
 
-  const getLastRefreshText = (lastRefresh: string) => {
-    const date = new Date(lastRefresh);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+  const toggleChannelSelection = (channelId: string) => {
+    const newSelection = new Set(selectedChannels);
+    if (newSelection.has(channelId)) {
+      newSelection.delete(channelId);
+    } else {
+      newSelection.add(channelId);
+    }
+    setSelectedChannels(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedChannels.size === channels.length) {
+      setSelectedChannels(new Set());
+    } else {
+      setSelectedChannels(new Set(channels.map(c => c.channel_id)));
+    }
+  };
+
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedChannels(new Set());
   };
 
   return (
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4" fontWeight="bold">
-          YouTube Channels
-        </Typography>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={() => setOpenDialog(true)}
-        >
-          Subscribe to Channel
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h4" fontWeight="bold">
+            YouTube Channels
+          </Typography>
+          {hasCustomOrder && (
+            <Tooltip title="Reset to default order">
+              <IconButton size="small" onClick={resetOrder} sx={{ opacity: 0.7 }}>
+                <ResetIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {channels.length > 0 && (
+            <Button
+              variant={selectionMode ? "contained" : "outlined"}
+              size="small"
+              startIcon={selectionMode ? <CheckBoxIcon /> : <CheckBoxOutlineBlankIcon />}
+              onClick={toggleSelectionMode}
+              color={selectionMode ? "primary" : "inherit"}
+            >
+              {selectionMode ? 'Cancel' : 'Select'}
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenDialog(true)}
+          >
+            Subscribe to Channel
+          </Button>
+        </Box>
       </Box>
 
-      {/* Channels Grid */}
-      <Grid container spacing={2}>
-        {channels.map((channel) => (
-          <Grid item xs={12} sm={6} md={4} key={channel.id}>
-            <Card>
-              
-              <CardContent>
-                {/* Channel Avatar & Name */}
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, mt: channel.channel_thumbnail ? -3 : 0 }}>
-                  <Avatar
-                    src={channel.channel_thumbnail}
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      border: '3px solid',
-                      borderColor: 'background.paper',
-                      boxShadow: 2,
-                    }}
-                  >
-                    <YouTubeIcon />
-                  </Avatar>
-                  <Box sx={{ ml: 1.5, flex: 1 }}>
-                    <Typography variant="subtitle1" fontWeight="bold" noWrap>
-                      {channel.channel_name}
-                    </Typography>
-                  </Box>
-                </Box>
+      {/* Active Tasks Status */}
+      {pendingTasks.length > 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2">
+              📡 Processing {pendingTasks.length} channel subscription{pendingTasks.length > 1 ? 's' : ''}...
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.7 }}>
+              Downloading channel info and videos in background
+            </Typography>
+          </Box>
+        </Alert>
+      )}
 
-                {/* Status Badges */}
-                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.5 }}>
-                  <Chip
-                    label={channel.status_display}
-                    color={getStatusColor(channel.sync_status)}
-                    size="small"
+      {/* Bulk Actions Bar */}
+      {selectionMode && (
+        <Box sx={{ 
+          mb: 2, 
+          p: 2, 
+          bgcolor: 'primary.main', 
+          color: 'primary.contrastText',
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={toggleSelectAll}
+              sx={{ 
+                color: 'inherit', 
+                borderColor: 'currentColor',
+                '&:hover': {
+                  borderColor: 'currentColor',
+                  bgcolor: 'rgba(255,255,255,0.1)',
+                }
+              }}
+            >
+              {selectedChannels.size === channels.length ? 'Deselect All' : 'Select All'}
+            </Button>
+            <Typography variant="body2">
+              {selectedChannels.size} of {channels.length} selected
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
+            startIcon={<DeleteSweepIcon />}
+            onClick={handleBulkDelete}
+            disabled={selectedChannels.size === 0}
+          >
+            Delete Selected
+          </Button>
+        </Box>
+      )}
+
+      {/* Channels Grid with Drag and Drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={sortedChannels.map(c => c.channel_id)}
+          strategy={rectSortingStrategy}
+        >
+          <Grid container spacing={3}>
+            {sortedChannels.map((channel) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={channel.channel_id}>
+                <SortableItem id={channel.channel_id} disabled={selectionMode}>
+                  <ChannelCard
+                    channel={channel}
+                    selectionMode={selectionMode}
+                    isSelected={selectedChannels.has(channel.channel_id)}
+                    onDelete={() => handleUnsubscribe(channel.channel_id)}
+                    onClick={() => navigate(`/channels/${channel.channel_id}`)}
+                    onToggleSelect={() => toggleChannelSelection(channel.channel_id)}
                   />
-                  {!channel.active && (
-                    <Chip label="Inactive" color="error" size="small" variant="outlined" />
-                  )}
-                </Box>
-
-                {/* Last Refresh */}
-                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                  {getLastRefreshText(channel.last_refreshed)}
-                </Typography>
-
-                {/* Error Message */}
-                {channel.error_message && (
-                  <Alert severity="error" sx={{ mt: 1, mb: 1, py: 0 }}>
-                    <Typography variant="caption">{channel.error_message}</Typography>
-                  </Alert>
-                )}
-
-                {/* Stats */}
-                <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Subscribers
-                    </Typography>
-                    <Typography variant="body2" fontWeight="bold" sx={{ fontSize: '0.8125rem' }}>
-                      {formatNumber(channel.subscriber_count)}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Videos
-                    </Typography>
-                    <Typography variant="body2" fontWeight="bold">
-                      {formatNumber(channel.video_count)}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Downloaded
-                    </Typography>
-                    <Typography variant="body2" fontWeight="bold">
-                      {channel.downloaded_count} ({channel.progress_percent}%)
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-
-              <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-                <IconButton size="small" title="Refresh channel">
-                  <RefreshIcon />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleUnsubscribe(channel.channel_id)}
-                  title="Unsubscribe"
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </CardActions>
-            </Card>
+                </SortableItem>
+              </Grid>
+            ))}
           </Grid>
-        ))}
-      </Grid>
+        </SortableContext>
+      </DndContext>
 
       {/* Empty State */}
       {!loading && channels.length === 0 && (
@@ -284,12 +379,34 @@ export default function ChannelsPage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button onClick={handleSubscribe} variant="contained" disabled={!channelUrl}>
-            Subscribe
+          <Button onClick={() => setOpenDialog(false)} disabled={subscribing}>Cancel</Button>
+          <Button 
+            onClick={handleSubscribe} 
+            variant="contained" 
+            disabled={!channelUrl || subscribing}
+          >
+            {subscribing ? 'Subscribing...' : 'Subscribe'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={() => setSuccessMessage('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSuccessMessage('')} 
+          severity="success" 
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
+      
+      <ScrollToTop />
     </Box>
   );
 }

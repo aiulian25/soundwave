@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -20,13 +20,25 @@ import {
   ListItemAvatar,
   Avatar,
   ListItemText,
+  Paper,
+  Popper,
+  Fade,
+  ClickAwayListener,
+  Divider,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay';
 import YouTubeIcon from '@mui/icons-material/YouTube';
+import HistoryIcon from '@mui/icons-material/History';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ClearIcon from '@mui/icons-material/Clear';
+import PersonIcon from '@mui/icons-material/Person';
+import AlbumIcon from '@mui/icons-material/Album';
 import { audioAPI, playlistAPI, channelAPI } from '../api/client';
+import { fetchAllAudio, fetchAllPlaylists, fetchAllChannels } from '../utils/fetchAll';
+import ScrollToTop from '../components/ScrollToTop';
 import type { Audio } from '../types';
 
 interface SearchPageProps {
@@ -51,16 +63,186 @@ interface Channel {
   subscribed: boolean;
 }
 
+interface QuickSuggestion {
+  type: 'artist' | 'song' | 'recent' | 'popular';
+  text: string;
+  icon: React.ReactNode;
+  audio?: Audio;
+}
+
 export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [allAudio, setAllAudio] = useState<Audio[]>([]);
+  const [popularSearches] = useState<string[]>([
+    'hip hop', 'rock music', 'jazz', 'classical', 'electronic', 'blues'
+  ]);
+  
+  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Search results
   const [audioResults, setAudioResults] = useState<Audio[]>([]);
   const [playlistResults, setPlaylistResults] = useState<Playlist[]>([]);
   const [channelResults, setChannelResults] = useState<Channel[]>([]);
+  
+  // Load all audio for suggestions on mount
+  useEffect(() => {
+    const loadAudioForSuggestions = async () => {
+      try {
+        const allAudioData = await fetchAllAudio();
+        setAllAudio(allAudioData);
+      } catch (err) {
+        console.error('Failed to load audio for suggestions:', err);
+      }
+    };
+    loadAudioForSuggestions();
+  }, []);
+  
+  // Load recent searches on component mount
+  useEffect(() => {
+    const stored = localStorage.getItem('soundwave_recent_searches');
+    if (stored) {
+      setRecentSearches(JSON.parse(stored));
+    }
+  }, []);
+  
+  // Save recent search
+  const saveRecentSearch = (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+    
+    const updated = [searchQuery, ...recentSearches.filter(s => s !== searchQuery)].slice(0, 10);
+    setRecentSearches(updated);
+    localStorage.setItem('soundwave_recent_searches', JSON.stringify(updated));
+  };
+  
+  // Clear all recent searches
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    localStorage.removeItem('soundwave_recent_searches');
+  };
+  
+  // Generate smart search suggestions
+  const suggestions = useMemo((): QuickSuggestion[] => {
+    const result: QuickSuggestion[] = [];
+    const queryLower = query.toLowerCase().trim();
+    
+    if (!queryLower) {
+      // Show recent searches when empty
+      recentSearches.slice(0, 5).forEach(search => {
+        result.push({
+          type: 'recent',
+          text: search,
+          icon: <HistoryIcon fontSize="small" color="action" />
+        });
+      });
+      
+      // Add popular searches
+      popularSearches.slice(0, 3).forEach(search => {
+        result.push({
+          type: 'popular',
+          text: search,
+          icon: <TrendingUpIcon fontSize="small" color="action" />
+        });
+      });
+      
+      return result;
+    }
+    
+    // Get unique artists from audio library
+    const artists = new Set<string>();
+    const matchingSongs: Audio[] = [];
+    
+    allAudio.forEach(audio => {
+      if (audio.channel_name) {
+        artists.add(audio.channel_name);
+      }
+      // Check if song title matches
+      if (audio.title?.toLowerCase().includes(queryLower)) {
+        matchingSongs.push(audio);
+      }
+    });
+    
+    // Add matching artists (up to 3)
+    const matchingArtists = Array.from(artists)
+      .filter(artist => artist.toLowerCase().includes(queryLower))
+      .slice(0, 3);
+    
+    matchingArtists.forEach(artist => {
+      result.push({
+        type: 'artist',
+        text: artist,
+        icon: <PersonIcon fontSize="small" color="primary" />
+      });
+    });
+    
+    // Add matching songs (up to 3)
+    matchingSongs.slice(0, 3).forEach(audio => {
+      result.push({
+        type: 'song',
+        text: audio.title,
+        icon: <MusicNoteIcon fontSize="small" color="secondary" />,
+        audio
+      });
+    });
+    
+    // Add matching recent searches
+    recentSearches
+      .filter(search => search.toLowerCase().includes(queryLower) && search.toLowerCase() !== queryLower)
+      .slice(0, 2)
+      .forEach(search => {
+        result.push({
+          type: 'recent',
+          text: search,
+          icon: <HistoryIcon fontSize="small" color="action" />
+        });
+      });
+    
+    // Add matching popular searches
+    popularSearches
+      .filter(search => search.toLowerCase().includes(queryLower) && search.toLowerCase() !== queryLower)
+      .slice(0, 2)
+      .forEach(search => {
+        result.push({
+          type: 'popular',
+          text: search,
+          icon: <TrendingUpIcon fontSize="small" color="action" />
+        });
+      });
+    
+    return result;
+  }, [query, recentSearches, popularSearches, allAudio]);
+  
+  // Reset selection when suggestions change
+  useEffect(() => {
+    setSelectedSuggestionIndex(-1);
+  }, [suggestions]);
+  
+  // Highlight matching text in suggestions
+  const highlightMatch = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const index = lowerText.indexOf(lowerQuery);
+    
+    if (index === -1) return text;
+    
+    return (
+      <>
+        {text.slice(0, index)}
+        <Box component="span" sx={{ fontWeight: 700, color: 'primary.main' }}>
+          {text.slice(index, index + query.length)}
+        </Box>
+        {text.slice(index + query.length)}
+      </>
+    );
+  };
   
   // Debounce search
   useEffect(() => {
@@ -78,35 +260,40 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const performSearch = async () => {
-    if (!query.trim()) return;
+  const performSearch = async (searchQuery: string = query) => {
+    if (!searchQuery.trim()) return;
 
+    // Save to recent searches
+    saveRecentSearch(searchQuery.trim());
+    setShowSuggestions(false);
+    
     setLoading(true);
     try {
-      const searchTerm = query.toLowerCase();
+      const searchTerm = searchQuery.toLowerCase();
 
-      // Search audio files
-      const audioResponse = await audioAPI.list();
-      const audioData = audioResponse.data?.data || audioResponse.data || [];
-      const filteredAudio = (Array.isArray(audioData) ? audioData : []).filter((audio: Audio) =>
+      // Search audio files - fetch all
+      const allAudioData = await fetchAllAudio();
+      
+      const filteredAudio = allAudioData.filter((audio: Audio) =>
         audio.title?.toLowerCase().includes(searchTerm) ||
         audio.channel_name?.toLowerCase().includes(searchTerm)
       );
       setAudioResults(filteredAudio);
+      
+      // Also update allAudio for suggestions
+      setAllAudio(allAudioData);
 
-      // Search playlists
-      const playlistResponse = await playlistAPI.list();
-      const playlistData = playlistResponse.data?.data || playlistResponse.data || [];
-      const filteredPlaylists = (Array.isArray(playlistData) ? playlistData : []).filter((playlist: Playlist) =>
+      // Search playlists - fetch all
+      const allPlaylistData = await fetchAllPlaylists();
+      const filteredPlaylists = allPlaylistData.filter((playlist: Playlist) =>
         playlist.title?.toLowerCase().includes(searchTerm) ||
         playlist.channel_name?.toLowerCase().includes(searchTerm)
       );
       setPlaylistResults(filteredPlaylists);
 
-      // Search channels
-      const channelResponse = await channelAPI.list();
-      const channelData = channelResponse.data?.data || channelResponse.data || [];
-      const filteredChannels = (Array.isArray(channelData) ? channelData : []).filter((channel: Channel) =>
+      // Search channels - fetch all
+      const allChannelData = await fetchAllChannels();
+      const filteredChannels = allChannelData.filter((channel: Channel) =>
         channel.channel_name?.toLowerCase().includes(searchTerm)
       );
       setChannelResults(filteredChannels);
@@ -116,6 +303,66 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleSearchSubmit = (searchQuery: string) => {
+    setQuery(searchQuery);
+    performSearch(searchQuery);
+  };
+  
+  const handleSuggestionClick = (suggestion: QuickSuggestion) => {
+    if (suggestion.type === 'song' && suggestion.audio) {
+      // Play the song directly
+      setCurrentAudio(suggestion.audio);
+      setShowSuggestions(false);
+      saveRecentSearch(suggestion.text);
+    } else {
+      // Search for the text
+      handleSearchSubmit(suggestion.text);
+    }
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) {
+      if (e.key === 'Enter') {
+        performSearch();
+      }
+      return;
+    }
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
+          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+        } else {
+          performSearch();
+        }
+        break;
+      case 'Escape':
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
+    }
+  };
+  
+  const handleInputFocus = () => {
+    setShowSuggestions(true);
+  };
+  
+  const handleClickAway = () => {
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
   };
 
   const formatDuration = (seconds: number) => {
@@ -132,29 +379,189 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
         Search
       </Typography>
 
-      {/* Search Input */}
-      <TextField
-        fullWidth
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search for songs, artists, playlists, or channels..."
-        variant="outlined"
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon />
-            </InputAdornment>
-          ),
-        }}
-        sx={{
-          mb: 3,
-          maxWidth: 800,
-          '& .MuiOutlinedInput-root': {
-            borderRadius: '9999px',
-            bgcolor: 'rgba(255, 255, 255, 0.05)',
-          },
-        }}
-      />
+      {/* Search Input with Auto-complete */}
+      <ClickAwayListener onClickAway={handleClickAway}>
+        <Box sx={{ position: 'relative', maxWidth: 800, mb: 3 }}>
+          <TextField
+            ref={searchRef}
+            inputRef={inputRef}
+            fullWidth
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={handleInputFocus}
+            onKeyDown={handleKeyDown}
+            placeholder="Search for songs, artists, playlists, or channels..."
+            variant="outlined"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: query && (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => {
+                      setQuery('');
+                      setAudioResults([]);
+                      setPlaylistResults([]);
+                      setChannelResults([]);
+                    }}
+                    size="small"
+                  >
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '9999px',
+                bgcolor: 'rgba(255, 255, 255, 0.05)',
+              },
+            }}
+          />
+          
+          {/* Auto-complete Dropdown */}
+          <Popper
+            open={showSuggestions && suggestions.length > 0}
+            anchorEl={searchRef.current}
+            placement="bottom-start"
+            style={{ width: searchRef.current?.offsetWidth, zIndex: 1300 }}
+            transition
+          >
+            {({ TransitionProps }) => (
+              <Fade {...TransitionProps} timeout={200}>
+                <Paper
+                  elevation={8}
+                  sx={{
+                    mt: 1,
+                    maxHeight: 400,
+                    overflowY: 'auto',
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  {/* Clear button for recent searches */}
+                  {!query.trim() && recentSearches.length > 0 && (
+                    <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <HistoryIcon fontSize="small" />
+                        Recent searches
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="primary"
+                        sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearRecentSearches();
+                        }}
+                      >
+                        Clear all
+                      </Typography>
+                    </Box>
+                  )}
+                  
+                  {/* Grouped suggestions by type */}
+                  {query.trim() && suggestions.some(s => s.type === 'artist') && (
+                    <Box sx={{ px: 2, py: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <PersonIcon fontSize="small" />
+                        Artists
+                      </Typography>
+                    </Box>
+                  )}
+                  
+                  {suggestions.map((suggestion, index) => {
+                    // Add section headers when type changes
+                    const prevSuggestion = index > 0 ? suggestions[index - 1] : null;
+                    const showSongHeader = query.trim() && suggestion.type === 'song' && prevSuggestion?.type !== 'song';
+                    const showRecentHeader = query.trim() && suggestion.type === 'recent' && prevSuggestion?.type !== 'recent';
+                    const showPopularHeader = suggestion.type === 'popular' && prevSuggestion?.type !== 'popular';
+                    
+                    return (
+                      <Box key={`suggestion-${index}`}>
+                        {showSongHeader && (
+                          <>
+                            <Divider sx={{ my: 0.5 }} />
+                            <Box sx={{ px: 2, py: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <MusicNoteIcon fontSize="small" />
+                                Songs
+                              </Typography>
+                            </Box>
+                          </>
+                        )}
+                        {showRecentHeader && (
+                          <>
+                            <Divider sx={{ my: 0.5 }} />
+                            <Box sx={{ px: 2, py: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <HistoryIcon fontSize="small" />
+                                Recent
+                              </Typography>
+                            </Box>
+                          </>
+                        )}
+                        {showPopularHeader && (
+                          <>
+                            <Divider sx={{ my: 0.5 }} />
+                            <Box sx={{ px: 2, py: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <TrendingUpIcon fontSize="small" />
+                                Popular
+                              </Typography>
+                            </Box>
+                          </>
+                        )}
+                        <ListItemButton
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          selected={index === selectedSuggestionIndex}
+                          sx={{ 
+                            py: 1,
+                            '&.Mui-selected': {
+                              bgcolor: 'action.selected',
+                            },
+                          }}
+                        >
+                          <ListItemAvatar sx={{ minWidth: 40 }}>
+                            {suggestion.icon}
+                          </ListItemAvatar>
+                          <ListItemText 
+                            primary={highlightMatch(suggestion.text, query)}
+                            secondary={suggestion.type === 'song' && suggestion.audio?.channel_name}
+                            primaryTypographyProps={{
+                              sx: { 
+                                fontWeight: index === selectedSuggestionIndex ? 600 : 400,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }
+                            }}
+                          />
+                          {suggestion.type === 'song' && (
+                            <PlayArrowIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} />
+                          )}
+                        </ListItemButton>
+                      </Box>
+                    );
+                  })}
+                  
+                  {suggestions.length === 0 && !query.trim() && (
+                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Start typing to search
+                      </Typography>
+                    </Box>
+                  )}
+                </Paper>
+              </Fade>
+            )}
+          </Popper>
+        </Box>
+      </ClickAwayListener>
 
       {/* Results Tabs */}
       {query && (
@@ -435,6 +842,8 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
           </Typography>
         </Box>
       )}
+      
+      <ScrollToTop />
     </Box>
   );
 }

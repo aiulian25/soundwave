@@ -5,7 +5,7 @@ import yt_dlp
 from audio.models import Audio
 from channel.models import Channel
 from download.models import DownloadQueue
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.utils import timezone
 import os
 
@@ -392,21 +392,67 @@ def download_playlist_task(playlist_id):
                     continue
                 
                 # This is NEW content - add to download queue
-                queue_item, created = DownloadQueue.objects.get_or_create(
+                # First check for existing queue item
+                existing_queue_item = DownloadQueue.objects.filter(
                     owner=playlist.owner,
-                    url=f"https://www.youtube.com/watch?v={video_id}",
-                    defaults={
-                        'youtube_id': video_id,
-                        'title': entry.get('title', 'Unknown'),
-                        'status': 'pending',
-                        'auto_start': True
-                    }
-                )
+                    youtube_id=video_id
+                ).first()
                 
-                if created:
-                    new_videos += 1
-                    # Trigger download task for NEW video
-                    download_audio_task.delay(queue_item.id)
+                # Check if item is stuck in downloading state (> 30 minutes)
+                if existing_queue_item and existing_queue_item.status == 'downloading':
+                    if existing_queue_item.started_date:
+                        stuck_threshold = timezone.now() - timedelta(minutes=30)
+                        if existing_queue_item.started_date < stuck_threshold:
+                            # Reset stuck download
+                            existing_queue_item.status = 'failed'
+                            existing_queue_item.error_message = 'Download stuck, resetting for retry'
+                            existing_queue_item.save()
+                            existing_queue_item = None  # Allow recreation
+                
+                # Create or get queue item
+                if not existing_queue_item or existing_queue_item.status in ['failed', 'ignored']:
+                    if existing_queue_item and existing_queue_item.status in ['failed', 'ignored']:
+                        # Update existing failed item
+                        existing_queue_item.status = 'pending'
+                        existing_queue_item.error_message = ''
+                        existing_queue_item.save()
+                        queue_item = existing_queue_item
+                        created = True  # Treat as newly created for triggering download
+                    else:
+                        # Create new item
+                        queue_item, created = DownloadQueue.objects.get_or_create(
+                            owner=playlist.owner,
+                            url=f"https://www.youtube.com/watch?v={video_id}",
+                            defaults={
+                                'youtube_id': video_id,
+                                'title': entry.get('title', 'Unknown'),
+                                'status': 'pending',
+                                'auto_start': True
+                            }
+                        )
+                    
+                    if created:
+                        new_videos += 1
+                        # Trigger download task for NEW video
+                        download_audio_task.delay(queue_item.id)
+                else:
+                    # Item is already downloading or completed
+                    if existing_queue_item.status == 'completed':
+                        # Verify the audio actually exists - if not, reset and redownload
+                        audio_exists = Audio.objects.filter(
+                            owner=playlist.owner,
+                            youtube_id=video_id
+                        ).exists()
+                        
+                        if audio_exists:
+                            skipped += 1
+                        else:
+                            # Queue shows completed but audio doesn't exist - reset and redownload
+                            existing_queue_item.status = 'pending'
+                            existing_queue_item.error_message = 'Audio missing, re-downloading'
+                            existing_queue_item.save()
+                            new_videos += 1
+                            download_audio_task.delay(existing_queue_item.id)
                 
                 # Create PlaylistItem for the downloaded audio (will be created after download completes)
                 # Note: Audio object might not exist yet, so we'll add a post-download hook
@@ -496,7 +542,6 @@ def link_audio_to_playlists(audio_id, user_id):
 def cleanup_task():
     """Cleanup old download queue items"""
     # Remove completed items older than 7 days
-    from datetime import timedelta
     cutoff_date = timezone.now() - timedelta(days=7)
 
     deleted = DownloadQueue.objects.filter(
@@ -505,3 +550,95 @@ def cleanup_task():
     ).delete()
 
     return f"Cleaned up {deleted[0]} items"
+
+
+@shared_task
+def reset_stuck_downloads():
+    """Reset downloads that have been stuck in 'downloading' status for more than 30 minutes"""
+    stuck_threshold = timezone.now() - timedelta(minutes=30)
+    
+    stuck_downloads = DownloadQueue.objects.filter(
+        status='downloading',
+        started_date__lt=stuck_threshold
+    )
+    
+    count = stuck_downloads.count()
+    
+    if count > 0:
+        stuck_downloads.update(
+            status='failed',
+            error_message='Download stuck, reset for retry'
+        )
+        
+        return f"Reset {count} stuck downloads"
+    else:
+        return "No stuck downloads found"
+
+
+@shared_task
+def retry_failed_downloads(max_retries=3):
+    """
+    Automatically retry failed downloads that haven't exceeded max retries.
+    This ensures downloads continue even when the app was closed.
+    """
+    # Get failed downloads from the last 24 hours
+    retry_window = timezone.now() - timedelta(hours=24)
+    
+    failed_downloads = DownloadQueue.objects.filter(
+        status='failed',
+        added_date__gte=retry_window,
+    ).exclude(
+        error_message__icontains='max retries exceeded'
+    ).exclude(
+        error_message__icontains='video unavailable'
+    ).exclude(
+        error_message__icontains='private video'
+    ).exclude(
+        error_message__icontains='copyright'
+    )
+    
+    retried = 0
+    skipped = 0
+    
+    for download in failed_downloads[:20]:  # Limit to 20 per cycle
+        # Count retry attempts from error message or default to 0
+        attempts = download.error_message.count('Retry attempt') if download.error_message else 0
+        
+        if attempts >= max_retries:
+            # Mark as permanently failed
+            download.error_message = f'{download.error_message}\nmax retries exceeded'
+            download.save()
+            skipped += 1
+            continue
+        
+        # Reset status and queue for retry
+        download.status = 'pending'
+        download.error_message = f'Retry attempt {attempts + 1}: {download.error_message or "Auto-retry"}'
+        download.save()
+        
+        # Trigger the download task
+        download_audio_task.delay(download.id)
+        retried += 1
+    
+    return f"Retried {retried} downloads, skipped {skipped}"
+
+
+@shared_task
+def resume_pending_downloads():
+    """
+    Resume any pending downloads that haven't been started.
+    Called on app startup to ensure downloads continue.
+    """
+    pending_downloads = DownloadQueue.objects.filter(
+        status='pending',
+        auto_start=True,
+    ).exclude(
+        started_date__isnull=False
+    )
+    
+    count = 0
+    for download in pending_downloads[:50]:  # Limit batch size
+        download_audio_task.delay(download.id)
+        count += 1
+    
+    return f"Resumed {count} pending downloads"

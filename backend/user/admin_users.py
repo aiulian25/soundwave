@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from user.models import Account, UserYouTubeAccount
+from user.models import Account, UserYouTubeAccount, UserConfig
 
 
 @admin.register(Account)
@@ -234,6 +234,59 @@ class UserYouTubeAccountAdmin(admin.ModelAdmin):
     )
     
     readonly_fields = ['created_date', 'last_verified']
+    
+    def get_queryset(self, request):
+        """Filter by user if not admin"""
+        qs = super().get_queryset(request)
+        if request.user.is_superuser or request.user.is_admin:
+            return qs
+        return qs.filter(user=request.user)
+
+
+@admin.register(UserConfig)
+class UserConfigAdmin(admin.ModelAdmin):
+    """Admin interface for UserConfig"""
+    
+    list_display = [
+        'user',
+        'theme',
+        'volume',
+        'repeat_mode',
+        'shuffle_enabled',
+        'audio_quality',
+        'updated_at',
+    ]
+    
+    list_filter = [
+        'theme',
+        'repeat_mode',
+        'shuffle_enabled',
+        'audio_quality',
+    ]
+    
+    search_fields = ['user__username', 'user__email']
+    
+    fieldsets = (
+        ('User', {
+            'fields': ('user',)
+        }),
+        ('UI Preferences', {
+            'fields': ('theme', 'items_per_page')
+        }),
+        ('Player Settings', {
+            'fields': ('volume', 'repeat_mode', 'shuffle_enabled', 'audio_quality')
+        }),
+        ('Additional Settings', {
+            'fields': ('extra_settings',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ['created_at', 'updated_at']
     
     def get_queryset(self, request):
         """Filter by user if not admin"""

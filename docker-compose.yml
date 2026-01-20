@@ -4,18 +4,21 @@ services:
   soundwave:
     container_name: soundwave
     # Option 1: Pull from GitHub Container Registry (recommended for users)
-    image: ghcr.io/aiulian25/soundwave:main
+    # image: ghcr.io/aiulian25/soundwave:main
     # Option 2: Build locally (uncomment if pulling fails or for development)
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "1000:1000"  # Run as host user to prevent file ownership issues
     ports:
       - "8889:8888"
     volumes:
       - ./audio:/app/audio
       - ./cache:/app/cache
       - ./data:/app/data
+      - ./backend:/app/backend  # Mount backend for development
       - ./backend/staticfiles:/app/backend/staticfiles
+      - ./frontend/dist:/app/frontend/dist  # Mount frontend for development
     environment:
       - SW_HOST=http://localhost:8889
       - SW_USERNAME=admin

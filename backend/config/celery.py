@@ -17,6 +17,16 @@ app.conf.beat_schedule = {
         'task': 'update_subscriptions',
         'schedule': crontab(minute='*/15'),  # Every 15 minutes for faster sync
     },
+    # Reset stuck downloads every 10 minutes
+    'reset-stuck-downloads': {
+        'task': 'task.tasks.reset_stuck_downloads',
+        'schedule': crontab(minute='*/10'),  # Every 10 minutes
+    },
+    # Retry failed downloads every 30 minutes
+    'retry-failed-downloads': {
+        'task': 'task.tasks.retry_failed_downloads',
+        'schedule': crontab(minute='*/30'),  # Every 30 minutes
+    },
     # Auto-fetch lyrics every hour
     'auto-fetch-lyrics': {
         'task': 'audio.auto_fetch_lyrics',

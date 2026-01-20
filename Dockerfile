@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies globally
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
-RUN pip install --no-cache-dir --user yt-dlp
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir yt-dlp
 
 # Final stage - runtime only
 FROM python:3.11-slim
@@ -24,13 +24,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 WORKDIR /app
 
-# Copy backend code
+# Copy backend code and fix permissions for user 1000
 COPY backend /app/backend
+RUN chown -R 1000:1000 /app/backend && chmod -R 755 /app/backend
 COPY docker_assets /app/docker_assets
 
 # Copy frontend build

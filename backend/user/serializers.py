@@ -1,7 +1,7 @@
 """User serializers"""
 
 from rest_framework import serializers
-from user.models import Account
+from user.models import Account, UserConfig
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -43,14 +43,19 @@ class LoginSerializer(serializers.Serializer):
     two_factor_code = serializers.CharField(required=False, allow_blank=True)
 
 
-class UserConfigSerializer(serializers.Serializer):
+class UserConfigSerializer(serializers.ModelSerializer):
     """User configuration serializer"""
-    theme = serializers.CharField(default='dark')
-    items_per_page = serializers.IntegerField(default=50)
-    audio_quality = serializers.ChoiceField(
-        choices=['low', 'medium', 'high', 'best'],
-        default='best'
-    )
+    class Meta:
+        model = UserConfig
+        fields = [
+            'theme', 'volume', 'repeat_mode', 'shuffle_enabled',
+            'smart_shuffle_enabled', 'smart_shuffle_history_size',
+            'crossfade_enabled', 'crossfade_duration',
+            'visualizer_theme', 'visualizer_enabled', 'visualizer_glow',
+            'audio_quality', 'items_per_page', 'prefetch_enabled',
+            'extra_settings', 'updated_at'
+        ]
+        read_only_fields = ['updated_at']
 
 
 class TwoFactorSetupSerializer(serializers.Serializer):

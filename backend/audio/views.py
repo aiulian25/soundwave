@@ -24,6 +24,7 @@ class AudioListView(ApiBaseView):
         channel_id = request.query_params.get('channel')
         playlist_id = request.query_params.get('playlist')
         status_filter = request.query_params.get('status')
+        favorites = request.query_params.get('favorites')
 
         # Base queryset - filter by user
         queryset = Audio.objects.filter(owner=request.user)
@@ -37,6 +38,8 @@ class AudioListView(ApiBaseView):
         if status_filter:
             # TODO: Filter by play status
             pass
+        if favorites == 'true':
+            queryset = queryset.filter(is_favorite=True)
 
         # Pagination
         page_size = 50
@@ -108,6 +111,15 @@ class AudioDetailView(ApiBaseView):
                     {'detail': 'Download already in progress', 'status': queue_item.status},
                     status=status.HTTP_200_OK
                 )
+        
+        elif action == 'toggle_favorite':
+            # Toggle favorite status
+            audio.is_favorite = not audio.is_favorite
+            audio.save()
+            return Response({
+                'message': 'Favorite status updated',
+                'is_favorite': audio.is_favorite
+            })
         
         return Response(
             {'detail': 'Invalid action'},

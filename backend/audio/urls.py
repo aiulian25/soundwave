@@ -9,7 +9,8 @@ from audio.views import (
     AudioProgressView,
     AudioDownloadView,
 )
-from audio.views_lyrics import LyricsViewSet, LyricsCacheViewSet
+from audio.views_lyrics import LyricsViewSet, LyricsCacheViewSet, LyricsDownloadView
+from audio.views_recommendations import AudioRecommendationsView, AudioSimilarTracksView
 
 # Create router for ViewSets
 router = DefaultRouter()
@@ -22,16 +23,25 @@ urlpatterns = [
     path('<str:youtube_id>/player/', AudioPlayerView.as_view(), name='audio-player'),
     path('<str:youtube_id>/progress/', AudioProgressView.as_view(), name='audio-progress'),
     path('<str:youtube_id>/download/', AudioDownloadView.as_view(), name='audio-download'),
-    # Lyrics endpoints
+    path('<str:youtube_id>/recommendations/', AudioRecommendationsView.as_view(), name='audio-recommendations'),
+    path('<str:youtube_id>/similar/', AudioSimilarTracksView.as_view(), name='audio-similar'),
+    # Lyrics endpoints - specific paths first, then generic
+    path('<str:youtube_id>/lyrics/fetch/', LyricsViewSet.as_view({
+        'post': 'fetch',
+    }), name='audio-lyrics-fetch'),
+    path('<str:youtube_id>/lyrics/suggestions/', LyricsViewSet.as_view({
+        'get': 'suggestions',
+    }), name='audio-lyrics-suggestions'),
+    path('<str:youtube_id>/lyrics/apply/', LyricsViewSet.as_view({
+        'post': 'apply_suggestion',
+    }), name='audio-lyrics-apply'),
+    path('<str:youtube_id>/lyrics/download/', LyricsDownloadView.as_view(), name='audio-lyrics-download'),
     path('<str:youtube_id>/lyrics/', LyricsViewSet.as_view({
         'get': 'retrieve',
         'put': 'update_lyrics',
         'patch': 'update_lyrics',
         'delete': 'delete_lyrics',
     }), name='audio-lyrics'),
-    path('<str:youtube_id>/lyrics/fetch/', LyricsViewSet.as_view({
-        'post': 'fetch',
-    }), name='audio-lyrics-fetch'),
     path('<str:youtube_id>/', AudioDetailView.as_view(), name='audio-detail'),
     
     # Include sub-apps LAST (they have root patterns that catch everything)

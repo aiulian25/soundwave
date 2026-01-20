@@ -2,6 +2,7 @@
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+import json
 
 
 class AccountManager(BaseUserManager):
@@ -150,3 +151,71 @@ class UserYouTubeAccount(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.account_name}"
+
+
+class UserConfig(models.Model):
+    """User configuration and preferences"""
+    user = models.OneToOneField(Account, on_delete=models.CASCADE, related_name='config')
+    
+    # UI Preferences
+    theme = models.CharField(max_length=50, default='dark', help_text="UI theme preference")
+    
+    # Player Settings
+    volume = models.IntegerField(default=80, help_text="Player volume (0-100)")
+    repeat_mode = models.CharField(
+        max_length=20,
+        default='none',
+        choices=[('none', 'None'), ('one', 'Repeat One'), ('all', 'Repeat All')],
+        help_text="Player repeat mode"
+    )
+    shuffle_enabled = models.BooleanField(default=False, help_text="Shuffle mode enabled")
+    
+    # Smart Shuffle Settings
+    smart_shuffle_enabled = models.BooleanField(default=True, help_text="Smart shuffle mode - avoids recently played songs")
+    smart_shuffle_history_size = models.IntegerField(default=10, help_text="Number of recent songs to avoid in smart shuffle (5-50)")
+    
+    # Crossfade Settings
+    crossfade_enabled = models.BooleanField(default=False, help_text="Enable crossfade between tracks")
+    crossfade_duration = models.IntegerField(default=3, help_text="Crossfade duration in seconds (1-12)")
+    
+    # Visualizer Settings
+    visualizer_theme = models.CharField(max_length=50, default='classic-bars', help_text="Audio visualizer theme")
+    visualizer_enabled = models.BooleanField(default=True, help_text="Enable audio visualizer")
+    visualizer_glow = models.BooleanField(default=True, help_text="Enable glow effect on visualizer")
+    
+    # Audio Quality
+    audio_quality = models.CharField(
+        max_length=20,
+        default='high',
+        choices=[('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('best', 'Best')],
+        help_text="Preferred audio quality"
+    )
+    
+    # Display Settings
+    items_per_page = models.IntegerField(default=50, help_text="Items per page in lists")
+    
+    # Prefetch/Caching Settings
+    prefetch_enabled = models.BooleanField(default=True, help_text="Enable automatic prefetching of upcoming tracks")
+    
+    # Additional settings stored as JSON
+    extra_settings = models.JSONField(default=dict, blank=True, help_text="Additional user settings")
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'User Configuration'
+        verbose_name_plural = 'User Configurations'
+    
+    def __str__(self):
+        return f"Config for {self.user.username}"
+    
+    def get_setting(self, key, default=None):
+        """Get a setting from extra_settings"""
+        return self.extra_settings.get(key, default)
+    
+    def set_setting(self, key, value):
+        """Set a setting in extra_settings"""
+        self.extra_settings[key] = value
+        self.save(update_fields=['extra_settings', 'updated_at'])

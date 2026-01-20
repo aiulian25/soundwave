@@ -30,6 +30,8 @@ import {
   CloudDone as CloudDoneIcon,
   WifiOff as WifiOffIcon,
   Storage as StorageIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { playlistAPI, audioAPI } from '../api/client';
@@ -143,6 +145,32 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       } catch (err) {
         console.error(`Failed to download ${item.audio.title}:`, err);
       }
+    }
+  };
+
+  const handleToggleFavorite = async (audio: Audio) => {
+    if (!audio.youtube_id) return;
+    
+    try {
+      const response = await audioAPI.toggleFavorite(audio.youtube_id);
+      // Update the local state immediately for better UX
+      setPlaylist(prev => {
+        if (!prev?.items) return prev;
+        return {
+          ...prev,
+          items: prev.items.map(item => 
+            item.audio.id === audio.id 
+              ? { ...item, audio: { ...item.audio, is_favorite: response.data.is_favorite }}
+              : item
+          )
+        };
+      });
+      setSnackbarMessage(audio.is_favorite ? 'Removed from favorites' : 'Added to favorites');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      setSnackbarMessage('Failed to update favorite status');
+      setSnackbarOpen(true);
     }
   };
 
@@ -693,6 +721,19 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                           <DownloadIcon />
                         </IconButton>
                       )}
+                      <IconButton
+                        size="small"
+                        onClick={() => handleToggleFavorite(item.audio)}
+                        sx={{
+                          color: item.audio.is_favorite ? 'error.main' : 'text.disabled',
+                          '&:hover': {
+                            color: 'error.main',
+                          },
+                        }}
+                        title={item.audio.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        {item.audio.is_favorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                      </IconButton>
                     </Box>
                   </TableCell>
                 </TableRow>

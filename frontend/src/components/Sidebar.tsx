@@ -9,6 +9,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import InsightsIcon from '@mui/icons-material/Insights';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -22,6 +23,7 @@ const menuItems = [
   { title: 'Favorites', path: '/favorites', icon: <FavoriteIcon /> },
   { title: 'Channels', path: '/channels', icon: <YouTubeIcon /> },
   { title: 'Playlists', path: '/playlists', icon: <PlaylistPlayIcon /> },
+  { title: 'Analytics', path: '/analytics', icon: <InsightsIcon /> },
   { title: 'Local Files', path: '/local-files', icon: <CloudUploadIcon /> },
   { title: 'Offline', path: '/offline', icon: <CloudDoneIcon />, isPWA: true },
 ];

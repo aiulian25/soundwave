@@ -3,6 +3,7 @@ import { AppBar, Toolbar, Avatar, IconButton, Typography, Box, Tooltip } from '@
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AvatarDialog from './AvatarDialog';
+import DownloadStatus from './DownloadStatus';
 
 interface TopBarProps {
   onLogout: () => void;
@@ -121,7 +122,10 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+          {/* Download Status */}
+          <DownloadStatus />
+          
           <Tooltip title="Logout" arrow>
             <IconButton 
               onClick={onLogout}

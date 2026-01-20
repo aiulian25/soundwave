@@ -1,7 +1,10 @@
 """Audio models"""
 
+import os
+from pathlib import Path
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 User = get_user_model()
 
@@ -36,6 +39,9 @@ class Audio(models.Model):
     play_count = models.IntegerField(default=0)
     last_played = models.DateTimeField(null=True, blank=True)
     
+    # Favorites
+    is_favorite = models.BooleanField(default=False)
+    
     class Meta:
         ordering = ['-published_date']
         unique_together = ('owner', 'youtube_id')  # Each user can have one copy of each video
@@ -43,6 +49,7 @@ class Audio(models.Model):
             models.Index(fields=['owner', 'youtube_id']),
             models.Index(fields=['owner', 'channel_id']),
             models.Index(fields=['owner', '-published_date']),
+            models.Index(fields=['owner', 'is_favorite']),
         ]
 
     def __str__(self):
@@ -57,6 +64,21 @@ class Audio(models.Model):
     def has_lyrics(self):
         """Check if audio has lyrics"""
         return hasattr(self, 'lyrics') and self.lyrics.has_lyrics
+    
+    def delete(self, *args, **kwargs):
+        """Override delete to remove audio file from filesystem"""
+        if self.file_path:
+            # Construct full path to the audio file
+            full_path = Path(settings.MEDIA_ROOT) / self.file_path
+            try:
+                if full_path.exists():
+                    full_path.unlink()  # Delete the file
+            except (OSError, IOError) as e:
+                # Log error but continue with database deletion
+                print(f"Warning: Could not delete audio file {full_path}: {e}")
+        
+        # Delete from database
+        super().delete(*args, **kwargs)
 
 
 class Channel(models.Model):

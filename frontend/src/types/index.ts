@@ -17,6 +17,7 @@ export interface Audio {
   bitrate?: number;
   play_count: number;
   last_played?: string;
+  is_favorite?: boolean;
   artist?: string;
   album?: string;
   cover_art_url?: string;

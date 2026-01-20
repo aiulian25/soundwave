@@ -23,6 +23,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Slider,
 } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -31,15 +32,23 @@ import PaletteIcon from '@mui/icons-material/Palette';
 import SpeedIcon from '@mui/icons-material/Speed';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GroupIcon from '@mui/icons-material/Group';
+import ShuffleIcon from '@mui/icons-material/Shuffle';
+import EqualizerIcon from '@mui/icons-material/Equalizer';
+import CachedIcon from '@mui/icons-material/Cached';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI } from '../api/client';
+import { audioCache, AUDIO_CACHE_CONFIG } from '../utils/audioCache';
 import { useThemeContext } from '../AppWithTheme';
 import { ThemeMode, themeNames } from '../theme/theme';
 import ThemePreview from '../components/ThemePreview';
+import VisualizerThemePreview from '../components/VisualizerThemePreview';
 import QuickSyncSettings from '../components/QuickSyncSettings';
 import PWASettingsCard from '../components/PWASettingsCard';
 import UserProfileCard from '../components/UserProfileCard';
+import { useSettings } from '../context/SettingsContext';
+import { visualizerThemes } from '../config/visualizerThemes';
 import axios from 'axios';
 
 interface TwoFactorStatus {
@@ -56,6 +65,7 @@ interface TwoFactorSetup {
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { themeMode, setThemeMode } = useThemeContext();
+  const { settings, updateSetting } = useSettings();
   const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus>({ enabled: false, backup_codes_count: 0 });
   const [setupDialogOpen, setSetupDialogOpen] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
@@ -66,11 +76,38 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('');
   const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Cache stats state
+  const [cacheStats, setCacheStats] = useState<{ count: number; totalSize: number } | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
 
   useEffect(() => {
     loadTwoFactorStatus();
     checkAdminStatus();
+    loadCacheStats();
   }, []);
+  
+  const loadCacheStats = async () => {
+    try {
+      const stats = await audioCache.getCacheStats();
+      setCacheStats(stats);
+    } catch (err) {
+      console.error('Failed to load cache stats:', err);
+    }
+  };
+  
+  const handleClearCache = async () => {
+    setClearingCache(true);
+    try {
+      await audioCache.clearCache();
+      await loadCacheStats();
+      setSuccess('Audio cache cleared successfully');
+    } catch (err) {
+      setError('Failed to clear cache');
+    } finally {
+      setClearingCache(false);
+    }
+  };
   
   const checkAdminStatus = async () => {
     try {
@@ -236,6 +273,66 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Visualizer Settings */}
+      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+            <EqualizerIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+            <Typography variant="subtitle1" fontWeight={600}>
+              Audio Visualizer
+            </Typography>
+          </Box>
+
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+            Choose a visualization style for the audio player. Different themes offer unique animations and color schemes.
+          </Typography>
+
+          <FormControlLabel
+            control={
+              <Switch 
+                size="small" 
+                checked={settings.visualizer_enabled}
+                onChange={(e) => updateSetting('visualizer_enabled', e.target.checked)}
+              />
+            }
+            label={<Typography variant="body2">Enable visualizer</Typography>}
+            sx={{ mb: 2, display: 'block' }}
+          />
+
+          {settings.visualizer_enabled && (
+            <>
+              <FormControlLabel
+                control={
+                  <Switch 
+                    size="small" 
+                    checked={settings.visualizer_glow}
+                    onChange={(e) => updateSetting('visualizer_glow', e.target.checked)}
+                  />
+                }
+                label={<Typography variant="body2">Enable glow effect</Typography>}
+                sx={{ mb: 2, display: 'block' }}
+              />
+
+              <Typography variant="body2" fontWeight={500} sx={{ mb: 1.5 }}>
+                Visualizer Theme
+              </Typography>
+
+              <Grid container spacing={1.5}>
+                {visualizerThemes.map((theme) => (
+                  <Grid item xs={4} sm={3} key={theme.id}>
+                    <VisualizerThemePreview
+                      theme={theme}
+                      isSelected={settings.visualizer_theme === theme.id}
+                      onClick={() => updateSetting('visualizer_theme', theme.id)}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* PWA Settings */}
       <PWASettingsCard />
 
@@ -319,25 +416,151 @@ export default function SettingsPage() {
       {/* Playback Settings */}
       <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
-            Playback
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+            <SpeedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+            <Typography variant="subtitle1" fontWeight={600}>
+              Playback
+            </Typography>
+          </Box>
 
           <FormControlLabel
             control={<Switch defaultChecked size="small" />}
             label={<Typography variant="body2">Autoplay</Typography>}
-            sx={{ mb: 1, display: 'block' }}
+            sx={{ mb: 2, display: 'block' }}
           />
 
-          <FormControlLabel
-            control={<Switch size="small" />}
-            label={<Typography variant="body2">Crossfade</Typography>}
-            sx={{ mb: 1, display: 'block' }}
-          />
+          {/* Smart Shuffle Section */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <ShuffleIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
+              <Typography variant="body2" fontWeight={500}>
+                Smart Shuffle
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+              When enabled, shuffle mode will avoid playing recently heard songs, creating a more varied listening experience.
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch 
+                  size="small" 
+                  checked={settings.smart_shuffle_enabled}
+                  onChange={(e) => updateSetting('smart_shuffle_enabled', e.target.checked)}
+                />
+              }
+              label={<Typography variant="body2">Enable smart shuffle</Typography>}
+              sx={{ mb: 1, display: 'block' }}
+            />
+            {settings.smart_shuffle_enabled && (
+              <Box sx={{ pl: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                  History size: {settings.smart_shuffle_history_size} tracks
+                </Typography>
+                <Slider
+                  value={settings.smart_shuffle_history_size}
+                  onChange={(_, value) => updateSetting('smart_shuffle_history_size', value as number)}
+                  min={5}
+                  max={50}
+                  step={5}
+                  marks={[
+                    { value: 5, label: '5' },
+                    { value: 25, label: '25' },
+                    { value: 50, label: '50' },
+                  ]}
+                  size="small"
+                  sx={{ maxWidth: 300 }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Number of recently played songs to avoid when shuffling
+                </Typography>
+              </Box>
+            )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Intelligent Prefetch Section */}
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <CachedIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
+              <Typography variant="body2" fontWeight={500}>
+                Intelligent Prefetch & Caching
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+              Automatically download upcoming tracks for instant playback. Cached tracks play without network delay.
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch 
+                  size="small" 
+                  checked={settings.prefetch_enabled !== false}
+                  onChange={(e) => updateSetting('prefetch_enabled', e.target.checked)}
+                />
+              }
+              label={<Typography variant="body2">Enable intelligent prefetching</Typography>}
+              sx={{ mb: 1, display: 'block' }}
+            />
+            
+            {/* Cache Statistics */}
+            {cacheStats && (
+              <Box sx={{ 
+                mt: 2, 
+                p: 2, 
+                bgcolor: 'rgba(255,255,255,0.03)', 
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider'
+              }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  Cache Statistics
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 3, mb: 1.5 }}>
+                  <Box>
+                    <Typography variant="h6" fontWeight={600} color="primary.main">
+                      {cacheStats.count}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Cached tracks
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" fontWeight={600} color="primary.main">
+                      {(cacheStats.totalSize / 1024 / 1024).toFixed(1)} MB
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Cache size
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" fontWeight={600} color="text.secondary">
+                      {(AUDIO_CACHE_CONFIG.maxCacheSize / 1024 / 1024).toFixed(0)} MB
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Max size
+                    </Typography>
+                  </Box>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteSweepIcon />}
+                  onClick={handleClearCache}
+                  disabled={clearingCache || cacheStats.count === 0}
+                  sx={{ mt: 1 }}
+                >
+                  {clearingCache ? 'Clearing...' : 'Clear Cache'}
+                </Button>
+              </Box>
+            )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
 
           <FormControlLabel
-            control={<Switch defaultChecked />}
-            label="Normalize audio"
+            control={<Switch defaultChecked size="small" />}
+            label={<Typography variant="body2">Normalize audio</Typography>}
             sx={{ display: 'block' }}
           />
         </CardContent>

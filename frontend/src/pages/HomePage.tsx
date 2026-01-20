@@ -21,7 +21,8 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
 
   const loadNewAudio = async () => {
     try {
-      const response = await audioAPI.list({ sort: 'downloaded', order: 'desc' });
+      // For recently added, we only need the first page sorted by download date
+      const response = await audioAPI.list({ sort: 'downloaded', order: 'desc', page: 1 });
       const data = response.data?.data || response.data || [];
       setNewAudio(Array.isArray(data) ? data.slice(0, 3) : []);
     } catch (error) {

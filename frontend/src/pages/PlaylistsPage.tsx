@@ -1,37 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
   Button,
-  Card,
-  CardContent,
-  CardActions,
-  Grid,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  Avatar,
-  Chip,
-  IconButton,
   Alert,
-  LinearProgress,
+  Snackbar,
+  IconButton,
   Tooltip,
-  Badge,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Delete as DeleteIcon,
   PlaylistPlay as PlaylistIcon,
-  Download as DownloadIcon,
-  CloudDone as CloudDoneIcon,
-  WifiOff as WifiOffIcon,
+  RestartAlt as ResetIcon,
 } from '@mui/icons-material';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
 import { playlistAPI } from '../api/client';
+import { fetchAllPlaylists } from '../utils/fetchAll';
 import { usePWA } from '../context/PWAContext';
+import { useSettings } from '../context/SettingsContext';
 import { offlineStorage } from '../utils/offlineStorage';
+import ScrollToTop from '../components/ScrollToTop';
+import PlaylistCard from '../components/PlaylistCard';
+import SortableItem from '../components/SortableItem';
+import { useSortableItems } from '../hooks/useSortableItems';
 
 interface Playlist {
   id: number;
@@ -53,18 +63,40 @@ interface Playlist {
 export default function PlaylistsPage() {
   const navigate = useNavigate();
   const { isOnline } = usePWA();
+  const { getExtraSetting, updateExtraSetting } = useSettings();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [playlistUrl, setPlaylistUrl] = useState('');
   const [error, setError] = useState('');
   const [offlinePlaylists, setOfflinePlaylists] = useState<Set<number>>(new Set());
+  const [syncingPlaylists, setSyncingPlaylists] = useState<Set<string>>(new Set());
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'info' });
+
+  // Drag and drop sorting with backend persistence
+  const getPlaylistId = useCallback((playlist: Playlist) => playlist.playlist_id, []);
+  const { sortedItems: sortedPlaylists, handleDragEnd, resetOrder, hasCustomOrder } = useSortableItems({
+    items: playlists,
+    storageKey: 'soundwave-playlist-order',
+    getItemId: getPlaylistId,
+    getExtraSetting,
+    updateExtraSetting,
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const loadPlaylists = async () => {
     try {
-      const response = await playlistAPI.list();
-      // Handle both array response and paginated object response
-      const data = Array.isArray(response.data) ? response.data : (response.data?.results || response.data?.data || []);
+      const data = await fetchAllPlaylists();
       setPlaylists(data);
       
       // Load offline status
@@ -115,12 +147,73 @@ export default function PlaylistsPage() {
   };
 
   const handleDownload = async (playlistId: string) => {
+    // Add to syncing set
+    setSyncingPlaylists(prev => new Set(prev).add(playlistId));
+    
     try {
-      await playlistAPI.download(playlistId);
-      // Reload playlists to show updated status
-      setTimeout(loadPlaylists, 1000);
-    } catch (err) {
+      const response = await playlistAPI.download(playlistId);
+      console.log('[Playlist] Download started:', response.data);
+      
+      setSnackbar({
+        open: true,
+        message: '🔄 Sync started! Checking for new tracks...',
+        severity: 'info'
+      });
+      
+      // Poll for updates every 2 seconds for the next 30 seconds
+      let pollCount = 0;
+      const maxPolls = 15;
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+        await loadPlaylists();
+        
+        // Check if sync is complete
+        const playlist = playlists.find(p => p.playlist_id === playlistId);
+        if (playlist && playlist.sync_status !== 'syncing') {
+          clearInterval(pollInterval);
+          setSyncingPlaylists(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(playlistId);
+            return newSet;
+          });
+          
+          if (playlist.sync_status === 'success') {
+            setSnackbar({
+              open: true,
+              message: `✅ Sync complete! ${playlist.downloaded_count}/${playlist.item_count} tracks available`,
+              severity: 'success'
+            });
+          } else if (playlist.sync_status === 'failed') {
+            setSnackbar({
+              open: true,
+              message: `❌ Sync failed: ${playlist.error_message || 'Unknown error'}`,
+              severity: 'error'
+            });
+          }
+        }
+        
+        if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          setSyncingPlaylists(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(playlistId);
+            return newSet;
+          });
+        }
+      }, 2000);
+      
+    } catch (err: any) {
       console.error('Failed to start download:', err);
+      setSyncingPlaylists(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(playlistId);
+        return newSet;
+      });
+      setSnackbar({
+        open: true,
+        message: `❌ Failed to start sync: ${err.response?.data?.detail || err.message || 'Unknown error'}`,
+        severity: 'error'
+      });
     }
   };
 
@@ -135,42 +228,22 @@ export default function PlaylistsPage() {
     }
   };
 
-  const getProgress = (playlist: Playlist) => {
-    return playlist.progress_percent || 0;
-  };
-
-  const getStatusColor = (status: string): 'default' | 'primary' | 'success' | 'error' | 'warning' => {
-    switch (status) {
-      case 'syncing': return 'primary';
-      case 'success': return 'success';
-      case 'failed': return 'error';
-      case 'stale': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const getLastRefreshText = (lastRefresh: string | null) => {
-    if (!lastRefresh) return 'Never synced';
-    const date = new Date(lastRefresh);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-  };
-
   return (
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, px: 0.5 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-          YouTube Playlists
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
+            YouTube Playlists
+          </Typography>
+          {hasCustomOrder && (
+            <Tooltip title="Reset to default order">
+              <IconButton size="small" onClick={resetOrder} sx={{ opacity: 0.7 }}>
+                <ResetIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
         <Button
           variant="contained"
           size="small"
@@ -182,130 +255,40 @@ export default function PlaylistsPage() {
         </Button>
       </Box>
 
-      {/* Playlists Grid */}
-      <Box sx={{ display: 'flex', gap: 3, overflowX: 'auto', pb: 2, '&::-webkit-scrollbar': { height: 8 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 1 } }}>
-        {playlists.map((playlist) => (
-          <Card 
-            key={playlist.id}
-            onClick={() => navigate(`/playlists/${playlist.playlist_id}`)}
+      {/* Playlists Grid with Drag and Drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={sortedPlaylists.map(p => p.playlist_id)}
+          strategy={rectSortingStrategy}
+        >
+          <Box 
             sx={{ 
-              minWidth: 160, 
-              width: 160,
-              cursor: 'pointer',
-              transition: 'transform 0.2s',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                bgcolor: 'rgba(255, 255, 255, 0.05)'
-              }
+              display: 'flex', 
+              flexWrap: 'wrap',
+              gap: 3, 
+              pb: 2,
             }}
           >
-            {/* Playlist Thumbnail */}
-            <Box
-              sx={{
-                height: 160,
-                width: 160,
-                backgroundImage: `url(${playlist.thumbnail_url})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundColor: 'grey.900',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '12px 12px 0 0',
-                position: 'relative',
-              }}
-            >
-              {!playlist.thumbnail_url && (
-                <PlaylistIcon sx={{ fontSize: 40, color: 'grey.600' }} />
-              )}
-              {/* Offline Badge */}
-              {offlinePlaylists.has(playlist.id) && (
-                <Chip
-                  icon={<CloudDoneIcon sx={{ fontSize: 14 }} />}
-                  label="Offline"
-                  size="small"
-                  sx={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    height: 20,
-                    fontSize: '0.65rem',
-                    fontWeight: 600,
-                    bgcolor: 'success.main',
-                    color: 'white',
-                    '& .MuiChip-icon': { color: 'white' },
-                  }}
+            {sortedPlaylists.map((playlist) => (
+              <SortableItem key={playlist.playlist_id} id={playlist.playlist_id}>
+                <PlaylistCard
+                  playlist={playlist}
+                  isOffline={offlinePlaylists.has(playlist.id)}
+                  isOnline={isOnline}
+                  isSyncing={syncingPlaylists.has(playlist.playlist_id) || playlist.sync_status === 'syncing'}
+                  onSync={() => handleDownload(playlist.playlist_id)}
+                  onDelete={() => handleDelete(playlist.playlist_id)}
+                  onClick={() => navigate(`/playlists/${playlist.playlist_id}`)}
                 />
-              )}
-              {/* Offline Mode Indicator */}
-              {!isOnline && !offlinePlaylists.has(playlist.id) && (
-                <Chip
-                  icon={<WifiOffIcon sx={{ fontSize: 14 }} />}
-                  label="Unavailable"
-                  size="small"
-                  sx={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    height: 20,
-                    fontSize: '0.65rem',
-                    fontWeight: 600,
-                    bgcolor: 'rgba(0, 0, 0, 0.7)',
-                    color: 'warning.main',
-                    '& .MuiChip-icon': { color: 'warning.main' },
-                  }}
-                />
-              )}
-            </Box>
-            
-            <CardContent sx={{ p: 1.5, pb: 1 }}>
-                {/* Playlist Name */}
-                <Typography variant="body2" fontWeight={600} noWrap sx={{ mb: 0.5 }}>
-                  {playlist.title}
-                </Typography>
-                
-                {/* Channel */}
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {playlist.channel_name}
-                </Typography>
-
-                {/* Progress */}
-                <Box sx={{ mt: 1 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                    {playlist.downloaded_count}/{playlist.item_count}
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={getProgress(playlist)}
-                    sx={{ height: 3, borderRadius: 1, mt: 0.5 }}
-                  />
-                </Box>
-              </CardContent>
-
-              <CardActions sx={{ justifyContent: 'space-between', px: 1, py: 0.5, gap: 0.5 }}>
-                <IconButton 
-                  size="small" 
-                  color="primary"
-                  onClick={(e) => { e.stopPropagation(); handleDownload(playlist.playlist_id); }}
-                  disabled={playlist.sync_status === 'syncing'}
-                  title={playlist.sync_status === 'syncing' ? 'Downloading...' : 'Download'}
-                  sx={{ width: 28, height: 28 }}
-                >
-                  <DownloadIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(playlist.playlist_id); }}
-                  title="Remove"
-                  sx={{ width: 28, height: 28 }}
-                >
-                  <DeleteIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </CardActions>
-            </Card>
-        ))}
-      </Box>
+              </SortableItem>
+            ))}
+          </Box>
+        </SortableContext>
+      </DndContext>
 
       {/* Empty State */}
       {!loading && playlists.length === 0 && (
@@ -360,6 +343,24 @@ export default function PlaylistsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+      
+      <ScrollToTop />
     </Box>
   );
 }

@@ -16,8 +16,12 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
-import { useEffect, useState } from 'react';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { audioAPI } from '../api/client';
+import { fetchAllAudio } from '../utils/fetchAll';
+import ScrollToTop from '../components/ScrollToTop';
 import type { Audio } from '../types';
 
 interface LibraryPageProps {
@@ -26,21 +30,48 @@ interface LibraryPageProps {
 
 export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
   const [audioList, setAudioList] = useState<Audio[]>([]);
+  const [loading, setLoading] = useState(false);
+  const location = useLocation();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  useEffect(() => {
-    loadAudio();
-  }, []);
-
-  const loadAudio = async () => {
+  const loadAudio = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await audioAPI.list();
-      const data = response.data?.data || response.data || [];
-      setAudioList(Array.isArray(data) ? data : []);
+      const allAudioData = await fetchAllAudio();
+      setAudioList(allAudioData);
     } catch (error) {
       console.error('Failed to load audio:', error);
       setAudioList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Reload audio when navigating to this page
+  useEffect(() => {
+    loadAudio();
+  }, [location.key, loadAudio]);
+
+  const handleToggleFavorite = async (audio: Audio) => {
+    if (!audio.youtube_id) return;
+    
+    try {
+      await audioAPI.toggleFavorite(audio.youtube_id);
+      // Update the local state immediately for better UX
+      setAudioList(prev => 
+        prev.map(item => 
+          item.id === audio.id 
+            ? { ...item, is_favorite: !item.is_favorite }
+            : item
+        )
+      );
+      setSnackbarMessage(audio.is_favorite ? 'Removed from favorites' : 'Added to favorites');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      setSnackbarMessage('Failed to update favorite status');
+      setSnackbarOpen(true);
     }
   };
 
@@ -132,8 +163,23 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
           >
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Shuffle</Box>
           </Button>
+          <IconButton
+            onClick={loadAudio}
+            disabled={loading}
+            sx={{
+              color: 'text.secondary',
+              '&:hover': { color: 'primary.main' },
+            }}
+            title="Refresh library"
+          >
+            <RefreshIcon sx={{ animation: loading ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
+          </IconButton>
         </Box>
       </Box>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {audioList.length} tracks in your library
+      </Typography>
 
       <TableContainer 
         component={Paper} 
@@ -206,14 +252,19 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
                   </IconButton>
                   <IconButton 
                     size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleFavorite(audio);
+                    }}
                     sx={{
+                      color: audio.is_favorite ? 'error.main' : 'text.disabled',
                       '&:hover': {
-                        color: 'primary.main',
-                        bgcolor: 'rgba(19, 236, 106, 0.1)',
+                        color: 'error.main',
+                        bgcolor: 'rgba(244, 67, 54, 0.1)',
                       },
                     }}
                   >
-                    <FavoriteBorderIcon />
+                    {audio.is_favorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
                   </IconButton>
                 </TableCell>
               </TableRow>
@@ -230,6 +281,8 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
         message={snackbarMessage}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
+      
+      <ScrollToTop />
     </Box>
   );
 }

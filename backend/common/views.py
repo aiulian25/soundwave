@@ -1,12 +1,14 @@
 """Common views"""
 
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.views import APIView
 
 
 class ApiBaseView(APIView):
-    """Base API view"""
-    pass
+    """Base API view - TubeArchivist pattern"""
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
 
 
 class AdminOnly(IsAdminUser):
