@@ -1,13 +1,13 @@
 """Common views"""
 
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.views import APIView
+from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
 
 
 class ApiBaseView(APIView):
     """Base API view - TubeArchivist pattern"""
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
     permission_classes = [IsAuthenticated]
 
 

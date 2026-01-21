@@ -24,14 +24,20 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUserData();
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetchUserData();
+    }
   }, []);
 
   const fetchUserData = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
     try {
       const response = await fetch('/api/user/account/', {
         headers: {
-          'Authorization': `Token ${localStorage.getItem('token')}`,
+          'Authorization': `Token ${token}`,
         },
       });
       if (response.ok) {

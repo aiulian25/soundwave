@@ -108,13 +108,18 @@ export const useUserSettings = () => {
     return settings.extra_settings[key] ?? defaultValue;
   }, [settings.extra_settings]);
 
-  // Load settings on mount - always try to load (API client handles auth via cookies or token)
+  // Load settings on mount - only if authenticated
   useEffect(() => {
     const token = localStorage.getItem('token');
     console.log('[Settings] Mount check - token exists:', !!token);
-    // Always try to load settings - the API will return 401 if not authenticated
-    // This handles both token-based and session-based auth
-    loadSettings();
+    // Only try to load settings if authenticated
+    if (token) {
+      loadSettings();
+    } else {
+      // Use defaults if not authenticated
+      setSettings(DEFAULT_SETTINGS);
+      setLoading(false);
+    }
   }, [loadSettings]);
 
   return {

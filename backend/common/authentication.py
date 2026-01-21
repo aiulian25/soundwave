@@ -1,6 +1,19 @@
 """Custom authentication classes"""
 
-from rest_framework.authentication import TokenAuthentication
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    """
+    SessionAuthentication that doesn't enforce CSRF when a token is present.
+    This allows both session and token auth to coexist without CSRF issues.
+    """
+    def enforce_csrf(self, request):
+        # Don't enforce CSRF if Authorization header is present (token auth)
+        if request.META.get('HTTP_AUTHORIZATION'):
+            return
+        # Otherwise, enforce CSRF for session auth
+        return super().enforce_csrf(request)
 
 
 class CsrfExemptTokenAuthentication(TokenAuthentication):

@@ -42,14 +42,20 @@ export default function UserProfileCard() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
-    loadUserData();
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadUserData();
+    }
   }, []);
 
   const loadUserData = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
     try {
       const response = await axios.get('/api/user/account/', {
         headers: {
-          'Authorization': `Token ${localStorage.getItem('token')}`,
+          'Authorization': `Token ${token}`,
         },
       });
       setUserData(response.data);

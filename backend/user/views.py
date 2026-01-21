@@ -11,6 +11,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from common.views import ApiBaseView
 from user.models import Account
 from user.serializers import (
     AccountSerializer,
@@ -31,7 +32,7 @@ from user.two_factor import (
 from datetime import datetime
 
 
-class UserAccountView(APIView):
+class UserAccountView(ApiBaseView):
     """User account endpoint"""
 
     def get(self, request):
@@ -43,7 +44,7 @@ class UserAccountView(APIView):
         return Response(serializer.data)
 
 
-class UserProfileView(APIView):
+class UserProfileView(ApiBaseView):
     """User profile management"""
     
     def patch(self, request):
@@ -127,7 +128,7 @@ class UserProfileView(APIView):
         })
 
 
-class ChangePasswordView(APIView):
+class ChangePasswordView(ApiBaseView):
     """Change user password"""
     
     def post(self, request):
@@ -222,7 +223,7 @@ class LoginView(APIView):
         })
 
 
-class LogoutView(APIView):
+class LogoutView(ApiBaseView):
     """Logout endpoint"""
 
     def post(self, request):
@@ -266,7 +267,7 @@ class RegisterView(APIView):
         )
 
 
-class UserConfigView(APIView):
+class UserConfigView(ApiBaseView):
     """User configuration endpoint"""
 
     def get(self, request):
@@ -296,7 +297,7 @@ class UserConfigView(APIView):
         })
 
 
-class TwoFactorStatusView(APIView):
+class TwoFactorStatusView(ApiBaseView):
     """Get 2FA status"""
 
     def get(self, request):
@@ -309,7 +310,7 @@ class TwoFactorStatusView(APIView):
         return Response(serializer.data)
 
 
-class TwoFactorSetupView(APIView):
+class TwoFactorSetupView(ApiBaseView):
     """Setup 2FA"""
 
     def post(self, request):
@@ -337,7 +338,7 @@ class TwoFactorSetupView(APIView):
         return Response(serializer.data)
 
 
-class TwoFactorVerifyView(APIView):
+class TwoFactorVerifyView(ApiBaseView):
     """Verify and enable 2FA"""
 
     def post(self, request):
@@ -368,7 +369,7 @@ class TwoFactorVerifyView(APIView):
         )
 
 
-class TwoFactorDisableView(APIView):
+class TwoFactorDisableView(ApiBaseView):
     """Disable 2FA"""
 
     def post(self, request):
@@ -402,7 +403,7 @@ class TwoFactorDisableView(APIView):
         )
 
 
-class TwoFactorRegenerateCodesView(APIView):
+class TwoFactorRegenerateCodesView(ApiBaseView):
     """Regenerate backup codes"""
 
     def post(self, request):
@@ -426,7 +427,7 @@ class TwoFactorRegenerateCodesView(APIView):
         })
 
 
-class TwoFactorDownloadCodesView(APIView):
+class TwoFactorDownloadCodesView(ApiBaseView):
     """Download backup codes as PDF"""
 
     def get(self, request):
@@ -532,9 +533,9 @@ class AvatarUploadView(APIView):
         })
 
 
-class AvatarPresetView(APIView):
+class AvatarPresetView(ApiBaseView):
     """Set preset avatar"""
-    
+
     def post(self, request):
         """Set preset avatar (1-5)"""
         preset = request.data.get('preset')
