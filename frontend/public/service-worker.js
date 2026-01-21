@@ -63,6 +63,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip non-GET requests - Cache API only supports GET
+  if (request.method !== 'GET') {
+    return;
+  }
+
   // API requests - Network first, fallback to cache
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request, API_CACHE_NAME));
@@ -117,10 +122,11 @@ async function networkFirstStrategy(request, cacheName) {
   try {
     const networkResponse = await fetch(request);
     
-    // Cache successful responses
-    if (networkResponse && networkResponse.status === 200) {
+    // Only cache GET requests with successful responses
+    if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
+      const responseClone = networkResponse.clone();
       const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
+      cache.put(request, responseClone);
     }
     
     return networkResponse;
@@ -147,19 +153,22 @@ async function networkFirstStrategy(request, cacheName) {
 
 // Cache first strategy - try cache, fallback to network
 async function cacheFirstStrategy(request, cacheName) {
-  const cachedResponse = await caches.match(request);
-  
-  if (cachedResponse) {
-    return cachedResponse;
+  // Only use cache for GET requests
+  if (request.method === 'GET') {
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
   }
   
   try {
     const networkResponse = await fetch(request);
     
-    // Cache successful responses
-    if (networkResponse && networkResponse.status === 200) {
+    // Only cache GET requests with successful responses
+    if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
+      const responseClone = networkResponse.clone();
       const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
+      cache.put(request, responseClone);
     }
     
     return networkResponse;
@@ -171,12 +180,14 @@ async function cacheFirstStrategy(request, cacheName) {
 
 // Stale while revalidate - return cache immediately, update in background
 async function staleWhileRevalidateStrategy(request, cacheName) {
-  const cachedResponse = await caches.match(request);
+  // Only use cache for GET requests
+  const cachedResponse = request.method === 'GET' ? await caches.match(request) : null;
   
   const fetchPromise = fetch(request).then((networkResponse) => {
-    if (networkResponse && networkResponse.status === 200) {
-      const cache = caches.open(cacheName);
-      cache.then((c) => c.put(request, networkResponse.clone()));
+    // Only cache GET requests with successful responses
+    if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
+      const responseClone = networkResponse.clone();
+      caches.open(cacheName).then((c) => c.put(request, responseClone));
     }
     return networkResponse;
   }).catch((error) => {
