@@ -88,9 +88,11 @@ def auto_fetch_lyrics(limit: int = 50, max_attempts: int = 3):
     from audio.models_lyrics import Lyrics
     from audio.lyrics_service import LyricsService
     
-    # Find audio without lyrics or with failed attempts
-    audio_without_lyrics = Audio.objects.filter(
-        downloaded=True
+    # Find audio without lyrics or with failed attempts (file_path indicates downloaded)
+    audio_without_lyrics = Audio.objects.exclude(
+        file_path=''
+    ).exclude(
+        file_path__isnull=True
     ).exclude(
         lyrics__fetch_attempted=True,
         lyrics__fetch_attempts__gte=max_attempts

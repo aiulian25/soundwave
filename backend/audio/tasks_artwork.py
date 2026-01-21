@@ -453,7 +453,7 @@ def embed_artwork_in_audio(self, audio_id: int, artwork_id: int = None):
         logger.error(f"Error embedding artwork for audio {audio_id}: {e}")
 
 
-@shared_task
+@shared_task(name='audio.auto_fetch_artwork_batch')
 def auto_fetch_artwork_batch(limit: int = 50):
     """
     Auto-fetch artwork for audio without artwork
@@ -474,7 +474,7 @@ def auto_fetch_artwork_batch(limit: int = 50):
     logger.info(f"Queued artwork fetch for {count} audio tracks")
 
 
-@shared_task
+@shared_task(name='audio.auto_fetch_artist_info_batch')
 def auto_fetch_artist_info_batch(limit: int = 20):
     """
     Auto-fetch artist info for channels without info
