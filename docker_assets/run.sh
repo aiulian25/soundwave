@@ -5,6 +5,18 @@ set +e
 
 echo "Starting SoundWave..."
 
+# Ensure data directories exist and are writable
+echo "Checking data directories..."
+for dir in /app/data /app/audio /app/cache; do
+    if [ ! -d "$dir" ]; then
+        echo "Creating $dir..."
+        mkdir -p "$dir" 2>/dev/null || echo "Warning: Could not create $dir"
+    fi
+    if [ ! -w "$dir" ]; then
+        echo "ERROR: $dir is not writable. Please run: sudo chown -R 1000:1000 $dir"
+    fi
+done
+
 # Wait for ElasticSearch with better health check
 echo "Waiting for ElasticSearch..."
 ES_RETRIES=0
