@@ -280,10 +280,15 @@ async function cacheFirstStrategy(request, cacheName) {
 async function staleWhileRevalidateStrategy(request, cacheName) {
   const cachedResponse = await caches.match(request);
   
-  const fetchPromise = fetch(request).then((networkResponse) => {
-    if (networkResponse && networkResponse.status === 200) {
-      const cache = caches.open(cacheName);
-      cache.then((c) => c.put(request, networkResponse.clone()));
+  const fetchPromise = fetch(request).then(async (networkResponse) => {
+    if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
+      try {
+        const responseClone = networkResponse.clone();
+        const cache = await caches.open(cacheName);
+        await cache.put(request, responseClone);
+      } catch (e) {
+        console.log('[Service Worker] Cache put failed:', e);
+      }
     }
     return networkResponse;
   }).catch((error) => {
