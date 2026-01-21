@@ -2,11 +2,12 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Sum, Q
 from django.contrib.auth import get_user_model
 
 from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
+from common.permissions import CanManageUsers
 from user.models import UserYouTubeAccount
 from user.serializers_admin import (
     UserDetailSerializer,
@@ -40,7 +41,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
     """Admin viewset for managing users"""
     queryset = User.objects.all()
     authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
-    permission_classes = [IsAdminUser]
+    permission_classes = [CanManageUsers]
     
     def get_serializer_class(self):
         if self.action == 'create':
