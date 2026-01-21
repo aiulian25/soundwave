@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LockIcon from '@mui/icons-material/Lock';
-import api from '../api/client';
+import axios from 'axios';
 
 interface UserData {
   id: number;
@@ -47,7 +47,11 @@ export default function UserProfileCard() {
 
   const loadUserData = async () => {
     try {
-      const response = await api.get('/user/account/');
+      const response = await axios.get('/api/user/account/', {
+        headers: {
+          'Authorization': `Token ${localStorage.getItem('token')}`,
+        },
+      });
       setUserData(response.data);
       setUsername(response.data.username);
       setFirstName(response.data.first_name || '');
@@ -104,7 +108,15 @@ export default function UserProfileCard() {
         payload.current_password = currentPassword;
       }
 
-      const response = await api.patch('/user/profile/', payload);
+      const response = await axios.patch('/api/user/profile/', 
+        payload,
+        {
+          headers: {
+            'Authorization': `Token ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       
       // Update local state with response data instead of reloading
       if (response.data.user) {
@@ -146,10 +158,18 @@ export default function UserProfileCard() {
     setSuccess('');
 
     try {
-      await api.post('/user/change-password/', { 
-        current_password: currentPassword,
-        new_password: newPassword 
-      });
+      await axios.post('/api/user/change-password/', 
+        { 
+          current_password: currentPassword,
+          new_password: newPassword 
+        },
+        {
+          headers: {
+            'Authorization': `Token ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       setSuccess('Password changed successfully!');
       setCurrentPassword('');
       setNewPassword('');

@@ -34,26 +34,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401/403 responses - clear invalid token and redirect to login
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      // Check if this is an auth endpoint failure (not login itself)
-      const url = error.config?.url || '';
-      if (!url.includes('/login') && !url.includes('/register')) {
-        console.warn('[API] Authentication failed, clearing token');
-        localStorage.removeItem('token');
-        // Redirect to login if not already there
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
 export default api;
 
 // Audio API

@@ -3,8 +3,6 @@ const CACHE_NAME = 'soundwave-v1';
 const API_CACHE_NAME = 'soundwave-api-v1';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v1';
 const IMAGE_CACHE_NAME = 'soundwave-images-v1';
-const DOWNLOAD_DB_NAME = 'soundwave-downloads';
-const DOWNLOAD_STORE_NAME = 'pending-downloads';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -13,105 +11,6 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon.ico',
 ];
-
-// =====================================================
-// IndexedDB helpers for persistent download queue
-// =====================================================
-function openDownloadDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DOWNLOAD_DB_NAME, 1);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(DOWNLOAD_STORE_NAME)) {
-        const store = db.createObjectStore(DOWNLOAD_STORE_NAME, { keyPath: 'id', autoIncrement: true });
-        store.createIndex('status', 'status', { unique: false });
-        store.createIndex('url', 'url', { unique: false });
-        store.createIndex('createdAt', 'createdAt', { unique: false });
-      }
-    };
-  });
-}
-
-async function addPendingDownload(downloadData) {
-  const db = await openDownloadDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([DOWNLOAD_STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(DOWNLOAD_STORE_NAME);
-    
-    const request = store.add({
-      ...downloadData,
-      status: 'pending',
-      createdAt: Date.now(),
-      attempts: 0,
-    });
-    
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function getPendingDownloads() {
-  const db = await openDownloadDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([DOWNLOAD_STORE_NAME], 'readonly');
-    const store = transaction.objectStore(DOWNLOAD_STORE_NAME);
-    const index = store.index('status');
-    const request = index.getAll('pending');
-    
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function updateDownloadStatus(id, status, error = null) {
-  const db = await openDownloadDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([DOWNLOAD_STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(DOWNLOAD_STORE_NAME);
-    
-    const getRequest = store.get(id);
-    getRequest.onsuccess = () => {
-      const download = getRequest.result;
-      if (download) {
-        download.status = status;
-        download.error = error;
-        download.updatedAt = Date.now();
-        download.attempts = (download.attempts || 0) + (status === 'failed' ? 1 : 0);
-        store.put(download);
-      }
-      resolve();
-    };
-    getRequest.onerror = () => reject(getRequest.error);
-  });
-}
-
-async function removeDownload(id) {
-  const db = await openDownloadDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([DOWNLOAD_STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(DOWNLOAD_STORE_NAME);
-    const request = store.delete(id);
-    
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function getAllDownloads() {
-  const db = await openDownloadDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([DOWNLOAD_STORE_NAME], 'readonly');
-    const store = transaction.objectStore(DOWNLOAD_STORE_NAME);
-    const request = store.getAll();
-    
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -164,12 +63,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip non-GET requests - Cache API doesn't support POST, PATCH, PUT, DELETE
-  if (request.method !== 'GET') {
-    return;
-  }
-
-  // API requests - Network first, fallback to cache (GET only)
+  // API requests - Network first, fallback to cache
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request, API_CACHE_NAME));
     return;
@@ -223,11 +117,10 @@ async function networkFirstStrategy(request, cacheName) {
   try {
     const networkResponse = await fetch(request);
     
-    // Cache successful GET responses only
-    if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
-      const responseClone = networkResponse.clone();
+    // Cache successful responses
+    if (networkResponse && networkResponse.status === 200) {
       const cache = await caches.open(cacheName);
-      cache.put(request, responseClone);
+      cache.put(request, networkResponse.clone());
     }
     
     return networkResponse;
@@ -280,15 +173,10 @@ async function cacheFirstStrategy(request, cacheName) {
 async function staleWhileRevalidateStrategy(request, cacheName) {
   const cachedResponse = await caches.match(request);
   
-  const fetchPromise = fetch(request).then(async (networkResponse) => {
-    if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
-      try {
-        const responseClone = networkResponse.clone();
-        const cache = await caches.open(cacheName);
-        await cache.put(request, responseClone);
-      } catch (e) {
-        console.log('[Service Worker] Cache put failed:', e);
-      }
+  const fetchPromise = fetch(request).then((networkResponse) => {
+    if (networkResponse && networkResponse.status === 200) {
+      const cache = caches.open(cacheName);
+      cache.then((c) => c.put(request, networkResponse.clone()));
     }
     return networkResponse;
   }).catch((error) => {
@@ -309,77 +197,7 @@ self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-favorites') {
     event.waitUntil(syncFavorites());
   }
-  
-  if (event.tag === 'sync-downloads') {
-    event.waitUntil(syncPendingDownloads());
-  }
 });
-
-// Sync pending downloads to server
-async function syncPendingDownloads() {
-  console.log('[Service Worker] Syncing pending downloads...');
-  
-  try {
-    const pendingDownloads = await getPendingDownloads();
-    console.log('[Service Worker] Found', pendingDownloads.length, 'pending downloads');
-    
-    for (const download of pendingDownloads) {
-      try {
-        // Get auth token from the client
-        const clients = await self.clients.matchAll();
-        let authToken = download.authToken;
-        
-        if (!authToken && clients.length > 0) {
-          // Try to get token from client
-          const response = await clients[0].postMessage({ 
-            type: 'GET_AUTH_TOKEN' 
-          });
-        }
-        
-        if (!authToken) {
-          console.log('[Service Worker] No auth token available, skipping download');
-          continue;
-        }
-        
-        // Submit download to server
-        const response = await fetch('/api/download/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${authToken}`,
-          },
-          body: JSON.stringify({
-            urls: [download.url],
-            auto_start: true,
-          }),
-        });
-        
-        if (response.ok) {
-          await updateDownloadStatus(download.id, 'submitted');
-          console.log('[Service Worker] Download submitted:', download.url);
-          
-          // Show notification
-          await self.registration.showNotification('Download Started', {
-            body: download.title || 'Your download has been queued',
-            icon: '/img/icons/icon-192x192.png',
-            badge: '/img/icons/icon-72x72.png',
-            tag: `download-started-${download.id}`,
-            data: { type: 'download-started', downloadId: download.id },
-          });
-        } else {
-          const errorText = await response.text();
-          await updateDownloadStatus(download.id, 'failed', errorText);
-          console.error('[Service Worker] Failed to submit download:', errorText);
-        }
-      } catch (error) {
-        await updateDownloadStatus(download.id, 'failed', error.message);
-        console.error('[Service Worker] Error syncing download:', error);
-      }
-    }
-  } catch (error) {
-    console.error('[Service Worker] Error in syncPendingDownloads:', error);
-  }
-}
 
 async function syncAudioUploads() {
   console.log('[Service Worker] Syncing audio uploads...');
@@ -392,82 +210,6 @@ async function syncFavorites() {
   // Implementation for syncing favorite changes when back online
 }
 
-// Periodic background sync for checking download status
-self.addEventListener('periodicsync', (event) => {
-  console.log('[Service Worker] Periodic sync:', event.tag);
-  
-  if (event.tag === 'check-download-status') {
-    event.waitUntil(checkDownloadStatus());
-  }
-});
-
-async function checkDownloadStatus() {
-  console.log('[Service Worker] Checking download status...');
-  
-  try {
-    // Get all clients and their auth tokens
-    const clients = await self.clients.matchAll();
-    if (clients.length === 0) {
-      console.log('[Service Worker] No clients available');
-      return;
-    }
-    
-    // Request auth token from client
-    const messageChannel = new MessageChannel();
-    clients[0].postMessage({ type: 'GET_AUTH_TOKEN' }, [messageChannel.port2]);
-    
-    const authToken = await new Promise((resolve) => {
-      messageChannel.port1.onmessage = (event) => {
-        resolve(event.data.token);
-      };
-      // Timeout after 5 seconds
-      setTimeout(() => resolve(null), 5000);
-    });
-    
-    if (!authToken) {
-      console.log('[Service Worker] No auth token received');
-      return;
-    }
-    
-    // Fetch current download status from server
-    const response = await fetch('/api/download/?filter=completed', {
-      headers: {
-        'Authorization': `Token ${authToken}`,
-      },
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const recentlyCompleted = data.data?.filter(d => {
-        const completedTime = new Date(d.completed_date).getTime();
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-        return completedTime > fiveMinutesAgo;
-      }) || [];
-      
-      // Notify about completed downloads
-      for (const download of recentlyCompleted) {
-        await self.registration.showNotification('Download Complete', {
-          body: download.title || 'Your download is ready',
-          icon: '/img/icons/icon-192x192.png',
-          badge: '/img/icons/icon-72x72.png',
-          tag: `download-complete-${download.id}`,
-          data: { 
-            type: 'download-complete', 
-            downloadId: download.id,
-            youtubeId: download.youtube_id,
-          },
-          actions: [
-            { action: 'play', title: 'Play Now' },
-            { action: 'dismiss', title: 'Dismiss' },
-          ],
-        });
-      }
-    }
-  } catch (error) {
-    console.error('[Service Worker] Error checking download status:', error);
-  }
-}
-
 // Push notifications
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push notification received');
@@ -476,7 +218,7 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'SoundWave';
   const options = {
     body: data.body || 'New content available',
-    icon: '/img/icons/icon-192x192.png',
+    icon: '/img/icon-192x192.png',
     badge: '/img/icon-72x72.png',
     vibrate: [200, 100, 200],
     data: data.url || '/',
@@ -493,44 +235,20 @@ self.addEventListener('push', (event) => {
 
 // Notification click
 self.addEventListener('notificationclick', (event) => {
-  console.log('[Service Worker] Notification clicked:', event.action);
+  console.log('[Service Worker] Notification clicked');
   event.notification.close();
   
-  const data = event.notification.data || {};
-  
-  // Handle download complete notification
-  if (data.type === 'download-complete' && event.action === 'play') {
-    event.waitUntil(
-      clients.matchAll({ type: 'window' }).then((clientList) => {
-        // If app is open, focus it and navigate to the track
-        for (const client of clientList) {
-          if (client.url.includes(self.location.origin)) {
-            client.focus();
-            client.postMessage({
-              type: 'PLAY_AUDIO',
-              youtubeId: data.youtubeId,
-            });
-            return;
-          }
-        }
-        // Otherwise open the app
-        return clients.openWindow(`/library?play=${data.youtubeId}`);
-      })
-    );
-    return;
-  }
-  
   if (event.action === 'open' || !event.action) {
-    const urlToOpen = data.url || '/';
+    const urlToOpen = event.notification.data || '/';
     event.waitUntil(
       clients.openWindow(urlToOpen)
     );
   }
 });
 
-// Message handling for cache management and downloads
+// Message handling for cache management
 self.addEventListener('message', (event) => {
-  console.log('[Service Worker] Message received:', event.data?.type);
+  console.log('[Service Worker] Message received:', event.data);
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -545,135 +263,6 @@ self.addEventListener('message', (event) => {
       }).then(() => {
         event.ports[0].postMessage({ success: true });
       })
-    );
-  }
-  
-  // =====================================================
-  // Background Download Operations
-  // =====================================================
-  
-  // Queue a download for background processing
-  if (event.data && event.data.type === 'QUEUE_DOWNLOAD') {
-    const { url, title, authToken } = event.data;
-    event.waitUntil(
-      (async () => {
-        try {
-          // Add to IndexedDB
-          const id = await addPendingDownload({ 
-            url, 
-            title, 
-            authToken,
-            queuedAt: Date.now(),
-          });
-          console.log('[Service Worker] Download queued:', id, url);
-          
-          // Try to register background sync
-          if (self.registration.sync) {
-            await self.registration.sync.register('sync-downloads');
-            console.log('[Service Worker] Background sync registered');
-          } else {
-            // Fallback: try to sync immediately if online
-            if (navigator.onLine) {
-              await syncPendingDownloads();
-            }
-          }
-          
-          event.ports[0].postMessage({ success: true, id });
-        } catch (error) {
-          console.error('[Service Worker] Error queuing download:', error);
-          event.ports[0].postMessage({ success: false, error: error.message });
-        }
-      })()
-    );
-  }
-  
-  // Queue multiple downloads
-  if (event.data && event.data.type === 'QUEUE_DOWNLOADS_BATCH') {
-    const { downloads, authToken } = event.data;
-    event.waitUntil(
-      (async () => {
-        try {
-          const ids = [];
-          for (const download of downloads) {
-            const id = await addPendingDownload({
-              url: download.url,
-              title: download.title,
-              authToken,
-              queuedAt: Date.now(),
-            });
-            ids.push(id);
-          }
-          console.log('[Service Worker] Batch downloads queued:', ids.length);
-          
-          // Register background sync
-          if (self.registration.sync) {
-            await self.registration.sync.register('sync-downloads');
-          } else if (navigator.onLine) {
-            await syncPendingDownloads();
-          }
-          
-          event.ports[0].postMessage({ success: true, ids });
-        } catch (error) {
-          console.error('[Service Worker] Error queuing batch downloads:', error);
-          event.ports[0].postMessage({ success: false, error: error.message });
-        }
-      })()
-    );
-  }
-  
-  // Get all pending downloads
-  if (event.data && event.data.type === 'GET_PENDING_DOWNLOADS') {
-    event.waitUntil(
-      getAllDownloads().then((downloads) => {
-        event.ports[0].postMessage({ success: true, downloads });
-      }).catch((error) => {
-        event.ports[0].postMessage({ success: false, error: error.message });
-      })
-    );
-  }
-  
-  // Remove a pending download
-  if (event.data && event.data.type === 'REMOVE_PENDING_DOWNLOAD') {
-    const { id } = event.data;
-    event.waitUntil(
-      removeDownload(id).then(() => {
-        event.ports[0].postMessage({ success: true });
-      }).catch((error) => {
-        event.ports[0].postMessage({ success: false, error: error.message });
-      })
-    );
-  }
-  
-  // Manually trigger sync (useful when coming back online)
-  if (event.data && event.data.type === 'TRIGGER_DOWNLOAD_SYNC') {
-    event.waitUntil(
-      syncPendingDownloads().then(() => {
-        event.ports[0].postMessage({ success: true });
-      }).catch((error) => {
-        event.ports[0].postMessage({ success: false, error: error.message });
-      })
-    );
-  }
-  
-  // Update auth token for pending downloads
-  if (event.data && event.data.type === 'UPDATE_AUTH_TOKEN') {
-    const { authToken } = event.data;
-    event.waitUntil(
-      (async () => {
-        try {
-          const downloads = await getPendingDownloads();
-          for (const download of downloads) {
-            const db = await openDownloadDB();
-            const transaction = db.transaction([DOWNLOAD_STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(DOWNLOAD_STORE_NAME);
-            download.authToken = authToken;
-            store.put(download);
-          }
-          event.ports[0].postMessage({ success: true });
-        } catch (error) {
-          event.ports[0].postMessage({ success: false, error: error.message });
-        }
-      })()
     );
   }
   
