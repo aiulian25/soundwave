@@ -164,7 +164,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API requests - Network first, fallback to cache
+  // Skip non-GET requests - Cache API doesn't support POST, PATCH, PUT, DELETE
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  // API requests - Network first, fallback to cache (GET only)
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request, API_CACHE_NAME));
     return;
@@ -218,10 +223,11 @@ async function networkFirstStrategy(request, cacheName) {
   try {
     const networkResponse = await fetch(request);
     
-    // Cache successful responses
-    if (networkResponse && networkResponse.status === 200) {
+    // Cache successful GET responses only
+    if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
+      const responseClone = networkResponse.clone();
       const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
+      cache.put(request, responseClone);
     }
     
     return networkResponse;
