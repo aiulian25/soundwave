@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.db.models import Count, Sum, Q
 from django.contrib.auth import get_user_model
 
+from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
 from user.models import UserYouTubeAccount
 from user.serializers_admin import (
     UserDetailSerializer,
@@ -38,6 +39,7 @@ class IsAdminOrSelf(IsAuthenticated):
 class UserManagementViewSet(viewsets.ModelViewSet):
     """Admin viewset for managing users"""
     queryset = User.objects.all()
+    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
     permission_classes = [IsAdminUser]
     
     def get_serializer_class(self):
@@ -167,6 +169,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
 class UserYouTubeAccountViewSet(viewsets.ModelViewSet):
     """ViewSet for managing user YouTube accounts"""
+    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
     permission_classes = [IsAdminOrSelf]
     
     def get_serializer_class(self):
