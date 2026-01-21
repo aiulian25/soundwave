@@ -1,0 +1,59 @@
+# Production docker-compose for users pulling from GitHub Container Registry
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  soundwave:
+    container_name: soundwave
+    image: ghcr.io/aiulian25/soundwave:main
+    user: "1000:1000"
+    ports:
+      - "8889:8888"
+    volumes:
+      # Only mount data directories - NOT code directories
+      - ./audio:/app/audio
+      - ./cache:/app/cache
+      - ./data:/app/data
+    environment:
+      - SW_HOST=http://localhost:8889
+      - SW_USERNAME=admin
+      - SW_PASSWORD=soundwave
+      - ELASTIC_PASSWORD=soundwave
+      - REDIS_HOST=soundwave-redis
+      - TZ=UTC
+      - ES_URL=http://soundwave-es:9200
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8889,https://localhost:8889}
+    depends_on:
+      - soundwave-es
+      - soundwave-redis
+    restart: unless-stopped
+
+  soundwave-es:
+    image: bbilly1/tubearchivist-es
+    container_name: soundwave-es
+    restart: unless-stopped
+    environment:
+      - "ELASTIC_PASSWORD=soundwave"
+      - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "xpack.security.enabled=true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    expose:
+      - "9200"
+
+  soundwave-redis:
+    image: redis:alpine
+    container_name: soundwave-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  es_data:
+  redis_data:
