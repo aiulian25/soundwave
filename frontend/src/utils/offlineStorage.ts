@@ -3,13 +3,14 @@
  */
 
 const DB_NAME = 'soundwave-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Increment version to add LYRICS store
 const STORES = {
   AUDIO_QUEUE: 'audioQueue',
   FAVORITES: 'favorites',
   PLAYLISTS: 'playlists',
   SETTINGS: 'settings',
   PENDING_UPLOADS: 'pendingUploads',
+  LYRICS: 'lyrics',
 };
 
 class OfflineStorageManager {
@@ -52,6 +53,10 @@ class OfflineStorageManager {
           });
           uploadStore.createIndex('timestamp', 'timestamp', { unique: false });
         }
+        // Lyrics cache for offline access
+        if (!db.objectStoreNames.contains(STORES.LYRICS)) {
+          db.createObjectStore(STORES.LYRICS, { keyPath: 'youtube_id' });
+        }
       };
     });
   }
@@ -60,48 +65,80 @@ class OfflineStorageManager {
    * Get data from store
    */
   async get(storeName: string, key: string | number): Promise<any> {
-    if (!this.db) await this.init();
+    try {
+      if (!this.db) await this.init();
+      
+      // Check if the store exists
+      if (!this.db!.objectStoreNames.contains(storeName)) {
+        console.log(`[OfflineStorage] Store ${storeName} does not exist`);
+        return null;
+      }
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(storeName, 'readonly');
-      const store = transaction.objectStore(storeName);
-      const request = store.get(key);
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.get(key);
 
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.error(`[OfflineStorage] Error getting from ${storeName}:`, err);
+      return null;
+    }
   }
 
   /**
    * Get all data from store
    */
   async getAll(storeName: string): Promise<any[]> {
-    if (!this.db) await this.init();
+    try {
+      if (!this.db) await this.init();
+      
+      // Check if the store exists
+      if (!this.db!.objectStoreNames.contains(storeName)) {
+        console.log(`[OfflineStorage] Store ${storeName} does not exist`);
+        return [];
+      }
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(storeName, 'readonly');
-      const store = transaction.objectStore(storeName);
-      const request = store.getAll();
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
 
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.error(`[OfflineStorage] Error getting all from ${storeName}:`, err);
+      return [];
+    }
   }
 
   /**
    * Put data into store
    */
   async put(storeName: string, data: any): Promise<void> {
-    if (!this.db) await this.init();
+    try {
+      if (!this.db) await this.init();
+      
+      // Check if the store exists
+      if (!this.db!.objectStoreNames.contains(storeName)) {
+        console.log(`[OfflineStorage] Store ${storeName} does not exist, skipping put`);
+        return;
+      }
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(storeName, 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.put(data);
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.put(data);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.error(`[OfflineStorage] Error putting to ${storeName}:`, err);
+    }
   }
 
   /**
@@ -203,6 +240,14 @@ class OfflineStorageManager {
     return await this.get(STORES.PLAYLISTS, id);
   }
 
+  /**
+   * Get playlist by playlist_id (YouTube playlist ID string)
+   */
+  async getPlaylistByPlaylistId(playlistId: string): Promise<any> {
+    const playlists = await this.getAll(STORES.PLAYLISTS);
+    return playlists.find(p => p.playlist_id === playlistId) || null;
+  }
+
   async getPlaylists(): Promise<any[]> {
     return await this.getAll(STORES.PLAYLISTS);
   }
@@ -233,7 +278,27 @@ class OfflineStorageManager {
     await this.clear(STORES.FAVORITES);
     await this.clear(STORES.PLAYLISTS);
     await this.clear(STORES.PENDING_UPLOADS);
+    await this.clear(STORES.LYRICS);
     // Keep settings
+  }
+
+  /**
+   * Lyrics-specific methods for offline access
+   */
+  async saveLyrics(youtubeId: string, lyricsData: any): Promise<void> {
+    await this.put(STORES.LYRICS, {
+      youtube_id: youtubeId,
+      ...lyricsData,
+      cachedAt: Date.now(),
+    });
+  }
+
+  async getLyrics(youtubeId: string): Promise<any> {
+    return await this.get(STORES.LYRICS, youtubeId);
+  }
+
+  async removeLyrics(youtubeId: string): Promise<void> {
+    await this.delete(STORES.LYRICS, youtubeId);
   }
 }
 

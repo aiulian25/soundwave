@@ -37,6 +37,13 @@ const PWAPrompts: React.FC = () => {
     if (!isOnline) {
       setShowOfflineAlert(true);
       setWasOffline(true);
+      
+      // Auto-hide offline alert after 5 seconds
+      const timer = setTimeout(() => {
+        setShowOfflineAlert(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
     } else if (wasOffline) {
       setShowOfflineAlert(false);
       setShowOnlineAlert(true);
@@ -76,15 +83,18 @@ const PWAPrompts: React.FC = () => {
 
   return (
     <>
-      {/* Offline Alert - Persistent */}
+      {/* Offline Alert - Auto-hides after 5 seconds, dismissible */}
       <Snackbar
         open={showOfflineAlert}
+        autoHideDuration={5000}
+        onClose={() => setShowOfflineAlert(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         sx={{ bottom: { xs: 80, sm: 24 } }}
       >
         <Alert
           severity="warning"
           icon={<OfflineIcon />}
+          onClose={() => setShowOfflineAlert(false)}
           sx={{ width: '100%' }}
         >
           <Typography variant="body2" fontWeight={600}>

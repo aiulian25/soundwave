@@ -14,6 +14,7 @@ import RecommendIcon from '@mui/icons-material/Recommend';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CachedIcon from '@mui/icons-material/Cached';
 import CloseIcon from '@mui/icons-material/Close';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { Audio } from '../types';
 import { useSettings } from '../context/SettingsContext';
@@ -23,7 +24,8 @@ import AudioVisualizer from './AudioVisualizer';
 import { visualizerThemes } from '../config/visualizerThemes';
 import { audioCache } from '../utils/audioCache';
 
-const LyricsPlayer = lazy(() => import('./LyricsPlayer'));
+// Import LyricsPlayer directly instead of lazy to avoid offline loading issues
+import LyricsPlayer from './LyricsPlayer';
 const RelatedTracks = lazy(() => import('./RelatedTracks'));
 import {
   setMediaMetadata,
@@ -64,6 +66,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
   const [isCachedPlayback, setIsCachedPlayback] = useState(false);
   const [visualizerData, setVisualizerData] = useState<number[]>(Array(16).fill(0));
   const [isFavorite, setIsFavorite] = useState(audio.is_favorite || false);
+  const [imageLoadError, setImageLoadError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -101,6 +104,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
     setLoadingStream(true);
     setIsCachedPlayback(false);
     setIsFavorite(audio.is_favorite || false);
+    setImageLoadError(false); // Reset image error state for new track
     // Reset listening tracking for new track
     playStartTimeRef.current = 0;
     listenedDurationRef.current = 0;
@@ -174,13 +178,21 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
         try {
           setLoadingStream(true);
           
-          // Check cache first for instant playback
-          const cachedUrl = await audioCache.getCachedUrl(audio.youtube_id);
-          if (cachedUrl) {
-            console.log('[Player] Playing from cache:', audio.title);
-            setStreamUrl(cachedUrl);
+          // Check ALL caches first (IndexedDB + Service Worker) for instant/offline playback
+          const cachedResult = await audioCache.getAnyCachedUrl(audio.youtube_id);
+          if (cachedResult) {
+            console.log(`[Player] Playing from ${cachedResult.source} cache:`, audio.title);
+            setStreamUrl(cachedResult.url);
             setLoadingStream(false);
             setIsCachedPlayback(true);
+            return;
+          }
+          
+          // Check if we're offline - if so, we can't fetch from server
+          if (!navigator.onLine) {
+            console.warn('[Player] Offline and no cached audio available:', audio.title);
+            setLoadingStream(false);
+            setIsCachedPlayback(false);
             return;
           }
           
@@ -201,6 +213,15 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
           }
         } catch (error) {
           console.error('Failed to fetch stream URL:', error);
+          
+          // If fetch failed (possibly offline), try one more time to get cached audio
+          const cachedResult = await audioCache.getAnyCachedUrl(audio.youtube_id);
+          if (cachedResult) {
+            console.log(`[Player] Fallback to ${cachedResult.source} cache after fetch error:`, audio.title);
+            setStreamUrl(cachedResult.url);
+            setIsCachedPlayback(true);
+          }
+          
           setLoadingStream(false);
         }
       }
@@ -683,14 +704,14 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
 
         {/* Middle: Album Art & Song Info */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4 }}>
-          {(audio.cover_art_url || audio.thumbnail_url) ? (
+          {(audio.cover_art_url || audio.thumbnail_url) && !imageLoadError ? (
             <Box
               onClick={() => audio.youtube_id && setShowLyrics(!showLyrics)}
               sx={{
                 width: 200,
                 height: 200,
                 borderRadius: 3,
-                backgroundImage: `url(${audio.cover_art_url || audio.thumbnail_url})`,
+                bgcolor: 'background.paper',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 mb: 3,
@@ -702,6 +723,10 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
                 cursor: audio.youtube_id ? 'pointer' : 'default',
                 transition: 'all 0.3s ease',
                 position: 'relative',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 animation: isPlaying ? 'album-pulse 2s ease-in-out infinite' : 'none',
                 '&:hover': audio.youtube_id ? {
                   transform: 'scale(1.05) rotate(2deg)',
@@ -730,6 +755,19 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
               }}
               title={audio.youtube_id ? 'Click to toggle lyrics' : 'Lyrics not available for local files'}
             >
+              {/* Hidden img to detect load errors */}
+              <img 
+                src={audio.cover_art_url || audio.thumbnail_url}
+                alt=""
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  position: 'absolute',
+                  inset: 0,
+                }}
+                onError={() => setImageLoadError(true)}
+              />
               {isBuffering && (
                 <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
                   <CircularProgress size={48} sx={{ color: 'primary.main' }} />
@@ -737,7 +775,43 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
               )}
             </Box>
           ) : (
-            <Skeleton variant="rounded" width={200} height={200} sx={{ mb: 3, borderRadius: 3 }} />
+            /* Fallback album art - show music icon */
+            <Box
+              onClick={() => audio.youtube_id && setShowLyrics(!showLyrics)}
+              sx={{
+                width: 200,
+                height: 200,
+                borderRadius: 3,
+                mb: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'rgba(19, 236, 106, 0.1)',
+                border: '2px solid',
+                borderColor: 'primary.main',
+                cursor: audio.youtube_id ? 'pointer' : 'default',
+                boxShadow: isPlaying 
+                  ? '0 8px 32px rgba(19, 236, 106, 0.4), 0 0 60px rgba(19, 236, 106, 0.2)'
+                  : '0 8px 32px rgba(0, 0, 0, 0.4)',
+                animation: isPlaying ? 'album-pulse 2s ease-in-out infinite' : 'none',
+                transition: 'all 0.3s ease',
+                '&:hover': audio.youtube_id ? {
+                  transform: 'scale(1.05)',
+                  bgcolor: 'rgba(19, 236, 106, 0.2)',
+                } : {},
+                '@keyframes album-pulse': {
+                  '0%, 100%': { 
+                    boxShadow: '0 8px 32px rgba(19, 236, 106, 0.4), 0 0 60px rgba(19, 236, 106, 0.2)',
+                  },
+                  '50%': { 
+                    boxShadow: '0 8px 32px rgba(19, 236, 106, 0.6), 0 0 80px rgba(19, 236, 106, 0.4)',
+                  },
+                },
+              }}
+              title={audio.youtube_id ? 'Click to toggle lyrics' : 'Lyrics not available for local files'}
+            >
+              <MusicNoteIcon sx={{ fontSize: 80, color: 'primary.main', opacity: 0.7 }} />
+            </Box>
           )}
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5, textAlign: 'center', px: 2, color: 'text.primary' }}>
             {audio.title}
@@ -1083,39 +1157,31 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
 
       {/* Lyrics Overlay */}
       {showLyrics && audio.youtube_id && (
-        <Suspense fallback={
-          <Box sx={{ 
-            position: 'absolute', 
-            inset: 0, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            bgcolor: 'rgba(0, 0, 0, 0.95)',
-            zIndex: 20,
-          }}>
-            <CircularProgress size={60} sx={{ color: 'primary.main' }} />
-          </Box>
-        }>
-          <Fade in={showLyrics}>
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(0, 0, 0, 0.95)',
-                backdropFilter: 'blur(10px)',
-                zIndex: 20,
-                overflow: 'auto',
+        <Fade in={showLyrics}>
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              bgcolor: 'rgba(0, 0, 0, 0.95)',
+              backdropFilter: 'blur(10px)',
+              zIndex: 20,
+              overflow: 'auto',
+            }}
+          >
+            <LyricsPlayer
+              youtubeId={audio.youtube_id}
+              currentTime={currentTime}
+              onClose={() => setShowLyrics(false)}
+              embedded={true}
+              onSeek={(time) => {
+                if (audioRef.current) {
+                  audioRef.current.currentTime = time;
+                  setCurrentTime(time);
+                }
               }}
-            >
-              <LyricsPlayer
-                youtubeId={audio.youtube_id}
-                currentTime={currentTime}
-                onClose={() => setShowLyrics(false)}
-                embedded={true}
-              />
-            </Box>
-          </Fade>
-        </Suspense>
+            />
+          </Box>
+        </Fade>
       )}
     </Box>
   );

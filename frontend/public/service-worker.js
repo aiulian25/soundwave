@@ -68,6 +68,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Audio download API endpoints - Cache first (critical for offline playback)
+  // These are cached by "Make Available Offline" feature
+  if (url.pathname.match(/\/api\/audio\/[^/]+\/download\/?$/)) {
+    console.log('[Service Worker] Audio download request:', url.pathname);
+    event.respondWith(audioCacheFirstStrategy(request));
+    return;
+  }
+
+  // Audio player API endpoints - Network first, but check audio cache as fallback
+  if (url.pathname.match(/\/api\/audio\/[^/]+\/player\/?$/)) {
+    event.respondWith(networkFirstStrategy(request, API_CACHE_NAME));
+    return;
+  }
+
   // API requests - Network first, fallback to cache
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request, API_CACHE_NAME));
@@ -175,6 +189,66 @@ async function cacheFirstStrategy(request, cacheName) {
   } catch (error) {
     console.error('[Service Worker] Cache and network failed:', error);
     throw error;
+  }
+}
+
+// Audio-specific cache first strategy with better URL matching
+async function audioCacheFirstStrategy(request) {
+  const url = new URL(request.url);
+  
+  // Try exact match first
+  const audioCache = await caches.open(AUDIO_CACHE_NAME);
+  let cachedResponse = await audioCache.match(request);
+  
+  if (cachedResponse) {
+    console.log('[Service Worker] Serving cached audio:', url.pathname);
+    return cachedResponse;
+  }
+  
+  // Try matching just the pathname (without query params)
+  cachedResponse = await audioCache.match(url.pathname);
+  if (cachedResponse) {
+    console.log('[Service Worker] Serving cached audio (pathname match):', url.pathname);
+    return cachedResponse;
+  }
+  
+  // Try matching with trailing slash variation
+  const pathWithSlash = url.pathname.endsWith('/') ? url.pathname : url.pathname + '/';
+  const pathWithoutSlash = url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
+  
+  cachedResponse = await audioCache.match(pathWithSlash);
+  if (cachedResponse) {
+    console.log('[Service Worker] Serving cached audio (with slash):', pathWithSlash);
+    return cachedResponse;
+  }
+  
+  cachedResponse = await audioCache.match(pathWithoutSlash);
+  if (cachedResponse) {
+    console.log('[Service Worker] Serving cached audio (without slash):', pathWithoutSlash);
+    return cachedResponse;
+  }
+  
+  // No cache hit, try network
+  try {
+    const networkResponse = await fetch(request);
+    
+    if (networkResponse && networkResponse.status === 200) {
+      // Cache the response for future offline use
+      const responseClone = networkResponse.clone();
+      audioCache.put(url.pathname, responseClone);
+      console.log('[Service Worker] Cached new audio:', url.pathname);
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.error('[Service Worker] Audio fetch failed (offline?):', url.pathname, error);
+    
+    // Return a proper error response instead of throwing
+    return new Response(JSON.stringify({ error: 'Audio not available offline' }), {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
 
@@ -292,43 +366,79 @@ self.addEventListener('message', (event) => {
   
   // Cache playlist for offline access with authentication
   if (event.data && event.data.type === 'CACHE_PLAYLIST') {
-    const { playlistId, audioUrls } = event.data;
+    const { playlistId, audioUrls, authToken } = event.data;
     event.waitUntil(
       (async () => {
         try {
           console.log('[Service Worker] Caching playlist:', playlistId, 'with', audioUrls.length, 'tracks');
+          
+          if (!authToken) {
+            console.error('[Service Worker] No auth token provided for playlist caching');
+            event.ports[0].postMessage({ success: false, error: 'No auth token' });
+            return;
+          }
           
           const results = {
             metadata: false,
             audioFiles: [],
             failed: []
           };
+          
+          const totalItems = audioUrls.length + 1; // +1 for metadata
+          let completedItems = 0;
+          
+          // Helper to send progress updates
+          const sendProgress = (currentItem, status) => {
+            event.ports[0].postMessage({
+              type: 'progress',
+              current: completedItems,
+              total: totalItems,
+              currentItem,
+              status,
+              percent: Math.round((completedItems / totalItems) * 100)
+            });
+          };
 
           // Cache playlist metadata API response (includes items)
+          sendProgress('Playlist metadata', 'downloading');
           try {
             const apiCache = await caches.open(API_CACHE_NAME);
             const metadataUrl = `/api/playlist/${playlistId}/?include_items=true`;
-            await apiCache.add(metadataUrl);
-            results.metadata = true;
-            console.log('[Service Worker] Cached playlist metadata');
+            const metadataResponse = await fetch(metadataUrl, {
+              headers: {
+                'Authorization': `Token ${authToken}`,
+                'Accept': 'application/json',
+              }
+            });
+            if (metadataResponse.ok) {
+              await apiCache.put(metadataUrl, metadataResponse.clone());
+              results.metadata = true;
+              console.log('[Service Worker] Cached playlist metadata');
+            }
           } catch (err) {
             console.warn('[Service Worker] Failed to cache playlist metadata:', err);
           }
+          completedItems++;
+          sendProgress('Playlist metadata', 'done');
           
           // Cache all audio files in playlist with authentication
           const audioCache = await caches.open(AUDIO_CACHE_NAME);
           
-          for (const url of audioUrls) {
+          for (let i = 0; i < audioUrls.length; i++) {
+            const url = audioUrls[i];
+            const trackNum = i + 1;
+            const trackName = `Track ${trackNum}/${audioUrls.length}`;
+            
+            sendProgress(trackName, 'downloading');
+            
             try {
-              // Create authenticated request
-              const authRequest = new Request(url, {
-                credentials: 'include',
+              // Create authenticated request with Token auth
+              const response = await fetch(url, {
                 headers: {
+                  'Authorization': `Token ${authToken}`,
                   'Accept': 'audio/*',
                 }
               });
-              
-              const response = await fetch(authRequest);
               
               if (response.ok) {
                 // Clone and cache the response
@@ -343,10 +453,14 @@ self.addEventListener('message', (event) => {
               results.failed.push(url);
               console.warn('[Service Worker] Failed to cache audio:', url, err);
             }
+            
+            completedItems++;
+            sendProgress(trackName, results.audioFiles.includes(url) ? 'done' : 'failed');
           }
           
           console.log('[Service Worker] Playlist caching complete:', results);
           event.ports[0].postMessage({ 
+            type: 'complete',
             success: results.audioFiles.length > 0,
             metadata: results.metadata,
             cached: results.audioFiles.length,
@@ -355,7 +469,7 @@ self.addEventListener('message', (event) => {
           });
         } catch (error) {
           console.error('[Service Worker] Playlist caching error:', error);
-          event.ports[0].postMessage({ success: false, error: error.message });
+          event.ports[0].postMessage({ type: 'complete', success: false, error: error.message });
         }
       })()
     );

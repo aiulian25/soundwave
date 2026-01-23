@@ -37,6 +37,7 @@ import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import api from '../api/client';
+import { offlineStorage } from '../utils/offlineStorage';
 
 interface LyricsData {
   audio_id: string;
@@ -137,6 +138,50 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     try {
       setLoading(true);
       setError('');
+      
+      // Check IndexedDB cache first (for offline mode) - with timeout to prevent hanging
+      let cachedLyrics = null;
+      try {
+        const cachePromise = offlineStorage.getLyrics(youtubeId);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Cache timeout')), 2000)
+        );
+        cachedLyrics = await Promise.race([cachePromise, timeoutPromise]);
+      } catch (cacheErr) {
+        console.log('[Lyrics] Cache check failed or timed out:', cacheErr);
+      }
+      
+      if (cachedLyrics) {
+        console.log('[Lyrics] Loading from offline cache');
+        setLyrics(cachedLyrics);
+        if (cachedLyrics.is_synced) {
+          const parsed = parseSyncedLyrics(cachedLyrics.synced_lyrics);
+          setParsedLyrics(parsed);
+        }
+        setLoading(false);
+        
+        // If online, try to refresh in background (non-blocking)
+        if (navigator.onLine) {
+          api.get(`/audio/${youtubeId}/lyrics/`).then(response => {
+            setLyrics(response.data);
+            if (response.data.is_synced) {
+              const parsed = parseSyncedLyrics(response.data.synced_lyrics);
+              setParsedLyrics(parsed);
+            }
+            // Update cache (fire and forget)
+            offlineStorage.saveLyrics(youtubeId, response.data).catch(() => {});
+          }).catch(() => {});
+        }
+        return;
+      }
+      
+      // No cache - fetch from API (requires online)
+      if (!navigator.onLine) {
+        setError('Lyrics not available offline');
+        setLoading(false);
+        return;
+      }
+      
       const response = await api.get(`/audio/${youtubeId}/lyrics/`);
       setLyrics(response.data);
       
@@ -144,6 +189,9 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         const parsed = parseSyncedLyrics(response.data.synced_lyrics);
         setParsedLyrics(parsed);
       }
+      
+      // Cache for offline use (fire and forget)
+      offlineStorage.saveLyrics(youtubeId, response.data).catch(() => {});
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load lyrics');
     } finally {

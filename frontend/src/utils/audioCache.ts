@@ -512,6 +512,81 @@ class AudioCacheManager {
   }
 
   /**
+   * Check Service Worker cache for offline audio (used by "Cache for Offline" feature)
+   * This is different from IndexedDB cache - it uses the Cache API
+   */
+  async getServiceWorkerCachedUrl(youtubeId: string): Promise<string | null> {
+    try {
+      // Check if Cache API is available
+      if (!('caches' in window)) {
+        console.log('[AudioCache] Cache API not available');
+        return null;
+      }
+
+      // The download URL that was cached by "Make Available Offline"
+      const downloadUrl = `/api/audio/${youtubeId}/download/`;
+      
+      // Check the audio cache
+      const audioCache = await caches.open('soundwave-audio-v1');
+      const cachedResponse = await audioCache.match(downloadUrl);
+      
+      if (cachedResponse) {
+        console.log('[AudioCache] Found in Service Worker cache:', youtubeId);
+        const blob = await cachedResponse.blob();
+        return URL.createObjectURL(blob);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[AudioCache] Error checking Service Worker cache:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get any cached audio URL - checks both IndexedDB and Service Worker cache
+   * Priority: IndexedDB (faster) -> Service Worker Cache (offline feature)
+   */
+  async getAnyCachedUrl(youtubeId: string): Promise<{ url: string; source: 'indexeddb' | 'serviceworker' } | null> {
+    // First check IndexedDB (prefetch cache)
+    const indexedDbUrl = await this.getCachedUrl(youtubeId);
+    if (indexedDbUrl) {
+      return { url: indexedDbUrl, source: 'indexeddb' };
+    }
+
+    // Then check Service Worker cache (offline feature)
+    const swUrl = await this.getServiceWorkerCachedUrl(youtubeId);
+    if (swUrl) {
+      return { url: swUrl, source: 'serviceworker' };
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if audio is available in any cache (IndexedDB or Service Worker)
+   */
+  async isAvailableOffline(youtubeId: string): Promise<boolean> {
+    // Check IndexedDB
+    if (await this.isCached(youtubeId)) {
+      return true;
+    }
+
+    // Check Service Worker cache
+    try {
+      if ('caches' in window) {
+        const cache = await caches.open('soundwave-audio-v1');
+        const response = await cache.match(`/api/audio/${youtubeId}/download/`);
+        return !!response;
+      }
+    } catch {
+      // Ignore errors
+    }
+
+    return false;
+  }
+
+  /**
    * Schedule periodic cleanup
    */
   private scheduleCleanup(): void {

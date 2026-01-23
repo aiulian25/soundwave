@@ -295,30 +295,79 @@ class PWAManager {
   }
 
   /**
-   * Cache entire playlist for offline access
+   * Cache progress callback type
    */
-  async cachePlaylist(playlistId: string, audioUrls: string[]): Promise<boolean> {
+  
+
+  /**
+   * Cache entire playlist for offline access with progress updates
+   */
+  async cachePlaylist(
+    playlistId: string, 
+    audioUrls: string[],
+    onProgress?: (progress: { current: number; total: number; percent: number; currentItem: string; status: string }) => void
+  ): Promise<{ success: boolean; cached: number; failed: number }> {
     if (!('serviceWorker' in navigator)) {
-      return false;
+      console.log('[PWA] Service Worker not supported');
+      return { success: false, cached: 0, failed: 0 };
     }
 
     try {
       const registration = await navigator.serviceWorker.ready;
       const messageChannel = new MessageChannel();
+      
+      // Get auth token from localStorage to pass to service worker
+      const authToken = localStorage.getItem('token');
+      if (!authToken) {
+        console.error('[PWA] No auth token available for caching');
+        return { success: false, cached: 0, failed: 0 };
+      }
 
       return new Promise((resolve) => {
+        // Set a timeout to avoid hanging
+        const timeout = setTimeout(() => {
+          console.error('[PWA] Playlist caching timed out');
+          resolve({ success: false, cached: 0, failed: audioUrls.length });
+        }, 300000); // 5 minutes timeout for large playlists
+
         messageChannel.port1.onmessage = (event) => {
-          resolve(event.data.success);
+          const data = event.data;
+          
+          // Handle progress updates
+          if (data.type === 'progress') {
+            console.log('[PWA] Cache progress:', data);
+            if (onProgress) {
+              onProgress({
+                current: data.current,
+                total: data.total,
+                percent: data.percent,
+                currentItem: data.currentItem,
+                status: data.status
+              });
+            }
+            return; // Don't resolve yet, wait for complete
+          }
+          
+          // Handle completion
+          if (data.type === 'complete' || data.success !== undefined) {
+            clearTimeout(timeout);
+            console.log('[PWA] Playlist cache complete:', data);
+            resolve({ 
+              success: data.success, 
+              cached: data.cached || 0, 
+              failed: data.failed || 0 
+            });
+          }
         };
 
         registration.active?.postMessage(
-          { type: 'CACHE_PLAYLIST', playlistId, audioUrls },
+          { type: 'CACHE_PLAYLIST', playlistId, audioUrls, authToken },
           [messageChannel.port2]
         );
       });
     } catch (error) {
       console.error('Error caching playlist:', error);
-      return false;
+      return { success: false, cached: 0, failed: audioUrls.length };
     }
   }
 

@@ -1,6 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { pwaManager } from '../utils/pwa';
 
+export interface CacheProgress {
+  current: number;
+  total: number;
+  percent: number;
+  currentItem: string;
+  status: string;
+}
+
+interface CacheResult {
+  success: boolean;
+  cached: number;
+  failed: number;
+}
+
 interface PWAContextType {
   isOnline: boolean;
   canInstall: boolean;
@@ -11,7 +25,7 @@ interface PWAContextType {
   updateApp: () => Promise<void>;
   clearCache: () => Promise<boolean>;
   cacheAudio: (url: string) => Promise<boolean>;
-  cachePlaylist: (playlistId: string, audioUrls: string[]) => Promise<boolean>;
+  cachePlaylist: (playlistId: string, audioUrls: string[], onProgress?: (progress: CacheProgress) => void) => Promise<CacheResult>;
   removePlaylistCache: (playlistId: string, audioUrls: string[]) => Promise<boolean>;
   requestNotifications: () => Promise<NotificationPermission>;
 }
@@ -102,9 +116,9 @@ export const PWAProvider: React.FC<PWAProviderProps> = ({ children }) => {
     return result;
   };
 
-  const cachePlaylist = async (playlistId: string, audioUrls: string[]) => {
-    const result = await pwaManager.cachePlaylist(playlistId, audioUrls);
-    if (result) {
+  const cachePlaylist = async (playlistId: string, audioUrls: string[], onProgress?: (progress: CacheProgress) => void) => {
+    const result = await pwaManager.cachePlaylist(playlistId, audioUrls, onProgress);
+    if (result.success) {
       const size = await pwaManager.getCacheSize();
       setCacheSize(size);
     }

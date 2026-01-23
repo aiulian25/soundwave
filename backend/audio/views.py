@@ -217,6 +217,19 @@ class AudioDownloadView(ApiBaseView):
     """Audio file download endpoint
     GET: download audio file to user's device
     """
+    # Accept any content type to bypass DRF content negotiation for file downloads
+    # This prevents 406 errors when clients request audio/* content types
+    from rest_framework.renderers import BaseRenderer
+    
+    class PassthroughRenderer(BaseRenderer):
+        """Renderer that passes through any content type"""
+        media_type = '*/*'
+        format = ''
+        
+        def render(self, data, accepted_media_type=None, renderer_context=None):
+            return data
+    
+    renderer_classes = [PassthroughRenderer]
 
     def get(self, request, youtube_id):
         """Download audio file with security checks"""

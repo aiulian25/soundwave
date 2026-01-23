@@ -25,6 +25,8 @@ import PWAPrompts from './components/PWAPrompts';
 import { useSmartShuffle } from './hooks/useSmartShuffle';
 import { useIntelligentPrefetch } from './hooks/useIntelligentPrefetch';
 import { useSettings } from './context/SettingsContext';
+import { offlineStorage } from './utils/offlineStorage';
+import { pwaManager } from './utils/pwa';
 import type { Audio } from './types';
 
 function App() {
@@ -118,14 +120,30 @@ function App() {
       });
     } catch (error) {
       console.error('Logout error:', error);
-    } finally {
-      // Always clear local storage and redirect to login
-      localStorage.removeItem('token');
-      setIsAuthenticated(false);
-      setCurrentAudio(null);
-      setQueue([]);
-      setCurrentQueueIndex(0);
     }
+    
+    // Clear offline data (IndexedDB playlists, favorites, etc.)
+    try {
+      await offlineStorage.clearAllData();
+      console.log('[Logout] Cleared IndexedDB offline data');
+    } catch (error) {
+      console.error('Failed to clear offline data:', error);
+    }
+    
+    // Clear Service Worker caches (audio files, API responses)
+    try {
+      await pwaManager.clearCache();
+      console.log('[Logout] Cleared Service Worker caches');
+    } catch (error) {
+      console.error('Failed to clear SW cache:', error);
+    }
+    
+    // Always clear local storage and redirect to login
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
+    setCurrentAudio(null);
+    setQueue([]);
+    setCurrentQueueIndex(0);
   };
 
   const toggleMobileDrawer = () => {

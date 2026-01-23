@@ -96,6 +96,39 @@ export default function PlaylistsPage() {
 
   const loadPlaylists = async () => {
     try {
+      // If offline, load from IndexedDB
+      if (!isOnline) {
+        console.log('[Offline] Loading playlists from cache');
+        const cachedPlaylists = await offlineStorage.getOfflinePlaylists();
+        if (cachedPlaylists.length > 0) {
+          // Convert cached playlists to expected format
+          const offlineData = cachedPlaylists.map(p => ({
+            id: p.id,
+            playlist_id: p.playlist_id,
+            title: p.title,
+            channel_name: p.channel_name || 'Offline',
+            thumbnail_url: p.thumbnail_url,
+            subscribed: true,
+            item_count: p.item_count || p.items?.length || 0,
+            downloaded_count: p.downloaded_count || p.items?.length || 0,
+            last_refresh: null,
+            sync_status: 'success' as const,
+            status_display: 'Offline',
+            error_message: '',
+            active: true,
+            progress_percent: 100,
+          }));
+          setPlaylists(offlineData);
+          // Mark all as offline available
+          setOfflinePlaylists(new Set(offlineData.map(p => p.id)));
+        } else {
+          setPlaylists([]);
+        }
+        setLoading(false);
+        return;
+      }
+      
+      // Online - fetch from API
       const data = await fetchAllPlaylists();
       setPlaylists(data);
       
@@ -121,7 +154,7 @@ export default function PlaylistsPage() {
 
   useEffect(() => {
     loadPlaylists();
-  }, []);
+  }, [isOnline]);
 
   const handleSubscribe = async () => {
     setError('');
