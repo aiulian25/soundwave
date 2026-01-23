@@ -8,19 +8,31 @@
 
 ## ✨ Features
 
+### Core Features
 - 🎧 **Audio-Only Downloads** - Extract high-quality audio from YouTube using yt-dlp
 - 📚 **Smart Organization** - Index audio files with full metadata (title, artist, duration, etc.)
 - 🔍 **Powerful Search** - Find your audio quickly with ElasticSearch-powered indexing
 - 🎵 **Built-in Player** - Stream your collection directly in the browser
 - 📊 **Channel Subscriptions** - Subscribe to YouTube channels and automatically download new audio
 - 📝 **Playlists** - Create custom playlists or sync YouTube playlists
-- � **PWA Support** - Install as mobile/desktop app with offline capabilities
-- 💾 **Persistent Storage** - Data survives container rebuilds
-- 🔄 **Offline Playlists** - Download playlists for offline playback
-- �📈 **Statistics** - Track plays, downloads, and library stats
+
+### PWA & Offline Features
+- 📱 **PWA Support** - Install as mobile/desktop app
+- 💾 **Full Offline Playback** - Cache playlists with audio, lyrics, and metadata for offline use
+- 🎤 **Synced Lyrics** - Display lyrics in sync with music playback (online & offline)
+- 🔄 **Background Caching** - Non-blocking progress indicator while caching
+
+### Visual & UI
 - 🌙 **Dark Theme** - Beautiful Material Design dark UI
+- 🎨 **Audio Visualizer** - Multiple visualization themes (Classic, Neon, Minimal, etc.)
+- 📐 **Responsive Grid** - 2-column layout on mobile, scales to 4 columns on desktop
+- 🖼️ **Offline Fallbacks** - Album art fallback icons when offline
+
+### Other Features
+- 📈 **Statistics** - Track plays, downloads, and library stats
 - 🔐 **User Management** - Multi-user support with authentication
 - ⚡ **Background Tasks** - Celery-powered async downloads and updates
+- 💾 **Persistent Storage** - Data survives container rebuilds
 
 ## 🏗️ Architecture
 
@@ -38,16 +50,39 @@
 - Dual-core CPU (quad-core recommended)
 - Storage space for your audio library
 
-## 🚀 Quick Start (For End Users)
+## 🚀 Quick Start
 
-### Option 1: Pull Pre-Built Image (Recommended)
+### Step 1: Download Files
 
-**1. Download docker-compose.yml**
 ```bash
-wget https://raw.githubusercontent.com/aiulian25/soundwave/main/docker-compose.yml
+# Create a directory for SoundWave
+mkdir soundwave && cd soundwave
+
+# Download docker-compose.yml
+wget https://raw.githubusercontent.com/aiulian25/soundwave/main/docker-compose.prod.yml -O docker-compose.yml
 ```
 
-**2. Create .env file**
+### Step 2: Create Data Directories
+
+**Important:** Docker needs these directories to exist with proper permissions before starting.
+
+```bash
+# Create directories
+mkdir -p ./audio ./cache ./data
+
+# Set permissions for container user (1000:1000)
+sudo chown -R 1000:1000 ./audio ./cache ./data
+```
+
+Or use the setup script:
+```bash
+wget https://raw.githubusercontent.com/aiulian25/soundwave/main/setup-dirs.sh
+chmod +x setup-dirs.sh
+./setup-dirs.sh
+```
+
+### Step 3: Create Environment File (Optional)
+
 ```bash
 cat > .env << EOF
 SW_HOST=http://localhost:8889
@@ -59,83 +94,41 @@ TZ=UTC
 EOF
 ```
 
-**3. Start SoundWave**
+### Step 4: Start SoundWave
+
 ```bash
 docker compose up -d
 ```
 
-**Access:** http://localhost:8889  
-**Login:** admin / soundwave
+### Step 5: Access the Application
 
-The pre-built image is hosted on Docker Hub at `aiulian25/soundwave:latest`
+- **URL:** http://localhost:8889
+- **Username:** admin
+- **Password:** soundwave
 
-### Option 2: Build From Source (For Developers)
+Wait ~30-60 seconds for all services to initialize on first start.
 
-**1. Clone the Repository**
-```bash
-git clone https://github.com/aiulian25/soundwave.git
-cd soundwave
-```
+## 🔧 Configuration
 
-**2. Build Frontend**
-```bash
-cd frontend
-npm install
-npm run build
-cd ..
-```
+### Environment Variables
 
-**3. Start with Docker**
-```bash
-# Edit docker-compose.yml to use "build: ." instead of "image: aiulian25/soundwave:latest"
-docker compose build
-docker compose up -d
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SW_HOST` | Application URL | `http://localhost:8889` |
+| `SW_USERNAME` | Initial admin username | `admin` |
+| `SW_PASSWORD` | Initial admin password | `soundwave` |
+| `ELASTIC_PASSWORD` | ElasticSearch password | `soundwave` |
+| `REDIS_HOST` | Redis hostname | `soundwave-redis` |
+| `TZ` | Timezone | `UTC` |
+| `SW_AUTO_UPDATE_YTDLP` | Auto-update yt-dlp | `false` |
 
-### First-Time Setup
+### Data Directories
 
-The application automatically:
-- Creates the admin user on first run
-- Runs database migrations
-- Collects static files
-- Initializes the search index
-
-Just wait ~30-60 seconds after `docker compose up -d` for services to be ready.
-
-## 📖 Detailed Setup (Old Method)
-
-Copy the example environment file and customize it:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your preferred settings:
-
-```env
-SW_HOST=http://localhost:123456
-SW_USERNAME=admin
-SW_PASSWORD=your_secure_password
-ELASTIC_PASSWORD=your_elastic_password
-TZ=America/New_York
-```
-
-### 3. Start SoundWave
-
-```bash
-docker-compose up -d
-```
-
-### 4. Access the Application
-
-Open your browser and navigate to:
-```
-http://localhost:123456
-```
-
-Login with the credentials you set in `.env`:
-- **Username**: admin (or your SW_USERNAME)
-- **Password**: soundwave (or your SW_PASSWORD)
+| Directory | Purpose |
+|-----------|---------|
+| `./audio` | Downloaded audio files |
+| `./cache` | Temporary cache files |
+| `./data` | Database and app data |
 
 ## 📖 Usage
 
@@ -155,16 +148,47 @@ Login with the credentials you set in `.env`:
 ### Creating Playlists
 
 1. Visit **Playlists**
-2. Create a new custom playlist
+2. Create a new custom playlist or add a YouTube playlist URL
 3. Add audio files from your library
+
+### Offline Playback (PWA)
+
+1. Install SoundWave as a PWA (click install icon in browser)
+2. Open a playlist and tap **Save Offline**
+3. Wait for caching to complete (progress shown in snackbar)
+4. Playlist is now available offline with audio, lyrics, and metadata!
 
 ### Playing Audio
 
 - Click any audio file to start playback
 - Use the player controls at the bottom
+- Tap the album art to open the visualizer
+- Swipe up/down on album art to show/hide lyrics
 - Track your listening progress automatically
 
 ## 🛠️ Development
+
+### Build From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/aiulian25/soundwave.git
+cd soundwave
+
+# Build frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Create data directories
+mkdir -p ./audio ./cache ./data
+sudo chown -R 1000:1000 ./audio ./cache ./data
+
+# Build and start
+docker compose build
+docker compose up -d
+```
 
 ### Backend Development
 
@@ -206,45 +230,40 @@ soundwave/
 │   │   ├── components/    # Reusable components
 │   │   ├── pages/         # Page components
 │   │   ├── api/           # API client
+│   │   ├── context/       # React contexts (PWA, Settings)
+│   │   ├── hooks/         # Custom React hooks
 │   │   ├── theme/         # Material-UI theme
+│   │   ├── utils/         # Utilities (offline storage, caching)
 │   │   └── types/         # TypeScript types
 ├── docker_assets/         # Docker helper scripts
-├── docker-compose.yml     # Docker orchestration
+├── docs/                  # Documentation
+├── docker-compose.yml     # Docker orchestration (development)
+├── docker-compose.prod.yml # Docker orchestration (production)
 ├── Dockerfile            # Application container
+├── setup-dirs.sh         # Directory setup script
 └── README.md             # This file
 ```
 
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SW_HOST` | Application URL | `http://localhost:123456` |
-| `SW_USERNAME` | Initial admin username | `admin` |
-| `SW_PASSWORD` | Initial admin password | `soundwave` |
-| `ELASTIC_PASSWORD` | ElasticSearch password | Required |
-| `REDIS_HOST` | Redis hostname | `soundwave-redis` |
-| `TZ` | Timezone | `UTC` |
-| `SW_AUTO_UPDATE_YTDLP` | Auto-update yt-dlp | `false` |
-
-### Audio Quality
-
-By default, SoundWave downloads the best available audio quality. You can configure this in the settings or via yt-dlp options in `task/tasks.py`.
-
 ## 🐛 Troubleshooting
+
+### Permission Denied Errors
+
+```bash
+# Re-run directory setup
+sudo chown -R 1000:1000 ./audio ./cache ./data
+```
 
 ### Container Won't Start
 
 ```bash
 # Check logs
-docker-compose logs soundwave
+docker compose logs soundwave
 
 # Check ElasticSearch
-docker-compose logs soundwave-es
+docker compose logs soundwave-es
 
 # Restart services
-docker-compose restart
+docker compose restart
 ```
 
 ### Download Failures
@@ -253,14 +272,43 @@ docker-compose restart
 - Check FFmpeg is installed in the container
 - Review download logs in the admin panel
 
+### Offline Playback Not Working
+
+- Ensure you cached the playlist while online
+- Check that Service Worker is registered (Settings > PWA)
+- Clear browser cache and re-cache the playlist
+
 ### Port Already in Use
 
-If port 123456 is in use, change it in `docker-compose.yml`:
-
+Change the port in `docker-compose.yml`:
 ```yaml
 ports:
-  - "YOUR_PORT:8000"
+  - "YOUR_PORT:8888"
 ```
+
+## 📝 Recent Changes
+
+### v1.5.0 - Offline Playback & UI Improvements (January 2026)
+
+#### Offline Playback
+- ✅ Full offline playback with cached audio, lyrics, and metadata
+- ✅ Service Worker authentication fix for 406 errors
+- ✅ IndexedDB lyrics caching (database version 2)
+- ✅ Proper playlist lookup by playlist_id for offline mode
+- ✅ Album art fallback icons when images fail to load offline
+- ✅ Non-blocking caching progress snackbar (auto-dismisses after 2s)
+- ✅ Completion notification when caching finishes
+
+#### UI/UX Improvements
+- ✅ Responsive 2-column playlist grid on mobile (3 on tablet, 4 on desktop)
+- ✅ Audio visualizer with multiple themes
+- ✅ Synced lyrics display with swipe gesture
+- ✅ Auto-dismissing offline notification (5 seconds)
+
+#### Technical Improvements
+- ✅ PassthroughRenderer for DRF content negotiation
+- ✅ Direct LyricsPlayer import (fixes lazy loading offline)
+- ✅ PWA Service Worker improvements
 
 ## 🤝 Contributing
 
@@ -274,7 +322,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -282,7 +330,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Built with [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - UI designed with [Material-UI](https://mui.com/)
 
-## � Documentation
+## 📚 Documentation
 
 - 📖 [Quick Reference](docs/QUICK_REFERENCE.md) - Quick start guide
 - 🔧 [Data Persistence Fix](docs/DATA_PERSISTENCE_FIX.md) - Technical details on persistence
@@ -291,13 +339,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - 🎨 [PWA Implementation](docs/PWA_COMPLETE.md) - Progressive Web App features
 - 🔒 [Security Audit](docs/SECURITY_AND_PWA_AUDIT_COMPLETE.md) - Security verification
 - 📝 [Change Log](docs/CHANGELOG.md) - Recent changes and improvements
-- 📂 [All Documentation](docs/) - Complete documentation index
 
 ## 📞 Support
 
-- 💬 [Discord Community](#)
-- 🐛 [Issue Tracker](https://github.com/yourusername/soundwave/issues)
-- 📖 [Full Documentation](https://docs.soundwave.app)
+- 🐛 [Issue Tracker](https://github.com/aiulian25/soundwave/issues)
 
 ---
 
