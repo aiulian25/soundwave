@@ -300,10 +300,16 @@ export default function PlaylistsPage() {
         >
           <Box 
             sx={{ 
-              display: 'flex', 
-              flexWrap: 'wrap',
-              gap: 3, 
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: { xs: 1.5, sm: 2, md: 3 },
               pb: 2,
+              '@media (min-width: 900px)': {
+                gridTemplateColumns: 'repeat(3, 1fr)',
+              },
+              '@media (min-width: 1200px)': {
+                gridTemplateColumns: 'repeat(4, 1fr)',
+              },
             }}
           >
             {sortedPlaylists.map((playlist) => (

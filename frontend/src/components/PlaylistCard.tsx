@@ -64,8 +64,9 @@ export default function PlaylistCard({
     <Box
       onClick={onClick}
       sx={{
-        width: 200,
-        minWidth: 200,
+        width: '100%',
+        minWidth: 0,
+        maxWidth: 280,
         borderRadius: 3,
         overflow: 'hidden',
         bgcolor: 'background.paper',
@@ -88,7 +89,8 @@ export default function PlaylistCard({
       {/* Thumbnail */}
       <Box
         sx={{
-          height: 200,
+          height: 0,
+          paddingBottom: '100%', // 1:1 aspect ratio
           width: '100%',
           position: 'relative',
           backgroundImage: playlist.thumbnail_url ? `url(${playlist.thumbnail_url})` : 'none',
