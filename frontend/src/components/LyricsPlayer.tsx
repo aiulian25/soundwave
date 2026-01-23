@@ -34,6 +34,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import DownloadIcon from '@mui/icons-material/Download';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import api from '../api/client';
 
 interface LyricsData {
@@ -96,6 +98,10 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [applyingId, setApplyingId] = useState<number | null>(null);
+  
+  // Edit mode - for finding different lyrics when already have some
+  const [editMode, setEditMode] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   // Download menu state
   const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<null | HTMLElement>(null);
@@ -204,10 +210,42 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       
       setShowSuggestions(false);
       setSuggestions([]);
+      setEditMode(false);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to apply lyrics');
     } finally {
       setApplyingId(null);
+    }
+  };
+
+  const deleteLyrics = async () => {
+    try {
+      setDeleting(true);
+      await api.delete(`/audio/${youtubeId}/lyrics/delete/`);
+      // Reset to empty lyrics state
+      setLyrics({
+        audio_id: youtubeId,
+        audio_title: lyrics?.audio_title || '',
+        synced_lyrics: '',
+        plain_lyrics: '',
+        is_instrumental: false,
+        source: '',
+        language: '',
+        has_lyrics: false,
+        is_synced: false,
+        display_lyrics: '',
+        fetch_attempted: true,
+        fetch_attempts: 0,
+        last_error: '',
+      });
+      setParsedLyrics([]);
+      setEditMode(false);
+      // Auto-load suggestions after delete
+      loadSuggestions();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to delete lyrics');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -525,6 +563,22 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           Lyrics
         </Typography>
         
+        {/* Find Different Lyrics button */}
+        <IconButton 
+          size="small" 
+          onClick={() => {
+            setEditMode(!editMode);
+            if (!editMode && suggestions.length === 0) {
+              loadSuggestions();
+            }
+          }}
+          sx={{ mr: 1 }}
+          title="Find different lyrics"
+          color={editMode ? 'primary' : 'default'}
+        >
+          <SwapHorizIcon />
+        </IconButton>
+        
         {/* Download button */}
         <IconButton 
           size="small" 
@@ -565,6 +619,126 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           </IconButton>
         )}
       </Box>
+      
+      {/* Edit mode panel - Find different lyrics */}
+      <Collapse in={editMode}>
+        <Box sx={{ p: 2, bgcolor: 'action.hover', borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="subtitle2" color="primary">
+              Find Different Lyrics
+            </Typography>
+            <Button
+              size="small"
+              color="error"
+              variant="outlined"
+              startIcon={deleting ? <CircularProgress size={16} /> : <DeleteOutlineIcon />}
+              onClick={deleteLyrics}
+              disabled={deleting}
+            >
+              {deleting ? 'Clearing...' : 'Clear & Search'}
+            </Button>
+          </Box>
+          
+          {/* Search form */}
+          <Box component="form" onSubmit={handleSearchSubmit} sx={{ mb: 2 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search by song title or artist..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Button type="submit" size="small" disabled={suggestionsLoading}>
+                      {suggestionsLoading ? 'Searching...' : 'Search'}
+                    </Button>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+          
+          {/* Suggestions list */}
+          {suggestionsLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          )}
+          
+          {!suggestionsLoading && suggestions.length > 0 && (
+            <Box sx={{ maxHeight: 250, overflow: 'auto' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                {suggestions.length} suggestions found - select one to replace current lyrics:
+              </Typography>
+              <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
+                {suggestions.map((suggestion) => (
+                  <ListItem
+                    key={suggestion.id}
+                    sx={{
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      '&:last-child': { borderBottom: 'none' },
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            "{suggestion.track_name}"
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            by {suggestion.artist_name}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                          {suggestion.has_synced && (
+                            <Chip label="Synced" size="small" color="success" sx={{ height: 20 }} />
+                          )}
+                          {suggestion.has_plain && !suggestion.has_synced && (
+                            <Chip label="Plain" size="small" sx={{ height: 20 }} />
+                          )}
+                          {suggestion.instrumental && (
+                            <Chip label="Instrumental" size="small" color="info" sx={{ height: 20 }} />
+                          )}
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDuration(suggestion.duration)}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        onClick={() => applySuggestion(suggestion)}
+                        disabled={applyingId === suggestion.id}
+                        startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
+                      >
+                        {applyingId === suggestion.id ? 'Applying...' : 'Use'}
+                      </Button>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+          
+          {!suggestionsLoading && suggestions.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+              No suggestions loaded yet. Enter a search term or click Search to find lyrics.
+            </Typography>
+          )}
+        </Box>
+      </Collapse>
 
       {lyrics.is_synced && (
         <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

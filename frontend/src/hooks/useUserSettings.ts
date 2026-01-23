@@ -33,8 +33,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   smart_shuffle_history_size: 10,
   audio_quality: 'high',
   items_per_page: 50,
-  // Visualizer defaults
-  visualizer_theme: 'classic-bars',
+  // Visualizer defaults - rounded-bars is user favorite
+  visualizer_theme: 'rounded-bars',
   visualizer_enabled: true,
   visualizer_glow: true,
   // Prefetch defaults

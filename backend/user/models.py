@@ -175,7 +175,7 @@ class UserConfig(models.Model):
     smart_shuffle_history_size = models.IntegerField(default=10, help_text="Number of recent songs to avoid in smart shuffle (5-50)")
     
     # Visualizer Settings
-    visualizer_theme = models.CharField(max_length=50, default='classic-bars', help_text="Audio visualizer theme")
+    visualizer_theme = models.CharField(max_length=50, default='rounded-bars', help_text="Audio visualizer theme")
     visualizer_enabled = models.BooleanField(default=True, help_text="Enable audio visualizer")
     visualizer_glow = models.BooleanField(default=True, help_text="Enable glow effect on visualizer")
     

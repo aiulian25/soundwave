@@ -4,14 +4,17 @@
  */
 
 export type VisualizerStyle = 
-  | 'bars' 
-  | 'bars-rounded' 
-  | 'wave' 
-  | 'circular' 
-  | 'particles' 
-  | 'spectrum'
-  | 'mirror-bars'
-  | 'dots';
+  | 'classic-bars'      // 0: Traditional frequency spectrum with rainbow-colored vertical bars
+  | 'bars-rounded'      // User favorite - Rounded bars with smooth animations
+  | 'circular-spectrum' // 1: Bars arranged in a circle radiating outward
+  | 'waveform'          // 2: Real-time audio waveform display (oscilloscope style)
+  | 'symmetric-bars'    // 3: Mirrored bars extending from center (top & bottom)
+  | 'particles'         // 4: Random particles that appear based on audio intensity
+  | 'frequency-rings'   // 5: Concentric circles that grow based on frequency data
+  | 'line-spectrum'     // 6: Smooth line graph with gradient colors
+  | 'radial-bars'       // 7: Bars radiating from a central circle outward
+  | 'block-grid'        // 8: 16×8 pixel-art style grid like an equalizer LED display
+  | 'spiral';           // 9: Dynamic spiral pattern that expands based on audio
 
 export type VisualizerColorScheme = 
   | 'theme' 
@@ -21,7 +24,8 @@ export type VisualizerColorScheme =
   | 'neon' 
   | 'sunset'
   | 'aurora'
-  | 'monochrome';
+  | 'monochrome'
+  | 'purple-blue-green';
 
 export interface VisualizerTheme {
   id: string;
@@ -38,121 +42,146 @@ export interface VisualizerTheme {
 
 // Predefined visualizer themes
 export const visualizerThemes: VisualizerTheme[] = [
-  {
-    id: 'classic-bars',
-    name: 'Classic Bars',
-    style: 'bars',
-    colorScheme: 'theme',
-    description: 'Traditional frequency bars using theme colors',
-    preview: {
-      primaryColor: '#5C6BC0',
-      secondaryColor: '#3F51B5',
-    },
-  },
+  // User favorite - Rounded Bars (default)
   {
     id: 'rounded-bars',
-    name: 'Rounded Bars',
+    name: 'Rounded Bars ⭐',
     style: 'bars-rounded',
     colorScheme: 'theme',
-    description: 'Soft rounded bars with smooth animations',
+    description: 'Soft rounded bars with smooth animations (Your favorite!)',
     preview: {
       primaryColor: '#7E57C2',
       secondaryColor: '#5C6BC0',
     },
   },
+  // 0: Classic Bars
   {
-    id: 'neon-wave',
-    name: 'Neon Wave',
-    style: 'wave',
-    colorScheme: 'neon',
-    description: 'Flowing neon waveform visualization',
-    preview: {
-      primaryColor: '#00FF87',
-      secondaryColor: '#FF00FF',
-      accentColor: '#00FFFF',
-    },
-  },
-  {
-    id: 'fire-spectrum',
-    name: 'Fire Spectrum',
-    style: 'spectrum',
-    colorScheme: 'fire',
-    description: 'Blazing fire-colored frequency spectrum',
-    preview: {
-      primaryColor: '#FF4500',
-      secondaryColor: '#FFD700',
-      accentColor: '#FF6347',
-    },
-  },
-  {
-    id: 'ocean-wave',
-    name: 'Ocean Wave',
-    style: 'wave',
-    colorScheme: 'ocean',
-    description: 'Cool ocean-inspired flowing waves',
-    preview: {
-      primaryColor: '#006994',
-      secondaryColor: '#00CED1',
-      accentColor: '#40E0D0',
-    },
-  },
-  {
-    id: 'circular-rainbow',
-    name: 'Circular Rainbow',
-    style: 'circular',
+    id: 'classic-bars',
+    name: 'Classic Bars',
+    style: 'classic-bars',
     colorScheme: 'rainbow',
-    description: 'Colorful circular audio spectrum',
+    description: 'Traditional frequency spectrum with rainbow-colored vertical bars',
     preview: {
       primaryColor: '#FF0000',
       secondaryColor: '#00FF00',
       accentColor: '#0000FF',
     },
   },
+  // 1: Circular Spectrum
   {
-    id: 'aurora-particles',
-    name: 'Aurora Particles',
-    style: 'particles',
-    colorScheme: 'aurora',
-    description: 'Northern lights-inspired particle effect',
+    id: 'circular-spectrum',
+    name: 'Circular Spectrum',
+    style: 'circular-spectrum',
+    colorScheme: 'neon',
+    description: 'Bars arranged in a circle radiating outward',
     preview: {
-      primaryColor: '#00FF87',
-      secondaryColor: '#7B68EE',
-      accentColor: '#FF69B4',
+      primaryColor: '#FF00FF',
+      secondaryColor: '#00FFFF',
+      accentColor: '#00FF00',
     },
   },
+  // 2: Waveform
   {
-    id: 'sunset-mirror',
-    name: 'Sunset Mirror',
-    style: 'mirror-bars',
+    id: 'waveform',
+    name: 'Waveform',
+    style: 'waveform',
+    colorScheme: 'ocean',
+    description: 'Real-time audio waveform display (oscilloscope style)',
+    preview: {
+      primaryColor: '#00CED1',
+      secondaryColor: '#006994',
+      accentColor: '#40E0D0',
+    },
+  },
+  // 3: Symmetric Bars
+  {
+    id: 'symmetric-bars',
+    name: 'Symmetric Bars',
+    style: 'symmetric-bars',
     colorScheme: 'sunset',
-    description: 'Mirrored bars with warm sunset colors',
+    description: 'Mirrored bars extending from center (top & bottom)',
     preview: {
       primaryColor: '#FF6B6B',
       secondaryColor: '#FFE66D',
       accentColor: '#FF8E53',
     },
   },
+  // 4: Particles
   {
-    id: 'minimal-dots',
-    name: 'Minimal Dots',
-    style: 'dots',
-    colorScheme: 'monochrome',
-    description: 'Clean, minimalist dot visualization',
+    id: 'particles',
+    name: 'Particles',
+    style: 'particles',
+    colorScheme: 'aurora',
+    description: 'Random particles that appear based on audio intensity',
     preview: {
-      primaryColor: '#FFFFFF',
-      secondaryColor: '#888888',
+      primaryColor: '#00FF87',
+      secondaryColor: '#7B68EE',
+      accentColor: '#FF69B4',
     },
   },
+  // 5: Frequency Rings
   {
-    id: 'rainbow-bars',
-    name: 'Rainbow Bars',
-    style: 'bars',
-    colorScheme: 'rainbow',
-    description: 'Full spectrum rainbow-colored bars',
+    id: 'frequency-rings',
+    name: 'Frequency Rings',
+    style: 'frequency-rings',
+    colorScheme: 'neon',
+    description: 'Concentric circles that grow based on frequency data',
     preview: {
-      primaryColor: '#FF0000',
-      secondaryColor: '#00FF00',
-      accentColor: '#0000FF',
+      primaryColor: '#FF00FF',
+      secondaryColor: '#00FFFF',
+      accentColor: '#FFFF00',
+    },
+  },
+  // 6: Line Spectrum
+  {
+    id: 'line-spectrum',
+    name: 'Line Spectrum',
+    style: 'line-spectrum',
+    colorScheme: 'purple-blue-green',
+    description: 'Smooth line graph with gradient colors (purple → blue → green)',
+    preview: {
+      primaryColor: '#9400D3',
+      secondaryColor: '#0000FF',
+      accentColor: '#00FF00',
+    },
+  },
+  // 7: Radial Bars
+  {
+    id: 'radial-bars',
+    name: 'Radial Bars',
+    style: 'radial-bars',
+    colorScheme: 'fire',
+    description: 'Bars radiating from a central circle outward',
+    preview: {
+      primaryColor: '#FF4500',
+      secondaryColor: '#FFD700',
+      accentColor: '#FF6347',
+    },
+  },
+  // 8: Block Grid
+  {
+    id: 'block-grid',
+    name: 'Block Grid',
+    style: 'block-grid',
+    colorScheme: 'rainbow',
+    description: '16×8 pixel-art style grid like an equalizer LED display',
+    preview: {
+      primaryColor: '#00FF00',
+      secondaryColor: '#FFFF00',
+      accentColor: '#FF0000',
+    },
+  },
+  // 9: Spiral
+  {
+    id: 'spiral',
+    name: 'Spiral',
+    style: 'spiral',
+    colorScheme: 'aurora',
+    description: 'Dynamic spiral pattern that expands based on audio',
+    preview: {
+      primaryColor: '#00FF87',
+      secondaryColor: '#FF69B4',
+      accentColor: '#7B68EE',
     },
   },
 ];
@@ -167,6 +196,7 @@ export const colorSchemeGradients: Record<VisualizerColorScheme, string[]> = {
   sunset: ['#FF6B6B', '#FFE66D', '#FF8E53', '#FF6347', '#CD5C5C'],
   aurora: ['#00FF87', '#7B68EE', '#FF69B4', '#00BFFF', '#98FB98'],
   monochrome: ['#FFFFFF', '#CCCCCC', '#999999', '#666666', '#333333'],
+  'purple-blue-green': ['#9400D3', '#4B0082', '#0000FF', '#00BFFF', '#00FF00'],
 };
 
 // Get color at position for gradient
@@ -221,14 +251,17 @@ function interpolateColor(color1: string, color2: string, factor: number): strin
 
 // Visualizer style display names
 export const visualizerStyleNames: Record<VisualizerStyle, string> = {
-  'bars': 'Classic Bars',
-  'bars-rounded': 'Rounded Bars',
-  'wave': 'Wave',
-  'circular': 'Circular',
+  'bars-rounded': 'Rounded Bars ⭐',
+  'classic-bars': 'Classic Bars',
+  'circular-spectrum': 'Circular Spectrum',
+  'waveform': 'Waveform',
+  'symmetric-bars': 'Symmetric Bars',
   'particles': 'Particles',
-  'spectrum': 'Spectrum',
-  'mirror-bars': 'Mirror Bars',
-  'dots': 'Dots',
+  'frequency-rings': 'Frequency Rings',
+  'line-spectrum': 'Line Spectrum',
+  'radial-bars': 'Radial Bars',
+  'block-grid': 'Block Grid',
+  'spiral': 'Spiral',
 };
 
 // Color scheme display names
@@ -241,10 +274,11 @@ export const colorSchemeNames: Record<VisualizerColorScheme, string> = {
   'sunset': 'Sunset',
   'aurora': 'Aurora',
   'monochrome': 'Monochrome',
+  'purple-blue-green': 'Purple Blue Green',
 };
 
-// Default visualizer theme ID
-export const DEFAULT_VISUALIZER_THEME = 'classic-bars';
+// Default visualizer theme ID - User's favorite (rounded bars)
+export const DEFAULT_VISUALIZER_THEME = 'rounded-bars';
 
 // Get theme by ID
 export function getVisualizerTheme(themeId: string): VisualizerTheme {
