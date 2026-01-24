@@ -42,7 +42,7 @@ import ScrollToTop from '../components/ScrollToTop';
 import type { Audio } from '../types';
 
 interface SearchPageProps {
-  setCurrentAudio: (audio: Audio) => void;
+  setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
 }
 
 interface Playlist {
@@ -312,8 +312,8 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   
   const handleSuggestionClick = (suggestion: QuickSuggestion) => {
     if (suggestion.type === 'song' && suggestion.audio) {
-      // Play the song directly
-      setCurrentAudio(suggestion.audio);
+      // Play the song directly with search results as queue
+      setCurrentAudio(suggestion.audio, audioResults.length > 0 ? audioResults : [suggestion.audio]);
       setShowSuggestions(false);
       saveRecentSearch(suggestion.text);
     } else {
@@ -619,7 +619,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             secondaryAction={
                               <IconButton
                                 edge="end"
-                                onClick={() => setCurrentAudio(audio)}
+                                onClick={() => setCurrentAudio(audio, audioResults)}
                                 disabled={!audio.file_path}
                                 sx={{ color: 'primary.main' }}
                               >
@@ -628,7 +628,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             }
                           >
                             <ListItemButton
-                              onClick={() => setCurrentAudio(audio)}
+                              onClick={() => setCurrentAudio(audio, audioResults)}
                               disabled={!audio.file_path}
                             >
                               <ListItemAvatar>
@@ -730,7 +730,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                       secondaryAction={
                         <IconButton
                           edge="end"
-                          onClick={() => setCurrentAudio(audio)}
+                          onClick={() => setCurrentAudio(audio, audioResults)}
                           disabled={!audio.file_path}
                           sx={{ color: 'primary.main' }}
                         >
@@ -739,7 +739,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                       }
                     >
                       <ListItemButton
-                        onClick={() => setCurrentAudio(audio)}
+                        onClick={() => setCurrentAudio(audio, audioResults)}
                         disabled={!audio.file_path}
                       >
                         <ListItemAvatar>

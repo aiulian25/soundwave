@@ -216,7 +216,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
                     bgcolor: 'rgba(19, 236, 106, 0.05)',
                   },
                 }}
-                onClick={() => setCurrentAudio(audio)}
+                onClick={() => setCurrentAudio(audio, audioList)}
               >
                 <TableCell sx={{ color: 'text.secondary' }}>{index + 1}</TableCell>
                 <TableCell>

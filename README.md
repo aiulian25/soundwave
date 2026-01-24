@@ -13,6 +13,7 @@
 - 📚 **Smart Organization** - Index audio files with full metadata (title, artist, duration, etc.)
 - 🔍 **Powerful Search** - Find your audio quickly with ElasticSearch-powered indexing
 - 🎵 **Built-in Player** - Stream your collection directly in the browser
+- ▶️ **Auto-Play / Continuous Playback** - Automatically plays next track in queue
 - 📊 **Channel Subscriptions** - Subscribe to YouTube channels and automatically download new audio
 - 📝 **Playlists** - Create custom playlists or sync YouTube playlists
 
@@ -288,6 +289,21 @@ ports:
 
 ## 📝 Recent Changes
 
+### v1.6.0 - Auto-Play & Infrastructure Improvements (January 2026)
+
+#### Auto-Play / Continuous Playback
+- ✅ Continuous playback - songs auto-play next track when finished
+- ✅ Queue system for Library, Playlists, Search, Favorites, Channels, Home
+- ✅ Previous/Next track navigation in player
+- ✅ Smart shuffle and regular shuffle modes
+- ✅ Works from any starting position in a list
+
+#### Infrastructure Improvements
+- ✅ Replaced third-party ElasticSearch image with official `docker.elastic.co/elasticsearch/elasticsearch:8.11.3`
+- ✅ Fixed SQLite "database is locked" errors with 30-second timeout
+- ✅ Reduced Celery worker concurrency to 2 to prevent DB contention
+- ✅ ElasticSearch health checks and disk watermark configuration
+
 ### v1.5.0 - Offline Playback & UI Improvements (January 2026)
 
 #### Offline Playback
@@ -304,11 +320,6 @@ ports:
 - ✅ Audio visualizer with multiple themes
 - ✅ Synced lyrics display with swipe gesture
 - ✅ Auto-dismissing offline notification (5 seconds)
-
-#### Technical Improvements
-- ✅ PassthroughRenderer for DRF content negotiation
-- ✅ Direct LyricsPlayer import (fixes lazy loading offline)
-- ✅ PWA Service Worker improvements
 
 ## 🤝 Contributing
 

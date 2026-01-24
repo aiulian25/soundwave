@@ -6,7 +6,7 @@ import { audioAPI, playlistAPI } from '../api/client';
 import type { Audio, Playlist } from '../types';
 
 interface HomePageProps {
-  setCurrentAudio: (audio: Audio) => void;
+  setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
 }
 
 export default function HomePage({ setCurrentAudio }: HomePageProps) {
@@ -79,7 +79,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   transform: 'scale(1.05)',
                 },
               }}
-              onClick={() => setCurrentAudio(audio)}
+              onClick={() => setCurrentAudio(audio, newAudio)}
             >
               <Box
                 sx={{

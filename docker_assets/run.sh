@@ -104,8 +104,8 @@ END
 # Collect static files
 python manage.py collectstatic --noinput
 
-# Start Celery worker in background
-celery -A config worker --loglevel=info &
+# Start Celery worker in background with limited concurrency to avoid SQLite locks
+celery -A config worker --loglevel=info --concurrency=2 &
 
 # Start Celery beat in background
 celery -A config beat --loglevel=info &

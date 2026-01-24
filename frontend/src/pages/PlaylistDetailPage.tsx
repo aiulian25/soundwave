@@ -725,7 +725,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           </TableHead>
           <TableBody>
             {playlist.items && playlist.items.length > 0 ? (
-              playlist.items.map((item, index) => (
+              playlist.items.map((item, index) => {
+                // Create queue from all downloaded tracks
+                const playlistQueue = (playlist.items || [])
+                  .filter(i => i.audio.file_path)
+                  .map(i => i.audio);
+                return (
                 <TableRow
                   key={item.id}
                   sx={{
@@ -736,7 +741,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                     },
                     opacity: item.audio.file_path ? 1 : 0.5,
                   }}
-                  onClick={() => item.audio.file_path && setCurrentAudio(item.audio)}
+                  onClick={() => item.audio.file_path && setCurrentAudio(item.audio, playlistQueue)}
                 >
                   <TableCell sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
                     {index + 1}
@@ -791,7 +796,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                       <IconButton
                         size="small"
-                        onClick={() => item.audio.file_path && setCurrentAudio(item.audio)}
+                        onClick={() => item.audio.file_path && setCurrentAudio(item.audio, playlistQueue)}
                         disabled={!item.audio.file_path}
                         sx={{
                           color: 'primary.main',
@@ -829,7 +834,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                     </Box>
                   </TableCell>
                 </TableRow>
-              ))
+              );})
             ) : (
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>

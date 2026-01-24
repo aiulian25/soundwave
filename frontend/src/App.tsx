@@ -260,16 +260,16 @@ function App() {
           }}
         >
           <Routes>
-            <Route path="/" element={<HomePage setCurrentAudio={setCurrentAudio} />} />
-            <Route path="/search" element={<SearchPage setCurrentAudio={setCurrentAudio} />} />
+            <Route path="/" element={<HomePage setCurrentAudio={setAudioWithQueue} />} />
+            <Route path="/search" element={<SearchPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/library" element={<LibraryPage setCurrentAudio={setAudioWithQueue} />} />
-            <Route path="/favorites" element={<FavoritesPage setCurrentAudio={setCurrentAudio} />} />
+            <Route path="/favorites" element={<FavoritesPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/channels" element={<ChannelsPage />} />
             <Route path="/channels/:channelId" element={<ChannelDetailPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/playlists" element={<PlaylistsPage />} />
             <Route path="/playlists/:playlistId" element={<PlaylistDetailPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/local-files" element={<LocalFilesPage setCurrentAudio={setCurrentAudio} />} />
+            <Route path="/local-files" element={<LocalFilesPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/offline" element={<OfflineManagerPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
@@ -299,7 +299,7 @@ function App() {
             onClose={() => setCurrentAudio(null)}
             onNext={playNext}
             onPrevious={playPrevious}
-            hasNext={settingsContext?.settings?.shuffle_enabled ? queue.length > 1 : currentQueueIndex < queue.length - 1}
+            hasNext={queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || currentQueueIndex < queue.length - 1)}
             hasPrevious={currentQueueIndex > 0}
             onFavoriteToggle={handlePlayerFavoriteToggle}
             onTrackSelect={handleRelatedTrackSelect}
@@ -349,7 +349,7 @@ function App() {
               onClose={() => setCurrentAudio(null)}
               onNext={playNext}
               onPrevious={playPrevious}
-              hasNext={settingsContext?.settings?.shuffle_enabled ? queue.length > 1 : currentQueueIndex < queue.length - 1}
+              hasNext={queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || currentQueueIndex < queue.length - 1)}
               hasPrevious={currentQueueIndex > 0}
               onFavoriteToggle={handlePlayerFavoriteToggle}
               onTrackSelect={handleRelatedTrackSelect}

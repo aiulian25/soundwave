@@ -28,7 +28,7 @@ import { extractMetadata, getAudioDuration } from '../utils/id3Reader';
 import type { Audio } from '../types';
 
 interface LocalFilesPageProps {
-  setCurrentAudio: (audio: Audio) => void;
+  setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
 }
 
 export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps) {
@@ -227,7 +227,34 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
         cover_art_url: localFile.coverArt,
       };
 
-      setCurrentAudio(audio);
+      // Convert all audio files to queue format
+      const queue: Audio[] = audioFiles.map(file => {
+        const fileURL = file.file ? URL.createObjectURL(file.file) : '';
+        return {
+          id: parseInt(file.id.split('-')[0]) || Date.now(),
+          youtube_id: undefined,
+          title: file.title,
+          channel_name: file.artist,
+          channel_id: '',
+          description: `${file.album}${file.year ? ` (${file.year})` : ''}`,
+          thumbnail_url: file.coverArt || '/placeholder.jpg',
+          duration: file.duration,
+          file_size: file.fileSize,
+          file_path: fileURL,
+          media_url: fileURL,
+          play_count: file.playCount,
+          published_date: file.addedDate.toISOString(),
+          downloaded_date: file.addedDate.toISOString(),
+          view_count: 0,
+          like_count: 0,
+          audio_format: file.mimeType.split('/')[1] || 'mp3',
+          artist: file.artist,
+          album: file.album,
+          cover_art_url: file.coverArt,
+        };
+      });
+
+      setCurrentAudio(audio, queue);
     } catch (error) {
       console.error('Error playing file:', error);
       setAlert({ message: 'Failed to play file', severity: 'error' });
