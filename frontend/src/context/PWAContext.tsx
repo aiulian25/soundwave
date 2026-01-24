@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { pwaManager } from '../utils/pwa';
+import { audioCache } from '../utils/audioCache';
 
 export interface CacheProgress {
   current: number;
@@ -121,6 +122,10 @@ export const PWAProvider: React.FC<PWAProviderProps> = ({ children }) => {
     if (result.success) {
       const size = await pwaManager.getCacheSize();
       setCacheSize(size);
+      
+      // Refresh the in-memory cache index so Player can find cached tracks instantly
+      await audioCache.refreshServiceWorkerIndex();
+      console.log('[PWA] Refreshed cache index after playlist cache');
     }
     return result;
   };
@@ -130,6 +135,9 @@ export const PWAProvider: React.FC<PWAProviderProps> = ({ children }) => {
     if (result) {
       const size = await pwaManager.getCacheSize();
       setCacheSize(size);
+      
+      // Refresh the in-memory cache index
+      await audioCache.refreshServiceWorkerIndex();
     }
     return result;
   };

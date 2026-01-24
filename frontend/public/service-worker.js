@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v1';
+const CACHE_NAME = 'soundwave-v4';
 const API_CACHE_NAME = 'soundwave-api-v1';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v1';
 const IMAGE_CACHE_NAME = 'soundwave-images-v1';

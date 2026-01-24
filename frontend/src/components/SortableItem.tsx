@@ -41,6 +41,12 @@ export default function SortableItem({ id, children, disabled = false }: Sortabl
         '&:hover .drag-handle': {
           opacity: disabled ? 0 : 1,
         },
+        // On touch devices, always show the drag handle since hover doesn't work
+        '@media (hover: none)': {
+          '& .drag-handle': {
+            opacity: disabled ? 0 : 0.7,
+          },
+        },
       }}
     >
       {/* Drag Handle */}
@@ -64,6 +70,12 @@ export default function SortableItem({ id, children, disabled = false }: Sortabl
             alignItems: 'center',
             justifyContent: 'center',
             backdropFilter: 'blur(4px)',
+            // Make touch target larger on mobile for easier tapping
+            '@media (hover: none)': {
+              p: 0.75,
+              minWidth: 32,
+              minHeight: 32,
+            },
             '&:hover': {
               bgcolor: 'rgba(0,0,0,0.8)',
             },
@@ -72,6 +84,10 @@ export default function SortableItem({ id, children, disabled = false }: Sortabl
               outline: '2px solid',
               outlineColor: 'primary.main',
             },
+            // Prevent text selection during drag on touch
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
           }}
         >
           <DragIndicatorIcon sx={{ fontSize: 20, color: 'white' }} />

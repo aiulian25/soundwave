@@ -57,6 +57,10 @@ class AudioCacheManager {
   private prefetchingInProgress: Set<string> = new Set();
   private cleanupScheduled = false;
   private initialized = false;
+  // In-memory index for instant cache lookups (no async DB query needed)
+  private cachedTrackIds: Set<string> = new Set();
+  // Service Worker cache index (populated on init)
+  private swCachedTrackIds: Set<string> = new Set();
 
   /**
    * Initialize IndexedDB for audio caching
@@ -76,6 +80,9 @@ class AudioCacheManager {
         this.db = request.result;
         this.initialized = true;
         this.scheduleCleanup();
+        // Build in-memory index for fast lookups
+        this.buildCacheIndex();
+        this.buildServiceWorkerCacheIndex();
         console.log('[AudioCache] Initialized successfully');
         resolve();
       };
@@ -106,9 +113,67 @@ class AudioCacheManager {
   }
 
   /**
+   * Build in-memory index of cached track IDs for instant lookups
+   */
+  private async buildCacheIndex(): Promise<void> {
+    if (!this.db) return;
+    
+    try {
+      const transaction = this.db.transaction(STORES.AUDIO_BLOBS, 'readonly');
+      const store = transaction.objectStore(STORES.AUDIO_BLOBS);
+      const request = store.getAllKeys();
+      
+      request.onsuccess = () => {
+        this.cachedTrackIds = new Set(request.result as string[]);
+        console.log(`[AudioCache] Index built: ${this.cachedTrackIds.size} tracks in IndexedDB cache`);
+      };
+    } catch (error) {
+      console.error('[AudioCache] Failed to build cache index:', error);
+    }
+  }
+
+  /**
+   * Build in-memory index of Service Worker cached tracks
+   */
+  private async buildServiceWorkerCacheIndex(): Promise<void> {
+    try {
+      if (!('caches' in window)) return;
+      
+      const cache = await caches.open('soundwave-audio-v1');
+      const keys = await cache.keys();
+      
+      this.swCachedTrackIds = new Set(
+        keys
+          .map(req => {
+            const match = req.url.match(/\/api\/audio\/([^/]+)\/download\//);
+            return match ? match[1] : null;
+          })
+          .filter((id): id is string => id !== null)
+      );
+      
+      console.log(`[AudioCache] SW Index built: ${this.swCachedTrackIds.size} tracks in Service Worker cache`);
+    } catch (error) {
+      console.error('[AudioCache] Failed to build SW cache index:', error);
+    }
+  }
+
+  /**
+   * Fast synchronous check if a track is likely cached (checks in-memory index)
+   * Use this for instant UI feedback, then verify with async methods if needed
+   */
+  isLikelyCached(youtubeId: string): boolean {
+    return this.cachedTrackIds.has(youtubeId) || this.swCachedTrackIds.has(youtubeId);
+  }
+
+  /**
    * Check if a track is cached
    */
   async isCached(youtubeId: string): Promise<boolean> {
+    // Fast path: check in-memory index first
+    if (this.cachedTrackIds.has(youtubeId)) {
+      return true;
+    }
+    
     if (!this.db) await this.init();
     
     return new Promise((resolve) => {
@@ -117,7 +182,13 @@ class AudioCacheManager {
         const store = transaction.objectStore(STORES.AUDIO_BLOBS);
         const request = store.get(youtubeId);
 
-        request.onsuccess = () => resolve(!!request.result);
+        request.onsuccess = () => {
+          const exists = !!request.result;
+          if (exists) {
+            this.cachedTrackIds.add(youtubeId); // Update index
+          }
+          resolve(exists);
+        };
         request.onerror = () => resolve(false);
       } catch {
         resolve(false);
@@ -209,6 +280,8 @@ class AudioCacheManager {
         }
 
         transaction.oncomplete = () => {
+          // Update in-memory index
+          this.cachedTrackIds.add(youtubeId);
           console.log(`[AudioCache] Cached: ${youtubeId} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`);
           resolve(true);
         };
@@ -228,8 +301,16 @@ class AudioCacheManager {
     // Skip local files (no youtube_id)
     if (!youtubeId) return;
     
-    // Skip if already cached or being prefetched
+    // Fast path: check in-memory index first
+    if (this.cachedTrackIds.has(youtubeId)) {
+      console.log(`[AudioCache] Already cached (fast): ${audio.title}`);
+      return;
+    }
+    
+    // Skip if being prefetched
     if (this.prefetchingInProgress.has(youtubeId)) return;
+    
+    // Double-check with DB
     if (await this.isCached(youtubeId)) {
       console.log(`[AudioCache] Already cached: ${audio.title}`);
       return;
@@ -546,17 +627,44 @@ class AudioCacheManager {
   /**
    * Get any cached audio URL - checks both IndexedDB and Service Worker cache
    * Priority: IndexedDB (faster) -> Service Worker Cache (offline feature)
+   * Optimized with in-memory index for instant lookups
    */
   async getAnyCachedUrl(youtubeId: string): Promise<{ url: string; source: 'indexeddb' | 'serviceworker' } | null> {
-    // First check IndexedDB (prefetch cache)
+    // Fast path: check in-memory indexes first to determine where to look
+    const inIndexedDb = this.cachedTrackIds.has(youtubeId);
+    const inServiceWorker = this.swCachedTrackIds.has(youtubeId);
+    
+    // If not in any index, skip expensive lookups
+    if (!inIndexedDb && !inServiceWorker) {
+      return null;
+    }
+    
+    // Check IndexedDB first if likely there (fastest for blob retrieval)
+    if (inIndexedDb) {
+      const indexedDbUrl = await this.getCachedUrl(youtubeId);
+      if (indexedDbUrl) {
+        return { url: indexedDbUrl, source: 'indexeddb' };
+      }
+    }
+
+    // Then check Service Worker cache
+    if (inServiceWorker) {
+      const swUrl = await this.getServiceWorkerCachedUrl(youtubeId);
+      if (swUrl) {
+        return { url: swUrl, source: 'serviceworker' };
+      }
+    }
+    
+    // Fallback: check both caches anyway (index might be stale)
     const indexedDbUrl = await this.getCachedUrl(youtubeId);
     if (indexedDbUrl) {
+      this.cachedTrackIds.add(youtubeId); // Update index
       return { url: indexedDbUrl, source: 'indexeddb' };
     }
 
-    // Then check Service Worker cache (offline feature)
     const swUrl = await this.getServiceWorkerCachedUrl(youtubeId);
     if (swUrl) {
+      this.swCachedTrackIds.add(youtubeId); // Update index
       return { url: swUrl, source: 'serviceworker' };
     }
 
@@ -565,8 +673,14 @@ class AudioCacheManager {
 
   /**
    * Check if audio is available in any cache (IndexedDB or Service Worker)
+   * Uses in-memory index for fast lookups
    */
   async isAvailableOffline(youtubeId: string): Promise<boolean> {
+    // Fast path: check in-memory indexes
+    if (this.cachedTrackIds.has(youtubeId) || this.swCachedTrackIds.has(youtubeId)) {
+      return true;
+    }
+    
     // Check IndexedDB
     if (await this.isCached(youtubeId)) {
       return true;
@@ -597,6 +711,22 @@ class AudioCacheManager {
       console.log('[AudioCache] Running scheduled cleanup...');
       await this.evictOldest(0, 0); // Just clean stale entries
     }, CACHE_CONFIG.cleanupInterval);
+  }
+
+  /**
+   * Refresh the Service Worker cache index
+   * Call this after caching a playlist to update the in-memory index
+   */
+  async refreshServiceWorkerIndex(): Promise<void> {
+    await this.buildServiceWorkerCacheIndex();
+  }
+
+  /**
+   * Add a track ID to the Service Worker cache index
+   * Call this when you know a track was just cached
+   */
+  addToServiceWorkerIndex(youtubeId: string): void {
+    this.swCachedTrackIds.add(youtubeId);
   }
 }
 

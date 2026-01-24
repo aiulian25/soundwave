@@ -347,6 +347,7 @@ function App() {
               isPlaying={isPlaying} 
               setIsPlaying={setIsPlaying} 
               onClose={() => setCurrentAudio(null)}
+              onMinimize={() => setPlayerMinimized(true)}
               onNext={playNext}
               onPrevious={playPrevious}
               hasNext={queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || currentQueueIndex < queue.length - 1)}

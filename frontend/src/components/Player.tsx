@@ -42,6 +42,7 @@ interface PlayerProps {
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
   onClose?: () => void;
+  onMinimize?: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
   hasNext?: boolean;
@@ -50,7 +51,7 @@ interface PlayerProps {
   onTrackSelect?: (audio: Audio) => void;
 }
 
-export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect }: PlayerProps) {
+export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect }: PlayerProps) {
   const { settings, updateSetting } = useSettings();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -94,7 +95,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
   useSwipeGesture(playerContainerRef, {
     onSwipeLeft: () => hasNext && onNext?.(),
     onSwipeRight: () => hasPrevious && onPrevious?.(),
-    onSwipeDown: onClose,
+    onSwipeDown: onMinimize || onClose,
     threshold: 80,
   });
 
@@ -173,7 +174,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
     };
   }, [audio.id, audio.youtube_id, recordListeningHistory]);
 
-  // Fetch stream URL when audio changes - check cache first
+  // Fetch stream URL when audio changes - ALWAYS prioritize cache for battery/data savings
   useEffect(() => {
     const fetchStreamUrl = async () => {
       if (audio.media_url) {
@@ -187,25 +188,27 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
         try {
           setLoadingStream(true);
           
-          // Check ALL caches first (IndexedDB + Service Worker) for instant/offline playback
+          // PRIORITY: Check ALL caches first (IndexedDB + Service Worker)
+          // This reduces data usage and battery consumption
           const cachedResult = await audioCache.getAnyCachedUrl(audio.youtube_id);
           if (cachedResult) {
-            console.log(`[Player] Playing from ${cachedResult.source} cache:`, audio.title);
+            console.log(`[Player] ✓ Playing from ${cachedResult.source} cache (saves data/battery):`, audio.title);
             setStreamUrl(cachedResult.url);
             setLoadingStream(false);
             setIsCachedPlayback(true);
-            return;
+            return; // Always use cache if available - don't stream online
           }
           
           // Check if we're offline - if so, we can't fetch from server
           if (!navigator.onLine) {
-            console.warn('[Player] Offline and no cached audio available:', audio.title);
+            console.warn('[Player] ✗ Offline and no cached audio available:', audio.title);
             setLoadingStream(false);
             setIsCachedPlayback(false);
             return;
           }
           
-          // Not cached, fetch from server
+          // No cache available - must fetch from server
+          console.log('[Player] → Streaming from server (not cached):', audio.title);
           const response = await fetch(`/api/audio/${audio.youtube_id}/player/`, {
             headers: {
               'Authorization': `Token ${localStorage.getItem('token')}`,
@@ -216,7 +219,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
           setLoadingStream(false);
           setIsCachedPlayback(false);
           
-          // Cache the audio in the background for future plays
+          // Cache the audio in the background for future plays (saves data next time)
           if (data.stream_url && settings.prefetch_enabled !== false) {
             audioCache.prefetchTrack(audio, 'low').catch(console.error);
           }
@@ -226,7 +229,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
           // If fetch failed (possibly offline), try one more time to get cached audio
           const cachedResult = await audioCache.getAnyCachedUrl(audio.youtube_id);
           if (cachedResult) {
-            console.log(`[Player] Fallback to ${cachedResult.source} cache after fetch error:`, audio.title);
+            console.log(`[Player] ✓ Fallback to ${cachedResult.source} cache after fetch error:`, audio.title);
             setStreamUrl(cachedResult.url);
             setIsCachedPlayback(true);
           }
@@ -1204,6 +1207,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
               currentTime={currentTime}
               onClose={() => setShowLyrics(false)}
               embedded={true}
+              visualizerTheme={settings.visualizer_theme}
+              isLightMode={theme.palette.mode === 'light'}
               onSeek={(time) => {
                 if (audioRef.current) {
                   audioRef.current.currentTime = time;

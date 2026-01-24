@@ -362,20 +362,19 @@ class BackgroundDownloadService {
   private sendMessage(type: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!navigator.serviceWorker.controller) {
-        reject(new Error('No service worker controller'));
+        // No controller yet - this is normal during SW update, just resolve with empty
+        console.log('[BackgroundDownload] No service worker controller, returning empty');
+        resolve({ downloads: [], success: true });
         return;
       }
 
       const messageChannel = new MessageChannel();
       
-      messageChannel.port1.onmessage = (event) => {
-        resolve(event.data);
-      };
-
-      // Timeout after 30 seconds
+      // Timeout after 5 seconds (shorter timeout to fail fast)
       const timeout = setTimeout(() => {
-        reject(new Error('Service worker message timeout'));
-      }, 30000);
+        console.log('[BackgroundDownload] Service worker message timeout, returning empty');
+        resolve({ downloads: [], success: true }); // Resolve with empty instead of rejecting
+      }, 5000);
 
       messageChannel.port1.onmessage = (event) => {
         clearTimeout(timeout);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -23,6 +23,7 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
+  useTheme,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
@@ -38,6 +39,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import api from '../api/client';
 import { offlineStorage } from '../utils/offlineStorage';
+import { getLyricsColors, LyricsThemeColors, DEFAULT_VISUALIZER_THEME } from '../config/visualizerThemes';
+import { useSettings } from '../context/SettingsContext';
 
 interface LyricsData {
   audio_id: string;
@@ -81,9 +84,21 @@ interface LyricsPlayerProps {
   onClose?: () => void;
   embedded?: boolean;
   onSeek?: (time: number) => void; // Optional callback to seek to a specific time
+  visualizerTheme?: string; // Theme ID for lyrics colors (optional, falls back to settings)
+  isLightMode?: boolean; // Whether the app is in light mode (optional, auto-detected)
 }
 
-export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek }: LyricsPlayerProps) {
+export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek, visualizerTheme, isLightMode }: LyricsPlayerProps) {
+  // Get settings and theme for automatic detection
+  const { settings } = useSettings();
+  const muiTheme = useTheme();
+  
+  // Use passed props or fall back to settings/auto-detection
+  const effectiveTheme = visualizerTheme || settings.visualizer_theme || DEFAULT_VISUALIZER_THEME;
+  const effectiveLightMode = isLightMode !== undefined ? isLightMode : muiTheme.palette.mode === 'light';
+  // Get the MUI theme's primary color to pass to getLyricsColors for 'theme' colorScheme
+  const muiPrimaryColor = muiTheme.palette.primary.main;
+  
   const [lyrics, setLyrics] = useState<LyricsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -92,6 +107,12 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   const [lineProgress, setLineProgress] = useState(0); // Progress through current line (0-1)
   const [autoScroll, setAutoScroll] = useState(true);
   const [tabValue, setTabValue] = useState(0);
+  
+  // Get theme colors for lyrics (adapts to light/dark mode, visualizer theme, and app color theme)
+  const themeColors = useMemo(() => {
+    console.log('[LyricsPlayer] Getting colors - theme:', effectiveTheme, 'lightMode:', effectiveLightMode, 'muiColor:', muiPrimaryColor);
+    return getLyricsColors(effectiveTheme, effectiveLightMode, muiPrimaryColor);
+  }, [effectiveTheme, effectiveLightMode, muiPrimaryColor]);
   
   // Suggestions state
   const [suggestions, setSuggestions] = useState<LyricsSuggestion[]>([]);
@@ -818,7 +839,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         sx={{
           flexGrow: 1,
           overflow: 'auto',
-          background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)',
+          background: `linear-gradient(180deg, transparent 0%, ${themeColors.background} 50%, transparent 100%)`,
           '&::-webkit-scrollbar': {
             width: '6px',
           },
@@ -827,10 +848,10 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             borderRadius: '3px',
           },
           '&::-webkit-scrollbar-thumb': {
-            backgroundColor: 'rgba(29, 185, 84, 0.5)',
+            backgroundColor: themeColors.glow,
             borderRadius: '3px',
             '&:hover': {
-              backgroundColor: 'rgba(29, 185, 84, 0.7)',
+              backgroundColor: themeColors.primary,
             },
           },
         }}
@@ -855,34 +876,46 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                     my: 0.5,
                     borderRadius: 2,
                     cursor: onSeek ? 'pointer' : 'default',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                     backgroundColor: isCurrentLine 
-                      ? 'rgba(29, 185, 84, 0.15)' 
+                      ? themeColors.background 
                       : 'transparent',
-                    transform: isCurrentLine ? 'scale(1.02)' : 'scale(1)',
+                    transform: isCurrentLine ? 'scale(1.03)' : 'scale(1)',
+                    boxShadow: isCurrentLine 
+                      ? `0 4px 20px ${themeColors.glow}, inset 0 0 20px ${themeColors.glow}` 
+                      : 'none',
+                    borderLeft: isCurrentLine 
+                      ? `3px solid ${themeColors.primary}` 
+                      : '3px solid transparent',
                     '&:hover': onSeek ? {
                       backgroundColor: isCurrentLine 
-                        ? 'rgba(29, 185, 84, 0.2)' 
-                        : 'rgba(255, 255, 255, 0.05)',
+                        ? themeColors.backgroundHover 
+                        : themeColors.hoverBackground,
+                      transform: isCurrentLine ? 'scale(1.03)' : 'scale(1.01)',
                     } : {},
                   }}
                 >
                   {isCurrentLine ? (
-                    // Full line highlighting for current line (no word-by-word karaoke)
+                    // Full line highlighting for current line with theme-colored gradient
                     <Box sx={{ position: 'relative', overflow: 'hidden' }}>
                       {/* Fully highlighted current line */}
                       <Typography
                         variant="body1"
                         sx={{
-                          fontSize: '1.25rem',
+                          fontSize: '1.3rem',
                           fontWeight: 700,
                           lineHeight: 1.6,
                           letterSpacing: '0.02em',
-                          background: 'linear-gradient(90deg, #1DB954 0%, #1ed760 50%, #23f06e 100%)',
+                          background: `linear-gradient(135deg, ${themeColors.gradientStart} 0%, ${themeColors.gradientMid} 50%, ${themeColors.gradientEnd} 100%)`,
                           backgroundClip: 'text',
                           WebkitBackgroundClip: 'text',
                           WebkitTextFillColor: 'transparent',
-                          textShadow: '0 0 30px rgba(29, 185, 84, 0.5)',
+                          filter: `drop-shadow(0 0 8px ${themeColors.glow})`,
+                          animation: 'lyricsPulse 2s ease-in-out infinite',
+                          '@keyframes lyricsPulse': {
+                            '0%, 100%': { filter: `drop-shadow(0 0 8px ${themeColors.glow})` },
+                            '50%': { filter: `drop-shadow(0 0 15px ${themeColors.glow})` },
+                          },
                         }}
                       >
                         {line.text}
@@ -892,31 +925,35 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                       <Box
                         sx={{
                           position: 'absolute',
-                          bottom: -4,
+                          bottom: -6,
                           left: 0,
                           height: 3,
-                          borderRadius: 1,
-                          background: 'linear-gradient(90deg, #1DB954, #1ed760)',
+                          borderRadius: 1.5,
+                          background: `linear-gradient(90deg, ${themeColors.gradientStart}, ${themeColors.gradientMid}, ${themeColors.gradientEnd})`,
                           width: `${lineProgress * 100}%`,
                           transition: 'width 0.1s linear',
-                          boxShadow: '0 0 10px rgba(29, 185, 84, 0.5)',
+                          boxShadow: `0 0 12px ${themeColors.glow}, 0 0 4px ${themeColors.primary}`,
                         }}
                       />
                     </Box>
                   ) : (
-                    // Non-current lines
+                    // Non-current lines - use theme-aware colors with smooth transitions
                     <Typography
                       variant="body1"
                       sx={{
-                        fontSize: isNextLine ? '1.1rem' : '1rem',
+                        fontSize: isNextLine ? '1.15rem' : '1rem',
                         fontWeight: isPastLine ? 400 : isNextLine ? 500 : 400,
                         lineHeight: 1.6,
                         color: isPastLine 
-                          ? 'rgba(255, 255, 255, 0.35)' 
+                          ? themeColors.pastTextColor 
                           : isUpcoming 
-                            ? 'rgba(255, 255, 255, 0.7)' 
-                            : 'rgba(255, 255, 255, 0.5)',
-                        transition: 'all 0.3s ease',
+                            ? themeColors.upcomingTextColor 
+                            : themeColors.textColor,
+                        transition: 'all 0.35s ease',
+                        // Subtle theme color tint for next line
+                        ...(isNextLine && {
+                          textShadow: `0 0 20px ${themeColors.glow}`,
+                        }),
                       }}
                     >
                       {line.text}
