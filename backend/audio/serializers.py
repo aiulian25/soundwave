@@ -14,7 +14,10 @@ class AudioSerializer(serializers.ModelSerializer):
             'channel_name', 'duration', 'file_path', 'file_size',
             'thumbnail_url', 'published_date', 'downloaded_date',
             'view_count', 'like_count', 'audio_format', 'bitrate',
-            'play_count', 'last_played', 'is_favorite'
+            'play_count', 'last_played', 'is_favorite',
+            # Enhanced metadata fields
+            'artist', 'album', 'year', 'genre', 'track_number',
+            'cover_art_url', 'musicbrainz_id', 'metadata_source', 'metadata_updated'
         ]
         read_only_fields = ['id', 'downloaded_date', 'play_count', 'last_played']
 

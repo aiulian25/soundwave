@@ -67,6 +67,13 @@ export const audioAPI = {
   // Recommendations endpoints
   getRecommendations: (youtubeId: string) => api.get(`/audio/${youtubeId}/recommendations/`),
   getSimilarTracks: (youtubeId: string) => api.get(`/audio/${youtubeId}/similar/`),
+  // Metadata endpoints
+  searchMetadata: (youtubeId: string, params?: { title?: string; artist?: string }) => 
+    api.get(`/audio/${youtubeId}/metadata/search/`, { params }),
+  applyMetadata: (youtubeId: string, data: any) => 
+    api.post(`/audio/${youtubeId}/metadata/apply/`, data),
+  autoFetchMetadata: (youtubeId: string) => 
+    api.post(`/audio/${youtubeId}/metadata/auto/`),
 };
 
 // Channel API

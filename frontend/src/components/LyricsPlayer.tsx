@@ -868,29 +868,12 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                   }}
                 >
                   {isCurrentLine ? (
-                    // Karaoke-style highlighting for current line
+                    // Full line highlighting for current line (no word-by-word karaoke)
                     <Box sx={{ position: 'relative', overflow: 'hidden' }}>
-                      {/* Background text (unhighlighted) */}
+                      {/* Fully highlighted current line */}
                       <Typography
                         variant="body1"
                         sx={{
-                          fontSize: '1.25rem',
-                          fontWeight: 700,
-                          lineHeight: 1.6,
-                          color: 'rgba(255, 255, 255, 0.4)',
-                          letterSpacing: '0.02em',
-                        }}
-                      >
-                        {line.text}
-                      </Typography>
-                      
-                      {/* Highlighted text overlay with clip-path */}
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
                           fontSize: '1.25rem',
                           fontWeight: 700,
                           lineHeight: 1.6,
@@ -899,8 +882,6 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                           backgroundClip: 'text',
                           WebkitBackgroundClip: 'text',
                           WebkitTextFillColor: 'transparent',
-                          clipPath: `inset(0 ${(1 - lineProgress) * 100}% 0 0)`,
-                          transition: 'clip-path 0.1s linear',
                           textShadow: '0 0 30px rgba(29, 185, 84, 0.5)',
                         }}
                       >

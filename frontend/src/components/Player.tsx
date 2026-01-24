@@ -15,6 +15,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CachedIcon from '@mui/icons-material/Cached';
 import CloseIcon from '@mui/icons-material/Close';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import EditIcon from '@mui/icons-material/Edit';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { Audio } from '../types';
 import { useSettings } from '../context/SettingsContext';
@@ -23,6 +24,7 @@ import { audioAPI, statsAPI } from '../api/client';
 import AudioVisualizer from './AudioVisualizer';
 import { visualizerThemes } from '../config/visualizerThemes';
 import { audioCache } from '../utils/audioCache';
+import MetadataEditor from './MetadataEditor';
 
 // Import LyricsPlayer directly instead of lazy to avoid offline loading issues
 import LyricsPlayer from './LyricsPlayer';
@@ -59,6 +61,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
   const [isMuted, setIsMuted] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showRelatedTracks, setShowRelatedTracks] = useState(false);
+  const [showMetadataEditor, setShowMetadataEditor] = useState(false);
+  const [currentAudioData, setCurrentAudioData] = useState<Audio>(audio);
   const [activeTab, setActiveTab] = useState(0);
   const [streamUrl, setStreamUrl] = useState<string>('');
   const [loadingStream, setLoadingStream] = useState(true);
@@ -80,6 +84,11 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
   const playStartTimeRef = useRef<number>(0);
   const listenedDurationRef = useRef<number>(0);
   const hasRecordedPlayRef = useRef<boolean>(false);
+
+  // Update currentAudioData when audio prop changes
+  useEffect(() => {
+    setCurrentAudioData(audio);
+  }, [audio]);
 
   // Swipe gestures for mobile navigation
   useSwipeGesture(playerContainerRef, {
@@ -816,17 +825,22 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5, textAlign: 'center', px: 2, color: 'text.primary' }}>
             {audio.title}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
             <Typography variant="body1" sx={{ fontWeight: 500, color: 'primary.main' }}>
-              {audio.channel_name}
+              {currentAudioData.artist || audio.channel_name}
             </Typography>
+            {currentAudioData.album && (
+              <Typography variant="body2" color="text.secondary">
+                • {currentAudioData.album} {currentAudioData.year && `(${currentAudioData.year})`}
+              </Typography>
+            )}
             {isCachedPlayback && (
               <Tooltip title="Playing from cache">
                 <CachedIcon sx={{ fontSize: 16, color: 'success.main' }} />
               </Tooltip>
             )}
           </Box>
-          {/* Favorite & Related Tracks Buttons */}
+          {/* Favorite & Related Tracks & Metadata Buttons */}
           <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
             <Tooltip title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}>
               <IconButton
@@ -843,6 +857,23 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
                 {isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
               </IconButton>
             </Tooltip>
+            {audio.youtube_id && (
+              <Tooltip title="Edit metadata">
+                <IconButton
+                  onClick={() => setShowMetadataEditor(true)}
+                  sx={{
+                    color: currentAudioData.metadata_source ? 'success.main' : 'text.secondary',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'scale(1.1)',
+                      color: 'primary.main',
+                    },
+                  }}
+                >
+                  <EditIcon />
+                </IconButton>
+              </Tooltip>
+            )}
             {audio.youtube_id && onTrackSelect && (
               <Tooltip title="Related tracks">
                 <IconButton
@@ -1182,6 +1213,16 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onNext
             />
           </Box>
         </Fade>
+      )}
+
+      {/* Metadata Editor Dialog */}
+      {audio.youtube_id && (
+        <MetadataEditor
+          audio={currentAudioData}
+          open={showMetadataEditor}
+          onClose={() => setShowMetadataEditor(false)}
+          onUpdate={(updatedAudio) => setCurrentAudioData(updatedAudio)}
+        />
       )}
     </Box>
   );

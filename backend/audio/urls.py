@@ -8,6 +8,9 @@ from audio.views import (
     AudioPlayerView,
     AudioProgressView,
     AudioDownloadView,
+    MetadataSearchView,
+    MetadataApplyView,
+    MetadataAutoFetchView,
 )
 from audio.views_lyrics import LyricsViewSet, LyricsCacheViewSet, LyricsDownloadView
 from audio.views_recommendations import AudioRecommendationsView, AudioSimilarTracksView
@@ -25,6 +28,10 @@ urlpatterns = [
     path('<str:youtube_id>/download/', AudioDownloadView.as_view(), name='audio-download'),
     path('<str:youtube_id>/recommendations/', AudioRecommendationsView.as_view(), name='audio-recommendations'),
     path('<str:youtube_id>/similar/', AudioSimilarTracksView.as_view(), name='audio-similar'),
+    # Metadata endpoints
+    path('<str:youtube_id>/metadata/search/', MetadataSearchView.as_view(), name='audio-metadata-search'),
+    path('<str:youtube_id>/metadata/apply/', MetadataApplyView.as_view(), name='audio-metadata-apply'),
+    path('<str:youtube_id>/metadata/auto/', MetadataAutoFetchView.as_view(), name='audio-metadata-auto'),
     # Lyrics endpoints - specific paths first, then generic
     path('<str:youtube_id>/lyrics/fetch/', LyricsViewSet.as_view({
         'post': 'fetch',

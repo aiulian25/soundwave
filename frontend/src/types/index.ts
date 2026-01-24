@@ -18,9 +18,16 @@ export interface Audio {
   play_count: number;
   last_played?: string;
   is_favorite?: boolean;
+  // Enhanced metadata fields
   artist?: string;
   album?: string;
+  year?: number;
+  genre?: string;
+  track_number?: number;
   cover_art_url?: string;
+  musicbrainz_id?: string;
+  metadata_source?: string;
+  metadata_updated?: string;
   media_url?: string;  // For local file playback (blob URLs)
 }
 

@@ -289,3 +289,211 @@ class AudioDownloadView(ApiBaseView):
         )
         
         return response
+
+
+class MetadataSearchView(ApiBaseView):
+    """Search for metadata from online sources
+    GET: search for metadata matches
+    """
+
+    def get(self, request, youtube_id):
+        """Search metadata for an audio track"""
+        from audio.metadata_fetcher import metadata_fetcher
+        from dataclasses import asdict
+        
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        # Get optional search parameters
+        title = request.query_params.get('title', audio.title)
+        artist = request.query_params.get('artist', audio.artist or audio.channel_name)
+        
+        # Search MusicBrainz
+        results = metadata_fetcher.search_musicbrainz(
+            title=title,
+            artist=artist,
+            channel_name=audio.channel_name
+        )
+        
+        return Response({
+            'results': [asdict(r) for r in results],
+            'current': {
+                'title': audio.title,
+                'artist': audio.artist,
+                'album': audio.album,
+                'year': audio.year,
+                'genre': audio.genre,
+                'cover_art_url': audio.cover_art_url,
+                'musicbrainz_id': audio.musicbrainz_id,
+                'metadata_source': audio.metadata_source,
+            }
+        })
+
+
+class MetadataApplyView(ApiBaseView):
+    """Apply metadata from search result or manual input
+    POST: apply metadata to audio track
+    """
+
+    def post(self, request, youtube_id):
+        """Apply metadata to audio track"""
+        from django.utils import timezone
+        from audio.metadata_fetcher import metadata_fetcher
+        from audio.tag_writer import write_metadata_to_file
+        
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        data = request.data
+        musicbrainz_id = data.get('musicbrainz_id')
+        
+        # If MusicBrainz ID provided, fetch full details
+        if musicbrainz_id:
+            result = metadata_fetcher.get_recording_details(musicbrainz_id)
+            if result:
+                audio.artist = result.artist or audio.artist
+                audio.album = result.album or audio.album
+                audio.year = result.year or audio.year
+                audio.genre = result.genre or audio.genre
+                audio.track_number = result.track_number or audio.track_number
+                audio.cover_art_url = result.cover_art_url or audio.cover_art_url
+                audio.musicbrainz_id = musicbrainz_id
+                audio.metadata_source = 'musicbrainz'
+                audio.metadata_updated = timezone.now()
+                audio.save()
+                
+                # Write tags to the actual audio file
+                if audio.file_path:
+                    write_metadata_to_file(
+                        file_path=audio.file_path,
+                        title=audio.title,
+                        artist=audio.artist,
+                        album=audio.album,
+                        year=audio.year,
+                        genre=audio.genre,
+                        track_number=audio.track_number,
+                        cover_art_url=audio.cover_art_url,
+                    )
+                
+                return Response({
+                    'message': 'Metadata applied from MusicBrainz',
+                    'audio': AudioSerializer(audio).data
+                })
+            else:
+                return Response(
+                    {'error': 'Could not fetch details from MusicBrainz'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Manual metadata application
+        if 'artist' in data:
+            audio.artist = data['artist']
+        if 'album' in data:
+            audio.album = data['album']
+        if 'year' in data:
+            audio.year = data.get('year')
+        if 'genre' in data:
+            audio.genre = data['genre']
+        if 'track_number' in data:
+            audio.track_number = data.get('track_number')
+        if 'cover_art_url' in data:
+            audio.cover_art_url = data['cover_art_url']
+        
+        audio.metadata_source = data.get('source', 'manual')
+        audio.metadata_updated = timezone.now()
+        audio.save()
+        
+        # Write tags to the actual audio file
+        if audio.file_path:
+            write_metadata_to_file(
+                file_path=audio.file_path,
+                title=audio.title,
+                artist=audio.artist,
+                album=audio.album,
+                year=audio.year,
+                genre=audio.genre,
+                track_number=audio.track_number,
+                cover_art_url=audio.cover_art_url,
+            )
+        
+        return Response({
+            'message': 'Metadata updated',
+            'audio': AudioSerializer(audio).data
+        })
+
+
+class MetadataAutoFetchView(ApiBaseView):
+    """Auto-fetch best matching metadata
+    POST: automatically fetch and apply best metadata match
+    """
+
+    def post(self, request, youtube_id):
+        """Auto-fetch metadata for an audio track"""
+        from django.utils import timezone
+        from audio.metadata_fetcher import metadata_fetcher
+        from audio.tag_writer import write_metadata_to_file
+        
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        # Search MusicBrainz
+        results = metadata_fetcher.search_musicbrainz(
+            title=audio.title,
+            artist=audio.artist or audio.channel_name,
+            channel_name=audio.channel_name
+        )
+        
+        if not results:
+            return Response({
+                'message': 'No metadata found',
+                'audio': AudioSerializer(audio).data
+            })
+        
+        # Take the best match (highest confidence)
+        best_match = results[0]
+        
+        # Only apply if confidence is reasonable
+        if best_match.confidence < 0.5:
+            return Response({
+                'message': 'No confident match found',
+                'best_match': {
+                    'title': best_match.title,
+                    'artist': best_match.artist,
+                    'confidence': best_match.confidence
+                },
+                'audio': AudioSerializer(audio).data
+            })
+        
+        # Get full details if we have a MusicBrainz ID
+        if best_match.musicbrainz_id:
+            result = metadata_fetcher.get_recording_details(best_match.musicbrainz_id)
+            if result:
+                best_match = result
+        
+        # Apply metadata
+        audio.artist = best_match.artist or audio.artist
+        audio.album = best_match.album or audio.album
+        audio.year = best_match.year or audio.year
+        audio.genre = best_match.genre or audio.genre
+        audio.track_number = best_match.track_number or audio.track_number
+        audio.cover_art_url = best_match.cover_art_url or audio.cover_art_url
+        audio.musicbrainz_id = best_match.musicbrainz_id or audio.musicbrainz_id
+        audio.metadata_source = 'musicbrainz'
+        audio.metadata_updated = timezone.now()
+        audio.save()
+        
+        # Write tags to the actual audio file
+        if audio.file_path:
+            write_metadata_to_file(
+                file_path=audio.file_path,
+                title=audio.title,
+                artist=audio.artist,
+                album=audio.album,
+                year=audio.year,
+                genre=audio.genre,
+                track_number=audio.track_number,
+                cover_art_url=audio.cover_art_url,
+            )
+        
+        return Response({
+            'message': 'Metadata applied',
+            'confidence': best_match.confidence,
+            'audio': AudioSerializer(audio).data
+        })

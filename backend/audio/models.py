@@ -35,6 +35,17 @@ class Audio(models.Model):
     audio_format = models.CharField(max_length=20, default='m4a')
     bitrate = models.IntegerField(null=True, blank=True, help_text="Bitrate in kbps")
     
+    # Enhanced metadata (from external sources)
+    artist = models.CharField(max_length=500, blank=True, help_text="Artist name from metadata lookup")
+    album = models.CharField(max_length=500, blank=True, help_text="Album name")
+    year = models.IntegerField(null=True, blank=True, help_text="Release year")
+    genre = models.CharField(max_length=100, blank=True, help_text="Music genre")
+    track_number = models.IntegerField(null=True, blank=True, help_text="Track number on album")
+    cover_art_url = models.URLField(max_length=500, blank=True, help_text="Cover art from metadata source")
+    musicbrainz_id = models.CharField(max_length=50, blank=True, help_text="MusicBrainz recording ID")
+    metadata_source = models.CharField(max_length=50, blank=True, help_text="Source of enhanced metadata")
+    metadata_updated = models.DateTimeField(null=True, blank=True, help_text="When metadata was last updated")
+    
     # Playback tracking
     play_count = models.IntegerField(default=0)
     last_played = models.DateTimeField(null=True, blank=True)
