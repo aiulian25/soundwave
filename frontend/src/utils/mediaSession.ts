@@ -29,12 +29,12 @@ class MediaSessionManager {
 
     const artwork = metadata.artwork || [
       {
-        src: '/img/icon-96x96.png',
+        src: '/img/icons/icon-96x96.png',
         sizes: '96x96',
         type: 'image/png',
       },
       {
-        src: '/img/icon-128x128.png',
+        src: '/img/icons/icon-128x128.png',
         sizes: '128x128',
         type: 'image/png',
       },
@@ -44,12 +44,7 @@ class MediaSessionManager {
         type: 'image/png',
       },
       {
-        src: '/img/icon-256x256.png',
-        sizes: '256x256',
-        type: 'image/png',
-      },
-      {
-        src: '/img/icon-384x384.png',
+        src: '/img/icons/icon-384x384.png',
         sizes: '384x384',
         type: 'image/png',
       },

@@ -291,6 +291,240 @@ class AudioDownloadView(ApiBaseView):
         return response
 
 
+class AudioExportView(ApiBaseView):
+    """Export audio file with format conversion and full metadata embedding
+    GET: Get export options for the track
+    POST: Export audio with specified format and options
+    """
+    from rest_framework.renderers import BaseRenderer
+    
+    class PassthroughRenderer(BaseRenderer):
+        """Renderer that passes through any content type"""
+        media_type = '*/*'
+        format = ''
+        
+        def render(self, data, accepted_media_type=None, renderer_context=None):
+            return data
+    
+    renderer_classes = [PassthroughRenderer]
+    
+    def get(self, request, youtube_id):
+        """Get export options for a track"""
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        if not audio.file_path:
+            return Response(
+                {'error': 'Audio file not available'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check for lyrics
+        has_lyrics = False
+        has_synced_lyrics = False
+        try:
+            from audio.models_lyrics import Lyrics
+            lyrics = Lyrics.objects.get(audio=audio)
+            has_lyrics = bool(lyrics.plain_lyrics or lyrics.synced_lyrics)
+            has_synced_lyrics = bool(lyrics.synced_lyrics)
+            print(f"[Export GET] Found lyrics for {youtube_id}: has_lyrics={has_lyrics}, has_synced={has_synced_lyrics}, source={lyrics.source}")
+        except Lyrics.DoesNotExist:
+            print(f"[Export GET] No lyrics found for {youtube_id}")
+        except Exception as e:
+            print(f"[Export GET] Error checking lyrics for {youtube_id}: {e}")
+        
+        # Check for artwork
+        has_artwork = bool(audio.cover_art_url or audio.thumbnail_url)
+        artwork_sources = []
+        if audio.cover_art_url:
+            artwork_sources.append({'type': 'cover_art', 'url': audio.cover_art_url, 'label': 'Album Cover'})
+        if audio.thumbnail_url:
+            artwork_sources.append({'type': 'thumbnail', 'url': audio.thumbnail_url, 'label': 'YouTube Thumbnail'})
+        
+        # Check for uploaded artwork
+        try:
+            from audio.models_artwork import Artwork
+            artworks = Artwork.objects.filter(audio=audio).order_by('-priority')
+            for art in artworks:
+                artwork_sources.append({
+                    'type': art.artwork_type,
+                    'url': art.url,
+                    'label': f'{art.get_artwork_type_display()} ({art.source})',
+                    'priority': art.priority,
+                })
+        except:
+            pass
+        
+        return Response({
+            'youtube_id': youtube_id,
+            'title': audio.title,
+            'artist': audio.artist or audio.channel_name,
+            'album': audio.album or '',
+            'current_format': audio.audio_format,
+            'available_formats': ['mp3', 'flac'],
+            'has_lyrics': has_lyrics,
+            'has_synced_lyrics': has_synced_lyrics,
+            'has_artwork': has_artwork,
+            'artwork_sources': artwork_sources,
+            'metadata': {
+                'title': audio.title,
+                'artist': audio.artist or audio.channel_name,
+                'album': audio.album,
+                'year': audio.year,
+                'genre': audio.genre,
+                'track_number': audio.track_number,
+            }
+        })
+    
+    def post(self, request, youtube_id):
+        """Export audio with specified format and embedded metadata"""
+        import subprocess
+        import tempfile
+        import shutil
+        from django.http import FileResponse
+        from django.conf import settings
+        from pathlib import Path
+        
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        if not audio.file_path:
+            return Response(
+                {'error': 'Audio file not available'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get export options
+        target_format = request.data.get('format', 'mp3').lower()
+        embed_lyrics = request.data.get('embed_lyrics', True)
+        embed_artwork = request.data.get('embed_artwork', True)
+        artwork_url = request.data.get('artwork_url', '')  # Custom artwork URL
+        quality = request.data.get('quality', 'high')  # high, medium, low
+        
+        if target_format not in ['mp3', 'flac']:
+            return Response(
+                {'error': 'Invalid format. Supported: mp3, flac'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Build source path
+        source_path = Path(settings.MEDIA_ROOT) / audio.file_path
+        if not source_path.exists():
+            return Response(
+                {'error': 'Source audio file not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get lyrics if requested
+        plain_lyrics = None
+        synced_lyrics = None
+        if embed_lyrics:
+            try:
+                from audio.models_lyrics import Lyrics
+                lyrics_obj = Lyrics.objects.get(audio=audio)
+                plain_lyrics = lyrics_obj.plain_lyrics
+                synced_lyrics = lyrics_obj.synced_lyrics
+            except:
+                pass
+        
+        # Get artwork
+        cover_art_data = None
+        if embed_artwork:
+            import requests as http_requests
+            
+            # Priority: custom URL > cover_art_url > thumbnail
+            art_url = artwork_url or audio.cover_art_url or audio.thumbnail_url
+            
+            if art_url:
+                try:
+                    resp = http_requests.get(art_url, timeout=10)
+                    if resp.status_code == 200:
+                        cover_art_data = resp.content
+                except Exception as e:
+                    print(f"Failed to download artwork: {e}")
+        
+        # Create temporary file for conversion
+        temp_dir = tempfile.mkdtemp()
+        try:
+            safe_title = "".join(c for c in audio.title if c.isalnum() or c in (' ', '-', '_')).strip()[:100]
+            if not safe_title:
+                safe_title = f"audio_{youtube_id}"
+            
+            output_filename = f"{safe_title}.{target_format}"
+            output_path = Path(temp_dir) / output_filename
+            
+            # Determine if conversion is needed
+            source_ext = source_path.suffix.lower()
+            needs_conversion = (
+                (target_format == 'mp3' and source_ext != '.mp3') or
+                (target_format == 'flac' and source_ext != '.flac')
+            )
+            
+            if needs_conversion:
+                # Use ffmpeg for conversion
+                ffmpeg_cmd = ['ffmpeg', '-y', '-i', str(source_path)]
+                
+                if target_format == 'mp3':
+                    # Quality settings for MP3
+                    if quality == 'high':
+                        ffmpeg_cmd.extend(['-codec:a', 'libmp3lame', '-b:a', '320k'])
+                    elif quality == 'medium':
+                        ffmpeg_cmd.extend(['-codec:a', 'libmp3lame', '-b:a', '192k'])
+                    else:
+                        ffmpeg_cmd.extend(['-codec:a', 'libmp3lame', '-b:a', '128k'])
+                elif target_format == 'flac':
+                    ffmpeg_cmd.extend(['-codec:a', 'flac', '-compression_level', '8'])
+                
+                ffmpeg_cmd.append(str(output_path))
+                
+                result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
+                if result.returncode != 0:
+                    print(f"FFmpeg error: {result.stderr}")
+                    return Response(
+                        {'error': 'Audio conversion failed'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            else:
+                # Just copy the file
+                shutil.copy2(source_path, output_path)
+            
+            # Write metadata tags including lyrics and artwork
+            from audio.tag_writer import write_metadata_to_file
+            
+            write_metadata_to_file(
+                file_path=str(output_path),
+                title=audio.title,
+                artist=audio.artist or audio.channel_name,
+                album=audio.album,
+                year=audio.year,
+                genre=audio.genre,
+                track_number=audio.track_number,
+                cover_art_data=cover_art_data,
+                lyrics=plain_lyrics,
+                synced_lyrics=synced_lyrics,
+            )
+            
+            # Determine content type
+            content_type = 'audio/mpeg' if target_format == 'mp3' else 'audio/flac'
+            
+            # Read the file into memory to return it
+            with open(output_path, 'rb') as f:
+                file_data = f.read()
+            
+            # Create response
+            from django.http import HttpResponse
+            response = HttpResponse(file_data, content_type=content_type)
+            response['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+            response['Content-Length'] = len(file_data)
+            
+            return response
+            
+        finally:
+            # Clean up temp directory
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+
+
 class MetadataSearchView(ApiBaseView):
     """Search for metadata from online sources
     GET: search for metadata matches
@@ -497,3 +731,46 @@ class MetadataAutoFetchView(ApiBaseView):
             'confidence': best_match.confidence,
             'audio': AudioSerializer(audio).data
         })
+
+
+class ArtworkProxyView(ApiBaseView):
+    """Proxy artwork images to avoid CORS issues for Media Session API"""
+    
+    def get(self, request, youtube_id):
+        """Proxy artwork for a track"""
+        import requests as http_requests
+        from django.http import HttpResponse
+        
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        # Get artwork URL
+        artwork_url = audio.cover_art_url or audio.thumbnail_url
+        
+        if not artwork_url:
+            return Response(
+                {'error': 'No artwork available'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            # Fetch the image
+            resp = http_requests.get(artwork_url, timeout=10)
+            if resp.status_code == 200:
+                # Determine content type
+                content_type = resp.headers.get('content-type', 'image/jpeg')
+                
+                # Return image with CORS headers
+                response = HttpResponse(resp.content, content_type=content_type)
+                response['Access-Control-Allow-Origin'] = '*'
+                response['Cache-Control'] = 'public, max-age=86400'  # Cache for 1 day
+                return response
+            else:
+                return Response(
+                    {'error': 'Failed to fetch artwork'},
+                    status=status.HTTP_502_BAD_GATEWAY
+                )
+        except Exception as e:
+            return Response(
+                {'error': f'Error fetching artwork: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

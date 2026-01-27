@@ -8,11 +8,13 @@ from audio.views import (
     AudioPlayerView,
     AudioProgressView,
     AudioDownloadView,
+    AudioExportView,
     MetadataSearchView,
     MetadataApplyView,
     MetadataAutoFetchView,
+    ArtworkProxyView,
 )
-from audio.views_lyrics import LyricsViewSet, LyricsCacheViewSet, LyricsDownloadView
+from audio.views_lyrics import LyricsViewSet, LyricsCacheViewSet, LyricsDownloadView, LyricsUploadView
 from audio.views_recommendations import AudioRecommendationsView, AudioSimilarTracksView
 
 # Create router for ViewSets
@@ -26,6 +28,8 @@ urlpatterns = [
     path('<str:youtube_id>/player/', AudioPlayerView.as_view(), name='audio-player'),
     path('<str:youtube_id>/progress/', AudioProgressView.as_view(), name='audio-progress'),
     path('<str:youtube_id>/download/', AudioDownloadView.as_view(), name='audio-download'),
+    path('<str:youtube_id>/export/', AudioExportView.as_view(), name='audio-export'),
+    path('<str:youtube_id>/artwork/', ArtworkProxyView.as_view(), name='audio-artwork'),
     path('<str:youtube_id>/recommendations/', AudioRecommendationsView.as_view(), name='audio-recommendations'),
     path('<str:youtube_id>/similar/', AudioSimilarTracksView.as_view(), name='audio-similar'),
     # Metadata endpoints
@@ -42,6 +46,7 @@ urlpatterns = [
     path('<str:youtube_id>/lyrics/apply/', LyricsViewSet.as_view({
         'post': 'apply_suggestion',
     }), name='audio-lyrics-apply'),
+    path('<str:youtube_id>/lyrics/upload/', LyricsUploadView.as_view(), name='audio-lyrics-upload'),
     path('<str:youtube_id>/lyrics/download/', LyricsDownloadView.as_view(), name='audio-lyrics-download'),
     path('<str:youtube_id>/lyrics/', LyricsViewSet.as_view({
         'get': 'retrieve',

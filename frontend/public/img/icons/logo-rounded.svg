@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Rounded rectangle background with nice corners -->
+  <rect width="512" height="512" rx="100" ry="100" fill="#1a2a3a"/>
+  
+  <!-- Gradient overlay for depth -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d4a5a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1f2f;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00e5e5;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#00e5e5;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="512" height="512" rx="100" ry="100" fill="url(#bgGrad)"/>
+  
+  <!-- Top glow effect -->
+  <ellipse cx="256" cy="80" rx="180" ry="60" fill="url(#glowGrad)"/>
+  
+  <!-- Outer circle -->
+  <circle cx="256" cy="230" r="95" fill="none" stroke="#00e5e5" stroke-width="8" opacity="0.6"/>
+  
+  <!-- Inner circle -->
+  <circle cx="256" cy="230" r="70" fill="none" stroke="#00e5e5" stroke-width="6"/>
+  
+  <!-- Play button triangle -->
+  <path fill="#00e5e5" d="M 235 205 L 235 255 L 285 230 Z"/>
+  
+  <!-- Sound wave bars - left -->
+  <rect x="115" y="215" width="10" height="30" rx="5" fill="#00e5e5" opacity="0.7"/>
+  <rect x="135" y="200" width="10" height="60" rx="5" fill="#00e5e5" opacity="0.8"/>
+  <rect x="155" y="185" width="10" height="90" rx="5" fill="#00e5e5"/>
+  
+  <!-- Sound wave bars - right -->
+  <rect x="387" y="215" width="10" height="30" rx="5" fill="#00e5e5" opacity="0.7"/>
+  <rect x="367" y="200" width="10" height="60" rx="5" fill="#00e5e5" opacity="0.8"/>
+  <rect x="347" y="185" width="10" height="90" rx="5" fill="#00e5e5"/>
+  
+  <!-- Text: SoundWave -->
+  <text x="256" y="380" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="bold" text-anchor="middle" fill="#ffffff">Sound</text>
+  <text x="256" y="435" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="bold" text-anchor="middle" fill="#00e5e5">Wave</text>
+</svg>

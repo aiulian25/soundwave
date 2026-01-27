@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full background for maskable (Android will apply its own shape) -->
+  <rect width="512" height="512" fill="#1a2a3a"/>
+  
+  <!-- Gradient overlay -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d4a5a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1f2f;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+  
+  <!-- Content scaled down to fit in safe zone (80% centered) -->
+  <g transform="translate(51.2, 51.2) scale(0.8)">
+    <!-- Outer circle -->
+    <circle cx="256" cy="200" r="85" fill="none" stroke="#00e5e5" stroke-width="8" opacity="0.6"/>
+    
+    <!-- Inner circle -->
+    <circle cx="256" cy="200" r="62" fill="none" stroke="#00e5e5" stroke-width="6"/>
+    
+    <!-- Play button triangle -->
+    <path fill="#00e5e5" d="M 238 178 L 238 222 L 282 200 Z"/>
+    
+    <!-- Sound wave bars - left -->
+    <rect x="125" y="185" width="10" height="30" rx="5" fill="#00e5e5" opacity="0.7"/>
+    <rect x="145" y="170" width="10" height="60" rx="5" fill="#00e5e5" opacity="0.8"/>
+    <rect x="165" y="155" width="10" height="90" rx="5" fill="#00e5e5"/>
+    
+    <!-- Sound wave bars - right -->
+    <rect x="377" y="185" width="10" height="30" rx="5" fill="#00e5e5" opacity="0.7"/>
+    <rect x="357" y="170" width="10" height="60" rx="5" fill="#00e5e5" opacity="0.8"/>
+    <rect x="337" y="155" width="10" height="90" rx="5" fill="#00e5e5"/>
+    
+    <!-- Text: SoundWave -->
+    <text x="256" y="340" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="bold" text-anchor="middle" fill="#ffffff">Sound</text>
+    <text x="256" y="390" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="bold" text-anchor="middle" fill="#00e5e5">Wave</text>
+  </g>
+</svg>

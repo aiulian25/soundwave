@@ -14,7 +14,7 @@ try:
     from mutagen.mp4 import MP4, MP4Cover
     from mutagen.oggvorbis import OggVorbis
     from mutagen.flac import FLAC, Picture
-    from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TCON, TRCK, APIC
+    from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TCON, TRCK, APIC, USLT, SYLT, Encoding
     MUTAGEN_AVAILABLE = True
 except ImportError:
     MUTAGEN_AVAILABLE = False
@@ -32,6 +32,45 @@ def download_cover_art(url: str) -> Optional[bytes]:
     return None
 
 
+def parse_lrc_to_synced_lyrics(lrc_text: str) -> list:
+    """
+    Parse LRC format text to a list of (time_ms, text) tuples for SYLT tag.
+    
+    Args:
+        lrc_text: LRC formatted lyrics string
+        
+    Returns:
+        List of (text, time_ms) tuples
+    """
+    import re
+    synced = []
+    
+    for line in lrc_text.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Match timestamp [mm:ss.xx] or [mm:ss.xxx]
+        match = re.match(r'\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)', line)
+        if match:
+            minutes = int(match.group(1))
+            seconds = int(match.group(2))
+            centiseconds = match.group(3)
+            # Normalize to milliseconds
+            if len(centiseconds) == 2:
+                ms = int(centiseconds) * 10
+            else:
+                ms = int(centiseconds)
+            
+            time_ms = (minutes * 60 + seconds) * 1000 + ms
+            text = match.group(4).strip()
+            
+            if text:
+                synced.append((text, time_ms))
+    
+    return synced
+
+
 def write_metadata_to_file(
     file_path: str,
     title: Optional[str] = None,
@@ -41,6 +80,9 @@ def write_metadata_to_file(
     genre: Optional[str] = None,
     track_number: Optional[int] = None,
     cover_art_url: Optional[str] = None,
+    cover_art_data: Optional[bytes] = None,
+    lyrics: Optional[str] = None,
+    synced_lyrics: Optional[str] = None,
 ) -> bool:
     """
     Write metadata tags to an audio file.
@@ -54,6 +96,9 @@ def write_metadata_to_file(
         genre: Music genre
         track_number: Track number on album
         cover_art_url: URL to download cover art from
+        cover_art_data: Raw cover art bytes (takes precedence over URL)
+        lyrics: Plain text lyrics (USLT tag)
+        synced_lyrics: LRC formatted synced lyrics (SYLT tag for MP3)
         
     Returns:
         True if successful, False otherwise
@@ -62,8 +107,11 @@ def write_metadata_to_file(
         print("mutagen not available")
         return False
     
-    # Build full path
-    full_path = Path(settings.MEDIA_ROOT) / file_path
+    # Build full path - handle both relative and absolute paths
+    if os.path.isabs(file_path):
+        full_path = Path(file_path)
+    else:
+        full_path = Path(settings.MEDIA_ROOT) / file_path
     
     if not full_path.exists():
         print(f"File not found: {full_path}")
@@ -72,15 +120,20 @@ def write_metadata_to_file(
     # Get file extension
     ext = full_path.suffix.lower()
     
+    # Get cover art data
+    cover_data = cover_art_data
+    if not cover_data and cover_art_url:
+        cover_data = download_cover_art(cover_art_url)
+    
     try:
         if ext == '.mp3':
-            return _write_mp3_tags(full_path, title, artist, album, year, genre, track_number, cover_art_url)
+            return _write_mp3_tags(full_path, title, artist, album, year, genre, track_number, cover_data, lyrics, synced_lyrics)
         elif ext in ['.m4a', '.mp4', '.aac']:
-            return _write_mp4_tags(full_path, title, artist, album, year, genre, track_number, cover_art_url)
+            return _write_mp4_tags(full_path, title, artist, album, year, genre, track_number, cover_data, lyrics)
         elif ext == '.ogg':
-            return _write_ogg_tags(full_path, title, artist, album, year, genre, track_number)
+            return _write_ogg_tags(full_path, title, artist, album, year, genre, track_number, lyrics)
         elif ext == '.flac':
-            return _write_flac_tags(full_path, title, artist, album, year, genre, track_number, cover_art_url)
+            return _write_flac_tags(full_path, title, artist, album, year, genre, track_number, cover_data, lyrics, synced_lyrics)
         else:
             print(f"Unsupported format: {ext}")
             return False
@@ -97,7 +150,9 @@ def _write_mp3_tags(
     year: Optional[int],
     genre: Optional[str],
     track_number: Optional[int],
-    cover_art_url: Optional[str],
+    cover_data: Optional[bytes],
+    lyrics: Optional[str] = None,
+    synced_lyrics: Optional[str] = None,
 ) -> bool:
     """Write ID3 tags to MP3 file"""
     try:
@@ -125,15 +180,40 @@ def _write_mp3_tags(
         audio.tags.add(TRCK(encoding=3, text=str(track_number)))
     
     # Add cover art
-    if cover_art_url:
-        cover_data = download_cover_art(cover_art_url)
-        if cover_data:
-            audio.tags.add(APIC(
-                encoding=3,
-                mime='image/jpeg',
-                type=3,  # Cover (front)
-                desc='Cover',
-                data=cover_data
+    if cover_data:
+        # Detect image type
+        mime_type = 'image/jpeg'
+        if cover_data[:8] == b'\x89PNG\r\n\x1a\n':
+            mime_type = 'image/png'
+        
+        audio.tags.add(APIC(
+            encoding=3,
+            mime=mime_type,
+            type=3,  # Cover (front)
+            desc='Cover',
+            data=cover_data
+        ))
+    
+    # Add plain lyrics (USLT)
+    if lyrics:
+        audio.tags.add(USLT(
+            encoding=Encoding.UTF8,
+            lang='eng',
+            desc='Lyrics',
+            text=lyrics
+        ))
+    
+    # Add synced lyrics (SYLT) - LRC embedded
+    if synced_lyrics:
+        synced_data = parse_lrc_to_synced_lyrics(synced_lyrics)
+        if synced_data:
+            audio.tags.add(SYLT(
+                encoding=Encoding.UTF8,
+                lang='eng',
+                format=2,  # milliseconds
+                type=1,    # lyrics
+                desc='SyncedLyrics',
+                text=synced_data
             ))
     
     audio.save(file_path)
@@ -149,7 +229,8 @@ def _write_mp4_tags(
     year: Optional[int],
     genre: Optional[str],
     track_number: Optional[int],
-    cover_art_url: Optional[str],
+    cover_data: Optional[bytes],
+    lyrics: Optional[str] = None,
 ) -> bool:
     """Write MP4/M4A tags"""
     audio = MP4(file_path)
@@ -167,19 +248,21 @@ def _write_mp4_tags(
     if track_number:
         audio['trkn'] = [(track_number, 0)]  # Track number
     
+    # Add lyrics
+    if lyrics:
+        audio['\xa9lyr'] = [lyrics]
+    
     # Add cover art
-    if cover_art_url:
-        cover_data = download_cover_art(cover_art_url)
-        if cover_data:
-            # Determine image format
-            if cover_data[:3] == b'\xff\xd8\xff':
-                img_format = MP4Cover.FORMAT_JPEG
-            elif cover_data[:8] == b'\x89PNG\r\n\x1a\n':
-                img_format = MP4Cover.FORMAT_PNG
-            else:
-                img_format = MP4Cover.FORMAT_JPEG
-            
-            audio['covr'] = [MP4Cover(cover_data, imageformat=img_format)]
+    if cover_data:
+        # Determine image format
+        if cover_data[:3] == b'\xff\xd8\xff':
+            img_format = MP4Cover.FORMAT_JPEG
+        elif cover_data[:8] == b'\x89PNG\r\n\x1a\n':
+            img_format = MP4Cover.FORMAT_PNG
+        else:
+            img_format = MP4Cover.FORMAT_JPEG
+        
+        audio['covr'] = [MP4Cover(cover_data, imageformat=img_format)]
     
     audio.save()
     print(f"Written MP4 tags to {file_path}")
@@ -194,6 +277,7 @@ def _write_ogg_tags(
     year: Optional[int],
     genre: Optional[str],
     track_number: Optional[int],
+    lyrics: Optional[str] = None,
 ) -> bool:
     """Write Vorbis comments to OGG file"""
     audio = OggVorbis(file_path)
@@ -210,6 +294,8 @@ def _write_ogg_tags(
         audio['genre'] = [genre]
     if track_number:
         audio['tracknumber'] = [str(track_number)]
+    if lyrics:
+        audio['lyrics'] = [lyrics]
     
     audio.save()
     print(f"Written OGG tags to {file_path}")
@@ -224,7 +310,9 @@ def _write_flac_tags(
     year: Optional[int],
     genre: Optional[str],
     track_number: Optional[int],
-    cover_art_url: Optional[str],
+    cover_data: Optional[bytes],
+    lyrics: Optional[str] = None,
+    synced_lyrics: Optional[str] = None,
 ) -> bool:
     """Write tags to FLAC file"""
     audio = FLAC(file_path)
@@ -242,16 +330,31 @@ def _write_flac_tags(
     if track_number:
         audio['tracknumber'] = [str(track_number)]
     
+    # Add lyrics (Vorbis comment)
+    if lyrics:
+        audio['lyrics'] = [lyrics]
+    
+    # Add synced lyrics as LRC in a custom tag
+    if synced_lyrics:
+        audio['syncedlyrics'] = [synced_lyrics]
+    
     # Add cover art
-    if cover_art_url:
-        cover_data = download_cover_art(cover_art_url)
-        if cover_data:
-            picture = Picture()
-            picture.type = 3  # Cover (front)
+    if cover_data:
+        # Clear existing pictures
+        audio.clear_pictures()
+        
+        picture = Picture()
+        picture.type = 3  # Cover (front)
+        picture.desc = 'Cover'
+        picture.data = cover_data
+        
+        # Detect image type
+        if cover_data[:8] == b'\x89PNG\r\n\x1a\n':
+            picture.mime = 'image/png'
+        else:
             picture.mime = 'image/jpeg'
-            picture.desc = 'Cover'
-            picture.data = cover_data
-            audio.add_picture(picture)
+        
+        audio.add_picture(picture)
     
     audio.save()
     print(f"Written FLAC tags to {file_path}")

@@ -16,6 +16,7 @@ import CachedIcon from '@mui/icons-material/Cached';
 import CloseIcon from '@mui/icons-material/Close';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import EditIcon from '@mui/icons-material/Edit';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { Audio } from '../types';
 import { useSettings } from '../context/SettingsContext';
@@ -25,6 +26,7 @@ import AudioVisualizer from './AudioVisualizer';
 import { visualizerThemes } from '../config/visualizerThemes';
 import { audioCache } from '../utils/audioCache';
 import MetadataEditor from './MetadataEditor';
+import DownloadDialog from './DownloadDialog';
 
 // Import LyricsPlayer directly instead of lazy to avoid offline loading issues
 import LyricsPlayer from './LyricsPlayer';
@@ -63,6 +65,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [showLyrics, setShowLyrics] = useState(false);
   const [showRelatedTracks, setShowRelatedTracks] = useState(false);
   const [showMetadataEditor, setShowMetadataEditor] = useState(false);
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [currentAudioData, setCurrentAudioData] = useState<Audio>(audio);
   const [activeTab, setActiveTab] = useState(0);
   const [streamUrl, setStreamUrl] = useState<string>('');
@@ -243,24 +246,33 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     // Use audio.id as single dependency to prevent double fetching
   }, [audio.id]);
 
-  // Initialize Media Session API
+  // Initialize Media Session API with artwork
   useEffect(() => {
-    // Set metadata
-    setMediaMetadata({
-      title: audio.title,
-      artist: audio.artist || 'Unknown Artist',
-      album: audio.album,
-      artwork: audio.cover_art_url
-        ? [
-            { src: audio.cover_art_url, sizes: '96x96', type: 'image/png' },
-            { src: audio.cover_art_url, sizes: '128x128', type: 'image/png' },
-            { src: audio.cover_art_url, sizes: '192x192', type: 'image/png' },
-            { src: audio.cover_art_url, sizes: '256x256', type: 'image/png' },
-            { src: audio.cover_art_url, sizes: '384x384', type: 'image/png' },
-            { src: audio.cover_art_url, sizes: '512x512', type: 'image/png' },
-          ]
-        : undefined,
-    });
+    // Get the best available artwork URL - use our proxy to avoid CORS issues
+    const artworkUrl = audio.cover_art_url || audio.thumbnail_url;
+    const proxyArtworkUrl = `/api/audio/${audio.youtube_id}/artwork/`;
+    
+    // Function to set metadata with artwork
+    const updateMediaSession = (artworkArray?: Array<{src: string; sizes: string; type: string}>) => {
+      setMediaMetadata({
+        title: audio.title,
+        artist: audio.artist || audio.channel_name || 'Unknown Artist',
+        album: audio.album,
+        artwork: artworkArray,
+      });
+    };
+
+    // Use proxied URL for artwork (works with CORS)
+    if (artworkUrl) {
+      updateMediaSession([
+        { src: proxyArtworkUrl, sizes: '96x96', type: 'image/jpeg' },
+        { src: proxyArtworkUrl, sizes: '128x128', type: 'image/jpeg' },
+        { src: proxyArtworkUrl, sizes: '256x256', type: 'image/jpeg' },
+        { src: proxyArtworkUrl, sizes: '512x512', type: 'image/jpeg' },
+      ]);
+    } else {
+      updateMediaSession(undefined);
+    }
 
     // Set action handlers
     setMediaActionHandlers({
@@ -695,7 +707,19 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               // Record completed play
               recordListeningHistory(true);
               
-              if (hasNext && onNext) {
+              // Handle repeat modes
+              if (repeatMode === 'one') {
+                // Repeat current track
+                if (audioRef.current) {
+                  audioRef.current.currentTime = 0;
+                  audioRef.current.play().catch(console.error);
+                }
+              } else if (hasNext && onNext) {
+                // Play next track (works for both 'none' and 'all' when not at end)
+                onNext();
+              } else if (repeatMode === 'all' && onNext) {
+                // At end of playlist with repeat all - go back to first track
+                // This is handled by the parent component through onNext
                 onNext();
               } else {
                 setIsPlaying(false);
@@ -860,6 +884,23 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                 {isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
               </IconButton>
             </Tooltip>
+            {audio.youtube_id && (
+              <Tooltip title="Export track">
+                <IconButton
+                  onClick={() => setShowDownloadDialog(true)}
+                  sx={{
+                    color: 'text.secondary',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'scale(1.1)',
+                      color: 'primary.main',
+                    },
+                  }}
+                >
+                  <DownloadIcon />
+                </IconButton>
+              </Tooltip>
+            )}
             {audio.youtube_id && (
               <Tooltip title="Edit metadata">
                 <IconButton
@@ -1227,6 +1268,16 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           open={showMetadataEditor}
           onClose={() => setShowMetadataEditor(false)}
           onUpdate={(updatedAudio) => setCurrentAudioData(updatedAudio)}
+        />
+      )}
+
+      {/* Download/Export Dialog */}
+      {audio.youtube_id && (
+        <DownloadDialog
+          youtubeId={audio.youtube_id}
+          title={audio.title}
+          open={showDownloadDialog}
+          onClose={() => setShowDownloadDialog(false)}
         />
       )}
     </Box>

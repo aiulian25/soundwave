@@ -162,6 +162,7 @@ function App() {
     
     const shuffleEnabled = settingsContext?.settings?.shuffle_enabled ?? false;
     const smartShuffleEnabled = settingsContext?.settings?.smart_shuffle_enabled ?? true;
+    const repeatMode = settingsContext?.settings?.repeat_mode ?? 'none';
     
     // Smart shuffle mode
     if (shuffleEnabled && smartShuffleEnabled) {
@@ -191,8 +192,12 @@ function App() {
       const nextIndex = currentQueueIndex + 1;
       setCurrentQueueIndex(nextIndex);
       setCurrentAudio(queue[nextIndex]);
+    } else if (repeatMode === 'all') {
+      // At end of queue with repeat all - wrap to beginning
+      setCurrentQueueIndex(0);
+      setCurrentAudio(queue[0]);
     }
-  }, [queue, currentQueueIndex, settingsContext?.settings?.shuffle_enabled, settingsContext?.settings?.smart_shuffle_enabled, smartShuffle]);
+  }, [queue, currentQueueIndex, settingsContext?.settings?.shuffle_enabled, settingsContext?.settings?.smart_shuffle_enabled, settingsContext?.settings?.repeat_mode, smartShuffle]);
 
   const playPrevious = () => {
     if (queue.length > 0 && currentQueueIndex > 0) {
@@ -299,7 +304,7 @@ function App() {
             onClose={() => setCurrentAudio(null)}
             onNext={playNext}
             onPrevious={playPrevious}
-            hasNext={queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || currentQueueIndex < queue.length - 1)}
+            hasNext={queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || settingsContext?.settings?.repeat_mode === 'all' || currentQueueIndex < queue.length - 1)}
             hasPrevious={currentQueueIndex > 0}
             onFavoriteToggle={handlePlayerFavoriteToggle}
             onTrackSelect={handleRelatedTrackSelect}
@@ -350,7 +355,7 @@ function App() {
               onMinimize={() => setPlayerMinimized(true)}
               onNext={playNext}
               onPrevious={playPrevious}
-              hasNext={queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || currentQueueIndex < queue.length - 1)}
+              hasNext={queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || settingsContext?.settings?.repeat_mode === 'all' || currentQueueIndex < queue.length - 1)}
               hasPrevious={currentQueueIndex > 0}
               onFavoriteToggle={handlePlayerFavoriteToggle}
               onTrackSelect={handleRelatedTrackSelect}

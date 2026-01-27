@@ -15,7 +15,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Chip,
   TextField,
   InputAdornment,
@@ -24,6 +23,8 @@ import {
   MenuItem,
   ListItemIcon,
   useTheme,
+  Tooltip,
+  Snackbar,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
@@ -34,10 +35,11 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import DownloadIcon from '@mui/icons-material/Download';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import api from '../api/client';
+import api, { audioAPI } from '../api/client';
 import { offlineStorage } from '../utils/offlineStorage';
 import { getLyricsColors, LyricsThemeColors, DEFAULT_VISUALIZER_THEME } from '../config/visualizerThemes';
 import { useSettings } from '../context/SettingsContext';
@@ -49,6 +51,7 @@ interface LyricsData {
   plain_lyrics: string;
   is_instrumental: boolean;
   source: string;
+  uploaded_filename?: string;
   language: string;
   has_lyrics: boolean;
   is_synced: boolean;
@@ -127,6 +130,11 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   
   // Download menu state
   const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<null | HTMLElement>(null);
+  
+  // LRC Upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const currentLineRef = useRef<HTMLDivElement>(null);
@@ -367,6 +375,57 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     }
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleLrcUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file extension
+    if (!file.name.toLowerCase().endsWith('.lrc')) {
+      setError('Please select a valid .lrc file');
+      return;
+    }
+
+    // Validate file size (max 1MB)
+    if (file.size > 1024 * 1024) {
+      setError('LRC file must be smaller than 1MB');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setError('');
+      
+      const response = await audioAPI.uploadLrcFile(youtubeId, file);
+      
+      setLyrics(response.data);
+      
+      if (response.data.is_synced) {
+        const parsed = parseSyncedLyrics(response.data.synced_lyrics);
+        setParsedLyrics(parsed);
+      }
+      
+      // Update offline cache
+      offlineStorage.saveLyrics(youtubeId, response.data).catch(() => {});
+      
+      setUploadSuccess(true);
+      setEditMode(false);
+      
+    } catch (err: any) {
+      console.error('Upload failed:', err);
+      setError(err.response?.data?.error || 'Failed to upload LRC file');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const parseSyncedLyrics = (syncedText: string): LyricsLine[] => {
     const lines: LyricsLine[] = [];
     const lrcLines = syncedText.split('\n');
@@ -508,7 +567,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             {lyrics.fetch_attempted && ` (Attempted ${lyrics.fetch_attempts} times)`}
           </Alert>
           
-          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
             <Button variant="contained" onClick={fetchLyrics} startIcon={<RefreshIcon />} size="small">
               Retry Fetch
             </Button>
@@ -521,7 +580,35 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             >
               {suggestionsLoading ? 'Searching...' : 'Find Suggestions'}
             </Button>
+            <Button
+              variant="outlined"
+              onClick={handleUploadClick}
+              startIcon={uploading ? <CircularProgress size={16} /> : <UploadFileIcon />}
+              size="small"
+              disabled={uploading}
+              color="secondary"
+            >
+              {uploading ? 'Uploading...' : 'Upload .LRC'}
+            </Button>
           </Box>
+          
+          {/* Hidden file input for upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".lrc"
+            style={{ display: 'none' }}
+            onChange={handleLrcUpload}
+          />
+          
+          {/* Success snackbar */}
+          <Snackbar
+            open={uploadSuccess}
+            autoHideDuration={3000}
+            onClose={() => setUploadSuccess(false)}
+            message="LRC file uploaded successfully!"
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          />
 
           {/* Search form */}
           <Box component="form" onSubmit={handleSearchSubmit} sx={{ mb: 2 }}>
@@ -550,7 +637,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
 
           {/* Suggestions list */}
           {suggestions.length > 0 && (
-            <Box>
+            <Box sx={{ maxHeight: 300, overflow: 'auto', position: 'relative' }}>
               <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
                 Found {suggestions.length} suggestions:
               </Typography>
@@ -562,21 +649,38 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                       borderBottom: '1px solid',
                       borderColor: 'divider',
                       '&:last-child': { borderBottom: 'none' },
+                      display: 'flex',
+                      alignItems: 'center',
+                      pr: 1,
                     }}
+                    secondaryAction={
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        onClick={() => applySuggestion(suggestion)}
+                        disabled={applyingId === suggestion.id}
+                        startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
+                        sx={{ minWidth: 70 }}
+                      >
+                        {applyingId === suggestion.id ? '...' : 'Use'}
+                      </Button>
+                    }
                   >
                     <ListItemText
+                      sx={{ pr: 8 }}
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
                             "{suggestion.track_name}"
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" noWrap>
                             by {suggestion.artist_name}
                           </Typography>
                         </Box>
                       }
                       secondary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                           {suggestion.has_synced && (
                             <Chip label="Synced" size="small" color="success" sx={{ height: 20 }} />
                           )}
@@ -590,25 +694,13 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                             {formatDuration(suggestion.duration)}
                           </Typography>
                           {suggestion.album_name && (
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" noWrap>
                               • {suggestion.album_name}
                             </Typography>
                           )}
                         </Box>
                       }
                     />
-                    <ListItemSecondaryAction>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        onClick={() => applySuggestion(suggestion)}
-                        disabled={applyingId === suggestion.id}
-                        startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
-                      >
-                        {applyingId === suggestion.id ? 'Applying...' : 'Use'}
-                      </Button>
-                    </ListItemSecondaryAction>
                   </ListItem>
                 ))}
               </List>
@@ -678,6 +770,25 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           </MenuItem>
         </Menu>
         
+        {/* Upload LRC button */}
+        <Tooltip title="Upload .LRC file">
+          <IconButton 
+            size="small" 
+            onClick={handleUploadClick}
+            sx={{ mr: 1 }}
+            disabled={uploading}
+          >
+            {uploading ? <CircularProgress size={20} /> : <UploadFileIcon />}
+          </IconButton>
+        </Tooltip>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".lrc"
+          style={{ display: 'none' }}
+          onChange={handleLrcUpload}
+        />
+        
         <IconButton size="small" onClick={fetchLyrics} sx={{ mr: 1 }} title="Refresh lyrics">
           <RefreshIcon />
         </IconButton>
@@ -688,6 +799,15 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           </IconButton>
         )}
       </Box>
+      
+      {/* Success snackbar for upload */}
+      <Snackbar
+        open={uploadSuccess}
+        autoHideDuration={3000}
+        onClose={() => setUploadSuccess(false)}
+        message="LRC file uploaded successfully!"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
       
       {/* Edit mode panel - Find different lyrics */}
       <Collapse in={editMode}>
@@ -741,7 +861,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           )}
           
           {!suggestionsLoading && suggestions.length > 0 && (
-            <Box sx={{ maxHeight: 250, overflow: 'auto' }}>
+            <Box sx={{ maxHeight: 250, overflow: 'auto', position: 'relative', zIndex: 1 }}>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                 {suggestions.length} suggestions found - select one to replace current lyrics:
               </Typography>
@@ -753,15 +873,32 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                       borderBottom: '1px solid',
                       borderColor: 'divider',
                       '&:last-child': { borderBottom: 'none' },
+                      display: 'flex',
+                      alignItems: 'center',
+                      pr: 1,
                     }}
+                    secondaryAction={
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        onClick={() => applySuggestion(suggestion)}
+                        disabled={applyingId === suggestion.id}
+                        startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
+                        sx={{ minWidth: 70 }}
+                      >
+                        {applyingId === suggestion.id ? '...' : 'Use'}
+                      </Button>
+                    }
                   >
                     <ListItemText
+                      sx={{ pr: 8 }}
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: 'break-word' }} noWrap>
                             "{suggestion.track_name}"
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" noWrap>
                             by {suggestion.artist_name}
                           </Typography>
                         </Box>
@@ -783,18 +920,6 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                         </Box>
                       }
                     />
-                    <ListItemSecondaryAction>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        onClick={() => applySuggestion(suggestion)}
-                        disabled={applyingId === suggestion.id}
-                        startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
-                      >
-                        {applyingId === suggestion.id ? 'Applying...' : 'Use'}
-                      </Button>
-                    </ListItemSecondaryAction>
                   </ListItem>
                 ))}
               </List>
@@ -812,7 +937,9 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       {lyrics.is_synced && (
         <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="caption" color="text.secondary">
-            Source: {lyrics.source} {lyrics.language && `• ${lyrics.language}`}
+            Source: {lyrics.source === 'upload' && lyrics.uploaded_filename 
+              ? `📤 ${lyrics.uploaded_filename}` 
+              : lyrics.source} {lyrics.language && `• ${lyrics.language}`}
           </Typography>
           <FormControlLabel
             control={

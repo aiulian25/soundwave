@@ -1,8 +1,10 @@
 """Views for lyrics management"""
+import re
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 
@@ -13,10 +15,113 @@ from audio.serializers_lyrics import (
     LyricsUpdateSerializer,
     LyricsFetchSerializer,
     LyricsCacheSerializer,
+    LRCUploadSerializer,
 )
 from audio.lyrics_service import LyricsService, LRCLIBClient, clean_title_for_lyrics
 from audio.tasks_lyrics import fetch_lyrics_for_audio, fetch_lyrics_batch
 from common.views import ApiBaseView
+
+
+def parse_lrc_content(lrc_content: str) -> tuple[str, str, str]:
+    """
+    Parse LRC file content and extract synced lyrics, plain lyrics, and metadata.
+    
+    Returns:
+        tuple: (synced_lyrics, plain_lyrics, language)
+    """
+    lines = lrc_content.strip().split('\n')
+    synced_lines = []
+    metadata = {}
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Check for metadata tags [key:value]
+        meta_match = re.match(r'\[([a-z]{2,}):(.+)\]', line, re.IGNORECASE)
+        if meta_match and not re.match(r'\[\d{2}:\d{2}', line):
+            key = meta_match.group(1).lower()
+            value = meta_match.group(2).strip()
+            metadata[key] = value
+            continue
+        
+        # Check for timestamp lines [mm:ss.xx]text
+        timestamp_match = re.match(r'(\[\d{2}:\d{2}\.\d{2,3}\])(.*)$', line)
+        if timestamp_match:
+            synced_lines.append(line)
+    
+    # Build synced lyrics string
+    synced_lyrics = '\n'.join(synced_lines)
+    
+    # Generate plain lyrics by stripping timestamps
+    plain_lines = []
+    for line in synced_lines:
+        text = re.sub(r'\[\d{2}:\d{2}\.\d{2,3}\]', '', line).strip()
+        if text:
+            plain_lines.append(text)
+    plain_lyrics = '\n'.join(plain_lines)
+    
+    # Extract language from metadata if available
+    language = metadata.get('la', metadata.get('lang', metadata.get('language', '')))
+    
+    return synced_lyrics, plain_lyrics, language
+
+
+class LyricsUploadView(ApiBaseView):
+    """View for uploading LRC files"""
+    
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def post(self, request, youtube_id):
+        """Upload an LRC file for a track"""
+        # Filter by owner to ensure user can only upload to their own tracks
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        # Validate uploaded file
+        serializer = LRCUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        lrc_file = serializer.validated_data['lrc_file']
+        
+        try:
+            # Read file content
+            content = lrc_file.read().decode('utf-8')
+            
+            # Parse LRC content
+            synced_lyrics, plain_lyrics, language = parse_lrc_content(content)
+            
+            if not synced_lyrics:
+                return Response(
+                    {'error': 'No valid synced lyrics found in LRC file'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get or create lyrics entry
+            lyrics, created = Lyrics.objects.get_or_create(audio=audio)
+            
+            # Update lyrics with uploaded content
+            lyrics.synced_lyrics = synced_lyrics
+            lyrics.plain_lyrics = plain_lyrics
+            lyrics.language = language
+            lyrics.source = 'upload'
+            lyrics.uploaded_filename = lrc_file.name[:255]  # Store original filename
+            lyrics.is_instrumental = False
+            lyrics.fetch_attempted = True
+            lyrics.last_error = ''
+            lyrics.save()
+            
+            print(f"[LRC Upload] Saved lyrics for {audio.title} - file: {lrc_file.name}, lines: {len(synced_lyrics.splitlines())}")
+            
+            # Return updated lyrics
+            response_serializer = LyricsSerializer(lyrics)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to process LRC file: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class LyricsDownloadView(ApiBaseView):

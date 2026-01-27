@@ -22,8 +22,11 @@ class Lyrics(models.Model):
     # Track is instrumental (no lyrics)
     is_instrumental = models.BooleanField(default=False)
     
-    # Lyrics source (lrclib, genius, manual, etc.)
-    source = models.CharField(max_length=50, default='lrclib')
+    # Lyrics source (lrclib, genius, manual, upload, etc.)
+    source = models.CharField(max_length=100, default='lrclib')
+    
+    # Original uploaded LRC filename (for user uploads)
+    uploaded_filename = models.CharField(max_length=255, blank=True, default='')
     
     # Language code (en, es, fr, etc.)
     language = models.CharField(max_length=10, blank=True, default='')

@@ -61,6 +61,13 @@ export const audioAPI = {
   fetchLyrics: (youtubeId: string, force?: boolean) => api.post(`/audio/${youtubeId}/lyrics/fetch/`, { force }),
   updateLyrics: (youtubeId: string, data: any) => api.put(`/audio/${youtubeId}/lyrics/`, data),
   deleteLyrics: (youtubeId: string) => api.delete(`/audio/${youtubeId}/lyrics/`),
+  uploadLrcFile: (youtubeId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('lrc_file', file);
+    return api.post(`/audio/${youtubeId}/lyrics/upload/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   fetchBatchLyrics: (youtubeIds: string[]) => api.post('/audio/lyrics/fetch_batch/', { youtube_ids: youtubeIds }),
   fetchAllMissingLyrics: (limit?: number) => api.post('/audio/lyrics/fetch_all_missing/', { limit }),
   getLyricsStats: () => api.get('/audio/lyrics/stats/'),
