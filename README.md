@@ -14,14 +14,28 @@
 - 🔍 **Powerful Search** - Find your audio quickly with ElasticSearch-powered indexing
 - 🎵 **Built-in Player** - Stream your collection directly in the browser
 - ▶️ **Auto-Play / Continuous Playback** - Automatically plays next track in queue
+- � **Repeat Modes** - Repeat one track, repeat all, or normal playback
+- 🔀 **Shuffle** - Smart shuffle and regular shuffle modes
 - 📊 **Channel Subscriptions** - Subscribe to YouTube channels and automatically download new audio
 - 📝 **Playlists** - Create custom playlists or sync YouTube playlists
 
-### PWA & Offline Features
-- 📱 **PWA Support** - Install as mobile/desktop app
-- 💾 **Full Offline Playback** - Cache playlists with audio, lyrics, and metadata for offline use
+### Lyrics Features
 - 🎤 **Synced Lyrics** - Display lyrics in sync with music playback (online & offline)
+- 📤 **LRC Upload** - Upload your own .lrc files for synced lyrics
+- 🔎 **Lyrics Search** - Search and apply lyrics from LRCLIB database
+- 💾 **Persistent Lyrics** - Uploaded lyrics are saved permanently with the track
+
+### Export & Download
+- 📥 **Export Dialog** - Export tracks as MP3 or FLAC with embedded metadata
+- 🎵 **Embedded Lyrics** - Export with synced lyrics (SYLT for MP3, LRC for FLAC)
+- 🖼️ **Embedded Artwork** - Include album art in exported files
+- 🎚️ **Quality Selection** - Choose export quality (320kbps, 192kbps, 128kbps)
+
+### PWA & Offline Features
+- 📱 **PWA Support** - Install as mobile/desktop app with rounded app icon
+- 💾 **Full Offline Playback** - Cache playlists with audio, lyrics, and metadata for offline use
 - 🔄 **Background Caching** - Non-blocking progress indicator while caching
+- 🖼️ **Media Session Artwork** - Album art in system notifications (all browsers)
 
 ### Visual & UI
 - 🌙 **Dark Theme** - Beautiful Material Design dark UI
@@ -288,6 +302,32 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.7.0 - LRC Upload, Export & Media Session (January 2026)
+
+#### LRC Upload & Lyrics Management
+- ✅ Upload custom .lrc files for synced lyrics
+- ✅ Persistent storage of uploaded lyrics with original filename
+- ✅ Enhanced lyrics search with suggestions panel
+- ✅ Fixed lyrics suggestions overflow UI
+
+#### Export Dialog
+- ✅ Export tracks as MP3 or FLAC format
+- ✅ Embed synced lyrics (SYLT tag for MP3, LRC metadata for FLAC)
+- ✅ Embed plain lyrics (USLT tag)
+- ✅ Embed album artwork in exported files
+- ✅ Quality selection (High/Medium/Low for MP3)
+
+#### PWA & Media Session
+- ✅ New rounded app icon with gradient design
+- ✅ Album artwork in system media notifications
+- ✅ Artwork proxy endpoint for Chromium browser support
+- ✅ Fixed favicon and all PWA icon sizes
+
+#### Player Improvements
+- ✅ Fixed repeat button (repeat one, repeat all, off)
+- ✅ Proper queue wrap-around for repeat all mode
+- ✅ Channel name fallback for artist in notifications
 
 ### v1.6.0 - Auto-Play & Infrastructure Improvements (January 2026)
 
