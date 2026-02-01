@@ -4,6 +4,7 @@ Django settings for SoundWave project.
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -11,7 +12,69 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security settings
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key-change-in-production')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = ['*']
+
+# ALLOWED_HOSTS configuration
+# Can be set via DJANGO_ALLOWED_HOSTS env var (comma-separated)
+# Falls back to extracting hostname from SW_HOST, or defaults to localhost
+def get_allowed_hosts():
+    """Build ALLOWED_HOSTS from environment variables."""
+    import re
+    
+    hosts = set()
+    
+    # Check for explicit DJANGO_ALLOWED_HOSTS
+    env_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+    if env_hosts:
+        hosts.update(h.strip() for h in env_hosts.split(',') if h.strip())
+    
+    # Extract hostname from SW_HOST
+    sw_host = os.environ.get('SW_HOST', '')
+    if sw_host:
+        parsed = urlparse(sw_host)
+        if parsed.hostname:
+            hosts.add(parsed.hostname)
+    
+    # Extract hostnames from CORS_ALLOWED_ORIGINS
+    cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+    if cors_origins:
+        for origin in cors_origins.split(','):
+            parsed = urlparse(origin.strip())
+            if parsed.hostname:
+                hosts.add(parsed.hostname)
+    
+    # Default safe hosts for development
+    if not hosts:
+        hosts = {'localhost', '127.0.0.1'}
+    
+    # Always include localhost for health checks
+    hosts.add('localhost')
+    hosts.add('127.0.0.1')
+    
+    # Allow local network access (private IP ranges)
+    # This is safe as these IPs are not routable from the internet
+    if os.environ.get('ALLOW_LOCAL_NETWORK', 'True') == 'True':
+        # Add Docker internal hosts
+        hosts.add('host.docker.internal')
+        
+        # Add explicit local network IPs from env var
+        local_ips = os.environ.get('LOCAL_NETWORK_IPS', '')
+        if local_ips:
+            hosts.update(ip.strip() for ip in local_ips.split(',') if ip.strip())
+        
+        # Add common local network subnets (192.168.0.x and 192.168.1.x)
+        # These are the most common home network ranges
+        for subnet in [0, 1]:
+            for host_num in range(1, 255):
+                hosts.add(f'192.168.{subnet}.{host_num}')
+        
+        # Add 10.0.0.x range as well (common for some routers)
+        for host_num in range(1, 255):
+            hosts.add(f'10.0.0.{host_num}')
+    
+    return list(hosts)
+
+
+ALLOWED_HOSTS = get_allowed_hosts()
 
 # Application definition
 INSTALLED_APPS = [
@@ -135,11 +198,38 @@ if not os.path.exists(MEDIA_ROOT):
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Cache configuration (using Redis for rate limiting, with fallback)
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': f"redis://{REDIS_HOST}:6379/1",
+        'KEY_PREFIX': 'soundwave',
+        'TIMEOUT': 3600,  # 1 hour default timeout
+    }
+}
+
+# Login security settings
+MAX_LOGIN_ATTEMPTS = 3  # Number of failed attempts before lockout
+LOGIN_LOCKOUT_DURATION = 60 * 60  # 60 minutes in seconds
+
+# Token expiry settings
+TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY_HOURS', 24 * 7))  # Default: 7 days
+TOKEN_EXPIRY_HOURS_EXTENDED = int(os.environ.get('TOKEN_EXPIRY_HOURS_EXTENDED', 24 * 30))  # Default: 30 days (for "remember me")
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'common.rate_limiter.SustainedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '10/minute',
+        'burst': '30/minute',
+        'sustained': '1000/hour',
+        'strict_anon': '5/minute',
+    },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
@@ -167,13 +257,49 @@ else:
         "http://127.0.0.1:8889",
         "http://192.168.50.71:8889",
     ]
-CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SECURE = False
 
-# Security headers for development
-SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # Disable COOP header for development
+# Determine if running in production/HTTPS mode
+# Set SECURE_COOKIES=True in production with HTTPS
+_USE_SECURE_COOKIES = os.environ.get('SECURE_COOKIES', 'auto').lower()
+if _USE_SECURE_COOKIES == 'auto':
+    # Auto-detect: secure if any CORS origin uses HTTPS (excluding localhost)
+    _has_https = any(
+        origin.startswith('https://') and 'localhost' not in origin
+        for origin in CSRF_TRUSTED_ORIGINS
+    )
+    USE_SECURE_COOKIES = _has_https
+elif _USE_SECURE_COOKIES in ('true', '1', 'yes'):
+    USE_SECURE_COOKIES = True
+else:
+    USE_SECURE_COOKIES = False
+
+# Cookie security settings
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = USE_SECURE_COOKIES
+CSRF_COOKIE_HTTPONLY = True  # Prevent JavaScript access to CSRF cookie
+
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = USE_SECURE_COOKIES
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 7 days session expiry
+
+# Additional security settings for production
+if USE_SECURE_COOKIES:
+    # HSTS - tell browsers to only use HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Redirect HTTP to HTTPS (if behind a proxy that handles SSL)
+    SECURE_SSL_REDIRECT = os.environ.get('SSL_REDIRECT', 'False') == 'True'
+    
+    # Proxy SSL header (for nginx/reverse proxy setups)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Security headers
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin' if USE_SECURE_COOKIES else None
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
 
 # Spectacular settings
 SPECTACULAR_SETTINGS = {

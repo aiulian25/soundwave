@@ -179,6 +179,9 @@ class UserConfig(models.Model):
     visualizer_enabled = models.BooleanField(default=True, help_text="Enable audio visualizer")
     visualizer_glow = models.BooleanField(default=True, help_text="Enable glow effect on visualizer")
     
+    # Seek Settings
+    seek_duration = models.IntegerField(default=3, help_text="Seek duration in seconds (3, 5, or 10)")
+    
     # Audio Quality
     audio_quality = models.CharField(
         max_length=20,

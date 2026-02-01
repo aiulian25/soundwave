@@ -18,6 +18,8 @@ export interface UserSettings {
   visualizer_theme: string;
   visualizer_enabled: boolean;
   visualizer_glow: boolean;
+  // Playback settings
+  seek_duration: 3 | 5 | 10;
   // Prefetch/caching settings
   prefetch_enabled: boolean;
   extra_settings: Record<string, any>;
@@ -37,6 +39,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   visualizer_theme: 'rounded-bars',
   visualizer_enabled: true,
   visualizer_glow: true,
+  // Playback defaults
+  seek_duration: 3,
   // Prefetch defaults
   prefetch_enabled: true,
   extra_settings: {},

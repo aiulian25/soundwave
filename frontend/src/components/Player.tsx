@@ -102,6 +102,40 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     threshold: 80,
   });
 
+  // Keyboard shortcuts for seek (arrow keys)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if not typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (audioRef.current && streamUrl && !loadingStream) {
+        const seekAmount = settings.seek_duration || 3;
+        
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          isSeeking.current = true;
+          audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - seekAmount);
+          setCurrentTime(audioRef.current.currentTime);
+          setTimeout(() => { isSeeking.current = false; }, 100);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          isSeeking.current = true;
+          audioRef.current.currentTime = Math.min(audio.duration, audioRef.current.currentTime + seekAmount);
+          setCurrentTime(audioRef.current.currentTime);
+          setTimeout(() => { isSeeking.current = false; }, 100);
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          setIsPlaying(!isPlaying);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [audio.duration, streamUrl, loadingStream, isPlaying, setIsPlaying, settings.seek_duration]);
+
   // Sync settings from context when they change (volume, repeat, shuffle)
   useEffect(() => {
     console.log('[Player] Settings sync triggered - volume:', settings.volume, 'repeat:', settings.repeat_mode, 'shuffle:', settings.shuffle_enabled);
@@ -296,22 +330,26 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           onNext();
         }
       },
-      seekbackward: () => {
+      seekbackward: (details) => {
         if (audioRef.current) {
           isSeeking.current = true;
-          audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
+          const seekAmount = details?.seekOffset || settings.seek_duration || 3;
+          audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - seekAmount);
+          setCurrentTime(audioRef.current.currentTime);
           setTimeout(() => {
             isSeeking.current = false;
           }, 100);
         }
       },
-      seekforward: () => {
+      seekforward: (details) => {
         if (audioRef.current) {
           isSeeking.current = true;
+          const seekAmount = details?.seekOffset || settings.seek_duration || 3;
           audioRef.current.currentTime = Math.min(
             audio.duration,
-            audioRef.current.currentTime + 10
+            audioRef.current.currentTime + seekAmount
           );
+          setCurrentTime(audioRef.current.currentTime);
           setTimeout(() => {
             isSeeking.current = false;
           }, 100);
@@ -332,7 +370,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     return () => {
       clearMediaSession();
     };
-  }, [audio, hasNext, hasPrevious, onNext, onPrevious, setIsPlaying]);
+  }, [audio, hasNext, hasPrevious, onNext, onPrevious, setIsPlaying, settings.seek_duration]);
 
   useEffect(() => {
     if (audioRef.current) {

@@ -172,22 +172,71 @@ class ChangePasswordView(ApiBaseView):
 
 
 class LoginView(APIView):
-    """Login endpoint"""
+    """Login endpoint with rate limiting and lockout protection"""
     permission_classes = [AllowAny]
+    
+    # Apply stricter throttling to login endpoint
+    from common.rate_limiter import LoginRateThrottle
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
-        """Authenticate user"""
+        """Authenticate user with brute-force protection"""
+        from common.rate_limiter import (
+            is_locked_out, 
+            record_failed_attempt, 
+            clear_login_attempts,
+            get_remaining_attempts,
+            MAX_LOGIN_ATTEMPTS
+        )
+        
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        username = serializer.validated_data['username']
+        
+        # Check if locked out BEFORE attempting authentication
+        locked, remaining_seconds = is_locked_out(request, username)
+        if locked:
+            remaining_minutes = remaining_seconds // 60
+            return Response(
+                {
+                    'error': 'Account temporarily locked due to too many failed login attempts',
+                    'locked': True,
+                    'remaining_seconds': remaining_seconds,
+                    'remaining_minutes': remaining_minutes,
+                    'message': f'Please try again in {remaining_minutes} minutes'
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
 
         user = authenticate(
-            username=serializer.validated_data['username'],
+            username=username,
             password=serializer.validated_data['password']
         )
 
         if not user:
+            # Record failed attempt
+            attempts, is_now_locked, lockout_duration = record_failed_attempt(request, username)
+            
+            if is_now_locked:
+                lockout_minutes = lockout_duration // 60
+                return Response(
+                    {
+                        'error': f'Too many failed login attempts. Account locked for {lockout_minutes} minutes.',
+                        'locked': True,
+                        'remaining_seconds': lockout_duration,
+                        'remaining_minutes': lockout_minutes,
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            
+            remaining = MAX_LOGIN_ATTEMPTS - attempts
             return Response(
-                {'error': 'Invalid credentials'},
+                {
+                    'error': 'Invalid credentials',
+                    'remaining_attempts': remaining,
+                    'message': f'Invalid credentials. {remaining} attempt(s) remaining before lockout.'
+                },
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
@@ -210,11 +259,28 @@ class LoginView(APIView):
                 user.backup_codes.remove(two_factor_code)
                 user.save()
             else:
+                # Record failed 2FA attempt too
+                attempts, is_now_locked, lockout_duration = record_failed_attempt(request, username)
+                
+                if is_now_locked:
+                    lockout_minutes = lockout_duration // 60
+                    return Response(
+                        {
+                            'error': f'Too many failed attempts. Account locked for {lockout_minutes} minutes.',
+                            'locked': True,
+                            'remaining_seconds': lockout_duration,
+                        },
+                        status=status.HTTP_429_TOO_MANY_REQUESTS
+                    )
+                
                 return Response(
                     {'error': 'Invalid two-factor code'},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
+        # Successful login - clear any failed attempts
+        clear_login_attempts(request, username)
+        
         login(request, user)
         token, _ = Token.objects.get_or_create(user=user)
         return Response({

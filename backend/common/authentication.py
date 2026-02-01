@@ -1,6 +1,7 @@
 """Custom authentication classes"""
 
-from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+from rest_framework.authentication import SessionAuthentication
+from common.expiring_token import ExpiringTokenAuthentication
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -16,11 +17,16 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
         return super().enforce_csrf(request)
 
 
-class CsrfExemptTokenAuthentication(TokenAuthentication):
+class CsrfExemptTokenAuthentication(ExpiringTokenAuthentication):
     """
-    Token authentication that doesn't require CSRF tokens.
+    Token authentication with expiry that doesn't require CSRF tokens.
     This is safe because tokens are stored in localStorage and sent via headers,
     not cookies, so they're not vulnerable to CSRF attacks.
+    
+    Tokens expire after TOKEN_EXPIRY_HOURS (default: 7 days).
+    Configure in settings.py:
+        TOKEN_EXPIRY_HOURS = 168  # 7 days
     """
     def enforce_csrf(self, request):
         return  # To not perform the csrf check
+

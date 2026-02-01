@@ -34,6 +34,28 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle token expiry - redirect to login when token expires
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const errorMessage = error.response?.data?.detail || error.response?.data?.error || '';
+      
+      // Check if token has expired
+      if (errorMessage.includes('expired') || errorMessage.includes('Invalid token')) {
+        // Clear token and redirect to login
+        localStorage.removeItem('token');
+        
+        // Dispatch custom event for app to handle logout
+        window.dispatchEvent(new CustomEvent('token-expired', { 
+          detail: { message: 'Your session has expired. Please log in again.' }
+        }));
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
 
 // Audio API

@@ -71,8 +71,8 @@ class MediaSessionManager {
     pause?: () => void;
     previoustrack?: () => void;
     nexttrack?: () => void;
-    seekbackward?: () => void;
-    seekforward?: () => void;
+    seekbackward?: (details?: { seekOffset?: number }) => void;
+    seekforward?: (details?: { seekOffset?: number }) => void;
     seekto?: (details: { seekTime: number }) => void;
   }) {
     if (!this.isSupported) return;

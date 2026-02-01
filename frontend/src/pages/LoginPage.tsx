@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -8,12 +8,14 @@ import {
   Typography,
   InputAdornment,
   IconButton,
+  Alert,
 } from '@mui/material';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import LockClockIcon from '@mui/icons-material/LockClock';
 import { userAPI } from '../api/client';
 
 interface LoginPageProps {
@@ -28,9 +30,38 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [error, setError] = useState('');
   const [requires2FA, setRequires2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (lockoutRemaining > 0) {
+      const timer = setInterval(() => {
+        setLockoutRemaining((prev) => {
+          if (prev <= 1) {
+            setIsLocked(false);
+            setError('');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [lockoutRemaining]);
+
+  const formatLockoutTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleLogin = async () => {
+    if (isLocked) return;
+    
     try {
+      setRemainingAttempts(null);
       const response = await userAPI.login({ 
         username, 
         password,
@@ -46,17 +77,35 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       localStorage.setItem('token', response.data.token);
       onLoginSuccess();
     } catch (err: any) {
-      if (err.response?.data?.requires_2fa) {
+      const data = err.response?.data;
+      
+      // Check for lockout
+      if (err.response?.status === 429 && data?.locked) {
+        setIsLocked(true);
+        setLockoutRemaining(data.remaining_seconds || 3600);
+        setError(data.error || 'Account temporarily locked');
+        setRemainingAttempts(null);
+        return;
+      }
+      
+      // Check for remaining attempts warning
+      if (data?.remaining_attempts !== undefined) {
+        setRemainingAttempts(data.remaining_attempts);
+        setError(data.message || 'Invalid credentials');
+        return;
+      }
+      
+      if (data?.requires_2fa) {
         setRequires2FA(true);
         setError('Please enter your two-factor authentication code');
       } else {
-        setError('Invalid credentials or verification code');
+        setError(data?.error || 'Invalid credentials or verification code');
       }
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isLocked) {
       handleLogin();
     }
   };
@@ -370,13 +419,66 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 transform: 'translateY(-2px)',
               },
               transition: 'all 0.3s ease',
+              '&:disabled': {
+                backgroundColor: 'rgba(100, 100, 100, 0.5)',
+                color: 'rgba(255, 255, 255, 0.5)',
+              },
             }}
-            endIcon={<ArrowForwardIcon />}
+            endIcon={isLocked ? <LockClockIcon /> : <ArrowForwardIcon />}
+            disabled={isLocked}
           >
-            Login
+            {isLocked ? `Locked (${formatLockoutTime(lockoutRemaining)})` : 'Login'}
           </Button>
 
-          {error && (
+          {/* Lockout Warning */}
+          {isLocked && (
+            <Alert 
+              severity="error" 
+              icon={<LockClockIcon />}
+              sx={{ 
+                mt: 2,
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                '& .MuiAlert-icon': { color: '#ef4444' },
+              }}
+            >
+              <Typography variant="body2" fontWeight={600}>
+                Account Temporarily Locked
+              </Typography>
+              <Typography variant="caption">
+                Too many failed login attempts. Please wait {formatLockoutTime(lockoutRemaining)} before trying again.
+              </Typography>
+            </Alert>
+          )}
+
+          {/* Remaining Attempts Warning - show after any failed login */}
+          {!isLocked && remainingAttempts !== null && (
+            <Alert 
+              severity={remainingAttempts <= 1 ? "error" : "warning"}
+              sx={{ 
+                mt: 2,
+                backgroundColor: remainingAttempts <= 1 
+                  ? 'rgba(239, 68, 68, 0.15)' 
+                  : 'rgba(251, 191, 36, 0.15)',
+                border: remainingAttempts <= 1 
+                  ? '1px solid rgba(239, 68, 68, 0.3)' 
+                  : '1px solid rgba(251, 191, 36, 0.3)',
+              }}
+            >
+              <Typography variant="body2" fontWeight={600}>
+                {remainingAttempts <= 1 ? '⚠️ Last Attempt!' : 'Invalid Credentials'}
+              </Typography>
+              <Typography variant="caption">
+                {remainingAttempts === 0 
+                  ? 'Account will be locked on next failed attempt.'
+                  : `${remainingAttempts} attempt${remainingAttempts !== 1 ? 's' : ''} remaining before your account is locked for 60 minutes.`
+                }
+              </Typography>
+            </Alert>
+          )}
+
+          {/* Regular Error Message - only show when no attempts info (like 2FA errors) */}
+          {error && !isLocked && remainingAttempts === null && (
             <Typography
               sx={{
                 color: '#ef4444',

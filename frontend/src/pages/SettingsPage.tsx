@@ -34,6 +34,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GroupIcon from '@mui/icons-material/Group';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
+import FastForwardIcon from '@mui/icons-material/FastForward';
 import CachedIcon from '@mui/icons-material/Cached';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { useState, useEffect } from 'react';
@@ -475,6 +476,31 @@ export default function SettingsPage() {
                 </Typography>
               </Box>
             )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Seek Duration Section */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <FastForwardIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
+              <Typography variant="body2" fontWeight={500}>
+                Seek Duration
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+              Choose how many seconds to skip forward or backward when using seek controls (media keys, headphones, etc.).
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={settings.seek_duration || 3}
+                onChange={(e) => updateSetting('seek_duration', Number(e.target.value) as 3 | 5 | 10)}
+              >
+                <MenuItem value={3}>3 seconds</MenuItem>
+                <MenuItem value={5}>5 seconds</MenuItem>
+                <MenuItem value={10}>10 seconds</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
 
           <Divider sx={{ my: 2 }} />

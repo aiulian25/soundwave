@@ -136,6 +136,11 @@ Wait ~30-60 seconds for all services to initialize on first start.
 | `REDIS_HOST` | Redis hostname | `soundwave-redis` |
 | `TZ` | Timezone | `UTC` |
 | `SW_AUTO_UPDATE_YTDLP` | Auto-update yt-dlp | `false` |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins | `http://localhost:8889` |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hosts | Auto-detected |
+| `TOKEN_EXPIRY_HOURS` | API token lifetime in hours | `168` (7 days) |
+| `ALLOW_LOCAL_NETWORK` | Allow 192.168.x.x access | `True` |
+| `SECURE_COOKIES` | Force secure cookies (auto/true/false) | `auto` |
 
 ### Data Directories
 
@@ -302,6 +307,30 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.8.0 - Security Hardening & Session Management (February 2026)
+
+#### Login Security
+- ✅ **Rate Limiting** - 3 failed login attempts triggers 60-minute lockout
+- ✅ **Visual Feedback** - Shows remaining attempts after each failed login
+- ✅ **Lockout Timer** - Countdown display when account is locked
+- ✅ **Redis-backed** - Lockout state persists across restarts
+
+#### Session & Token Security
+- ✅ **Token Expiry** - API tokens expire after 7 days (configurable)
+- ✅ **Session Timeout** - Automatic logout on token expiration
+- ✅ **Secure Cookies** - HTTPS-only cookies in production
+- ✅ **HTTPOnly Cookies** - Prevents XSS cookie theft
+
+#### Host Security
+- ✅ **ALLOWED_HOSTS** - Dynamic host validation (no more `*` wildcard)
+- ✅ **Local Network Support** - Private IPs (192.168.x.x) allowed by default
+- ✅ **HSTS Headers** - Strict Transport Security for HTTPS deployments
+
+#### Additional Security Headers
+- ✅ `X-Frame-Options: DENY` - Prevents clickjacking
+- ✅ `X-Content-Type-Options: nosniff` - Prevents MIME sniffing
+- ✅ `Secure` cookie flag for HTTPS
 
 ### v1.7.0 - LRC Upload, Export & Media Session (January 2026)
 

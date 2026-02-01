@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Box, IconButton, Typography, useMediaQuery, useTheme } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
@@ -39,6 +39,7 @@ function App() {
   const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
+  const navigate = useNavigate();
   
   // Get settings from context (may not be available if not authenticated)
   const settingsContext = (() => {
@@ -75,6 +76,19 @@ function App() {
         settingsContext.loadSettings();
       }
     }
+    
+    // Listen for token expiry events from API client
+    const handleTokenExpired = (event: CustomEvent) => {
+      console.log('[App] Token expired:', event.detail?.message);
+      // Trigger logout to clean up state
+      handleLogout();
+    };
+    
+    window.addEventListener('token-expired', handleTokenExpired as EventListener);
+    
+    return () => {
+      window.removeEventListener('token-expired', handleTokenExpired as EventListener);
+    };
   }, []);
 
   // Auto-play when new audio is set
@@ -109,12 +123,14 @@ function App() {
   };
 
   const handleLogout = async () => {
+    // Clear local storage first to prevent any API calls with old token
+    localStorage.removeItem('token');
+    
     try {
       // Call logout endpoint to delete token on server
       await fetch('/api/user/logout/', {
         method: 'POST',
         headers: {
-          'Authorization': `Token ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -138,12 +154,22 @@ function App() {
       console.error('Failed to clear SW cache:', error);
     }
     
-    // Always clear local storage and redirect to login
-    localStorage.removeItem('token');
-    setIsAuthenticated(false);
+    // Clear all session cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
+    // Reset all state
     setCurrentAudio(null);
     setQueue([]);
     setCurrentQueueIndex(0);
+    setIsPlaying(false);
+    setPlayerMinimized(false);
+    setMobileDrawerOpen(false);
+    
+    // Navigate to root and set authenticated to false
+    navigate('/', { replace: true });
+    setIsAuthenticated(false);
   };
 
   const toggleMobileDrawer = () => {

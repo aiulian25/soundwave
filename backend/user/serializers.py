@@ -51,6 +51,7 @@ class UserConfigSerializer(serializers.ModelSerializer):
             'theme', 'volume', 'repeat_mode', 'shuffle_enabled',
             'smart_shuffle_enabled', 'smart_shuffle_history_size',
             'visualizer_theme', 'visualizer_enabled', 'visualizer_glow',
+            'seek_duration',
             'audio_quality', 'items_per_page', 'prefetch_enabled',
             'extra_settings', 'updated_at'
         ]
