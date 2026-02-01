@@ -18,7 +18,7 @@ Added comprehensive logging and timeout handling to the offline playlist caching
 4. Clear console (trash icon)
 
 ### 2. Navigate to a Playlist
-1. Login (username: `iulian`, password: whatever you set)
+1. Login (username: `admin`, password: whatever you set)
 2. Go to **Playlists** page
 3. Click on any playlist that has downloaded tracks
 4. You should see the playlist detail page

@@ -105,7 +105,7 @@ Open DevTools → **Network** tab
 
 Required headers:
 ```
-Access-Control-Allow-Origin: https://sound.iulian.uk
+Access-Control-Allow-Origin: https://yourdomain.com
 Access-Control-Allow-Credentials: true
 Content-Type: audio/mpeg (or audio/mp4, etc.)
 ```
@@ -226,7 +226,7 @@ If fails:
 
 ### Fix 1: Restart Docker Containers
 ```bash
-cd /home/iulian/projects/zi-tube/soundwave
+cd /path/to/soundwave
 docker compose down
 docker compose build --no-cache
 docker compose up -d
@@ -275,7 +275,7 @@ updateSW();
 docker compose exec soundwave env | grep CORS
 
 # Should show:
-# CORS_ALLOWED_ORIGINS=http://localhost:8889,https://localhost:8889,https://sound.iulian.uk
+# CORS_ALLOWED_ORIGINS=http://localhost:8889,https://localhost:8889,https://yourdomain.com
 ```
 
 If not shown, environment variable not set in docker-compose.yml.
@@ -341,9 +341,9 @@ print("CSRF_TRUSTED_ORIGINS:", settings.CSRF_TRUSTED_ORIGINS)
 
 Expected output:
 ```python
-CORS_ALLOWED_ORIGINS: ['http://localhost:8889', 'https://localhost:8889', 'https://sound.iulian.uk']
+CORS_ALLOWED_ORIGINS: ['http://localhost:8889', 'https://localhost:8889', 'https://yourdomain.com']
 CORS_ALLOW_CREDENTIALS: True
-CSRF_TRUSTED_ORIGINS: ['http://localhost:8889', 'https://localhost:8889', 'https://sound.iulian.uk']
+CSRF_TRUSTED_ORIGINS: ['http://localhost:8889', 'https://localhost:8889', 'https://yourdomain.com']
 ```
 
 ## Need More Help?

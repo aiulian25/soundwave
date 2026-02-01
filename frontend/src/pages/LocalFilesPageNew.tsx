@@ -131,7 +131,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       const isSecureContext = window.isSecureContext;
       if (!isSecureContext) {
         setAlert({ 
-          message: 'Folder selection requires HTTPS or localhost. For local network access, use "Select Files" instead or access via https://sound.iulian.uk', 
+          message: 'Folder selection requires HTTPS or localhost. For local network access, use "Select Files" instead or access via HTTPS.', 
           severity: 'info' 
         });
         return;
@@ -360,7 +360,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
           </Button>
           <Tooltip 
             title={!window.isSecureContext 
-              ? 'Folder selection requires HTTPS or localhost. Currently viewing over HTTP. Use "Select Files" instead, or access via https://sound.iulian.uk' 
+              ? 'Folder selection requires HTTPS or localhost. Currently viewing over HTTP. Use "Select Files" instead, or access via HTTPS.' 
               : 'Select a folder to scan recursively including all subfolders'
             }
             arrow

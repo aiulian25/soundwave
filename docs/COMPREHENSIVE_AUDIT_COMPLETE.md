@@ -492,7 +492,7 @@ Total JS:            643.92 kB (200.60 kB gzipped)
 ```bash
 DJANGO_SECRET_KEY=<strong-secret-key>
 DJANGO_DEBUG=False
-ALLOWED_HOSTS=sound.iulian.uk,localhost
+ALLOWED_HOSTS=yourdomain.com,localhost
 DATABASE_URL=<postgres-url>
 REDIS_URL=redis://soundwave-redis:6379/0
 ES_URL=http://soundwave-es:9200

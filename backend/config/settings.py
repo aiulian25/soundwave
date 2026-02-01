@@ -243,7 +243,7 @@ else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:8889",
         "http://127.0.0.1:8889",
-        "http://192.168.50.71:8889",
+        "http://192.168.1.100:8889",
     ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -255,7 +255,7 @@ else:
     CSRF_TRUSTED_ORIGINS = [
         "http://localhost:8889",
         "http://127.0.0.1:8889",
-        "http://192.168.50.71:8889",
+        "http://192.168.1.100:8889",
     ]
 
 # Determine if running in production/HTTPS mode

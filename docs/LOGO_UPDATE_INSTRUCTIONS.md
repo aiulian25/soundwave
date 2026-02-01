@@ -166,7 +166,7 @@ Your logo perfectly matches these requirements:
 
 ```bash
 # Full update process
-cd /home/iulian/projects/zi-tube/soundwave
+cd /path/to/soundwave
 
 # 1. Place your logo.png in frontend/public/img/
 

@@ -8,7 +8,7 @@
 Copy the example environment file and customize it:
 
 ```bash
-cd /home/iulian/projects/zi-tube/soundwave
+cd /path/to/soundwave
 cp .env.example .env
 ```
 
@@ -80,7 +80,7 @@ The build output goes to `frontend/dist/` which will be served by Django.
 Ensure volume directories exist with proper permissions:
 
 ```bash
-cd /home/iulian/projects/zi-tube/soundwave
+cd /path/to/soundwave
 mkdir -p audio cache es redis
 chmod -R 755 audio cache es redis
 ```
@@ -98,7 +98,7 @@ echo "================================"
 echo ""
 
 # Navigate to project directory
-cd /home/iulian/projects/zi-tube/soundwave
+cd /path/to/soundwave
 
 # Step 1: Create .env file
 echo "📝 Step 1/5: Creating environment file..."

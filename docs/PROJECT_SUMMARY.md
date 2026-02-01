@@ -159,7 +159,7 @@ soundwave/
 
 1. **Setup**:
    ```bash
-   cd /home/iulian/projects/zi-tube/soundwave
+   cd /path/to/soundwave
    cp .env.example .env
    # Edit .env with your settings
    ```

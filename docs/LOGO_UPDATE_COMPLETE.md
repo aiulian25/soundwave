@@ -177,7 +177,7 @@ The SoundWave app now features a unified circular logo throughout all interfaces
 ---
 
 **Access the updated app:**  
-- Local: http://192.168.50.71:8889
-- HTTPS: https://sound.iulian.uk
+- Local: http://192.168.1.100:8889
+- HTTPS: https://yourdomain.com
 
 **All logo updates deployed and verified!** 🎵

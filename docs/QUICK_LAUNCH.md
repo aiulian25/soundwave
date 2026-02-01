@@ -3,7 +3,7 @@
 ## ⚡ One-Command Setup
 
 ```bash
-cd /home/iulian/projects/zi-tube/soundwave
+cd /path/to/soundwave
 ./setup.sh
 ```
 

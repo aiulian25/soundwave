@@ -11,7 +11,7 @@
 
 2. **Navigate to the project directory**
    ```bash
-   cd /home/iulian/projects/zi-tube/soundwave
+   cd /path/to/soundwave
    ```
 
 3. **Create environment file**

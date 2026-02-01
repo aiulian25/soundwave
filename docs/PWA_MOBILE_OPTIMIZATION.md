@@ -228,8 +228,8 @@ useEffect(() => {
 
 ## 📝 Testing URLs
 
-**Local Network**: http://192.168.50.71:8889  
-**HTTPS (for full PWA)**: https://sound.iulian.uk  
+**Local Network**: http://192.168.1.100:8889  
+**HTTPS (for full PWA)**: https://yourdomain.com  
 
 **Test with**:
 - Chrome DevTools Mobile Emulation
