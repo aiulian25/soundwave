@@ -1,11 +1,16 @@
 """Playlist API views"""
 
+import logging
 from django.shortcuts import get_object_or_404
+from django.db.models import Max
 from rest_framework import status
 from rest_framework.response import Response
 from playlist.models import Playlist, PlaylistItem
 from playlist.serializers import PlaylistSerializer, PlaylistItemSerializer
 from common.views import ApiBaseView, AdminWriteOnly
+from audio.models import Audio
+
+logger = logging.getLogger(__name__)
 
 
 class PlaylistListView(ApiBaseView):
@@ -108,3 +113,120 @@ class PlaylistDetailView(ApiBaseView):
         playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
         playlist.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PlaylistItemsView(ApiBaseView):
+    """Manage items in a playlist"""
+    
+    def get(self, request, playlist_id):
+        """Get all items in a playlist"""
+        playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
+        items = PlaylistItem.objects.filter(playlist=playlist).select_related('audio').order_by('position')
+        from audio.serializers import AudioSerializer
+        response_data = [{
+            'id': item.id,
+            'position': item.position,
+            'added_date': item.added_date,
+            'audio': AudioSerializer(item.audio).data
+        } for item in items]
+        return Response({'data': response_data})
+    
+    def post(self, request, playlist_id):
+        """Add a track to a playlist"""
+        try:
+            playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
+            
+            youtube_id = request.data.get('youtube_id')
+            if not youtube_id:
+                return Response({'error': 'youtube_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the audio track
+            audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+            
+            # Check if already in playlist
+            if PlaylistItem.objects.filter(playlist=playlist, audio=audio).exists():
+                return Response({'error': 'Track already in playlist'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get next position
+            max_position = PlaylistItem.objects.filter(playlist=playlist).aggregate(Max('position'))['position__max']
+            next_position = (max_position or 0) + 1
+            
+            # Add to playlist
+            item = PlaylistItem.objects.create(
+                playlist=playlist,
+                audio=audio,
+                position=next_position
+            )
+            
+            # Update playlist item count
+            playlist.item_count = PlaylistItem.objects.filter(playlist=playlist).count()
+            playlist.downloaded_count = PlaylistItem.objects.filter(playlist=playlist, audio__file_path__isnull=False).exclude(audio__file_path='').count()
+            playlist.save(update_fields=['item_count', 'downloaded_count'])
+            
+            from audio.serializers import AudioSerializer
+            return Response({
+                'id': item.id,
+                'position': item.position,
+                'added_date': item.added_date,
+                'audio': AudioSerializer(item.audio).data
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.exception(f"Error adding track to playlist {playlist_id}: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def delete(self, request, playlist_id):
+        """Remove a track from a playlist"""
+        playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
+        
+        youtube_id = request.data.get('youtube_id')
+        if not youtube_id:
+            return Response({'error': 'youtube_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the audio track
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        # Remove from playlist
+        deleted, _ = PlaylistItem.objects.filter(playlist=playlist, audio=audio).delete()
+        
+        if deleted == 0:
+            return Response({'error': 'Track not in playlist'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Update playlist item count
+        playlist.item_count = PlaylistItem.objects.filter(playlist=playlist).count()
+        playlist.downloaded_count = PlaylistItem.objects.filter(playlist=playlist, audio__file_path__isnull=False).exclude(audio__file_path='').count()
+        playlist.save(update_fields=['item_count', 'downloaded_count'])
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TrackPlaylistsView(ApiBaseView):
+    """Find which playlists contain a specific track"""
+    
+    def get(self, request, youtube_id):
+        """Get all playlists that contain a specific track"""
+        try:
+            # Get the audio track
+            audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+            
+            # Find all playlists containing this track
+            playlist_items = PlaylistItem.objects.filter(
+                audio=audio,
+                playlist__owner=request.user
+            ).select_related('playlist')
+            
+            playlists = []
+            for item in playlist_items:
+                playlists.append({
+                    'id': item.playlist.id,
+                    'playlist_id': item.playlist.playlist_id,
+                    'title': item.playlist.title,
+                    'playlist_type': item.playlist.playlist_type,
+                    'thumbnail_url': item.playlist.thumbnail_url,
+                    'item_count': item.playlist.item_count,
+                    'position': item.position,
+                })
+            
+            return Response({'data': playlists})
+        except Exception as e:
+            logger.exception(f"Error finding playlists for track {youtube_id}: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

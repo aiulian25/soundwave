@@ -8,8 +8,12 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import InsightsIcon from '@mui/icons-material/Insights';
+import HistoryIcon from '@mui/icons-material/History';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -21,9 +25,13 @@ const menuItems = [
   { title: 'Search', path: '/search', icon: <SearchIcon /> },
   { title: 'Library', path: '/library', icon: <LibraryMusicIcon /> },
   { title: 'Favorites', path: '/favorites', icon: <FavoriteIcon /> },
+  { title: 'History', path: '/history', icon: <HistoryIcon /> },
   { title: 'Channels', path: '/channels', icon: <YouTubeIcon /> },
   { title: 'Playlists', path: '/playlists', icon: <PlaylistPlayIcon /> },
+  { title: 'Smart Playlists', path: '/smart-playlists', icon: <AutoAwesomeIcon /> },
   { title: 'Analytics', path: '/analytics', icon: <InsightsIcon /> },
+  { title: 'Achievements', path: '/achievements', icon: <EmojiEventsIcon /> },
+  { title: 'Yearly Wrapped', path: '/wrapped', icon: <CardGiftcardIcon /> },
   { title: 'Local Files', path: '/local-files', icon: <CloudUploadIcon /> },
   { title: 'Offline', path: '/offline', icon: <CloudDoneIcon />, isPWA: true },
 ];

@@ -30,8 +30,6 @@ import {
   CloudDone as CloudDoneIcon,
   WifiOff as WifiOffIcon,
   Storage as StorageIcon,
-  Favorite as FavoriteIcon,
-  FavoriteBorder as FavoriteBorderIcon,
   OfflinePin as OfflinePinIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -39,6 +37,8 @@ import { playlistAPI, audioAPI } from '../api/client';
 import { usePWA, CacheProgress } from '../context/PWAContext';
 import { offlineStorage } from '../utils/offlineStorage';
 import { audioCache } from '../utils/audioCache';
+import TrackActionsMenu from '../components/TrackActionsMenu';
+import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 
 interface PlaylistItem {
@@ -75,6 +75,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { isOnline, cachePlaylist, removePlaylistCache, cacheSize } = usePWA();
+  const { getTrackRef, shouldHighlight } = useHighlightTrack();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -217,30 +218,19 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     }
   };
 
-  const handleToggleFavorite = async (audio: Audio) => {
-    if (!audio.youtube_id) return;
-    
-    try {
-      const response = await audioAPI.toggleFavorite(audio.youtube_id);
-      // Update the local state immediately for better UX
-      setPlaylist(prev => {
-        if (!prev?.items) return prev;
-        return {
-          ...prev,
-          items: prev.items.map(item => 
-            item.audio.id === audio.id 
-              ? { ...item, audio: { ...item.audio, is_favorite: response.data.is_favorite }}
-              : item
-          )
-        };
-      });
-      setSnackbarMessage(audio.is_favorite ? 'Removed from favorites' : 'Added to favorites');
-      setSnackbarOpen(true);
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-      setSnackbarMessage('Failed to update favorite status');
-      setSnackbarOpen(true);
-    }
+  const handleTrackUpdate = (updatedTrack: Audio) => {
+    // Update the local state when a track is updated (e.g., favorite toggled)
+    setPlaylist(prev => {
+      if (!prev?.items) return prev;
+      return {
+        ...prev,
+        items: prev.items.map(item => 
+          item.audio.id === updatedTrack.id 
+            ? { ...item, audio: updatedTrack }
+            : item
+        )
+      };
+    });
   };
 
   const handleCacheForOffline = async () => {
@@ -733,6 +723,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                 return (
                 <TableRow
                   key={item.id}
+                  ref={getTrackRef(item.audio.youtube_id)}
                   sx={{
                     cursor: 'pointer',
                     transition: 'background-color 0.3s ease',
@@ -740,6 +731,9 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                       bgcolor: 'rgba(19, 236, 106, 0.05)',
                     },
                     opacity: item.audio.file_path ? 1 : 0.5,
+                    ...(shouldHighlight(item.audio.youtube_id) && {
+                      bgcolor: 'rgba(19, 236, 106, 0.1)',
+                    }),
                   }}
                   onClick={() => item.audio.file_path && setCurrentAudio(item.audio, playlistQueue)}
                 >
@@ -818,19 +812,10 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                           <DownloadIcon />
                         </IconButton>
                       )}
-                      <IconButton
-                        size="small"
-                        onClick={() => handleToggleFavorite(item.audio)}
-                        sx={{
-                          color: item.audio.is_favorite ? 'error.main' : 'text.disabled',
-                          '&:hover': {
-                            color: 'error.main',
-                          },
-                        }}
-                        title={item.audio.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-                      >
-                        {item.audio.is_favorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                      </IconButton>
+                      <TrackActionsMenu 
+                        track={item.audio}
+                        onTrackUpdate={handleTrackUpdate}
+                      />
                     </Box>
                   </TableCell>
                 </TableRow>

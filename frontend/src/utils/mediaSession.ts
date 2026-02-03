@@ -120,7 +120,25 @@ class MediaSessionManager {
 
     try {
       if ('setPositionState' in navigator.mediaSession) {
-        navigator.mediaSession.setPositionState(state);
+        // Validate state values to avoid errors
+        const duration = state.duration || 0;
+        let position = state.position || 0;
+        
+        // Clamp position to valid range (can't be greater than duration or negative)
+        if (duration > 0) {
+          position = Math.max(0, Math.min(position, duration));
+        } else {
+          position = 0;
+        }
+        
+        // Only set if we have valid values
+        if (duration > 0 && isFinite(duration) && isFinite(position)) {
+          navigator.mediaSession.setPositionState({
+            duration,
+            playbackRate: state.playbackRate || 1,
+            position,
+          });
+        }
       }
     } catch (error) {
       console.warn('Failed to set position state:', error);

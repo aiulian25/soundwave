@@ -14,10 +14,19 @@
 - 🔍 **Powerful Search** - Find your audio quickly with ElasticSearch-powered indexing
 - 🎵 **Built-in Player** - Stream your collection directly in the browser
 - ▶️ **Auto-Play / Continuous Playback** - Automatically plays next track in queue
-- � **Repeat Modes** - Repeat one track, repeat all, or normal playback
+- 🔁 **Repeat Modes** - Repeat one track, repeat all, or normal playback
 - 🔀 **Shuffle** - Smart shuffle and regular shuffle modes
 - 📊 **Channel Subscriptions** - Subscribe to YouTube channels and automatically download new audio
 - 📝 **Playlists** - Create custom playlists or sync YouTube playlists
+- ✨ **Smart Playlists** - Dynamic auto-updating playlists based on rules (Most Played, Recently Added, Genre filters, and more)
+
+### Analytics & Achievements
+- 🏆 **Achievements System** - 37 unlockable achievements across 6 categories (Tracks, Hours, Streaks, Artists, Channels, Special)
+- 🔥 **Listening Streaks** - Track daily listening streaks with visual weekly activity grid
+- 📅 **Yearly Wrapped** - Spotify-style year-in-review with top artists, tracks, and personalized insights
+- 🎉 **Achievement Notifications** - Real-time celebration popup with confetti when unlocking achievements
+- 📈 **Listening History** - Complete history of played tracks with "On This Day" memories
+- 📊 **Analytics Dashboard** - Detailed listening insights, genre breakdown, peak hours, and more
 
 ### Lyrics Features
 - 🎤 **Synced Lyrics** - Display lyrics in sync with music playback (online & offline)
@@ -171,6 +180,26 @@ Wait ~30-60 seconds for all services to initialize on first start.
 2. Create a new custom playlist or add a YouTube playlist URL
 3. Add audio files from your library
 
+### Using Smart Playlists
+
+Smart Playlists automatically update based on rules you define:
+
+1. Go to **Smart Playlists** in the sidebar
+2. **Auto Playlists** (system presets) are created automatically:
+   - 🔥 **Most Played** - Your top 50 most played tracks
+   - ✨ **Recently Added** - Tracks added in the last 30 days
+   - 🕰️ **Rediscover** - Tracks not played in over 60 days
+   - 🆕 **Never Played** - Tracks you haven't listened to yet
+   - ⚡ **Quick Hits** - Tracks under 3 minutes
+   - 🎸 **Epic Tracks** - Tracks over 6 minutes
+3. **Create Custom Smart Playlists**:
+   - Click "Create" to make a new smart playlist
+   - Add rules like "Genre contains Rock" or "Play count > 10"
+   - Combine rules with AND/OR logic
+   - Set ordering (most played, random, etc.) and track limits
+   - Preview matches before saving
+4. Smart playlists update automatically as your library changes
+
 ### Offline Playback (PWA)
 
 1. Install SoundWave as a PWA (click install icon in browser)
@@ -185,6 +214,30 @@ Wait ~30-60 seconds for all services to initialize on first start.
 - Tap the album art to open the visualizer
 - Swipe up/down on album art to show/hide lyrics
 - Track your listening progress automatically
+
+### Achievements & Streaks
+
+1. Go to **Achievements** in the sidebar (trophy icon)
+2. View your **current streak** and weekly activity at the top
+3. Browse achievements by category using the tabs:
+   - **All** - View all 37 achievements
+   - **Tracks** - Song milestones (First Song to 50,000 songs)
+   - **Time** - Listening hour milestones
+   - **Streaks** - Consecutive day achievements
+   - **Variety** - Artist and channel diversity
+   - **Special** - Night Owl, Weekend Warrior, etc.
+4. Progress bars show how close you are to unlocking each achievement
+5. Achievements unlock automatically as you listen - watch for the confetti celebration!
+
+### Yearly Wrapped
+
+1. Click **Yearly Wrapped** in the sidebar (gift icon)
+2. View your listening summary for the year:
+   - Your **Listening Personality** type
+   - **Monthly breakdown** of listening activity
+   - **Top 5 Artists** and **Top 5 Tracks** with artwork
+   - Total **hours, tracks, artists, and channels**
+3. Use the year dropdown to view previous years' summaries
 
 ## 🛠️ Development
 
@@ -307,6 +360,40 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.9.0 - Achievements & Yearly Wrapped (February 2026)
+
+#### Achievement System
+- ✅ **37 Achievements** across 6 categories:
+  - 🎵 **Tracks**: First Song, 100/500/1000/5000/10000/50000 songs milestones
+  - ⏱️ **Hours**: 1/10/50/100/500/1000 hours listening milestones
+  - 🔥 **Streaks**: 3/7/14/30/60/90/180/365 day streak achievements
+  - 🎤 **Artists**: 10/25/50/100 different artists explored
+  - 📺 **Channels**: 5/10/25/50 different channels discovered
+  - ⭐ **Special**: Night Owl, Early Bird, Weekend Warrior, Marathon Listener, Explorer, Dedicated Fan
+- ✅ **Achievement Notifications** - Real-time popup with confetti animation when unlocking
+- ✅ **Progress Tracking** - Visual progress bars for each achievement
+- ✅ **Achievement Categories** - Tabbed interface to browse by category
+
+#### Listening Streaks
+- ✅ **Daily Streak Tracking** - Track consecutive listening days
+- ✅ **Weekly Activity Grid** - Visual 7-day activity indicator
+- ✅ **Current & Longest Streak** - Display of streak statistics
+- ✅ **Streak Preservation** - Automatic daily tracking via listening history
+
+#### Yearly Wrapped
+- ✅ **Spotify-Style Summary** - Beautiful year-in-review page
+- ✅ **Listening Personality** - AI-determined personality type based on habits
+- ✅ **Monthly Listening Chart** - Visual breakdown of listening by month
+- ✅ **Top 5 Artists & Tracks** - With album artwork and play counts
+- ✅ **Stats Cards** - Total hours, tracks, artists, and channels
+- ✅ **Year Selector** - View wrapped for any previous year
+
+#### UI/UX Improvements
+- ✅ **Achievements Page** - New dedicated page accessible from sidebar
+- ✅ **Wrapped Page** - New yearly wrapped page with gradient design
+- ✅ **Navigation Links** - Trophy and gift icons in sidebar
+- ✅ **AchievementNotification Component** - Modal with multi-achievement support
 
 ### v1.8.0 - Security Hardening & Session Management (February 2026)
 

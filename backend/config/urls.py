@@ -13,6 +13,8 @@ import os
 urlpatterns = [
     path("api/", include("common.urls")),
     path("api/audio/", include("audio.urls")),
+    path("api/playback-sync/", include("audio.urls_playback_sync")),
+    path("api/radio/", include("audio.urls_radio")),
     path("api/channel/", include("channel.urls")),
     path("api/playlist/", include("playlist.urls")),
     path("api/download/", include("download.urls")),

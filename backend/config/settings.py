@@ -226,8 +226,8 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'login': '10/minute',
-        'burst': '30/minute',
-        'sustained': '1000/hour',
+        'burst': '60/minute',
+        'sustained': '10000/hour',  # Increased from 1000 to prevent 429 on page load
         'strict_anon': '5/minute',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -244,6 +244,8 @@ else:
         "http://localhost:8889",
         "http://127.0.0.1:8889",
         "http://192.168.1.100:8889",
+        "http://192.168.1.80:8889",
+        "https://test.ascunse.uk",
     ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -256,6 +258,8 @@ else:
         "http://localhost:8889",
         "http://127.0.0.1:8889",
         "http://192.168.1.100:8889",
+        "http://192.168.1.80:8889",
+        "https://test.ascunse.uk",
     ]
 
 # Determine if running in production/HTTPS mode

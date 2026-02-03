@@ -27,11 +27,11 @@ import {
   Shuffle as ShuffleIcon,
   YouTube as YouTubeIcon,
   PlaylistPlay as PlayAllIcon,
-  Favorite as FavoriteIcon,
-  FavoriteBorder as FavoriteBorderIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { channelAPI, audioAPI } from '../api/client';
+import TrackActionsMenu from '../components/TrackActionsMenu';
+import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 
 interface ChannelDetail {
@@ -60,6 +60,7 @@ interface ChannelDetailPageProps {
 export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPageProps) {
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
+  const { getTrackRef, shouldHighlight } = useHighlightTrack();
   const [channel, setChannel] = useState<ChannelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -148,30 +149,17 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
     }
   };
 
-  const handleToggleFavorite = async (audio: Audio) => {
-    if (!audio.youtube_id) return;
-    
-    try {
-      const response = await audioAPI.toggleFavorite(audio.youtube_id);
-      // Update the local state immediately for better UX
-      setChannel(prev => {
-        if (!prev?.audio_files) return prev;
-        return {
-          ...prev,
-          audio_files: prev.audio_files.map(item => 
-            item.id === audio.id 
-              ? { ...item, is_favorite: response.data.is_favorite }
-              : item
-          )
-        };
-      });
-      setSnackbarMessage(audio.is_favorite ? 'Removed from favorites' : 'Added to favorites');
-      setSnackbarOpen(true);
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-      setSnackbarMessage('Failed to update favorite status');
-      setSnackbarOpen(true);
-    }
+  const handleTrackUpdate = (updatedTrack: Audio) => {
+    // Update the local state when a track is updated (e.g., favorite toggled)
+    setChannel(prev => {
+      if (!prev?.audio_files) return prev;
+      return {
+        ...prev,
+        audio_files: prev.audio_files.map(item => 
+          item.id === updatedTrack.id ? updatedTrack : item
+        )
+      };
+    });
   };
 
   const formatDuration = (seconds: number) => {
@@ -323,10 +311,14 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
               {channel.audio_files.map((audio, index) => (
                 <TableRow 
                   key={audio.id}
+                  ref={getTrackRef(audio.youtube_id)}
                   hover
                   sx={{ 
                     cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
+                    '&:hover': { bgcolor: 'action.hover' },
+                    ...(shouldHighlight(audio.youtube_id) && {
+                      bgcolor: 'rgba(19, 236, 106, 0.1)',
+                    }),
                   }}
                   onClick={() => handlePlayTrack(audio)}
                 >
@@ -415,23 +407,10 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                           <DownloadIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title={audio.is_favorite ? 'Remove from favorites' : 'Add to favorites'}>
-                        <IconButton 
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleFavorite(audio);
-                          }}
-                          sx={{
-                            color: audio.is_favorite ? 'error.main' : 'text.disabled',
-                            '&:hover': {
-                              color: 'error.main',
-                            },
-                          }}
-                        >
-                          {audio.is_favorite ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
+                      <TrackActionsMenu 
+                        track={audio}
+                        onTrackUpdate={handleTrackUpdate}
+                      />
                     </Box>
                   </TableCell>
                 </TableRow>

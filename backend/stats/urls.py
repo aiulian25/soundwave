@@ -8,6 +8,10 @@ from stats.views import (
     ListeningInsightsView,
     RecordListeningView,
     ListeningHistoryView,
+    OnThisDayView,
+    AchievementsView,
+    StreakView,
+    YearlyWrappedView,
 )
 
 urlpatterns = [
@@ -17,4 +21,8 @@ urlpatterns = [
     path('insights/', ListeningInsightsView.as_view(), name='listening-insights'),
     path('record/', RecordListeningView.as_view(), name='record-listening'),
     path('history/', ListeningHistoryView.as_view(), name='listening-history'),
+    path('on-this-day/', OnThisDayView.as_view(), name='on-this-day'),
+    path('achievements/', AchievementsView.as_view(), name='achievements'),
+    path('streak/', StreakView.as_view(), name='streak'),
+    path('wrapped/', YearlyWrappedView.as_view(), name='yearly-wrapped'),
 ]

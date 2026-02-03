@@ -39,6 +39,7 @@ import AlbumIcon from '@mui/icons-material/Album';
 import { audioAPI, playlistAPI, channelAPI } from '../api/client';
 import { fetchAllAudio, fetchAllPlaylists, fetchAllChannels } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
+import TrackActionsMenu from '../components/TrackActionsMenu';
 import type { Audio } from '../types';
 
 interface SearchPageProps {
@@ -617,14 +618,23 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             key={audio.id}
                             disablePadding
                             secondaryAction={
-                              <IconButton
-                                edge="end"
-                                onClick={() => setCurrentAudio(audio, audioResults)}
-                                disabled={!audio.file_path}
-                                sx={{ color: 'primary.main' }}
-                              >
-                                <PlayArrowIcon />
-                              </IconButton>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <IconButton
+                                  edge="end"
+                                  onClick={() => setCurrentAudio(audio, audioResults)}
+                                  disabled={!audio.file_path}
+                                  sx={{ color: 'primary.main' }}
+                                >
+                                  <PlayArrowIcon />
+                                </IconButton>
+                                <TrackActionsMenu 
+                                  track={audio}
+                                  onTrackUpdate={(updatedTrack) => {
+                                    setAudioResults(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
+                                    setAllAudio(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
+                                  }}
+                                />
+                              </Box>
                             }
                           >
                             <ListItemButton
@@ -728,14 +738,23 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                       key={audio.id}
                       disablePadding
                       secondaryAction={
-                        <IconButton
-                          edge="end"
-                          onClick={() => setCurrentAudio(audio, audioResults)}
-                          disabled={!audio.file_path}
-                          sx={{ color: 'primary.main' }}
-                        >
-                          <PlayArrowIcon />
-                        </IconButton>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton
+                            edge="end"
+                            onClick={() => setCurrentAudio(audio, audioResults)}
+                            disabled={!audio.file_path}
+                            sx={{ color: 'primary.main' }}
+                          >
+                            <PlayArrowIcon />
+                          </IconButton>
+                          <TrackActionsMenu 
+                            track={audio}
+                            onTrackUpdate={(updatedTrack) => {
+                              setAudioResults(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
+                              setAllAudio(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
+                            }}
+                          />
+                        </Box>
                       }
                     >
                       <ListItemButton

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Disallow admin and API endpoints
+Disallow: /api/
+Disallow: /admin/
+
+# Sitemap
+Sitemap: https://soundwave.app/sitemap.xml

@@ -1,4 +1,4 @@
-import { Box, IconButton, Slider, Typography, LinearProgress, Fade, Skeleton, CircularProgress, Tabs, Tab, useMediaQuery, useTheme, Tooltip, Chip } from '@mui/material';
+import { Box, IconButton, Slider, Typography, LinearProgress, Fade, Skeleton, CircularProgress, Tabs, Tab, useMediaQuery, useTheme, Tooltip, Chip, Menu, MenuItem, ListItemIcon, ListItemText, Divider } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
@@ -10,6 +10,8 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import RecommendIcon from '@mui/icons-material/Recommend';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CachedIcon from '@mui/icons-material/Cached';
@@ -17,9 +19,17 @@ import CloseIcon from '@mui/icons-material/Close';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import EditIcon from '@mui/icons-material/Edit';
 import DownloadIcon from '@mui/icons-material/Download';
+import RadioIcon from '@mui/icons-material/Radio';
+import BedtimeIcon from '@mui/icons-material/Bedtime';
+import QueueMusicIcon from '@mui/icons-material/QueueMusic';
+import EqualizerIcon from '@mui/icons-material/Equalizer';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { Audio } from '../types';
 import { useSettings } from '../context/SettingsContext';
+import { useRadio } from '../context/RadioContext';
+import { useSleepTimer } from '../context/SleepTimerContext';
+import { useEqualizer } from '../context/EqualizerContext';
+import { useAchievementNotification } from '../context/AchievementNotificationContext';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { audioAPI, statsAPI } from '../api/client';
 import AudioVisualizer from './AudioVisualizer';
@@ -27,6 +37,11 @@ import { visualizerThemes } from '../config/visualizerThemes';
 import { audioCache } from '../utils/audioCache';
 import MetadataEditor from './MetadataEditor';
 import DownloadDialog from './DownloadDialog';
+import StartRadioMenu from './StartRadioMenu';
+import SleepTimerDialog from './SleepTimerDialog';
+import QueueDrawer from './QueueDrawer';
+import EqualizerDialog from './EqualizerDialog';
+import AddToPlaylistDialog from './AddToPlaylistDialog';
 
 // Import LyricsPlayer directly instead of lazy to avoid offline loading issues
 import LyricsPlayer from './LyricsPlayer';
@@ -51,10 +66,24 @@ interface PlayerProps {
   hasPrevious?: boolean;
   onFavoriteToggle?: (audioId: number, isFavorite: boolean) => void;
   onTrackSelect?: (audio: Audio) => void;
+  onTimeUpdate?: (time: number) => void;  // Callback for cross-device sync
+  initialSeek?: number;  // Initial seek position for resuming playback
+  isRadioMode?: boolean;  // Whether radio mode is active
+  // Queue management props
+  queue?: Audio[];
+  currentQueueIndex?: number;
+  onQueueReorder?: (fromIndex: number, toIndex: number) => void;
+  onRemoveFromQueue?: (index: number) => void;
+  onPlayQueueTrack?: (index: number) => void;
+  onClearQueue?: () => void;
 }
 
-export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect }: PlayerProps) {
+export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect, onTimeUpdate, initialSeek, isRadioMode = false, queue = [], currentQueueIndex = 0, onQueueReorder, onRemoveFromQueue, onPlayQueueTrack, onClearQueue }: PlayerProps) {
   const { settings, updateSetting } = useSettings();
+  const { isRadioMode: radioActive, stopRadio } = useRadio();
+  const { timerState: sleepTimerState, getFadeVolume, shouldStop: shouldSleepStop, onSongEnded } = useSleepTimer();
+  const { enabled: eqEnabled, gains: eqGains, connectAudioSource } = useEqualizer();
+  const { showAchievements } = useAchievementNotification();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [currentTime, setCurrentTime] = useState(0);
@@ -66,6 +95,12 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [showRelatedTracks, setShowRelatedTracks] = useState(false);
   const [showMetadataEditor, setShowMetadataEditor] = useState(false);
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
+  const [radioMenuAnchor, setRadioMenuAnchor] = useState<HTMLElement | null>(null);
+  const [showSleepTimerDialog, setShowSleepTimerDialog] = useState(false);
+  const [showQueueDrawer, setShowQueueDrawer] = useState(false);
+  const [showEqualizerDialog, setShowEqualizerDialog] = useState(false);
+  const [trackActionsMenuAnchor, setTrackActionsMenuAnchor] = useState<HTMLElement | null>(null);
+  const [showAddToPlaylistDialog, setShowAddToPlaylistDialog] = useState(false);
   const [currentAudioData, setCurrentAudioData] = useState<Audio>(audio);
   const [activeTab, setActiveTab] = useState(0);
   const [streamUrl, setStreamUrl] = useState<string>('');
@@ -79,6 +114,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const eqFiltersRef = useRef<BiquadFilterNode[]>([]);
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isPlayingRef = useRef(isPlaying);
@@ -88,11 +125,49 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const playStartTimeRef = useRef<number>(0);
   const listenedDurationRef = useRef<number>(0);
   const hasRecordedPlayRef = useRef<boolean>(false);
+  const initialSeekApplied = useRef<boolean>(false);  // Track if initial seek was applied
+
+  // EQ frequencies (10-band)
+  const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
   // Update currentAudioData when audio prop changes
   useEffect(() => {
     setCurrentAudioData(audio);
   }, [audio]);
+
+  // Handle initial seek for cross-device resume
+  useEffect(() => {
+    if (initialSeek && initialSeek > 0 && !initialSeekApplied.current && audioRef.current && streamUrl) {
+      const applyInitialSeek = () => {
+        if (audioRef.current && audioRef.current.readyState >= 2) {
+          console.log(`[Player] Resuming playback at ${initialSeek}s`);
+          audioRef.current.currentTime = initialSeek;
+          setCurrentTime(initialSeek);
+          initialSeekApplied.current = true;
+        }
+      };
+      
+      // Try immediately if audio is ready
+      if (audioRef.current.readyState >= 2) {
+        applyInitialSeek();
+      } else {
+        // Wait for audio to be ready
+        const handleCanPlay = () => {
+          applyInitialSeek();
+          audioRef.current?.removeEventListener('canplay', handleCanPlay);
+        };
+        audioRef.current.addEventListener('canplay', handleCanPlay);
+        return () => {
+          audioRef.current?.removeEventListener('canplay', handleCanPlay);
+        };
+      }
+    }
+  }, [initialSeek, streamUrl]);
+
+  // Reset initial seek flag when audio changes
+  useEffect(() => {
+    initialSeekApplied.current = false;
+  }, [audio.id]);
 
   // Swipe gestures for mobile navigation
   useSwipeGesture(playerContainerRef, {
@@ -169,15 +244,20 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     hasRecordedPlayRef.current = true;
     
     try {
-      await statsAPI.recordListening({
+      const response = await statsAPI.recordListening({
         youtube_id: audio.youtube_id,
         duration_listened: Math.floor(durationListened),
         completed,
       });
+      
+      // Check for new achievements in the response
+      if (response.data?.new_achievements && response.data.new_achievements.length > 0) {
+        showAchievements(response.data.new_achievements);
+      }
     } catch (error) {
       console.error('Failed to record listening history:', error);
     }
-  }, [audio.youtube_id]);
+  }, [audio.youtube_id, showAchievements]);
 
   // Track play duration
   useEffect(() => {
@@ -374,25 +454,74 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = volume / 100;
+      // Apply both user volume and sleep timer fade
+      const fadeMultiplier = getFadeVolume();
+      audioRef.current.volume = (volume / 100) * fadeMultiplier;
     }
-  }, [volume]);
+  }, [volume, getFadeVolume]);
 
-  // Initialize Web Audio API for visualizer
+  // Sleep timer fade effect - update volume during fade
+  useEffect(() => {
+    if (!sleepTimerState.isFading || !audioRef.current) return;
+    
+    const fadeInterval = setInterval(() => {
+      if (audioRef.current) {
+        const fadeMultiplier = getFadeVolume();
+        audioRef.current.volume = (volume / 100) * fadeMultiplier;
+      }
+    }, 100); // Update every 100ms for smooth fade
+    
+    return () => clearInterval(fadeInterval);
+  }, [sleepTimerState.isFading, volume, getFadeVolume]);
+
+  // Sleep timer stop check
+  useEffect(() => {
+    if (shouldSleepStop()) {
+      console.log('[Player] Sleep timer triggered stop');
+      setIsPlaying(false);
+    }
+  }, [shouldSleepStop, setIsPlaying]);
+
+  // Initialize Web Audio API for visualizer and EQ
   useEffect(() => {
     if (!audioRef.current || !streamUrl) return;
 
-    // Create audio context and analyser
+    // Create audio context, EQ filters, and analyser
     if (!audioContextRef.current) {
       try {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const source = audioContextRef.current.createMediaElementSource(audioRef.current);
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+        
+        // Create 10-band EQ filters
+        eqFiltersRef.current = EQ_FREQUENCIES.map((freq) => {
+          const filter = audioContextRef.current!.createBiquadFilter();
+          filter.type = 'peaking';
+          filter.frequency.value = freq;
+          filter.Q.value = 1.4; // Standard Q for 10-band EQ
+          filter.gain.value = 0; // Will be updated by EQ context
+          return filter;
+        });
+        
+        // Create analyser for visualizer
         analyserRef.current = audioContextRef.current.createAnalyser();
         analyserRef.current.fftSize = 64; // 32 frequency bins
         analyserRef.current.smoothingTimeConstant = 0.8; // Smooth animation
-        source.connect(analyserRef.current);
+        
+        // Connect chain: source -> EQ filters -> analyser -> destination
+        let lastNode: AudioNode = sourceNodeRef.current;
+        
+        // Connect EQ filters in series
+        eqFiltersRef.current.forEach((filter) => {
+          lastNode.connect(filter);
+          lastNode = filter;
+        });
+        
+        // Connect to analyser and then to destination
+        lastNode.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
+        
         dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+        console.log('[Player] Audio chain initialized with EQ');
       } catch (error) {
         console.error('Web Audio API not supported:', error);
       }
@@ -431,6 +560,17 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       }
     };
   }, [streamUrl]);
+
+  // Apply EQ gains when they change
+  useEffect(() => {
+    if (eqFiltersRef.current.length > 0) {
+      eqFiltersRef.current.forEach((filter, index) => {
+        if (eqGains[index] !== undefined) {
+          filter.gain.value = eqEnabled ? eqGains[index] : 0;
+        }
+      });
+    }
+  }, [eqGains, eqEnabled]);
 
   // Handlers for settings changes with debouncing
   const handleVolumeChange = useCallback((_: Event, value: number | number[]) => {
@@ -517,13 +657,17 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const handleTimeUpdate = useCallback(() => {
     // Don't update time display while user is seeking
     if (audioRef.current && !isSeeking.current) {
-      setCurrentTime(audioRef.current.currentTime);
+      const time = audioRef.current.currentTime;
+      setCurrentTime(time);
+      
+      // Notify parent for cross-device sync (throttled in parent)
+      onTimeUpdate?.(time);
       
       // Update Media Session position state
       setPositionState({
         duration: audio.duration,
         playbackRate: audioRef.current.playbackRate,
-        position: audioRef.current.currentTime,
+        position: time,
       });
     }
   }, [audio.duration]);
@@ -745,6 +889,16 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               // Record completed play
               recordListeningHistory(true);
               
+              // Notify sleep timer that song ended and check if we should stop
+              const sleepTimerShouldStop = onSongEnded();
+              
+              // If sleep timer says stop, don't proceed to next track
+              if (sleepTimerShouldStop) {
+                console.log('[Player] Sleep timer triggered stop - not playing next track');
+                setIsPlaying(false);
+                return;
+              }
+              
               // Handle repeat modes
               if (repeatMode === 'one') {
                 // Repeat current track
@@ -905,57 +1059,59 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </Tooltip>
             )}
           </Box>
-          {/* Favorite & Related Tracks & Metadata Buttons */}
+          {/* Track Actions & Related Tracks & Metadata Buttons */}
           <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-            <Tooltip title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}>
+            <Tooltip title="Track options">
               <IconButton
-                onClick={handleFavoriteToggle}
+                onClick={(e) => setTrackActionsMenuAnchor(e.currentTarget)}
                 sx={{
-                  color: isFavorite ? '#e91e63' : 'text.secondary',
+                  color: 'text.secondary',
                   transition: 'all 0.2s ease',
                   '&:hover': {
                     transform: 'scale(1.1)',
-                    color: '#e91e63',
+                    color: 'primary.main',
                   },
                 }}
               >
-                {isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                <MoreVertIcon />
               </IconButton>
             </Tooltip>
-            {audio.youtube_id && (
-              <Tooltip title="Export track">
-                <IconButton
-                  onClick={() => setShowDownloadDialog(true)}
-                  sx={{
-                    color: 'text.secondary',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'scale(1.1)',
-                      color: 'primary.main',
-                    },
-                  }}
-                >
-                  <DownloadIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-            {audio.youtube_id && (
-              <Tooltip title="Edit metadata">
-                <IconButton
-                  onClick={() => setShowMetadataEditor(true)}
-                  sx={{
-                    color: currentAudioData.metadata_source ? 'success.main' : 'text.secondary',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'scale(1.1)',
-                      color: 'primary.main',
-                    },
-                  }}
-                >
-                  <EditIcon />
-                </IconButton>
-              </Tooltip>
-            )}
+            {/* Track Actions Menu */}
+            <Menu
+              anchorEl={trackActionsMenuAnchor}
+              open={Boolean(trackActionsMenuAnchor)}
+              onClose={() => setTrackActionsMenuAnchor(null)}
+            >
+              <MenuItem onClick={() => { setShowAddToPlaylistDialog(true); setTrackActionsMenuAnchor(null); }}>
+                <ListItemIcon>
+                  <PlaylistAddIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Add to Playlist</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { handleFavoriteToggle(); setTrackActionsMenuAnchor(null); }}>
+                <ListItemIcon>
+                  {isFavorite ? <FavoriteIcon fontSize="small" sx={{ color: 'error.main' }} /> : <FavoriteBorderIcon fontSize="small" />}
+                </ListItemIcon>
+                <ListItemText>{isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}</ListItemText>
+              </MenuItem>
+              {audio.youtube_id && (
+                <>
+                  <Divider />
+                  <MenuItem onClick={() => { setShowDownloadDialog(true); setTrackActionsMenuAnchor(null); }}>
+                    <ListItemIcon>
+                      <DownloadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Export Track</ListItemText>
+                  </MenuItem>
+                  <MenuItem onClick={() => { setShowMetadataEditor(true); setTrackActionsMenuAnchor(null); }}>
+                    <ListItemIcon>
+                      <EditIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Edit Metadata</ListItemText>
+                  </MenuItem>
+                </>
+              )}
+            </Menu>
             {audio.youtube_id && onTrackSelect && (
               <Tooltip title="Related tracks">
                 <IconButton
@@ -973,6 +1129,130 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                 </IconButton>
               </Tooltip>
             )}
+            {audio.youtube_id && !radioActive && (
+              <Tooltip title="Start Radio">
+                <IconButton
+                  onClick={(e) => setRadioMenuAnchor(e.currentTarget)}
+                  sx={{
+                    color: 'text.secondary',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'scale(1.1)',
+                      color: 'secondary.main',
+                    },
+                  }}
+                >
+                  <RadioIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            {radioActive && (
+              <Tooltip title="Click to stop radio">
+                <Chip
+                  icon={<RadioIcon sx={{ fontSize: 16 }} />}
+                  label="RADIO"
+                  size="small"
+                  color="secondary"
+                  onClick={() => stopRadio()}
+                  sx={{
+                    cursor: 'pointer',
+                    animation: 'pulse 2s ease-in-out infinite',
+                    '@keyframes pulse': {
+                      '0%, 100%': { opacity: 1 },
+                      '50%': { opacity: 0.7 },
+                    },
+                    '&:hover': {
+                      opacity: 0.8,
+                    },
+                  }}
+                />
+              </Tooltip>
+            )}
+            {/* Sleep Timer Button */}
+            <Tooltip title={sleepTimerState.isActive ? 'Sleep timer active' : 'Sleep timer'}>
+              <IconButton
+                onClick={() => setShowSleepTimerDialog(true)}
+                sx={{
+                  color: sleepTimerState.isActive ? 'warning.main' : 'text.secondary',
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    color: 'warning.main',
+                  },
+                }}
+              >
+                <BedtimeIcon />
+                {sleepTimerState.isActive && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      bgcolor: 'warning.main',
+                      animation: 'pulse 2s ease-in-out infinite',
+                    }}
+                  />
+                )}
+              </IconButton>
+            </Tooltip>
+            {/* Queue Button */}
+            <Tooltip title={`Queue (${queue.length} tracks)`}>
+              <IconButton
+                onClick={() => setShowQueueDrawer(true)}
+                sx={{
+                  color: queue.length > 1 ? 'primary.main' : 'text.secondary',
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    color: 'primary.main',
+                  },
+                }}
+              >
+                <QueueMusicIcon />
+                {queue.length > 1 && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 2,
+                      right: 2,
+                      minWidth: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                      fontSize: 10,
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {queue.length > 99 ? '99+' : queue.length}
+                  </Box>
+                )}
+              </IconButton>
+            </Tooltip>
+            {/* Equalizer Button */}
+            <Tooltip title={eqEnabled ? 'Equalizer (on)' : 'Equalizer'}>
+              <IconButton
+                onClick={() => setShowEqualizerDialog(true)}
+                sx={{
+                  color: eqEnabled ? 'secondary.main' : 'text.secondary',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    color: 'secondary.main',
+                  },
+                }}
+              >
+                <EqualizerIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
 
@@ -1318,6 +1598,51 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           onClose={() => setShowDownloadDialog(false)}
         />
       )}
+
+      {/* Start Radio Menu */}
+      <StartRadioMenu
+        anchorEl={radioMenuAnchor}
+        open={Boolean(radioMenuAnchor)}
+        onClose={() => setRadioMenuAnchor(null)}
+        track={audio}
+      />
+
+      {/* Sleep Timer Dialog */}
+      <SleepTimerDialog
+        open={showSleepTimerDialog}
+        onClose={() => setShowSleepTimerDialog(false)}
+      />
+
+      {/* Queue Drawer */}
+      <QueueDrawer
+        open={showQueueDrawer}
+        onClose={() => setShowQueueDrawer(false)}
+        queue={queue}
+        currentIndex={currentQueueIndex}
+        onPlayTrack={(index) => {
+          onPlayQueueTrack?.(index);
+          setShowQueueDrawer(false);
+        }}
+        onRemoveTrack={(index) => onRemoveFromQueue?.(index)}
+        onReorderTrack={(from, to) => onQueueReorder?.(from, to)}
+        onClearQueue={() => {
+          onClearQueue?.();
+          setShowQueueDrawer(false);
+        }}
+      />
+
+      {/* Equalizer Dialog */}
+      <EqualizerDialog
+        open={showEqualizerDialog}
+        onClose={() => setShowEqualizerDialog(false)}
+      />
+
+      {/* Add to Playlist Dialog */}
+      <AddToPlaylistDialog
+        open={showAddToPlaylistDialog}
+        onClose={() => setShowAddToPlaylistDialog(false)}
+        track={audio}
+      />
     </Box>
   );
 }

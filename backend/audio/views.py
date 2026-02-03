@@ -3,6 +3,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from audio.models import Audio, AudioProgress
 from audio.serializers import (
     AudioListSerializer,
@@ -733,15 +734,26 @@ class MetadataAutoFetchView(ApiBaseView):
         })
 
 
-class ArtworkProxyView(ApiBaseView):
-    """Proxy artwork images to avoid CORS issues for Media Session API"""
+class ArtworkProxyView(APIView):
+    """Proxy artwork images to avoid CORS issues for Media Session API
+    
+    This view allows unauthenticated access because the Media Session API
+    cannot pass authentication headers when fetching artwork URLs.
+    Security is maintained because:
+    1. Only serves publicly available artwork URLs (YouTube thumbnails, etc.)
+    2. Does not expose any user data
+    3. The youtube_id must exist in the database
+    """
+    authentication_classes = []
+    permission_classes = []
     
     def get(self, request, youtube_id):
         """Proxy artwork for a track"""
         import requests as http_requests
         from django.http import HttpResponse
         
-        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        # Allow any user's audio since this doesn't expose sensitive data
+        audio = get_object_or_404(Audio, youtube_id=youtube_id)
         
         # Get artwork URL
         artwork_url = audio.cover_art_url or audio.thumbnail_url

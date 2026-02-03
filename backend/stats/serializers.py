@@ -1,7 +1,7 @@
 """Stats serializers"""
 
 from rest_framework import serializers
-from stats.models import ListeningHistory
+from stats.models import ListeningHistory, Achievement
 
 
 class AudioStatsSerializer(serializers.Serializer):
@@ -23,6 +23,41 @@ class DownloadStatsSerializer(serializers.Serializer):
     pending = serializers.IntegerField()
     completed = serializers.IntegerField()
     failed = serializers.IntegerField()
+
+
+class AchievementSerializer(serializers.ModelSerializer):
+    """Achievement serializer"""
+    name = serializers.SerializerMethodField()
+    icon = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Achievement
+        fields = ['id', 'achievement_type', 'name', 'icon', 'description', 'unlocked_at', 'context', 'seen']
+    
+    def get_name(self, obj):
+        details = Achievement.get_achievement_details()
+        return details.get(obj.achievement_type, {}).get('name', obj.achievement_type)
+    
+    def get_icon(self, obj):
+        details = Achievement.get_achievement_details()
+        return details.get(obj.achievement_type, {}).get('icon', '🏆')
+    
+    def get_description(self, obj):
+        details = Achievement.get_achievement_details()
+        return details.get(obj.achievement_type, {}).get('description', '')
+
+
+class AchievementProgressSerializer(serializers.Serializer):
+    """Achievement progress serializer"""
+    type = serializers.CharField()
+    name = serializers.CharField()
+    icon = serializers.CharField()
+    description = serializers.CharField()
+    threshold = serializers.IntegerField()
+    current = serializers.FloatField()
+    progress = serializers.IntegerField()
+    unlocked = serializers.BooleanField()
 
 
 class ListeningHistorySerializer(serializers.ModelSerializer):
@@ -106,3 +141,38 @@ class ListeningInsightsSerializer(serializers.Serializer):
     daily_listening = DailyListeningSerializer(many=True)
     genre_distribution = GenreDistributionSerializer(many=True)
     recent_history = ListeningHistorySerializer(many=True)
+
+
+class YearlyWrappedSerializer(serializers.Serializer):
+    """Yearly Wrapped summary - Spotify-style year in review"""
+    year = serializers.IntegerField()
+    
+    # Top stats
+    total_minutes_listened = serializers.IntegerField()
+    total_tracks_played = serializers.IntegerField()
+    total_unique_tracks = serializers.IntegerField()
+    total_unique_artists = serializers.IntegerField()
+    total_unique_channels = serializers.IntegerField()
+    
+    # Streaks
+    longest_streak = serializers.IntegerField()
+    total_listening_days = serializers.IntegerField()
+    
+    # Rankings
+    top_artist = serializers.DictField(allow_null=True)
+    top_channel = serializers.DictField(allow_null=True)
+    top_track = serializers.DictField(allow_null=True)
+    top_5_artists = TopArtistSerializer(many=True)
+    top_5_tracks = TopTrackSerializer(many=True)
+    
+    # Fun facts
+    listening_personality = serializers.CharField()
+    peak_month = serializers.CharField()
+    peak_day_of_week = serializers.CharField()
+    peak_hour = serializers.IntegerField(allow_null=True)
+    
+    # Monthly breakdown
+    monthly_minutes = serializers.ListField(child=serializers.DictField())
+    
+    # Achievements unlocked this year
+    achievements_unlocked = serializers.IntegerField()

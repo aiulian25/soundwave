@@ -13,8 +13,6 @@ import {
   Snackbar,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useEffect, useState, useCallback } from 'react';
@@ -22,6 +20,8 @@ import { useLocation } from 'react-router-dom';
 import { audioAPI } from '../api/client';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
+import TrackActionsMenu from '../components/TrackActionsMenu';
+import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 
 interface LibraryPageProps {
@@ -32,6 +32,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
   const [audioList, setAudioList] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(false);
   const location = useLocation();
+  const { getTrackRef, shouldHighlight } = useHighlightTrack();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -52,28 +53,6 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
   useEffect(() => {
     loadAudio();
   }, [location.key, loadAudio]);
-
-  const handleToggleFavorite = async (audio: Audio) => {
-    if (!audio.youtube_id) return;
-    
-    try {
-      await audioAPI.toggleFavorite(audio.youtube_id);
-      // Update the local state immediately for better UX
-      setAudioList(prev => 
-        prev.map(item => 
-          item.id === audio.id 
-            ? { ...item, is_favorite: !item.is_favorite }
-            : item
-        )
-      );
-      setSnackbarMessage(audio.is_favorite ? 'Removed from favorites' : 'Added to favorites');
-      setSnackbarOpen(true);
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-      setSnackbarMessage('Failed to update favorite status');
-      setSnackbarOpen(true);
-    }
-  };
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -209,12 +188,16 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
             {audioList.map((audio, index) => (
               <TableRow
                 key={audio.id}
+                ref={getTrackRef(audio.youtube_id)}
                 sx={{ 
                   cursor: 'pointer',
                   transition: 'background-color 0.3s ease',
                   '&:hover': {
                     bgcolor: 'rgba(19, 236, 106, 0.05)',
                   },
+                  ...(shouldHighlight(audio.youtube_id) && {
+                    bgcolor: 'rgba(19, 236, 106, 0.1)',
+                  }),
                 }}
                 onClick={() => setCurrentAudio(audio, audioList)}
               >
@@ -250,22 +233,12 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
                   >
                     <PlayArrowIcon />
                   </IconButton>
-                  <IconButton 
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleFavorite(audio);
+                  <TrackActionsMenu 
+                    track={audio}
+                    onTrackUpdate={(updatedTrack) => {
+                      setAudioList(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
                     }}
-                    sx={{
-                      color: audio.is_favorite ? 'error.main' : 'text.disabled',
-                      '&:hover': {
-                        color: 'error.main',
-                        bgcolor: 'rgba(244, 67, 54, 0.1)',
-                      },
-                    }}
-                  >
-                    {audio.is_favorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                  </IconButton>
+                  />
                 </TableCell>
               </TableRow>
             ))}

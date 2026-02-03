@@ -174,6 +174,7 @@ class ChangePasswordView(ApiBaseView):
 class LoginView(APIView):
     """Login endpoint with rate limiting and lockout protection"""
     permission_classes = [AllowAny]
+    authentication_classes = []  # No auth required, exempt from CSRF
     
     # Apply stricter throttling to login endpoint
     from common.rate_limiter import LoginRateThrottle

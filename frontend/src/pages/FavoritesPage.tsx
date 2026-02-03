@@ -15,11 +15,12 @@ import {
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { audioAPI } from '../api/client';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
+import TrackActionsMenu from '../components/TrackActionsMenu';
+import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 
 interface FavoritesPageProps {
@@ -29,6 +30,7 @@ interface FavoritesPageProps {
 export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
   const [favorites, setFavorites] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getTrackRef, shouldHighlight } = useHighlightTrack();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -51,19 +53,16 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
     }
   };
 
-  const handleToggleFavorite = async (audio: Audio) => {
-    if (!audio.youtube_id) return;
-    
-    try {
-      await audioAPI.toggleFavorite(audio.youtube_id);
-      // Remove from favorites list since it's no longer a favorite
-      setFavorites(prev => prev.filter(fav => fav.id !== audio.id));
+  // Handle track update from TrackActionsMenu (including favorite toggle)
+  const handleTrackUpdate = (updatedTrack: Audio) => {
+    if (!updatedTrack.is_favorite) {
+      // If track is unfavorited, remove it from the list
+      setFavorites(prev => prev.filter(fav => fav.id !== updatedTrack.id));
       setSnackbarMessage('Removed from favorites');
       setSnackbarOpen(true);
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-      setSnackbarMessage('Failed to update favorite status');
-      setSnackbarOpen(true);
+    } else {
+      // Update the track in place
+      setFavorites(prev => prev.map(fav => fav.id === updatedTrack.id ? updatedTrack : fav));
     }
   };
 
@@ -198,12 +197,16 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
               {favorites.map((audio, index) => (
                 <TableRow
                   key={audio.id}
+                  ref={getTrackRef(audio.youtube_id)}
                   sx={{ 
                     cursor: 'pointer',
                     transition: 'background-color 0.3s ease',
                     '&:hover': {
                       bgcolor: 'rgba(19, 236, 106, 0.05)',
                     },
+                    ...(shouldHighlight(audio.youtube_id) && {
+                      bgcolor: 'rgba(19, 236, 106, 0.1)',
+                    }),
                   }}
                   onClick={() => setCurrentAudio(audio, favorites)}
                 >
@@ -243,21 +246,10 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
                     >
                       <PlayArrowIcon />
                     </IconButton>
-                    <IconButton 
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleFavorite(audio);
-                      }}
-                      sx={{
-                        color: 'error.main',
-                        '&:hover': {
-                          bgcolor: 'rgba(244, 67, 54, 0.1)',
-                        },
-                      }}
-                    >
-                      <FavoriteIcon />
-                    </IconButton>
+                    <TrackActionsMenu 
+                      track={audio}
+                      onTrackUpdate={handleTrackUpdate}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

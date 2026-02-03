@@ -123,7 +123,7 @@ class BurstRateThrottle(AnonRateThrottle):
 
 class SustainedRateThrottle(UserRateThrottle):
     """Sustained rate limit for authenticated users."""
-    rate = '1000/hour'
+    rate = '10000/hour'  # Increased from 1000 to prevent 429 on page loads
     scope = 'sustained'
 
 

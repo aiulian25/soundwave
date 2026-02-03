@@ -121,6 +121,72 @@ export const playlistAPI = {
   create: (data: any) => api.post('/playlist/', data),
   delete: (playlistId: string) => api.delete(`/playlist/${playlistId}/`),
   download: (playlistId: string) => api.post(`/playlist/${playlistId}/`, { action: 'download' }),
+  // Item management
+  getItems: (playlistId: string) => api.get(`/playlist/${playlistId}/items/`),
+  addItem: (playlistId: string, youtubeId: string) => api.post(`/playlist/${playlistId}/items/`, { youtube_id: youtubeId }),
+  removeItem: (playlistId: string, youtubeId: string) => api.delete(`/playlist/${playlistId}/items/`, { data: { youtube_id: youtubeId } }),
+  // Find playlists containing a track
+  findContaining: (youtubeId: string) => api.get(`/playlist/containing/${youtubeId}/`),
+};
+
+// Smart Playlist API
+export const smartPlaylistAPI = {
+  // List all smart playlists
+  list: () => api.get('/playlist/smart/'),
+  
+  // Get smart playlist details
+  get: (playlistId: number) => api.get(`/playlist/smart/${playlistId}/`),
+  getWithTracks: (playlistId: number) => api.get(`/playlist/smart/${playlistId}/`, { params: { include_tracks: 'true' } }),
+  
+  // Get tracks for a smart playlist (paginated)
+  getTracks: (playlistId: number, params?: { page?: number; page_size?: number }) => 
+    api.get(`/playlist/smart/${playlistId}/tracks/`, { params }),
+  
+  // Create a new smart playlist
+  create: (data: {
+    name: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    match_mode?: 'all' | 'any';
+    order_by?: string;
+    limit?: number | null;
+    rules?: Array<{
+      field: string;
+      operator: string;
+      value?: string;
+      value_2?: string;
+    }>;
+  }) => api.post('/playlist/smart/', data),
+  
+  // Update a smart playlist
+  update: (playlistId: number, data: any) => api.put(`/playlist/smart/${playlistId}/`, data),
+  
+  // Delete a smart playlist
+  delete: (playlistId: number) => api.delete(`/playlist/smart/${playlistId}/`),
+  
+  // Get available choices for rules
+  getChoices: () => api.get('/playlist/smart/choices/'),
+  
+  // Preview matching tracks without saving
+  preview: (data: {
+    rules: Array<{
+      field: string;
+      operator: string;
+      value?: string;
+      value_2?: string;
+    }>;
+    match_mode?: 'all' | 'any';
+    order_by?: string;
+    limit?: number | null;
+  }) => api.post('/playlist/smart/preview/', data),
+  
+  // Manage rules for a smart playlist
+  getRules: (playlistId: number) => api.get(`/playlist/smart/${playlistId}/rules/`),
+  addRule: (playlistId: number, rule: { field: string; operator: string; value?: string; value_2?: string }) =>
+    api.post(`/playlist/smart/${playlistId}/rules/`, rule),
+  setRules: (playlistId: number, rules: Array<{ field: string; operator: string; value?: string; value_2?: string }>) =>
+    api.put(`/playlist/smart/${playlistId}/rules/`, { rules }),
 };
 
 // Download API
@@ -141,10 +207,22 @@ export const statsAPI = {
   insights: (days?: number) => api.get('/stats/insights/', { params: days ? { days } : {} }),
   recordListening: (data: { youtube_id: string; duration_listened: number; completed: boolean }) => 
     api.post('/stats/record/', data),
-  history: (params?: { page?: number; page_size?: number }) => 
+  history: (params?: { page?: number; page_size?: number; date?: string }) => 
     api.get('/stats/history/', { params }),
   clearHistory: (days?: number) => 
     api.delete('/stats/history/', { params: days ? { days } : {} }),
+  onThisDay: () => api.get('/stats/on-this-day/'),
+  // Achievements
+  achievements: (params?: { progress?: boolean; unseen?: boolean }) => 
+    api.get('/stats/achievements/', { params }),
+  checkAchievements: () => api.post('/stats/achievements/'),
+  markAchievementsSeen: (ids?: number[]) => 
+    api.patch('/stats/achievements/', ids ? { ids } : { all: true }),
+  // Streaks
+  streak: () => api.get('/stats/streak/'),
+  // Yearly Wrapped
+  yearlyWrapped: (year?: number) => 
+    api.get('/stats/wrapped/', { params: year ? { year } : {} }),
 };
 
 // User API
@@ -168,4 +246,72 @@ export const settingsAPI = {
   config: () => api.get('/appsettings/config/'),
   backup: () => api.get('/appsettings/backup/'),
   createBackup: () => api.post('/appsettings/backup/'),
+};
+
+// Playback Sync API - Cross-device playback continuity
+export const playbackSyncAPI = {
+  // Get the user's last playback session
+  getSession: () => api.get('/playback-sync/'),
+  
+  // Check if user has an active session (lightweight)
+  checkStatus: () => api.get('/playback-sync/status/'),
+  
+  // Update/save current playback state
+  syncPlayback: (data: {
+    youtube_id: string;
+    position: number;
+    duration?: number;
+    is_playing?: boolean;
+    volume?: number;
+    queue_youtube_ids?: string[];
+    queue_index?: number;
+    device_id?: string;
+    device_name?: string;
+  }) => api.post('/playback-sync/', data),
+  
+  // Clear the playback session
+  clearSession: () => api.delete('/playback-sync/'),
+};
+
+// Smart Radio / Auto-DJ API
+export const radioAPI = {
+  // Start a new radio session
+  start: (data: {
+    mode: 'track' | 'artist' | 'favorites' | 'discovery' | 'recent';
+    seed_youtube_id?: string;
+    seed_channel_id?: string;
+    variety_level?: number;
+  }) => api.post('/radio/start/', data),
+  
+  // Stop the current radio session
+  stop: () => api.post('/radio/stop/'),
+  
+  // Get radio status
+  status: () => api.get('/radio/status/'),
+  
+  // Get next track
+  next: () => api.get('/radio/next/'),
+  
+  // Report a skip (for learning)
+  skip: (data: {
+    youtube_id: string;
+    listen_duration?: number;
+    track_duration?: number;
+  }) => api.post('/radio/skip/', data),
+  
+  // Report positive feedback (played through, liked, repeated)
+  like: (data: {
+    youtube_id: string;
+    feedback_type?: 'played' | 'liked' | 'repeated';
+    listen_duration?: number;
+    track_duration?: number;
+  }) => api.post('/radio/like/', data),
+  
+  // Get/update radio settings
+  getSettings: () => api.get('/radio/settings/'),
+  updateSettings: (data: {
+    variety_level?: number;
+    max_history_size?: number;
+    reset_learning?: boolean;
+  }) => api.post('/radio/settings/', data),
 };
