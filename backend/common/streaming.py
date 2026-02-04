@@ -169,4 +169,13 @@ def serve_media_with_range(request, path, document_root):
     # Add Content-Disposition for download fallback
     response['Content-Disposition'] = f'inline; filename="{full_path.name}"'
     
+    # iOS Safari specific headers for better audio streaming
+    response['X-Content-Type-Options'] = 'nosniff'
+    
+    # Allow cross-origin requests for audio (needed for PWA/Service Worker)
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+    response['Access-Control-Allow-Headers'] = 'Range, Content-Type'
+    response['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges'
+    
     return response

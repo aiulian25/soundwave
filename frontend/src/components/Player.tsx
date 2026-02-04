@@ -324,8 +324,25 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             return;
           }
           
-          // No cache available - must fetch from server
-          console.log('[Player] → Streaming from server (not cached):', audio.title);
+          // OPTIMIZATION: If we have file_path, construct URL directly without API call
+          // This reduces latency and prevents buffering on track change
+          if (audio.file_path) {
+            const encodedPath = audio.file_path.split('/').map(part => encodeURIComponent(part)).join('/');
+            const directUrl = `/media/${encodedPath}`;
+            console.log('[Player] → Streaming directly (no API call):', audio.title);
+            setStreamUrl(directUrl);
+            setLoadingStream(false);
+            setIsCachedPlayback(false);
+            
+            // Cache the audio in the background for future plays
+            if (settings.prefetch_enabled !== false) {
+              audioCache.prefetchTrack(audio, 'low').catch(console.error);
+            }
+            return;
+          }
+          
+          // Fallback: fetch stream URL from API (for tracks without file_path)
+          console.log('[Player] → Fetching stream URL from API:', audio.title);
           const response = await fetch(`/api/audio/${audio.youtube_id}/player/`, {
             headers: {
               'Authorization': `Token ${localStorage.getItem('token')}`,
@@ -630,8 +647,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       audioRef.current.pause();
       // Reset current time when audio changes
       setCurrentTime(0);
-      // Load new audio source
-      audioRef.current.load();
+      // Don't call load() - just changing src is enough and causes less buffering on iOS
+      // The browser will automatically start loading when src changes
       // Reset playing ref
       isPlayingRef.current = false;
     }
@@ -709,33 +726,20 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       // Ensure flag is still set
       isSeeking.current = true;
       
-      // Pause before seeking to prevent race conditions
       const wasPlaying = !audioRef.current.paused;
-      audioRef.current.pause();
       
-      // Only seek if audio is ready (has duration)
-      if (audioRef.current.readyState >= 2) { // HAVE_CURRENT_DATA or better
-        audioRef.current.currentTime = time;
-        
-        // Resume playback after seek completes
-        if (wasPlaying) {
-          // The 'seeked' event will resume playback
-          audioRef.current.play();
-        }
-        
-        // Update Media Session position
-        setPositionState({
-          duration: audio.duration,
-          playbackRate: audioRef.current.playbackRate,
-          position: time,
-        });
-      } else {
-        // If not ready, wait for it and then seek
+      // On iOS, don't pause before seeking - it causes more buffering
+      // Just seek directly
+      audioRef.current.currentTime = time;
+      
+      // If audio wasn't ready, wait for canplay
+      if (audioRef.current.readyState < 2) {
         const handleCanPlay = () => {
           if (audioRef.current) {
+            // Seek again to ensure we're at the right position
             audioRef.current.currentTime = time;
             if (wasPlaying) {
-              audioRef.current.play();
+              audioRef.current.play().catch(console.error);
             }
             audioRef.current.removeEventListener('canplay', handleCanPlay);
           }
@@ -911,15 +915,10 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             onCanPlay={() => setIsBuffering(false)}
             onPlaying={() => setIsBuffering(false)}
             onStalled={() => {
-              console.warn('[Player] Audio stalled - attempting recovery');
+              console.warn('[Player] Audio stalled');
               setIsBuffering(true);
-              // iOS sometimes stalls - try to recover by nudging the playback
-              if (audioRef.current && !audioRef.current.paused) {
-                const currentPos = audioRef.current.currentTime;
-                audioRef.current.load();
-                audioRef.current.currentTime = currentPos;
-                audioRef.current.play().catch(console.error);
-              }
+              // Don't call load() on stall - it causes more buffering
+              // Just wait for the browser to recover
             }}
             onEnded={() => {
               // Record completed play
