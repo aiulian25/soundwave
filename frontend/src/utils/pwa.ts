@@ -26,11 +26,29 @@ class PWAManager {
     // Check if already installed
     this.checkIfInstalled();
 
-    // Listen for install prompt
+    // Check if prompt was captured early (before React loaded)
+    if ((window as any).deferredPWAPrompt) {
+      this.deferredPrompt = (window as any).deferredPWAPrompt as BeforeInstallPromptEvent;
+      console.log('[PWA] Using early-captured install prompt');
+      // Emit after a tick to allow listeners to be set up
+      setTimeout(() => this.emit('canInstall', true), 0);
+    }
+
+    // Listen for install prompt (in case it fires after React loads)
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       this.deferredPrompt = e as BeforeInstallPromptEvent;
+      console.log('[PWA] Install prompt captured in React');
       this.emit('canInstall', true);
+    });
+
+    // Listen for custom event from early capture
+    window.addEventListener('pwa-install-available', () => {
+      if ((window as any).deferredPWAPrompt && !this.deferredPrompt) {
+        this.deferredPrompt = (window as any).deferredPWAPrompt as BeforeInstallPromptEvent;
+        console.log('[PWA] Install prompt received via custom event');
+        this.emit('canInstall', true);
+      }
     });
 
     // Listen for app installed

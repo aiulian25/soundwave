@@ -54,7 +54,19 @@
     
     <!-- Preconnect to API -->
     <link rel="preconnect" href="/api" />
-    <script type="module" crossorigin src="/assets/index-BYt56FNB.js"></script>
+    
+    <!-- Early PWA install prompt capture - must be before any module scripts -->
+    <script>
+      window.deferredPWAPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.deferredPWAPrompt = e;
+        console.log('[PWA] Install prompt captured early');
+        // Dispatch custom event for React to pick up
+        window.dispatchEvent(new CustomEvent('pwa-install-available'));
+      });
+    </script>
+    <script type="module" crossorigin src="/assets/index-YFJ6-8TS.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/vendor-4GryFJQ2.js">
     <link rel="modulepreload" crossorigin href="/assets/mui-CaAFxKVL.js">
     <link rel="stylesheet" crossorigin href="/assets/index-BeD0Hr3E.css">

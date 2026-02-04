@@ -54,6 +54,18 @@
     
     <!-- Preconnect to API -->
     <link rel="preconnect" href="/api" />
+    
+    <!-- Early PWA install prompt capture - must be before any module scripts -->
+    <script>
+      window.deferredPWAPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.deferredPWAPrompt = e;
+        console.log('[PWA] Install prompt captured early');
+        // Dispatch custom event for React to pick up
+        window.dispatchEvent(new CustomEvent('pwa-install-available'));
+      });
+    </script>
   </head>
   <body>
     <noscript>
