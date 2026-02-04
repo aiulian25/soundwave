@@ -33,6 +33,7 @@ import { useAchievementNotification } from '../context/AchievementNotificationCo
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { audioAPI, statsAPI } from '../api/client';
 import AudioVisualizer from './AudioVisualizer';
+import WaveformSeekBar from './WaveformSeekBar';
 import { visualizerThemes } from '../config/visualizerThemes';
 import { audioCache } from '../utils/audioCache';
 import MetadataEditor from './MetadataEditor';
@@ -711,7 +712,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     }
   }, [audio.duration]);
 
-  const handleSeekChange = useCallback((_: Event, value: number | number[]) => {
+  const handleSeekChange = useCallback((_: Event | null, value: number | number[]) => {
     // Block time updates during drag
     isSeeking.current = true;
     // Update visual position while dragging (no actual seek yet)
@@ -719,7 +720,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     setCurrentTime(time);
   }, []);
 
-  const handleSeekCommitted = useCallback((_: Event | React.SyntheticEvent, value: number | number[]) => {
+  const handleSeekCommitted = useCallback((_: Event | React.SyntheticEvent | null, value: number | number[]) => {
     // Actually seek when user releases slider
     const time = value as number;
     if (audioRef.current && !loadingStream) {
@@ -1293,48 +1294,15 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
 
         {/* Bottom: Player Controls */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Progress Bar */}
-          <Box>
-            <Slider
-              value={currentTime}
-              max={audio.duration}
-              onChange={handleSeekChange}
-              onChangeCommitted={handleSeekCommitted}
-              sx={{
-                color: 'primary.main',
-                height: 6,
-                padding: '13px 0',
-                '& .MuiSlider-thumb': {
-                  width: 12,
-                  height: 12,
-                  backgroundColor: (theme) => theme.palette.mode === 'dark' ? '#fff' : theme.palette.primary.main,
-                  boxShadow: (theme) => theme.palette.mode === 'dark' 
-                    ? '0 0 10px rgba(255, 255, 255, 0.5)'
-                    : `0 0 10px ${theme.palette.primary.main}40`,
-                  '&:hover, &.Mui-focusVisible': {
-                    boxShadow: '0 0 0 8px rgba(19, 236, 106, 0.16)',
-                  },
-                },
-                '& .MuiSlider-track': {
-                  border: 'none',
-                  height: 6,
-                },
-                '& .MuiSlider-rail': {
-                  opacity: (theme) => theme.palette.mode === 'dark' ? 0.3 : 0.2,
-                  backgroundColor: (theme) => theme.palette.mode === 'dark' ? '#fff' : theme.palette.text.secondary,
-                  height: 6,
-                },
-              }}
-            />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.75rem' }}>
-                {formatTime(currentTime)}
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.75rem' }}>
-                {formatTime(audio.duration)}
-              </Typography>
-            </Box>
-          </Box>
+          {/* Waveform Progress Bar */}
+          <WaveformSeekBar
+            audioElement={audioRef.current}
+            currentTime={currentTime}
+            duration={audio.duration}
+            onSeek={(time) => handleSeekChange(null, time)}
+            onSeekCommitted={(time) => handleSeekCommitted(null, time)}
+            streamUrl={streamUrl}
+          />
 
           {/* Buttons */}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>

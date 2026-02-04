@@ -1,6 +1,7 @@
 /**
  * Visualizer Theme Preview Component
  * Shows a visual preview of a visualizer theme with animated demo
+ * Updated for Lyrique visualizers
  */
 
 import { Box, Typography, useTheme } from '@mui/material';
@@ -39,34 +40,8 @@ export default function VisualizerThemePreview({
   // Render mini visualization based on style
   const renderMiniVisualization = () => {
     switch (visualizerTheme.style) {
-      // User Favorite: Rounded Bars
-      case 'bars-rounded':
-        return (
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'flex-end', 
-            height: '100%',
-            gap: '2px',
-            p: 0.5,
-          }}>
-            {animationData.map((value, i) => (
-              <Box
-                key={i}
-                sx={{
-                  flex: 1,
-                  height: `${value * 100}%`,
-                  bgcolor: colors[i],
-                  borderRadius: '4px',
-                  transition: 'height 0.15s ease',
-                  opacity: 0.8,
-                }}
-              />
-            ))}
-          </Box>
-        );
-      
-      // 0: Classic Bars
-      case 'classic-bars':
+      // Bars Classic
+      case 'bars-classic':
         return (
           <Box sx={{ 
             display: 'flex', 
@@ -91,8 +66,35 @@ export default function VisualizerThemePreview({
           </Box>
         );
       
-      // 1: Circular Spectrum
-      case 'circular-spectrum':
+      // Bars Mirrored
+      case 'bars-mirrored':
+        return (
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            height: '100%',
+            gap: '2px',
+            p: 0.5,
+          }}>
+            {animationData.map((value, i) => (
+              <Box
+                key={i}
+                sx={{
+                  flex: 1,
+                  height: `${value * 80}%`,
+                  bgcolor: colors[i],
+                  borderRadius: '2px',
+                  transition: 'height 0.15s ease',
+                  opacity: 0.8,
+                }}
+              />
+            ))}
+          </Box>
+        );
+      
+      // Bars Circular & Circle Bars
+      case 'bars-circular':
+      case 'circle-bars':
         return (
           <Box sx={{ 
             display: 'flex',
@@ -128,8 +130,9 @@ export default function VisualizerThemePreview({
           </Box>
         );
       
-      // 2: Waveform (oscilloscope)
-      case 'waveform':
+      // Wave Line & Oscilloscope
+      case 'wave-line':
+      case 'oscilloscope':
         return (
           <Box sx={{ 
             position: 'relative',
@@ -138,7 +141,7 @@ export default function VisualizerThemePreview({
           }}>
             <svg width="100%" height="100%" viewBox="0 0 100 40" preserveAspectRatio="none">
               <defs>
-                <linearGradient id={`waveform-gradient-${visualizerTheme.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                <linearGradient id={`wave-gradient-${visualizerTheme.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
                   {colors.map((color, i) => (
                     <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={color} />
                   ))}
@@ -149,40 +152,69 @@ export default function VisualizerThemePreview({
                   `Q ${(i + 0.5) * (100 / animationData.length)} ${20 + (v - 0.5) * 25} ${(i + 1) * (100 / animationData.length)} 20`
                 ).join(' ')}`}
                 fill="none"
-                stroke={`url(#waveform-gradient-${visualizerTheme.id})`}
+                stroke={`url(#wave-gradient-${visualizerTheme.id})`}
                 strokeWidth="2"
               />
             </svg>
           </Box>
         );
       
-      // 3: Symmetric Bars (mirrored from center)
-      case 'symmetric-bars':
+      // Wave Fill
+      case 'wave-fill':
         return (
           <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+            position: 'relative',
             height: '100%',
-            gap: '2px',
-            p: 0.5,
+            overflow: 'hidden',
           }}>
-            {animationData.map((value, i) => (
-              <Box
-                key={i}
-                sx={{
-                  flex: 1,
-                  height: `${value * 80}%`,
-                  bgcolor: colors[i],
-                  borderRadius: '2px',
-                  transition: 'height 0.15s ease',
-                  opacity: 0.8,
-                }}
+            <svg width="100%" height="100%" viewBox="0 0 100 40" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id={`wavefill-gradient-${visualizerTheme.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor={colors[0]} stopOpacity="0.8" />
+                  <stop offset="100%" stopColor={colors[0]} stopOpacity="0.1" />
+                </linearGradient>
+              </defs>
+              <path
+                d={`M 0 40 ${animationData.map((v, i) => 
+                  `L ${(i + 1) * (100 / animationData.length)} ${40 - v * 35}`
+                ).join(' ')} L 100 40 Z`}
+                fill={`url(#wavefill-gradient-${visualizerTheme.id})`}
               />
-            ))}
+            </svg>
           </Box>
         );
       
-      // 4: Particles
+      // Circle Pulse
+      case 'circle-pulse':
+        return (
+          <Box sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+          }}>
+            <svg width="50" height="50" viewBox="0 0 50 50">
+              {[0.8, 0.5].map((scale, i) => {
+                const radius = (animationData[i] * 15 + 5) * scale;
+                return (
+                  <circle
+                    key={i}
+                    cx="25"
+                    cy="25"
+                    r={radius}
+                    fill="none"
+                    stroke={colors[0]}
+                    strokeWidth={2 + animationData[i] * 2}
+                    opacity={0.3 + animationData[i] * 0.5}
+                    style={{ transition: 'all 0.15s ease' }}
+                  />
+                );
+              })}
+            </svg>
+          </Box>
+        );
+      
+      // Particles
       case 'particles':
         return (
           <Box sx={{ 
@@ -210,8 +242,57 @@ export default function VisualizerThemePreview({
           </Box>
         );
       
-      // 5: Frequency Rings
-      case 'frequency-rings':
+      // DNA Helix
+      case 'dna-helix':
+        return (
+          <Box sx={{ 
+            position: 'relative',
+            height: '100%',
+            overflow: 'hidden',
+          }}>
+            <svg width="100%" height="100%" viewBox="0 0 100 40" preserveAspectRatio="none">
+              {animationData.map((v, i) => {
+                const x = (i + 0.5) * (100 / animationData.length);
+                const y1 = 20 + Math.sin(i * 0.8) * (8 + v * 8);
+                const y2 = 20 - Math.sin(i * 0.8) * (8 + v * 8);
+                return (
+                  <g key={i}>
+                    <circle cx={x} cy={y1} r="3" fill={colors[i]} />
+                    <circle cx={x} cy={y2} r="3" fill={colors[i]} opacity="0.7" />
+                    <line x1={x} y1={y1} x2={x} y2={y2} stroke={colors[i]} strokeWidth="1" opacity="0.3" />
+                  </g>
+                );
+              })}
+            </svg>
+          </Box>
+        );
+      
+      // Spectrum
+      case 'spectrum':
+        return (
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'flex-end', 
+            height: '100%',
+            gap: '1px',
+            p: 0.5,
+          }}>
+            {animationData.map((value, i) => (
+              <Box
+                key={i}
+                sx={{
+                  flex: 1,
+                  height: `${value * 100}%`,
+                  background: `linear-gradient(to top, ${colors[0]}, ${colors[0]}CC, ${colors[0]}80)`,
+                  transition: 'height 0.15s ease',
+                }}
+              />
+            ))}
+          </Box>
+        );
+      
+      // Galaxy
+      case 'galaxy':
         return (
           <Box sx={{ 
             display: 'flex',
@@ -220,18 +301,21 @@ export default function VisualizerThemePreview({
             height: '100%',
           }}>
             <svg width="50" height="50" viewBox="0 0 50 50">
-              {animationData.slice(0, 4).map((value, i) => {
-                const radius = (i + 1) * 5 * (0.8 + value * 0.4);
+              {animationData.map((value, i) => {
+                const angle = (i / animationData.length) * Math.PI * 4;
+                const distance = 5 + (i / animationData.length) * 15 + value * 5;
+                const x = 25 + Math.cos(angle) * distance;
+                const y = 25 + Math.sin(angle) * distance * 0.6;
+                const size = 1 + value * 2;
+                
                 return (
                   <circle
                     key={i}
-                    cx="25"
-                    cy="25"
-                    r={radius}
-                    fill="none"
-                    stroke={colors[i * 2]}
-                    strokeWidth="2"
-                    opacity={0.5 + value * 0.5}
+                    cx={x}
+                    cy={y}
+                    r={size}
+                    fill={colors[i]}
+                    opacity={0.3 + value * 0.7}
                     style={{ transition: 'all 0.15s ease' }}
                   />
                 );
@@ -240,8 +324,68 @@ export default function VisualizerThemePreview({
           </Box>
         );
       
-      // 6: Line Spectrum
-      case 'line-spectrum':
+      // Flower
+      case 'flower':
+        return (
+          <Box sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+          }}>
+            <svg width="50" height="50" viewBox="0 0 50 50">
+              {animationData.map((value, i) => {
+                const angle = (i / animationData.length) * Math.PI * 2;
+                const petalLength = 5 + value * 12;
+                
+                return (
+                  <ellipse
+                    key={i}
+                    cx={25 + Math.cos(angle) * petalLength * 0.3}
+                    cy={25 + Math.sin(angle) * petalLength * 0.3}
+                    rx={petalLength * 0.2}
+                    ry={petalLength * 0.5}
+                    fill={colors[i]}
+                    opacity={0.3 + value * 0.4}
+                    transform={`rotate(${(angle * 180) / Math.PI}, ${25 + Math.cos(angle) * petalLength * 0.3}, ${25 + Math.sin(angle) * petalLength * 0.3})`}
+                    style={{ transition: 'all 0.15s ease' }}
+                  />
+                );
+              })}
+            </svg>
+          </Box>
+        );
+      
+      // Matrix Rain
+      case 'matrix-rain':
+        return (
+          <Box sx={{ 
+            position: 'relative',
+            height: '100%',
+            overflow: 'hidden',
+            fontFamily: 'monospace',
+            fontSize: '8px',
+          }}>
+            {animationData.map((value, i) => (
+              <Box
+                key={i}
+                sx={{
+                  position: 'absolute',
+                  left: `${(i / animationData.length) * 100}%`,
+                  top: `${(1 - value) * 50}%`,
+                  color: colors[0],
+                  opacity: value,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {String.fromCharCode(0x30A0 + Math.floor(Math.random() * 96))}
+              </Box>
+            ))}
+          </Box>
+        );
+      
+      // Aurora
+      case 'aurora':
         return (
           <Box sx={{ 
             position: 'relative',
@@ -250,27 +394,26 @@ export default function VisualizerThemePreview({
           }}>
             <svg width="100%" height="100%" viewBox="0 0 100 40" preserveAspectRatio="none">
               <defs>
-                <linearGradient id={`line-gradient-${visualizerTheme.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                  {colors.map((color, i) => (
-                    <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={color} />
-                  ))}
+                <linearGradient id={`aurora-gradient-${visualizerTheme.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor={colors[0]} stopOpacity="0.4" />
+                  <stop offset="100%" stopColor={colors[0]} stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <path
-                d={`M 0 ${40 - animationData[0] * 35} ${animationData.map((v, i) => 
-                  `L ${(i + 1) * (100 / animationData.length)} ${40 - v * 35}`
-                ).join(' ')}`}
-                fill="none"
-                stroke={`url(#line-gradient-${visualizerTheme.id})`}
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              {[0, 1, 2].map(layer => (
+                <path
+                  key={layer}
+                  d={`M 0 40 ${animationData.map((v, i) => 
+                    `L ${(i + 1) * (100 / animationData.length)} ${40 - v * (25 - layer * 5) - layer * 5}`
+                  ).join(' ')} L 100 40 Z`}
+                  fill={`url(#aurora-gradient-${visualizerTheme.id})`}
+                  opacity={1 - layer * 0.2}
+                />
+              ))}
             </svg>
           </Box>
         );
       
-      // 7: Radial Bars
+      // Radial Bars (Radial Metallic)
       case 'radial-bars':
         return (
           <Box sx={{ 
@@ -280,15 +423,14 @@ export default function VisualizerThemePreview({
             height: '100%',
           }}>
             <svg width="50" height="50" viewBox="0 0 50 50">
-              {Array.from({ length: 16 }).map((_, i) => {
-                const dataIndex = i % animationData.length;
-                const value = animationData[dataIndex];
-                const angle = (i / 16) * Math.PI * 2 - Math.PI / 2;
-                const length = 5 + value * 12;
-                const x1 = 25 + Math.cos(angle) * 6;
-                const y1 = 25 + Math.sin(angle) * 6;
-                const x2 = 25 + Math.cos(angle) * (6 + length);
-                const y2 = 25 + Math.sin(angle) * (6 + length);
+              {animationData.concat(animationData).map((value, i) => {
+                const angle = (i / (animationData.length * 2)) * Math.PI * 2 - Math.PI / 2;
+                const length = 5 + value * 10;
+                const innerR = 6;
+                const x1 = 25 + Math.cos(angle) * innerR;
+                const y1 = 25 + Math.sin(angle) * innerR;
+                const x2 = 25 + Math.cos(angle) * (innerR + length);
+                const y2 = 25 + Math.sin(angle) * (innerR + length);
                 
                 return (
                   <line
@@ -297,91 +439,26 @@ export default function VisualizerThemePreview({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke={colors[dataIndex]}
+                    stroke={colors[i % colors.length]}
                     strokeWidth="2"
                     strokeLinecap="round"
+                    opacity={0.7 + value * 0.3}
                     style={{ transition: 'all 0.15s ease' }}
                   />
                 );
               })}
-              <circle cx="25" cy="25" r="5" fill={colors[0]} opacity="0.5" />
-            </svg>
-          </Box>
-        );
-      
-      // 8: Block Grid (LED equalizer)
-      case 'block-grid':
-        return (
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'flex-end', 
-            height: '100%',
-            gap: '1px',
-            p: 0.5,
-          }}>
-            {animationData.map((value, col) => {
-              const litBlocks = Math.floor(value * 4);
-              return (
-                <Box key={col} sx={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', gap: '1px' }}>
-                  {Array.from({ length: 4 }).map((_, row) => {
-                    const isLit = row < litBlocks;
-                    const color = row < 2 ? '#00FF00' : row < 3 ? '#FFFF00' : '#FF0000';
-                    return (
-                      <Box
-                        key={row}
-                        sx={{
-                          height: 8,
-                          bgcolor: isLit ? color : '#333',
-                          opacity: isLit ? 0.9 : 0.3,
-                          borderRadius: '1px',
-                          transition: 'all 0.1s ease',
-                        }}
-                      />
-                    );
-                  })}
-                </Box>
-              );
-            })}
-          </Box>
-        );
-      
-      // 9: Spiral
-      case 'spiral':
-        const avgValue = animationData.reduce((a, b) => a + b, 0) / animationData.length;
-        return (
-          <Box sx={{ 
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-          }}>
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <defs>
-                <linearGradient id={`spiral-gradient-${visualizerTheme.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                  {colors.map((color, i) => (
-                    <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={color} />
-                  ))}
-                </linearGradient>
-              </defs>
-              <path
-                d={`M 25 25 ${Array.from({ length: 50 }).map((_, i) => {
-                  const t = i / 50;
-                  const angle = t * 6 * Math.PI;
-                  const radius = t * 20 * (0.8 + avgValue * 0.4);
-                  const x = 25 + Math.cos(angle) * radius;
-                  const y = 25 + Math.sin(angle) * radius;
-                  return `L ${x} ${y}`;
-                }).join(' ')}`}
-                fill="none"
-                stroke={`url(#spiral-gradient-${visualizerTheme.id})`}
-                strokeWidth="2"
-                strokeLinecap="round"
+              <circle 
+                cx="25" 
+                cy="25" 
+                r="5" 
+                fill={colors[0]} 
+                opacity="0.5" 
               />
-              <circle cx="25" cy="25" r={3 + avgValue * 3} fill={colors[0]} opacity="0.8" />
             </svg>
           </Box>
         );
       
+      // Default fallback - bars
       default:
         return (
           <Box sx={{ 
@@ -398,7 +475,7 @@ export default function VisualizerThemePreview({
                   flex: 1,
                   height: `${value * 100}%`,
                   bgcolor: colors[i],
-                  borderRadius: '4px',
+                  borderRadius: '2px',
                   transition: 'height 0.15s ease',
                   opacity: 0.8,
                 }}
@@ -413,19 +490,24 @@ export default function VisualizerThemePreview({
     <Box
       onClick={onClick}
       sx={{
-        width: '100%',
         cursor: 'pointer',
         borderRadius: 2,
         overflow: 'hidden',
-        border: '2px solid',
-        borderColor: isSelected ? 'primary.main' : 'transparent',
-        bgcolor: 'background.default',
+        border: isSelected 
+          ? `2px solid ${muiTheme.palette.primary.main}` 
+          : `2px solid transparent`,
+        bgcolor: isSelected 
+          ? `${muiTheme.palette.primary.main}15` 
+          : muiTheme.palette.background.paper,
         transition: 'all 0.2s ease',
-        position: 'relative',
         '&:hover': {
-          borderColor: isSelected ? 'primary.main' : 'action.hover',
           transform: 'scale(1.02)',
+          boxShadow: muiTheme.shadows[4],
+          bgcolor: isSelected 
+            ? `${muiTheme.palette.primary.main}20` 
+            : muiTheme.palette.action.hover,
         },
+        position: 'relative',
       }}
     >
       {/* Selection indicator */}
@@ -433,13 +515,11 @@ export default function VisualizerThemePreview({
         <CheckCircleIcon
           sx={{
             position: 'absolute',
-            top: 4,
-            right: 4,
-            zIndex: 2,
-            color: 'primary.main',
-            fontSize: 18,
-            bgcolor: 'background.paper',
-            borderRadius: '50%',
+            top: 8,
+            right: 8,
+            fontSize: 20,
+            color: muiTheme.palette.primary.main,
+            zIndex: 1,
           }}
         />
       )}
@@ -448,26 +528,58 @@ export default function VisualizerThemePreview({
       <Box
         sx={{
           height: 60,
-          bgcolor: 'rgba(0, 0, 0, 0.3)',
-          position: 'relative',
+          bgcolor: muiTheme.palette.mode === 'dark' 
+            ? 'rgba(0,0,0,0.3)' 
+            : 'rgba(0,0,0,0.05)',
+          overflow: 'hidden',
         }}
       >
         {renderMiniVisualization()}
       </Box>
       
-      {/* Theme name */}
-      <Box sx={{ p: 1, textAlign: 'center' }}>
-        <Typography
-          variant="caption"
-          sx={{
-            fontWeight: isSelected ? 600 : 400,
-            color: isSelected ? 'primary.main' : 'text.secondary',
-            display: 'block',
-            lineHeight: 1.2,
+      {/* Theme info */}
+      <Box sx={{ p: 1.5 }}>
+        <Typography 
+          variant="subtitle2" 
+          sx={{ 
+            fontWeight: isSelected ? 600 : 500,
+            color: isSelected 
+              ? muiTheme.palette.primary.main 
+              : muiTheme.palette.text.primary,
+            mb: 0.5,
           }}
         >
           {visualizerTheme.name}
         </Typography>
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            color: muiTheme.palette.text.secondary,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            lineHeight: 1.3,
+          }}
+        >
+          {visualizerTheme.description}
+        </Typography>
+        
+        {/* Color preview dots */}
+        <Box sx={{ display: 'flex', gap: 0.5, mt: 1 }}>
+          {colors.slice(0, 5).map((color, i) => (
+            <Box
+              key={i}
+              sx={{
+                width: 12,
+                height: 12,
+                bgcolor: color,
+                borderRadius: '50%',
+                border: `1px solid ${muiTheme.palette.divider}`,
+              }}
+            />
+          ))}
+        </Box>
       </Box>
     </Box>
   );

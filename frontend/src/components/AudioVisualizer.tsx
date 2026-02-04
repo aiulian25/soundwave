@@ -1,6 +1,7 @@
 /**
  * Audio Visualizer Component
- * Supports multiple visualization styles and color schemes
+ * Visualizers ported from Lyrique desktop app
+ * Supports 16 visualization styles including Radial Metallic (kept)
  */
 
 import { Box, useTheme } from '@mui/material';
@@ -23,6 +24,44 @@ interface AudioVisualizerProps {
   showGlow?: boolean;
 }
 
+// Particle interface for particle visualizer
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+  color: string;
+}
+
+// Frequency bands helper
+interface FrequencyBands {
+  bass: number;
+  mid: number;
+  high: number;
+}
+
+function getFrequencyBands(data: number[]): FrequencyBands {
+  const len = data.length;
+  const bassEnd = Math.floor(len * 0.15);
+  const midEnd = Math.floor(len * 0.5);
+  
+  let bass = 0, mid = 0, high = 0;
+  for (let i = 0; i < len; i++) {
+    if (i < bassEnd) bass += data[i];
+    else if (i < midEnd) mid += data[i];
+    else high += data[i];
+  }
+  
+  return {
+    bass: bass / bassEnd,
+    mid: mid / (midEnd - bassEnd),
+    high: high / (len - midEnd),
+  };
+}
+
 export default function AudioVisualizer({
   data,
   isPlaying,
@@ -36,6 +75,7 @@ export default function AudioVisualizer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const particlesRef = useRef<Particle[]>([]);
+  const timeRef = useRef<number>(Date.now());
   
   // Get theme configuration
   const visualizerTheme = useMemo(() => getVisualizerTheme(themeId), [themeId]);
@@ -48,17 +88,11 @@ export default function AudioVisualizer({
     [currentColorScheme, data.length, theme.palette.primary.main]
   );
 
-  // Particle type for particle visualizer
-  interface Particle {
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    life: number;
-    maxLife: number;
-    size: number;
-    color: string;
-  }
+  // Primary color for single-color visualizers
+  const primaryColor = useMemo(() => 
+    currentColorScheme === 'theme' ? theme.palette.primary.main : colors[0],
+    [currentColorScheme, theme.palette.primary.main, colors]
+  );
 
   // Create particles
   const createParticle = useCallback((x: number, y: number, intensity: number): Particle => {
@@ -93,47 +127,64 @@ export default function AudioVisualizer({
     const draw = () => {
       const width = rect.width;
       const height = rect.height;
+      const bands = getFrequencyBands(data);
+      timeRef.current = Date.now();
       
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
       
       // Draw based on style
       switch (currentStyle) {
-        case 'classic-bars':
-          drawClassicBars(ctx, data, colors, width, height, showGlow);
+        case 'bars-classic':
+          drawBarsClassic(ctx, data, colors, width, height);
           break;
-        case 'bars-rounded':
-          drawRoundedBars(ctx, data, colors, width, height, showGlow);
+        case 'bars-mirrored':
+          drawBarsMirrored(ctx, data, colors, width, height);
           break;
-        case 'circular-spectrum':
-          drawCircularSpectrum(ctx, data, colors, width, height, showGlow);
+        case 'bars-circular':
+          drawBarsCircular(ctx, data, colors, width, height);
           break;
-        case 'waveform':
-          drawWaveform(ctx, data, colors, width, height, showGlow);
+        case 'wave-line':
+          drawWaveLine(ctx, data, primaryColor, width, height);
           break;
-        case 'symmetric-bars':
-          drawSymmetricBars(ctx, data, colors, width, height, showGlow);
+        case 'wave-fill':
+          drawWaveFill(ctx, data, primaryColor, width, height);
+          break;
+        case 'circle-pulse':
+          drawCirclePulse(ctx, bands, primaryColor, width, height);
+          break;
+        case 'circle-bars':
+          drawCircleBars(ctx, data, colors, width, height);
           break;
         case 'particles':
           drawParticles(ctx, data, colors, width, height, particlesRef, createParticle, isPlaying);
           break;
-        case 'frequency-rings':
-          drawFrequencyRings(ctx, data, colors, width, height, showGlow);
+        case 'dna-helix':
+          drawDnaHelix(ctx, data, primaryColor, width, height, timeRef.current);
           break;
-        case 'line-spectrum':
-          drawLineSpectrum(ctx, data, colors, width, height, showGlow);
+        case 'spectrum':
+          drawSpectrum(ctx, data, primaryColor, width, height);
+          break;
+        case 'oscilloscope':
+          drawOscilloscope(ctx, data, primaryColor, width, height);
+          break;
+        case 'galaxy':
+          drawGalaxy(ctx, data, primaryColor, width, height, timeRef.current);
+          break;
+        case 'flower':
+          drawFlower(ctx, data, colors, width, height, timeRef.current);
+          break;
+        case 'matrix-rain':
+          drawMatrixRain(ctx, data, primaryColor, width, height, timeRef.current);
+          break;
+        case 'aurora':
+          drawAurora(ctx, data, primaryColor, width, height, timeRef.current);
           break;
         case 'radial-bars':
           drawRadialBars(ctx, data, colors, width, height, showGlow);
           break;
-        case 'block-grid':
-          drawBlockGrid(ctx, data, colors, width, height, showGlow);
-          break;
-        case 'spiral':
-          drawSpiral(ctx, data, colors, width, height, showGlow);
-          break;
         default:
-          drawRoundedBars(ctx, data, colors, width, height, showGlow);
+          drawBarsClassic(ctx, data, colors, width, height);
       }
 
       animationRef.current = requestAnimationFrame(draw);
@@ -146,54 +197,8 @@ export default function AudioVisualizer({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [data, colors, currentStyle, showGlow, isPlaying, createParticle]);
+  }, [data, colors, primaryColor, currentStyle, showGlow, isPlaying, createParticle]);
 
-  // Use Box-based fallback for simple bar visualization (for performance on low-end devices)
-  const SimpleBarsVisualizer = useMemo(() => {
-    if (currentStyle !== 'classic-bars' && currentStyle !== 'bars-rounded') return null;
-    
-    return (
-      <Box sx={{ 
-        height, 
-        display: 'flex', 
-        alignItems: 'flex-end', 
-        justifyContent: 'center', 
-        gap: 0.5, 
-        width: '100%',
-        px: 2,
-      }}>
-        {data.map((value, i) => {
-          const barHeight = 15 + (value * 80);
-          const isRounded = currentStyle === 'bars-rounded';
-          
-          return (
-            <Box
-              key={i}
-              sx={{
-                flex: 1,
-                maxWidth: 12,
-                minWidth: 4,
-                bgcolor: colors[i],
-                borderRadius: isRounded ? '8px' : '4px 4px 0 0',
-                height: `${barHeight}%`,
-                opacity: 0.7 + value * 0.3,
-                transition: 'height 0.08s ease-out, opacity 0.15s ease',
-                boxShadow: showGlow && value > 0.6 
-                  ? `0 0 12px ${colors[i]}80` 
-                  : 'none',
-                '&:hover': {
-                  transform: 'scaleX(1.2)',
-                  opacity: 1,
-                },
-              }}
-            />
-          );
-        })}
-      </Box>
-    );
-  }, [data, colors, currentStyle, height, showGlow]);
-
-  // For canvas-based visualizers
   return (
     <Box sx={{ width: '100%', height, position: 'relative' }}>
       <canvas
@@ -208,247 +213,197 @@ export default function AudioVisualizer({
   );
 }
 
-// Drawing functions for different visualizer styles
+// ============================================
+// VISUALIZER DRAWING FUNCTIONS (from Lyrique)
+// ============================================
 
-// 0: Classic Bars - Traditional frequency spectrum with rainbow-colored vertical bars
-function drawClassicBars(
+// Bars Classic - Traditional frequency spectrum
+function drawBarsClassic(
   ctx: CanvasRenderingContext2D,
   data: number[],
   colors: string[],
   width: number,
-  height: number,
-  showGlow: boolean
+  height: number
 ) {
-  const barWidth = (width / data.length) * 0.8;
-  const gap = (width / data.length) * 0.2;
+  const bufferLength = data.length;
+  const barWidth = width / bufferLength;
 
-  data.forEach((value, i) => {
-    const barHeight = value * height * 0.9;
-    const x = i * (barWidth + gap) + gap / 2;
-    const y = height - barHeight;
-    
-    ctx.fillStyle = colors[i];
-    ctx.globalAlpha = 0.8 + value * 0.2;
-    
-    if (showGlow && value > 0.5) {
-      ctx.shadowColor = colors[i];
-      ctx.shadowBlur = 20 * value;
-    } else {
-      ctx.shadowBlur = 0;
-    }
-    
-    ctx.fillRect(x, y, barWidth, barHeight);
-  });
-  
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
+  for (let i = 0; i < bufferLength; i++) {
+    const barHeight = data[i] * height * 0.9;
+    const x = i * barWidth;
+    const hue = (i / bufferLength) * 60 + 170;
+    ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+    ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
+  }
 }
 
-// User Favorite: Rounded Bars - Soft rounded bars with smooth animations
-function drawRoundedBars(
+// Bars Mirrored - Mirrored bars from center
+function drawBarsMirrored(
   ctx: CanvasRenderingContext2D,
   data: number[],
   colors: string[],
   width: number,
-  height: number,
-  showGlow: boolean
+  height: number
 ) {
-  const barWidth = (width / data.length) * 0.7;
-  const gap = (width / data.length) * 0.3;
+  const bufferLength = data.length;
+  const barWidth = width / bufferLength;
+  const centerY = height / 2;
 
-  data.forEach((value, i) => {
-    const barHeight = Math.max(value * height * 0.85, 4);
-    const x = i * (barWidth + gap) + gap / 2;
-    const y = height - barHeight;
-    
-    ctx.fillStyle = colors[i];
-    ctx.globalAlpha = 0.7 + value * 0.3;
-    
-    if (showGlow && value > 0.5) {
-      ctx.shadowColor = colors[i];
-      ctx.shadowBlur = 15 * value;
-    } else {
-      ctx.shadowBlur = 0;
-    }
-    
-    const radius = Math.min(barWidth / 2, 8);
-    ctx.beginPath();
-    ctx.roundRect(x, y, barWidth, barHeight, [radius, radius, 0, 0]);
-    ctx.fill();
-  });
-  
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
+  for (let i = 0; i < bufferLength; i++) {
+    const barHeight = data[i] * height * 0.45;
+    const x = i * barWidth;
+    const hue = (i / bufferLength) * 60 + 170;
+    ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+    ctx.fillRect(x, centerY - barHeight, barWidth - 1, barHeight * 2);
+  }
 }
 
-// 1: Circular Spectrum - Bars arranged in a circle radiating outward
-function drawCircularSpectrum(
+// Bars Circular - Bars arranged in a circle
+function drawBarsCircular(
   ctx: CanvasRenderingContext2D,
   data: number[],
   colors: string[],
   width: number,
-  height: number,
-  showGlow: boolean
+  height: number
 ) {
   const centerX = width / 2;
   const centerY = height / 2;
-  const baseRadius = Math.min(width, height) * 0.2;
-  const maxRadius = Math.min(width, height) * 0.45;
-  
-  data.forEach((value, i) => {
-    const angle = (i / data.length) * Math.PI * 2 - Math.PI / 2;
-    const barLength = value * (maxRadius - baseRadius) + 5;
-    
-    const x1 = centerX + Math.cos(angle) * baseRadius;
-    const y1 = centerY + Math.sin(angle) * baseRadius;
-    const x2 = centerX + Math.cos(angle) * (baseRadius + barLength);
-    const y2 = centerY + Math.sin(angle) * (baseRadius + barLength);
-    
-    ctx.strokeStyle = colors[i];
-    ctx.lineWidth = Math.max(3, (width / data.length) * 0.6);
-    ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.7 + value * 0.3;
-    
-    if (showGlow && value > 0.5) {
-      ctx.shadowColor = colors[i];
-      ctx.shadowBlur = 15 * value;
-    }
+  const numBars = 64;
+  const bufferLength = data.length;
+
+  for (let i = 0; i < numBars; i++) {
+    const dataIndex = Math.floor(i * bufferLength / numBars);
+    const barHeight = data[dataIndex] * 35 + 5;
+    const angle = (i / numBars) * Math.PI * 2 - Math.PI / 2;
+    const innerRadius = Math.min(width, height) * 0.15;
     
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(
+      centerX + Math.cos(angle) * innerRadius,
+      centerY + Math.sin(angle) * innerRadius
+    );
+    ctx.lineTo(
+      centerX + Math.cos(angle) * (innerRadius + barHeight),
+      centerY + Math.sin(angle) * (innerRadius + barHeight)
+    );
+    const hue = (i / numBars) * 60 + 170;
+    ctx.strokeStyle = `hsl(${hue}, 70%, 50%)`;
+    ctx.lineWidth = 3;
     ctx.stroke();
-  });
-  
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
-  
-  // Draw center circle
-  const avgValue = data.reduce((a, b) => a + b, 0) / data.length;
-  ctx.fillStyle = colors[0];
-  ctx.globalAlpha = 0.3 + avgValue * 0.3;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, baseRadius * 0.7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  }
 }
 
-// 2: Waveform - Real-time audio waveform display (oscilloscope style)
-function drawWaveform(
+// Wave Line - Oscilloscope style line
+function drawWaveLine(
   ctx: CanvasRenderingContext2D,
   data: number[],
-  colors: string[],
+  color: string,
   width: number,
-  height: number,
-  showGlow: boolean
+  height: number
 ) {
   const centerY = height / 2;
-  const segmentWidth = width / (data.length - 1);
-  
-  // Create gradient
-  const gradient = ctx.createLinearGradient(0, 0, width, 0);
-  colors.forEach((color, i) => {
-    gradient.addColorStop(i / (colors.length - 1), color);
-  });
-  
-  ctx.strokeStyle = gradient;
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  
-  if (showGlow) {
-    ctx.shadowColor = colors[Math.floor(colors.length / 2)];
-    ctx.shadowBlur = 15;
-  }
-  
-  // Draw main waveform
-  ctx.beginPath();
-  
-  for (let i = 0; i < data.length; i++) {
-    const x = i * segmentWidth;
-    const amplitude = data[i] * height * 0.4;
-    const y = centerY + Math.sin(i * 0.3 + Date.now() * 0.002) * amplitude;
-    
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      const prevX = (i - 1) * segmentWidth;
-      const cpX = (prevX + x) / 2;
-      ctx.quadraticCurveTo(prevX, ctx.getTransform().f, cpX, y);
-    }
-  }
-  
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  
-  // Draw filled area
-  ctx.lineTo(width, centerY);
-  ctx.lineTo(0, centerY);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.globalAlpha = 0.15;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-}
+  const bufferLength = data.length;
 
-// 3: Symmetric Bars - Mirrored bars extending from center (top & bottom)
-function drawSymmetricBars(
-  ctx: CanvasRenderingContext2D,
-  data: number[],
-  colors: string[],
-  width: number,
-  height: number,
-  showGlow: boolean
-) {
-  const barWidth = (width / data.length) * 0.7;
-  const gap = (width / data.length) * 0.3;
-  const centerY = height / 2;
-  
-  data.forEach((value, i) => {
-    const barHeight = value * height * 0.45;
-    const x = i * (barWidth + gap) + gap / 2;
-    
-    ctx.fillStyle = colors[i];
-    ctx.globalAlpha = 0.7 + value * 0.3;
-    
-    if (showGlow && value > 0.5) {
-      ctx.shadowColor = colors[i];
-      ctx.shadowBlur = 15 * value;
-    }
-    
-    // Top bar (going up from center)
-    ctx.fillRect(x, centerY - barHeight, barWidth, barHeight);
-    
-    // Bottom bar (going down from center)
-    ctx.fillRect(x, centerY, barWidth, barHeight);
-  });
-  
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
-  
-  // Draw center line
-  ctx.strokeStyle = colors[Math.floor(colors.length / 2)];
-  ctx.lineWidth = 2;
-  ctx.globalAlpha = 0.4;
   ctx.beginPath();
   ctx.moveTo(0, centerY);
-  ctx.lineTo(width, centerY);
+  for (let i = 0; i < bufferLength; i++) {
+    const x = (i / bufferLength) * width;
+    const y = centerY + ((data[i] - 0.5) * 2) * (height / 2) * 0.8;
+    ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
   ctx.stroke();
+}
+
+// Wave Fill - Filled waveform with gradient
+function drawWaveFill(
+  ctx: CanvasRenderingContext2D,
+  data: number[],
+  color: string,
+  width: number,
+  height: number
+) {
+  const bufferLength = data.length;
+
+  ctx.beginPath();
+  ctx.moveTo(0, height);
+  for (let i = 0; i < bufferLength; i++) {
+    const x = (i / bufferLength) * width;
+    const y = height - data[i] * height * 0.9;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(width, height);
+  ctx.closePath();
+  
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, color + 'CC');
+  gradient.addColorStop(1, color + '1A');
+  ctx.fillStyle = gradient;
+  ctx.fill();
+}
+
+// Circle Pulse - Pulsing rings based on bass/mids
+function drawCirclePulse(
+  ctx: CanvasRenderingContext2D,
+  bands: FrequencyBands,
+  color: string,
+  width: number,
+  height: number
+) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const maxRadius = Math.min(width, height) * 0.4;
+
+  // Outer ring based on bass
+  const pulseRadius = 15 + bands.bass * maxRadius;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, pulseRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.3 + bands.bass * 0.7;
+  ctx.lineWidth = 2 + bands.bass * 4;
+  ctx.stroke();
+  
+  // Inner ring based on mids
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, pulseRadius * 0.6, 0, Math.PI * 2);
+  ctx.globalAlpha = 0.2 + bands.mid * 0.5;
+  ctx.lineWidth = 1 + bands.mid * 2;
+  ctx.stroke();
+  
   ctx.globalAlpha = 1;
 }
 
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  size: number;
-  color: string;
+// Circle Bars - Circular bars radiating from center
+function drawCircleBars(
+  ctx: CanvasRenderingContext2D,
+  data: number[],
+  colors: string[],
+  width: number,
+  height: number
+) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const numBars = 48;
+  const bufferLength = data.length;
+  const innerR = Math.min(width, height) * 0.12;
+
+  for (let i = 0; i < numBars; i++) {
+    const dataIndex = Math.floor(i * bufferLength / numBars);
+    const barH = data[dataIndex] * 30 + 5;
+    const angle = (i / numBars) * Math.PI * 2 - Math.PI / 2;
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX + Math.cos(angle) * innerR, centerY + Math.sin(angle) * innerR);
+    ctx.lineTo(centerX + Math.cos(angle) * (innerR + barH), centerY + Math.sin(angle) * (innerR + barH));
+    const hue = 175 + data[dataIndex] * 30;
+    ctx.strokeStyle = `hsl(${hue}, 70%, 50%)`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
 }
 
-// 4: Particles - Random particles that appear based on audio intensity
+// Particles - Floating particles based on audio
 function drawParticles(
   ctx: CanvasRenderingContext2D,
   data: number[],
@@ -459,11 +414,13 @@ function drawParticles(
   createParticle: (x: number, y: number, intensity: number) => Particle,
   isPlaying: boolean
 ) {
+  const bands = getFrequencyBands(data);
+  
   // Update and draw existing particles
   particlesRef.current = particlesRef.current.filter(p => {
     p.x += p.vx;
     p.y += p.vy;
-    p.vy += 0.03; // lighter gravity
+    p.vy += 0.03;
     p.life -= 0.015;
     
     if (p.life <= 0) return false;
@@ -474,131 +431,257 @@ function drawParticles(
     ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2);
     ctx.fill();
     
-    // Add glow effect
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = 10;
-    
     return true;
   });
   
   ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
   
-  // Create new particles based on audio data
+  // Create new particles
   if (isPlaying) {
-    data.forEach((value, i) => {
-      if (value > 0.25 && Math.random() < value * 0.4) {
-        const x = (i / data.length) * width + Math.random() * 30 - 15;
-        const y = height - value * height * 0.6;
-        particlesRef.current.push(createParticle(x, y, value));
+    const particleCount = Math.floor(20 + bands.bass * 40);
+    for (let i = 0; i < particleCount; i++) {
+      const dataIndex = Math.floor(i * data.length / particleCount);
+      const x = (i / particleCount) * width + (Math.random() - 0.5) * 20;
+      const y = height - data[dataIndex] * height * 0.9;
+      const size = data[dataIndex] * 6 + 1;
+      const alpha = data[dataIndex];
+      
+      if (Math.random() < data[dataIndex] * 0.3) {
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fillStyle = colors[dataIndex % colors.length];
+        ctx.globalAlpha = alpha;
+        ctx.fill();
       }
-    });
-    
-    // Limit particles
-    if (particlesRef.current.length > 300) {
-      particlesRef.current = particlesRef.current.slice(-300);
     }
+    ctx.globalAlpha = 1;
   }
 }
 
-// 5: Frequency Rings - Concentric circles that grow based on frequency data
-function drawFrequencyRings(
+// DNA Helix - Animated double helix
+function drawDnaHelix(
   ctx: CanvasRenderingContext2D,
   data: number[],
-  colors: string[],
+  color: string,
   width: number,
   height: number,
-  showGlow: boolean
+  time: number
+) {
+  const centerY = height / 2;
+  const timeOffset = time / 500;
+  const bufferLength = data.length;
+
+  for (let i = 0; i < width; i += 8) {
+    const dataIndex = Math.floor((i / width) * bufferLength);
+    const amplitude = data[dataIndex] * 25 + 10;
+    const y1 = centerY + Math.sin(i / 20 + timeOffset) * amplitude;
+    const y2 = centerY - Math.sin(i / 20 + timeOffset) * amplitude;
+    
+    // Top strand
+    ctx.beginPath();
+    ctx.arc(i, y1, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    
+    // Bottom strand
+    ctx.beginPath();
+    ctx.arc(i, y2, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    
+    // Connector
+    ctx.beginPath();
+    ctx.moveTo(i, y1);
+    ctx.lineTo(i, y2);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Spectrum - Classic spectrum analyzer
+function drawSpectrum(
+  ctx: CanvasRenderingContext2D,
+  data: number[],
+  color: string,
+  width: number,
+  height: number
+) {
+  const bufferLength = data.length;
+  const barWidth = width / bufferLength;
+
+  const gradient = ctx.createLinearGradient(0, height, 0, 0);
+  gradient.addColorStop(0, color);
+  gradient.addColorStop(0.5, color + 'CC');
+  gradient.addColorStop(1, color + '80');
+  
+  ctx.fillStyle = gradient;
+  for (let i = 0; i < bufferLength; i++) {
+    const barH = data[i] * height * 0.9;
+    ctx.fillRect(i * barWidth, height - barH, barWidth - 1, barH);
+  }
+}
+
+// Oscilloscope - Real oscilloscope with glow
+function drawOscilloscope(
+  ctx: CanvasRenderingContext2D,
+  data: number[],
+  color: string,
+  width: number,
+  height: number
+) {
+  const centerY = height / 2;
+  const bufferLength = data.length;
+
+  ctx.beginPath();
+  ctx.moveTo(0, centerY);
+  for (let i = 0; i < bufferLength; i++) {
+    const x = (i / bufferLength) * width;
+    const y = centerY + ((data[i] - 0.5) * 2) * centerY * 0.8;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // Glow effect
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+// Galaxy - Spiral galaxy pattern
+function drawGalaxy(
+  ctx: CanvasRenderingContext2D,
+  data: number[],
+  color: string,
+  width: number,
+  height: number,
+  time: number
 ) {
   const centerX = width / 2;
   const centerY = height / 2;
-  const maxRadius = Math.min(width, height) * 0.45;
-  
-  // Draw rings from outside to inside
-  const numRings = Math.min(data.length, 8);
-  
-  for (let i = numRings - 1; i >= 0; i--) {
-    const value = data[Math.floor(i * data.length / numRings)];
-    const baseRadius = (i + 1) * (maxRadius / numRings);
-    const ringRadius = baseRadius * (0.8 + value * 0.4);
-    
-    ctx.strokeStyle = colors[i % colors.length];
-    ctx.lineWidth = 3 + value * 4;
-    ctx.globalAlpha = 0.5 + value * 0.5;
-    
-    if (showGlow && value > 0.4) {
-      ctx.shadowColor = colors[i % colors.length];
-      ctx.shadowBlur = 20 * value;
-    }
+  const galaxyTime = time / 1000;
+  const bufferLength = data.length;
+
+  for (let i = 0; i < 80; i++) {
+    const angle = (i / 80) * Math.PI * 4 + galaxyTime;
+    const dataIndex = Math.floor((i / 80) * bufferLength);
+    const distance = 10 + (i / 80) * 40 + data[dataIndex] * 15;
+    const x = centerX + Math.cos(angle) * distance;
+    const y = centerY + Math.sin(angle) * distance * 0.6;
+    const size = data[dataIndex] * 3 + 1;
+    const alpha = 0.3 + data[dataIndex] * 0.7;
     
     ctx.beginPath();
-    ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.fill();
   }
-  
   ctx.globalAlpha = 1;
 }
 
-// 6: Line Spectrum - Smooth line graph with gradient colors (purple → blue → green)
-function drawLineSpectrum(
+// Flower - Pulsing flower petals
+function drawFlower(
   ctx: CanvasRenderingContext2D,
   data: number[],
   colors: string[],
   width: number,
   height: number,
-  showGlow: boolean
+  time: number
 ) {
-  const segmentWidth = width / (data.length - 1);
-  
-  // Create gradient
-  const gradient = ctx.createLinearGradient(0, 0, width, 0);
-  colors.forEach((color, i) => {
-    gradient.addColorStop(i / (colors.length - 1), color);
-  });
-  
-  ctx.strokeStyle = gradient;
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  
-  if (showGlow) {
-    ctx.shadowColor = colors[Math.floor(colors.length / 2)];
-    ctx.shadowBlur = 20;
-  }
-  
-  // Draw smooth line
-  ctx.beginPath();
-  
-  for (let i = 0; i < data.length; i++) {
-    const x = i * segmentWidth;
-    const y = height - (data[i] * height * 0.85) - 10;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const petalCount = 12;
+  const bufferLength = data.length;
+
+  for (let p = 0; p < petalCount; p++) {
+    const dataIndex = Math.floor((p / petalCount) * bufferLength);
+    const petalLength = 15 + data[dataIndex] * 30;
+    const angle = (p / petalCount) * Math.PI * 2 + time / 3000;
     
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      const prevX = (i - 1) * segmentWidth;
-      const prevY = height - (data[i - 1] * height * 0.85) - 10;
-      const cpX = (prevX + x) / 2;
-      ctx.quadraticCurveTo(prevX, prevY, cpX, (prevY + y) / 2);
-      ctx.quadraticCurveTo(cpX, y, x, y);
+    ctx.beginPath();
+    ctx.ellipse(
+      centerX + Math.cos(angle) * petalLength * 0.3,
+      centerY + Math.sin(angle) * petalLength * 0.3,
+      petalLength * 0.2, petalLength * 0.6,
+      angle, 0, Math.PI * 2
+    );
+    const hue = 175 + (p / petalCount) * 30;
+    ctx.fillStyle = `hsla(${hue}, 70%, 50%, ${0.3 + data[dataIndex] * 0.4})`;
+    ctx.fill();
+  }
+}
+
+// Matrix Rain - Falling characters
+function drawMatrixRain(
+  ctx: CanvasRenderingContext2D,
+  data: number[],
+  color: string,
+  width: number,
+  height: number,
+  time: number
+) {
+  ctx.font = '10px monospace';
+  const cols = Math.floor(width / 12);
+  const bufferLength = data.length;
+
+  for (let i = 0; i < cols; i++) {
+    const x = i * 12;
+    const dataIndex = Math.floor((i / cols) * bufferLength);
+    const chars = Math.floor(data[dataIndex] * 6) + 2;
+    
+    for (let j = 0; j < chars; j++) {
+      const char = String.fromCharCode(0x30A0 + Math.random() * 96);
+      const alpha = (1 - j / chars) * data[dataIndex];
+      ctx.fillStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.fillText(char, x, (j + 1) * 12 + ((time / 50 + i * 20) % height));
     }
   }
-  
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  
-  // Draw filled area
-  ctx.lineTo(width, height);
-  ctx.lineTo(0, height);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.globalAlpha = 0.2;
-  ctx.fill();
   ctx.globalAlpha = 1;
 }
 
-// 7: Radial Bars - Bars radiating from a central circle outward
+// Aurora - Northern lights wave
+function drawAurora(
+  ctx: CanvasRenderingContext2D,
+  data: number[],
+  color: string,
+  width: number,
+  height: number,
+  time: number
+) {
+  const bufferLength = data.length;
+
+  for (let layer = 0; layer < 3; layer++) {
+    ctx.beginPath();
+    ctx.moveTo(0, height);
+    for (let i = 0; i <= width; i += 8) {
+      const dataIndex = Math.floor((i / width) * bufferLength);
+      const wave = Math.sin(i / 40 + time / (800 + layer * 150) + layer) * 15;
+      const y = height - data[dataIndex] * (60 - layer * 15) - wave - layer * 15;
+      ctx.lineTo(i, y);
+    }
+    ctx.lineTo(width, height);
+    ctx.closePath();
+    
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    const alphaHex = Math.floor((0.4 - layer * 0.1) * 255).toString(16).padStart(2, '0');
+    gradient.addColorStop(0, color + alphaHex);
+    gradient.addColorStop(1, color + '00');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+  }
+}
+
+// Radial Bars (KEPT - Radial Metallic)
 function drawRadialBars(
   ctx: CanvasRenderingContext2D,
   data: number[],
@@ -611,8 +694,8 @@ function drawRadialBars(
   const centerY = height / 2;
   const innerRadius = Math.min(width, height) * 0.15;
   const maxLength = Math.min(width, height) * 0.35;
-  const numBars = data.length * 2; // Double for full circle
-  
+  const numBars = data.length * 2;
+
   for (let i = 0; i < numBars; i++) {
     const dataIndex = i % data.length;
     const value = data[dataIndex];
@@ -624,7 +707,6 @@ function drawRadialBars(
     const x2 = centerX + Math.cos(angle) * (innerRadius + barLength);
     const y2 = centerY + Math.sin(angle) * (innerRadius + barLength);
     
-    // Create gradient for each bar
     const barGradient = ctx.createLinearGradient(x1, y1, x2, y2);
     barGradient.addColorStop(0, colors[dataIndex % colors.length]);
     barGradient.addColorStop(1, colors[(dataIndex + 1) % colors.length]);
@@ -657,138 +739,6 @@ function drawRadialBars(
   ctx.globalAlpha = 0.4 + avgValue * 0.3;
   ctx.beginPath();
   ctx.arc(centerX, centerY, innerRadius * 0.9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-}
-
-// 8: Block Grid - 16×8 pixel-art style grid like an equalizer LED display
-function drawBlockGrid(
-  ctx: CanvasRenderingContext2D,
-  data: number[],
-  colors: string[],
-  width: number,
-  height: number,
-  showGlow: boolean
-) {
-  const cols = 16;
-  const rows = 8;
-  const blockWidth = (width / cols) * 0.85;
-  const blockHeight = (height / rows) * 0.85;
-  const gapX = (width / cols) * 0.15;
-  const gapY = (height / rows) * 0.15;
-  
-  // Map data to columns
-  const step = data.length / cols;
-  
-  for (let col = 0; col < cols; col++) {
-    const dataIndex = Math.floor(col * step);
-    const value = data[dataIndex];
-    const litBlocks = Math.floor(value * rows);
-    
-    for (let row = 0; row < rows; row++) {
-      const x = col * (blockWidth + gapX) + gapX / 2;
-      const y = height - (row + 1) * (blockHeight + gapY);
-      
-      const isLit = row < litBlocks;
-      
-      // Color gradient from green (bottom) to yellow (middle) to red (top)
-      let blockColor: string;
-      if (row < 3) {
-        blockColor = '#00FF00'; // Green
-      } else if (row < 6) {
-        blockColor = '#FFFF00'; // Yellow
-      } else {
-        blockColor = '#FF0000'; // Red
-      }
-      
-      if (isLit) {
-        ctx.fillStyle = blockColor;
-        ctx.globalAlpha = 0.9;
-        
-        if (showGlow) {
-          ctx.shadowColor = blockColor;
-          ctx.shadowBlur = 8;
-        }
-      } else {
-        ctx.fillStyle = '#333333';
-        ctx.globalAlpha = 0.3;
-        ctx.shadowBlur = 0;
-      }
-      
-      ctx.beginPath();
-      ctx.roundRect(x, y, blockWidth, blockHeight, 2);
-      ctx.fill();
-    }
-  }
-  
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
-}
-
-// 9: Spiral - Dynamic spiral pattern that expands based on audio
-function drawSpiral(
-  ctx: CanvasRenderingContext2D,
-  data: number[],
-  colors: string[],
-  width: number,
-  height: number,
-  showGlow: boolean
-) {
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const maxRadius = Math.min(width, height) * 0.45;
-  const avgValue = data.reduce((a, b) => a + b, 0) / data.length;
-  const time = Date.now() * 0.001;
-  
-  // Create spiral gradient
-  const gradient = ctx.createLinearGradient(0, 0, width, height);
-  colors.forEach((color, i) => {
-    gradient.addColorStop(i / (colors.length - 1), color);
-  });
-  
-  ctx.strokeStyle = gradient;
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  
-  if (showGlow) {
-    ctx.shadowColor = colors[Math.floor(colors.length / 2)];
-    ctx.shadowBlur = 15;
-  }
-  
-  // Draw spiral
-  ctx.beginPath();
-  
-  const spiralTurns = 3;
-  const points = 200;
-  
-  for (let i = 0; i < points; i++) {
-    const t = i / points;
-    const angle = t * spiralTurns * Math.PI * 2 + time;
-    const dataIndex = Math.floor(t * data.length);
-    const audioMod = 1 + data[dataIndex] * 0.5;
-    const radius = t * maxRadius * audioMod * (0.7 + avgValue * 0.5);
-    
-    const x = centerX + Math.cos(angle) * radius;
-    const y = centerY + Math.sin(angle) * radius;
-    
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-    
-    ctx.globalAlpha = 0.3 + t * 0.7;
-  }
-  
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
-  
-  // Draw center dot
-  ctx.fillStyle = colors[0];
-  ctx.globalAlpha = 0.8;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, 5 + avgValue * 10, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
 }
