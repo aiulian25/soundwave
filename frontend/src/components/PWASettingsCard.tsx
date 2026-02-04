@@ -177,9 +177,29 @@ const PWASettingsCard: React.FC = () => {
               </Button>
             </Box>
           ) : (
-            <Alert severity="info">
-              Installation not available. You may already be using the installed app or your browser doesn't support PWA installation.
-            </Alert>
+            <Box>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  <strong>To install SoundWave:</strong>
+                </Typography>
+                <Typography variant="caption" component="div">
+                  <strong>Chrome/Edge:</strong> Click the install icon (⊕) in the address bar, or Menu → "Install SoundWave"
+                </Typography>
+                <Typography variant="caption" component="div">
+                  <strong>Safari (iOS):</strong> Tap Share → "Add to Home Screen"
+                </Typography>
+                <Typography variant="caption" component="div">
+                  <strong>Firefox:</strong> Menu → "Install" (if available)
+                </Typography>
+              </Alert>
+              <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
+                Requirements: HTTPS connection, valid manifest, service worker
+              </Typography>
+              <Typography variant="caption" color="textSecondary" display="block">
+                Status: {window.location.protocol === 'https:' || window.location.hostname === 'localhost' ? '✅ Secure context' : '❌ Not HTTPS'} | 
+                {'serviceWorker' in navigator ? ' ✅ SW supported' : ' ❌ No SW support'}
+              </Typography>
+            </Box>
           )}
         </Box>
 

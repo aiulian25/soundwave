@@ -23,8 +23,15 @@ class PWAManager {
   }
 
   private init() {
+    console.log('[PWA] Initializing PWAManager...');
+    console.log('[PWA] Protocol:', window.location.protocol);
+    console.log('[PWA] Hostname:', window.location.hostname);
+    console.log('[PWA] Secure context:', window.isSecureContext);
+    console.log('[PWA] Service Worker support:', 'serviceWorker' in navigator);
+    
     // Check if already installed
-    this.checkIfInstalled();
+    const installed = this.checkIfInstalled();
+    console.log('[PWA] Already installed:', installed);
 
     // Check if prompt was captured early (before React loaded)
     if ((window as any).deferredPWAPrompt) {
@@ -32,6 +39,8 @@ class PWAManager {
       console.log('[PWA] Using early-captured install prompt');
       // Emit after a tick to allow listeners to be set up
       setTimeout(() => this.emit('canInstall', true), 0);
+    } else {
+      console.log('[PWA] No early-captured install prompt found');
     }
 
     // Listen for install prompt (in case it fires after React loads)
@@ -98,7 +107,13 @@ class PWAManager {
    */
   async registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
     if (!('serviceWorker' in navigator)) {
-      // Silently return for non-HTTPS environments
+      console.warn('[PWA] Service Worker not supported');
+      return null;
+    }
+
+    // Check if we're in a secure context
+    if (!window.isSecureContext) {
+      console.warn('[PWA] Not in a secure context (HTTPS required)');
       return null;
     }
 
@@ -107,7 +122,8 @@ class PWAManager {
         scope: '/',
       });
 
-      console.log('Service Worker registered:', this.registration);
+      console.log('[PWA] Service Worker registered:', this.registration);
+      console.log('[PWA] SW State:', this.registration.active?.state || 'no active worker');
 
       // Check for updates
       this.registration.addEventListener('updatefound', () => {
