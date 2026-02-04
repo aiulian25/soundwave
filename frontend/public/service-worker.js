@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v10';
+const CACHE_NAME = 'soundwave-v11';
 const API_CACHE_NAME = 'soundwave-api-v3';
-const AUDIO_CACHE_NAME = 'soundwave-audio-v2';
+const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
 const IMAGE_CACHE_NAME = 'soundwave-images-v2';
 
 // Assets to cache on install
@@ -192,39 +192,38 @@ async function cacheFirstStrategy(request, cacheName) {
   }
 }
 
-// Audio-specific cache first strategy with better URL matching
+// Audio-specific cache first strategy with better URL matching and range request support
 async function audioCacheFirstStrategy(request) {
   const url = new URL(request.url);
   
+  // Check for range requests (iOS Safari uses these for audio seeking)
+  const rangeHeader = request.headers.get('range');
+  
   // Try exact match first
   const audioCache = await caches.open(AUDIO_CACHE_NAME);
-  let cachedResponse = await audioCache.match(request);
+  let cachedResponse = await audioCache.match(request, { ignoreSearch: true });
+  
+  if (!cachedResponse) {
+    // Try matching just the pathname (without query params)
+    cachedResponse = await audioCache.match(url.pathname);
+  }
+  
+  if (!cachedResponse) {
+    // Try matching with trailing slash variation
+    const pathWithSlash = url.pathname.endsWith('/') ? url.pathname : url.pathname + '/';
+    const pathWithoutSlash = url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
+    
+    cachedResponse = await audioCache.match(pathWithSlash) || await audioCache.match(pathWithoutSlash);
+  }
   
   if (cachedResponse) {
     console.log('[Service Worker] Serving cached audio:', url.pathname);
-    return cachedResponse;
-  }
-  
-  // Try matching just the pathname (without query params)
-  cachedResponse = await audioCache.match(url.pathname);
-  if (cachedResponse) {
-    console.log('[Service Worker] Serving cached audio (pathname match):', url.pathname);
-    return cachedResponse;
-  }
-  
-  // Try matching with trailing slash variation
-  const pathWithSlash = url.pathname.endsWith('/') ? url.pathname : url.pathname + '/';
-  const pathWithoutSlash = url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
-  
-  cachedResponse = await audioCache.match(pathWithSlash);
-  if (cachedResponse) {
-    console.log('[Service Worker] Serving cached audio (with slash):', pathWithSlash);
-    return cachedResponse;
-  }
-  
-  cachedResponse = await audioCache.match(pathWithoutSlash);
-  if (cachedResponse) {
-    console.log('[Service Worker] Serving cached audio (without slash):', pathWithoutSlash);
+    
+    // Handle range requests for cached audio (critical for iOS Safari)
+    if (rangeHeader) {
+      return handleRangeRequest(cachedResponse, rangeHeader);
+    }
+    
     return cachedResponse;
   }
   
@@ -249,6 +248,54 @@ async function audioCacheFirstStrategy(request) {
       statusText: 'Service Unavailable',
       headers: { 'Content-Type': 'application/json' }
     });
+  }
+}
+
+// Handle range requests for cached audio (required for iOS Safari seeking)
+async function handleRangeRequest(cachedResponse, rangeHeader) {
+  try {
+    const arrayBuffer = await cachedResponse.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const totalLength = bytes.length;
+    
+    // Parse range header: "bytes=0-" or "bytes=123-456"
+    const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+    if (!rangeMatch) {
+      // Invalid range header, return full response
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': cachedResponse.headers.get('Content-Type') || 'audio/mpeg',
+          'Content-Length': totalLength.toString(),
+          'Accept-Ranges': 'bytes',
+        }
+      });
+    }
+    
+    let start = rangeMatch[1] ? parseInt(rangeMatch[1], 10) : 0;
+    let end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalLength - 1;
+    
+    // Clamp values
+    start = Math.max(0, Math.min(start, totalLength - 1));
+    end = Math.max(start, Math.min(end, totalLength - 1));
+    
+    const slicedBytes = bytes.slice(start, end + 1);
+    
+    console.log(`[Service Worker] Range request: bytes ${start}-${end}/${totalLength}`);
+    
+    return new Response(slicedBytes, {
+      status: 206,
+      statusText: 'Partial Content',
+      headers: {
+        'Content-Type': cachedResponse.headers.get('Content-Type') || 'audio/mpeg',
+        'Content-Length': slicedBytes.length.toString(),
+        'Content-Range': `bytes ${start}-${end}/${totalLength}`,
+        'Accept-Ranges': 'bytes',
+      }
+    });
+  } catch (error) {
+    console.error('[Service Worker] Range request handling failed:', error);
+    return cachedResponse;
   }
 }
 

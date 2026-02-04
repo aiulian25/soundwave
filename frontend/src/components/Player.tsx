@@ -482,6 +482,28 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     }
   }, [shouldSleepStop, setIsPlaying]);
 
+  // iOS Audio Context resume - Safari requires user interaction to start AudioContext
+  useEffect(() => {
+    const resumeAudioContext = () => {
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        console.log('[Player] Resuming suspended AudioContext (iOS)');
+        audioContextRef.current.resume().catch(console.error);
+      }
+    };
+    
+    // Resume on user interaction
+    const events = ['touchstart', 'touchend', 'click', 'keydown'];
+    events.forEach(event => {
+      document.addEventListener(event, resumeAudioContext, { once: true, passive: true });
+    });
+    
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, resumeAudioContext);
+      });
+    };
+  }, []);
+
   // Initialize Web Audio API for visualizer and EQ
   useEffect(() => {
     if (!audioRef.current || !streamUrl) return;
@@ -880,11 +902,25 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           <audio
             ref={audioRef}
             src={streamUrl}
+            preload="auto"
+            playsInline
+            x-webkit-airplay="allow"
             onTimeUpdate={handleTimeUpdate}
             onSeeked={handleSeeked}
             onWaiting={() => setIsBuffering(true)}
             onCanPlay={() => setIsBuffering(false)}
             onPlaying={() => setIsBuffering(false)}
+            onStalled={() => {
+              console.warn('[Player] Audio stalled - attempting recovery');
+              setIsBuffering(true);
+              // iOS sometimes stalls - try to recover by nudging the playback
+              if (audioRef.current && !audioRef.current.paused) {
+                const currentPos = audioRef.current.currentTime;
+                audioRef.current.load();
+                audioRef.current.currentTime = currentPos;
+                audioRef.current.play().catch(console.error);
+              }
+            }}
             onEnded={() => {
               // Record completed play
               recordListeningHistory(true);

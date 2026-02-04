@@ -178,20 +178,51 @@ const PWASettingsCard: React.FC = () => {
             </Box>
           ) : (
             <Box>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>To install SoundWave:</strong>
-                </Typography>
-                <Typography variant="caption" component="div">
-                  <strong>Chrome/Edge:</strong> Click the install icon (⊕) in the address bar, or Menu → "Install SoundWave"
-                </Typography>
-                <Typography variant="caption" component="div">
-                  <strong>Safari (iOS):</strong> Tap Share → "Add to Home Screen"
-                </Typography>
-                <Typography variant="caption" component="div">
-                  <strong>Firefox:</strong> Menu → "Install" (if available)
-                </Typography>
-              </Alert>
+              {/* Detect iOS/Safari for specific instructions */}
+              {(() => {
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                
+                if (isIOS) {
+                  return (
+                    <Alert severity="info" sx={{ mb: 2 }} icon={<InstallIcon />}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Install on iPhone/iPad:</strong>
+                      </Typography>
+                      <Typography variant="caption" component="div" sx={{ mb: 0.5 }}>
+                        1️⃣ Tap the <strong>Share</strong> button (box with arrow) at the bottom of Safari
+                      </Typography>
+                      <Typography variant="caption" component="div" sx={{ mb: 0.5 }}>
+                        2️⃣ Scroll down and tap <strong>"Add to Home Screen"</strong>
+                      </Typography>
+                      <Typography variant="caption" component="div" sx={{ mb: 0.5 }}>
+                        3️⃣ Tap <strong>"Add"</strong> in the top right corner
+                      </Typography>
+                      <Typography variant="caption" component="div" sx={{ mt: 1, fontStyle: 'italic' }}>
+                        ✨ On iOS 26+, any website can be installed as a full PWA!
+                      </Typography>
+                    </Alert>
+                  );
+                }
+                
+                return (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>To install SoundWave:</strong>
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      <strong>Chrome/Edge:</strong> Click the install icon (⊕) in the address bar, or Menu → "Install SoundWave"
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      <strong>Safari (Mac):</strong> File → "Add to Dock..."
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      <strong>Firefox:</strong> Menu → "Install" (if available)
+                    </Typography>
+                  </Alert>
+                );
+              })()}
               <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
                 Requirements: HTTPS connection, valid manifest, service worker
               </Typography>
