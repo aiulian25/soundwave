@@ -198,12 +198,12 @@ function App() {
     // Sync immediately when track changes
     syncPlayback();
 
-    // Set up periodic sync (every 15 seconds while playing)
+    // Set up periodic sync (every 30 seconds while playing) - reduced from 15s for better performance
     syncIntervalRef.current = setInterval(() => {
       if (isPlaying) {
         syncPlayback();
       }
-    }, 15000);
+    }, 30000);
 
     return () => {
       if (syncIntervalRef.current) {
@@ -217,29 +217,35 @@ function App() {
   useEffect(() => {
     if (!isAuthenticated || !currentAudio?.youtube_id) return;
 
-    // When pausing, sync immediately
-    if (!isPlaying && currentTime > 0) {
-      const getDeviceId = () => localStorage.getItem('soundwave_device_id') || 'unknown';
-      const getDeviceName = () => {
-        const ua = navigator.userAgent;
-        if (/iPhone|iPad/i.test(ua)) return 'iOS';
-        if (/Android/i.test(ua)) return 'Android';
-        if (/Mac/i.test(ua)) return 'Mac';
-        if (/Windows/i.test(ua)) return 'Windows';
-        return 'Web';
-      };
+    // When pausing, sync after a short delay (non-blocking)
+    if (!isPlaying && currentTime > 0 && currentAudio?.youtube_id) {
+      // Debounce pause sync - only sync if still paused after 1 second
+      const youtubeId = currentAudio.youtube_id; // Capture for closure
+      const timeoutId = setTimeout(() => {
+        const getDeviceId = () => localStorage.getItem('soundwave_device_id') || 'unknown';
+        const getDeviceName = () => {
+          const ua = navigator.userAgent;
+          if (/iPhone|iPad/i.test(ua)) return 'iOS';
+          if (/Android/i.test(ua)) return 'Android';
+          if (/Mac/i.test(ua)) return 'Mac';
+          if (/Windows/i.test(ua)) return 'Windows';
+          return 'Web';
+        };
 
-      playbackSyncAPI.syncPlayback({
-        youtube_id: currentAudio.youtube_id,
-        position: currentTime,
-        duration: currentAudio.duration,
-        is_playing: false,
-        volume: settingsContext?.settings?.volume ?? 100,
-        queue_youtube_ids: queue.map(a => a.youtube_id).filter(Boolean) as string[],
-        queue_index: currentQueueIndex,
-        device_id: getDeviceId(),
-        device_name: getDeviceName(),
-      }).catch(() => {});
+        playbackSyncAPI.syncPlayback({
+          youtube_id: youtubeId,
+          position: currentTime,
+          duration: currentAudio.duration,
+          is_playing: false,
+          volume: settingsContext?.settings?.volume ?? 100,
+          queue_youtube_ids: queue.map(a => a.youtube_id).filter(Boolean) as string[],
+          queue_index: currentQueueIndex,
+          device_id: getDeviceId(),
+          device_name: getDeviceName(),
+        }).catch(() => {});
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [isPlaying]);
 

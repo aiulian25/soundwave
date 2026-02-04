@@ -243,21 +243,25 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     if (durationListened < 10) return;
     
     hasRecordedPlayRef.current = true;
+    const youtubeId = audio.youtube_id; // Capture for closure (ensures non-null)
     
-    try {
-      const response = await statsAPI.recordListening({
-        youtube_id: audio.youtube_id,
-        duration_listened: Math.floor(durationListened),
-        completed,
-      });
-      
-      // Check for new achievements in the response
-      if (response.data?.new_achievements && response.data.new_achievements.length > 0) {
-        showAchievements(response.data.new_achievements);
+    // Non-blocking: defer API call to not block UI thread
+    setTimeout(async () => {
+      try {
+        const response = await statsAPI.recordListening({
+          youtube_id: youtubeId,
+          duration_listened: Math.floor(durationListened),
+          completed,
+        });
+        
+        // Check for new achievements in the response
+        if (response.data?.new_achievements && response.data.new_achievements.length > 0) {
+          showAchievements(response.data.new_achievements);
+        }
+      } catch (error) {
+        console.error('Failed to record listening history:', error);
       }
-    } catch (error) {
-      console.error('Failed to record listening history:', error);
-    }
+    }, 0);
   }, [audio.youtube_id, showAchievements]);
 
   // Track play duration
@@ -487,7 +491,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
         const fadeMultiplier = getFadeVolume();
         audioRef.current.volume = (volume / 100) * fadeMultiplier;
       }
-    }, 100); // Update every 100ms for smooth fade
+    }, 500); // Update every 500ms - sufficient for smooth fade with less CPU overhead
     
     return () => clearInterval(fadeInterval);
   }, [sleepTimerState.isFading, volume, getFadeVolume]);
@@ -522,48 +526,60 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     };
   }, []);
 
-  // Initialize Web Audio API for visualizer and EQ
+  // Initialize Web Audio API for visualizer and EQ - optimized for performance
   useEffect(() => {
     if (!audioRef.current || !streamUrl) return;
 
-    // Create audio context, EQ filters, and analyser
+    // Create audio context, EQ filters, and analyser - deferred to avoid blocking
     if (!audioContextRef.current) {
-      try {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
-        
-        // Create 10-band EQ filters
-        eqFiltersRef.current = EQ_FREQUENCIES.map((freq) => {
-          const filter = audioContextRef.current!.createBiquadFilter();
-          filter.type = 'peaking';
-          filter.frequency.value = freq;
-          filter.Q.value = 1.4; // Standard Q for 10-band EQ
-          filter.gain.value = 0; // Will be updated by EQ context
-          return filter;
-        });
-        
-        // Create analyser for visualizer
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 64; // 32 frequency bins
-        analyserRef.current.smoothingTimeConstant = 0.8; // Smooth animation
-        
-        // Connect chain: source -> EQ filters -> analyser -> destination
-        let lastNode: AudioNode = sourceNodeRef.current;
-        
-        // Connect EQ filters in series
-        eqFiltersRef.current.forEach((filter) => {
-          lastNode.connect(filter);
-          lastNode = filter;
-        });
-        
-        // Connect to analyser and then to destination
-        lastNode.connect(analyserRef.current);
-        analyserRef.current.connect(audioContextRef.current.destination);
-        
-        dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
-        console.log('[Player] Audio chain initialized with EQ');
-      } catch (error) {
-        console.error('Web Audio API not supported:', error);
+      // Use requestIdleCallback or setTimeout to avoid blocking track start
+      const initAudioChain = () => {
+        try {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current!);
+          
+          // Create 10-band EQ filters - all start at 0 gain (pass-through)
+          eqFiltersRef.current = EQ_FREQUENCIES.map((freq) => {
+            const filter = audioContextRef.current!.createBiquadFilter();
+            filter.type = 'peaking';
+            filter.frequency.value = freq;
+            filter.Q.value = 1.4; // Standard Q for 10-band EQ
+            filter.gain.value = 0; // Pass-through until EQ is enabled
+            return filter;
+          });
+          
+          // Create analyser for visualizer - optimized settings
+          analyserRef.current = audioContextRef.current.createAnalyser();
+          analyserRef.current.fftSize = 64; // 32 frequency bins (minimal for visualization)
+          analyserRef.current.smoothingTimeConstant = 0.85; // Slightly more smoothing = less CPU
+          analyserRef.current.minDecibels = -90;
+          analyserRef.current.maxDecibels = -10;
+          
+          // Connect chain: source -> EQ filters -> analyser -> destination
+          let lastNode: AudioNode = sourceNodeRef.current;
+          
+          // Connect EQ filters in series
+          eqFiltersRef.current.forEach((filter) => {
+            lastNode.connect(filter);
+            lastNode = filter;
+          });
+          
+          // Connect to analyser and then to destination
+          lastNode.connect(analyserRef.current);
+          analyserRef.current.connect(audioContextRef.current.destination);
+          
+          dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+          console.log('[Player] Audio chain initialized (optimized)');
+        } catch (error) {
+          console.error('Web Audio API not supported:', error);
+        }
+      };
+
+      // Defer initialization slightly to not block audio playback start
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(initAudioChain, { timeout: 100 });
+      } else {
+        setTimeout(initAudioChain, 0);
       }
     }
 
@@ -601,12 +617,15 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     };
   }, [streamUrl]);
 
-  // Apply EQ gains when they change
+  // Apply EQ gains when they change - optimized to set all gains at once
   useEffect(() => {
     if (eqFiltersRef.current.length > 0) {
+      // Batch update all filter gains - more efficient than individual updates
+      const targetGains = eqEnabled ? eqGains : Array(10).fill(0);
       eqFiltersRef.current.forEach((filter, index) => {
-        if (eqGains[index] !== undefined) {
-          filter.gain.value = eqEnabled ? eqGains[index] : 0;
+        // Only update if value actually changed
+        if (filter.gain.value !== targetGains[index]) {
+          filter.gain.value = targetGains[index];
         }
       });
     }
