@@ -1,6 +1,7 @@
 {
   "name": "SoundWave",
   "short_name": "SoundWave",
+  "id": "/",
   "description": "Music streaming platform with local file support and offline playback",
   "start_url": "/",
   "display": "standalone",
@@ -9,6 +10,12 @@
   "orientation": "portrait-primary",
   "scope": "/",
   "icons": [
+    {
+      "src": "/img/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/img/icons/icon-72x72.png",
       "sizes": "72x72",

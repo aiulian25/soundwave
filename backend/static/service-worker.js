@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v9';
-const API_CACHE_NAME = 'soundwave-api-v2';
-const AUDIO_CACHE_NAME = 'soundwave-audio-v1';
-const IMAGE_CACHE_NAME = 'soundwave-images-v1';
+const CACHE_NAME = 'soundwave-v10';
+const API_CACHE_NAME = 'soundwave-api-v3';
+const AUDIO_CACHE_NAME = 'soundwave-audio-v2';
+const IMAGE_CACHE_NAME = 'soundwave-images-v2';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
