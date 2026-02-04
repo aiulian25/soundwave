@@ -74,6 +74,23 @@
 - Dual-core CPU (quad-core recommended)
 - Storage space for your audio library
 
+## ⚠️ Important Notes
+
+### Elasticsearch Version Update (v9.0.0)
+
+As of February 2026, SoundWave uses **Elasticsearch 9.0.0**. If you're upgrading from a previous installation that used Elasticsearch 8.x:
+
+- **New installations**: No action needed, just follow the Quick Start guide.
+- **Existing installations with ES 8.x data**: Your data will be automatically upgraded on first start with ES 9.x.
+- **Downgrade warning**: If you previously ran ES 9.x and try to use ES 8.x, it will fail because Lucene index formats are not backwards compatible. Always ensure your docker-compose uses ES 9.0.0 or later.
+
+If you encounter Elasticsearch startup errors mentioning "Lucene912 codec not found", update your `docker-compose.yml` to use `elasticsearch:9.0.0` or delete the ES volume to start fresh:
+```bash
+docker compose down
+docker volume rm soundwave_es_data  # Warning: this deletes search index data
+docker compose up -d
+```
+
 ## 🚀 Quick Start
 
 ### Step 1: Download Files
