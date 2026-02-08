@@ -141,7 +141,18 @@ function App() {
   }, [currentAudio]);
 
   // Cross-device playback sync - periodically save playback state
+  // Optimized: Skip when offline, use longer intervals, debounce
+  // Can be disabled in settings to reduce battery/data usage
   useEffect(() => {
+    // Skip if sync is disabled in settings
+    if (!settingsContext?.settings?.playback_sync_enabled) {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+      return;
+    }
+    
     if (!isAuthenticated || !currentAudio?.youtube_id) {
       // Clear sync interval if no audio
       if (syncIntervalRef.current) {
@@ -172,8 +183,14 @@ function App() {
       return 'Web Browser';
     };
 
-    // Sync function
+    // Sync function - only syncs when online
     const syncPlayback = async () => {
+      // Skip sync if offline - playback sync is not needed for cached playback
+      if (!navigator.onLine) {
+        console.debug('[PlaybackSync] Skipping sync - offline');
+        return;
+      }
+      
       if (!currentAudio?.youtube_id) return;
       
       try {
@@ -195,33 +212,45 @@ function App() {
       }
     };
 
-    // Sync immediately when track changes
-    syncPlayback();
+    // Delay initial sync to not block playback startup
+    const initialSyncTimeout = setTimeout(() => {
+      syncPlayback();
+    }, 3000);
 
-    // Set up periodic sync (every 30 seconds while playing) - reduced from 15s for better performance
+    // Set up periodic sync (every 60 seconds while playing) - increased from 30s for better mobile performance
     syncIntervalRef.current = setInterval(() => {
-      if (isPlaying) {
+      if (isPlaying && navigator.onLine) {
         syncPlayback();
       }
-    }, 30000);
+    }, 60000);
 
     return () => {
+      clearTimeout(initialSyncTimeout);
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current);
         syncIntervalRef.current = null;
       }
     };
-  }, [isAuthenticated, currentAudio?.youtube_id, currentAudio?.duration, isPlaying, currentTime, queue, currentQueueIndex, settingsContext?.settings?.volume]);
+  }, [isAuthenticated, currentAudio?.youtube_id, currentAudio?.duration, isPlaying, currentTime, queue, currentQueueIndex, settingsContext?.settings?.volume, settingsContext?.settings?.playback_sync_enabled]);
 
-  // Sync when pausing (important for resume)
+  // Sync when pausing (important for resume) - only when online and sync is enabled
   useEffect(() => {
     if (!isAuthenticated || !currentAudio?.youtube_id) return;
 
+    // Skip if sync is disabled
+    if (!settingsContext?.settings?.playback_sync_enabled) return;
+
+    // Skip if offline - pause position will be synced when back online
+    if (!navigator.onLine) return;
+
     // When pausing, sync after a short delay (non-blocking)
     if (!isPlaying && currentTime > 0 && currentAudio?.youtube_id) {
-      // Debounce pause sync - only sync if still paused after 1 second
+      // Debounce pause sync - only sync if still paused after 2 seconds
       const youtubeId = currentAudio.youtube_id; // Capture for closure
       const timeoutId = setTimeout(() => {
+        // Double-check still online before syncing
+        if (!navigator.onLine) return;
+        
         const getDeviceId = () => localStorage.getItem('soundwave_device_id') || 'unknown';
         const getDeviceName = () => {
           const ua = navigator.userAgent;
@@ -243,7 +272,7 @@ function App() {
           device_id: getDeviceId(),
           device_name: getDeviceName(),
         }).catch(() => {});
-      }, 1000);
+      }, 2000);
       
       return () => clearTimeout(timeoutId);
     }

@@ -47,6 +47,8 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
     removePendingDownload,
     triggerSync,
     refreshStatus,
+    startPolling,
+    stopPolling,
   } = useBackgroundDownload();
 
   const open = Boolean(anchorEl);
@@ -60,11 +62,15 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
+    // Start polling when popup opens - lazy loading
+    startPolling();
     refreshStatus();
   };
 
   const handleClose = () => {
     setAnchorEl(null);
+    // Stop polling when popup closes - save resources
+    stopPolling();
   };
 
   const handleSync = async () => {

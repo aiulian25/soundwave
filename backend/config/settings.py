@@ -154,6 +154,26 @@ DATABASES = {
     }
 }
 
+# Enable SQLite WAL mode for better concurrent access performance
+# This is set via direct connection on module load
+def enable_wal_mode():
+    """Enable WAL mode for SQLite to prevent 'database is locked' errors"""
+    import sqlite3
+    db_path = os.path.join(DATA_DIR, 'db.sqlite3')
+    if os.path.exists(db_path):
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA busy_timeout=30000;")  # 30 second timeout
+            conn.close()
+            print(f"[Settings] Enabled WAL mode for SQLite: {db_path}")
+        except Exception as e:
+            print(f"[Settings] Failed to enable WAL mode: {e}")
+
+# Try to enable WAL mode on module load
+enable_wal_mode()
+
 # Custom user model
 AUTH_USER_MODEL = 'user.Account'
 

@@ -18,6 +18,9 @@ export interface UseBackgroundDownloadReturn {
   removePendingDownload: (id: number) => Promise<boolean>;
   triggerSync: () => Promise<boolean>;
   refreshStatus: () => Promise<void>;
+  // Lazy polling control - only poll when UI is visible
+  startPolling: () => void;
+  stopPolling: () => void;
 }
 
 export function useBackgroundDownload(): UseBackgroundDownloadReturn {
@@ -55,22 +58,39 @@ export function useBackgroundDownload(): UseBackgroundDownloadReturn {
     };
   }, []);
 
-  // Subscribe to status updates
+  // Track if polling is active (only when UI is visible)
+  const [pollingActive, setPollingActive] = useState(false);
+
+  // Subscribe to status updates - but DON'T auto-start polling
+  // Polling is controlled by startPolling/stopPolling for lazy loading
   useEffect(() => {
     const unsubscribe = backgroundDownload.onStatusUpdate((downloads) => {
       setActiveDownloads(downloads);
     });
 
-    // Start polling when online
-    if (isOnline) {
-      backgroundDownload.startStatusPolling(5000);
-    }
-
     return () => {
       unsubscribe();
       backgroundDownload.stopStatusPolling();
     };
-  }, [isOnline]);
+  }, []);
+
+  // Start polling - call this when download UI becomes visible
+  const startPolling = useCallback(() => {
+    if (isOnline && !pollingActive) {
+      console.debug('[BackgroundDownload] Starting polling (UI visible)');
+      backgroundDownload.startStatusPolling(10000);
+      setPollingActive(true);
+    }
+  }, [isOnline, pollingActive]);
+
+  // Stop polling - call this when download UI is hidden
+  const stopPolling = useCallback(() => {
+    if (pollingActive) {
+      console.debug('[BackgroundDownload] Stopping polling (UI hidden)');
+      backgroundDownload.stopStatusPolling();
+      setPollingActive(false);
+    }
+  }, [pollingActive]);
 
   // Load pending downloads on mount
   useEffect(() => {
@@ -175,6 +195,8 @@ export function useBackgroundDownload(): UseBackgroundDownloadReturn {
     removePendingDownload,
     triggerSync,
     refreshStatus,
+    startPolling,
+    stopPolling,
   };
 }
 

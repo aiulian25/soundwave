@@ -22,6 +22,8 @@ export interface UserSettings {
   seek_duration: 3 | 5 | 10;
   // Prefetch/caching settings
   prefetch_enabled: boolean;
+  // Cross-device sync - can be disabled to reduce battery/data usage
+  playback_sync_enabled: boolean;
   extra_settings: Record<string, any>;
   updated_at?: string;
 }
@@ -43,6 +45,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   seek_duration: 3,
   // Prefetch defaults
   prefetch_enabled: true,
+  // Cross-device sync - enabled by default for seamless experience
+  playback_sync_enabled: true,
   extra_settings: {},
 };
 

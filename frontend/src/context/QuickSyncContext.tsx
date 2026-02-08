@@ -118,10 +118,9 @@ export const QuickSyncProvider = ({ children }: QuickSyncProviderProps) => {
       return;
     }
     
+    // Fetch once on mount - no background polling to save mobile battery
+    // Users can manually refresh via refreshStatus()
     fetchStatus();
-    // Refresh status every 5 minutes
-    const interval = setInterval(fetchStatus, 5 * 60 * 1000);
-    return () => clearInterval(interval);
   }, []);
 
   return (

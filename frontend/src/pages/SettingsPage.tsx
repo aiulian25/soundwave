@@ -37,6 +37,7 @@ import EqualizerIcon from '@mui/icons-material/Equalizer';
 import FastForwardIcon from '@mui/icons-material/FastForward';
 import CachedIcon from '@mui/icons-material/Cached';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import SyncIcon from '@mui/icons-material/Sync';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI } from '../api/client';
@@ -525,6 +526,28 @@ export default function SettingsPage() {
                 />
               }
               label={<Typography variant="body2">Enable intelligent prefetching</Typography>}
+              sx={{ mb: 1, display: 'block' }}
+            />
+            
+            {/* Cross-device sync setting */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, mt: 2 }}>
+              <SyncIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
+              <Typography variant="body2" fontWeight={500}>
+                Cross-Device Playback Sync
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+              Sync playback position across devices. Disable to reduce battery and data usage on mobile.
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch 
+                  size="small" 
+                  checked={settings.playback_sync_enabled !== false}
+                  onChange={(e) => updateSetting('playback_sync_enabled', e.target.checked)}
+                />
+              }
+              label={<Typography variant="body2">Enable playback sync</Typography>}
               sx={{ mb: 1, display: 'block' }}
             />
             

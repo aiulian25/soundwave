@@ -72,11 +72,8 @@ const PlaylistDownloadManager = ({ playlistId }: PlaylistDownloadProps) => {
 
   useEffect(() => {
     loadDownloads();
-    // Refresh every 5 seconds for active downloads
-    const interval = setInterval(() => {
-      loadDownloads(true);
-    }, 5000);
-    return () => clearInterval(interval);
+    // No background polling - users can manually refresh to check status
+    // This saves mobile battery and reduces server load
   }, [playlistId]);
 
   const loadDownloads = async (silent = false) => {

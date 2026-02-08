@@ -7,7 +7,44 @@ from channel.models import Channel
 from download.models import DownloadQueue
 from datetime import datetime, timedelta
 from django.utils import timezone
+from django.db.models import Q
 import os
+
+
+# Error patterns that indicate a video is permanently unavailable
+# Don't retry these - they won't magically become available
+PERMANENT_ERROR_PATTERNS = [
+    'video unavailable',
+    'private video',
+    'copyright',
+    'blocked in your country',
+    'video has been removed',
+    'account associated with this video has been terminated',
+    'age-restricted',
+    'not available',
+    'no longer available',
+]
+
+
+def is_permanently_unavailable(error_message):
+    """Check if an error message indicates a permanently unavailable video."""
+    if not error_message:
+        return False
+    error_lower = error_message.lower()
+    return any(pattern in error_lower for pattern in PERMANENT_ERROR_PATTERNS)
+
+
+def get_permanently_unavailable_ids(owner):
+    """Get set of youtube_ids that are permanently unavailable for an owner."""
+    # Build query for all permanent error patterns
+    error_query = Q()
+    for pattern in PERMANENT_ERROR_PATTERNS:
+        error_query |= Q(error_message__icontains=pattern)
+    
+    return set(DownloadQueue.objects.filter(
+        owner=owner,
+        status='failed',
+    ).filter(error_query).values_list('youtube_id', flat=True))
 
 
 @shared_task
@@ -124,9 +161,13 @@ def download_channel_task(channel_id):
                 owner=channel.owner
             ).values_list('youtube_id', flat=True))
             
+            # Get list of permanently unavailable videos (copyright, private, etc.)
+            unavailable_ids = get_permanently_unavailable_ids(channel.owner)
+            
             # Queue only NEW videos
             new_videos = 0
             skipped = 0
+            skipped_unavailable = 0
             
             for entry in info['entries']:
                 if not entry:
@@ -139,6 +180,11 @@ def download_channel_task(channel_id):
                 # SMART SYNC: Skip if already downloaded
                 if video_id in existing_ids:
                     skipped += 1
+                    continue
+                
+                # Skip permanently unavailable videos (copyright blocked, private, etc.)
+                if video_id in unavailable_ids:
+                    skipped_unavailable += 1
                     continue
                 
                 # This is NEW content
@@ -163,9 +209,16 @@ def download_channel_task(channel_id):
             channel.save()
             
             if new_videos == 0:
-                return f"Channel '{channel.channel_name}' up to date ({skipped} already downloaded)"
+                msg = f"Channel '{channel.channel_name}' up to date ({skipped} already downloaded"
+                if skipped_unavailable > 0:
+                    msg += f", {skipped_unavailable} unavailable skipped"
+                msg += ")"
+                return msg
             
-            return f"Channel '{channel.channel_name}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+            msg = f"Channel '{channel.channel_name}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+            if skipped_unavailable > 0:
+                msg += f", {skipped_unavailable} unavailable skipped"
+            return msg
     
     except Exception as e:
         channel.sync_status = 'failed'
@@ -363,9 +416,13 @@ def download_playlist_task(playlist_id):
                 owner=playlist.owner
             ).values_list('youtube_id', flat=True))
             
+            # Get list of permanently unavailable videos (copyright, private, etc.)
+            unavailable_ids = get_permanently_unavailable_ids(playlist.owner)
+            
             # Queue only NEW videos (not already downloaded)
             new_videos = 0
             skipped = 0
+            skipped_unavailable = 0
             
             for idx, entry in enumerate(info['entries']):
                 if not entry:
@@ -391,6 +448,11 @@ def download_playlist_task(playlist_id):
                     skipped += 1
                     continue
                 
+                # Skip permanently unavailable videos (copyright blocked, private, etc.)
+                if video_id in unavailable_ids:
+                    skipped_unavailable += 1
+                    continue
+                
                 # This is NEW content - add to download queue
                 # First check for existing queue item
                 existing_queue_item = DownloadQueue.objects.filter(
@@ -409,10 +471,14 @@ def download_playlist_task(playlist_id):
                             existing_queue_item.save()
                             existing_queue_item = None  # Allow recreation
                 
-                # Create or get queue item
+                # Create or get queue item - but skip permanently unavailable videos
                 if not existing_queue_item or existing_queue_item.status in ['failed', 'ignored']:
                     if existing_queue_item and existing_queue_item.status in ['failed', 'ignored']:
-                        # Update existing failed item
+                        # Check if this is a permanent failure - DON'T retry these
+                        if is_permanently_unavailable(existing_queue_item.error_message):
+                            skipped_unavailable += 1
+                            continue
+                        # Update existing failed item (temporary failures only)
                         existing_queue_item.status = 'pending'
                         existing_queue_item.error_message = ''
                         existing_queue_item.save()
@@ -469,9 +535,16 @@ def download_playlist_task(playlist_id):
             playlist.save()
             
             if new_videos == 0:
-                return f"Playlist '{playlist.title}' up to date ({skipped} already downloaded)"
+                msg = f"Playlist '{playlist.title}' up to date ({skipped} already downloaded"
+                if skipped_unavailable > 0:
+                    msg += f", {skipped_unavailable} unavailable skipped"
+                msg += ")"
+                return msg
             
-            return f"Playlist '{playlist.title}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+            msg = f"Playlist '{playlist.title}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+            if skipped_unavailable > 0:
+                msg += f", {skipped_unavailable} unavailable skipped"
+            return msg
     
     except Exception as e:
         playlist.sync_status = 'failed'

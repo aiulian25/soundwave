@@ -223,6 +223,9 @@ export const statsAPI = {
   // Yearly Wrapped
   yearlyWrapped: (year?: number) => 
     api.get('/stats/wrapped/', { params: year ? { year } : {} }),
+  // Homepage data
+  homepage: () => api.get('/stats/homepage/'),
+  clearContinueListening: () => api.delete('/stats/homepage/'),
 };
 
 // User API

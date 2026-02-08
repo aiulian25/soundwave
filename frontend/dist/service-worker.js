@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v11';
+const CACHE_NAME = 'soundwave-v12';
 const API_CACHE_NAME = 'soundwave-api-v3';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
 const IMAGE_CACHE_NAME = 'soundwave-images-v2';
@@ -13,8 +13,11 @@ const STATIC_ASSETS = [
 ];
 
 // Install event - cache static assets
+// NOTE: Do NOT call skipWaiting() here - we want the user to be notified of updates
+// The waiting service worker will be activated when the user clicks "Update" in the UI
+// which triggers a SKIP_WAITING message
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
+  console.log('[Service Worker] Installing new version...');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Caching static assets');
@@ -22,8 +25,8 @@ self.addEventListener('install', (event) => {
         console.error('[Service Worker] Failed to cache static assets:', err);
       });
     }).then(() => {
-      console.log('[Service Worker] Installed');
-      return self.skipWaiting(); // Activate immediately
+      console.log('[Service Worker] Installed - waiting for activation');
+      // Don't call skipWaiting() here - let the UI control when to activate
     })
   );
 });

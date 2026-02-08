@@ -117,16 +117,9 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     loadChannels();
-    
-    // Auto-refresh channels every 10 seconds if there are pending tasks
-    const interval = setInterval(() => {
-      if (pendingTasks.length > 0) {
-        loadChannels();
-      }
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [pendingTasks]);
+    // No background polling - user can pull to refresh or wait for next visit
+    // This saves mobile battery and reduces server load
+  }, []);
 
   const handleSubscribe = async () => {
     setError('');
@@ -144,9 +137,13 @@ export default function ChannelsPage() {
       setChannelUrl('');
       setOpenDialog(false);
       
-      // Add task to pending list
+      // Add task to pending list (auto-clear after 30s since we don't poll)
       if (taskId) {
         setPendingTasks(prev => [...prev, taskId]);
+        setTimeout(() => {
+          setPendingTasks(prev => prev.filter(id => id !== taskId));
+          loadChannels(); // Refresh once when indicator clears
+        }, 30000);
       }
       
       // Reload channels after a short delay to show the new channel
@@ -259,7 +256,7 @@ export default function ChannelsPage() {
               📡 Processing {pendingTasks.length} channel subscription{pendingTasks.length > 1 ? 's' : ''}...
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.7 }}>
-              Downloading channel info and videos in background
+              Server is downloading in background - will auto-refresh
             </Typography>
           </Box>
         </Alert>

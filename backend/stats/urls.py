@@ -12,6 +12,7 @@ from stats.views import (
     AchievementsView,
     StreakView,
     YearlyWrappedView,
+    HomepageDataView,
 )
 
 urlpatterns = [
@@ -25,4 +26,5 @@ urlpatterns = [
     path('achievements/', AchievementsView.as_view(), name='achievements'),
     path('streak/', StreakView.as_view(), name='streak'),
     path('wrapped/', YearlyWrappedView.as_view(), name='yearly-wrapped'),
+    path('homepage/', HomepageDataView.as_view(), name='homepage-data'),
 ]

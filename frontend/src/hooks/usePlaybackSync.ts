@@ -3,11 +3,15 @@
  * 
  * Periodically syncs playback position to the server so users can
  * resume on another device from where they left off.
+ * 
+ * Network-aware: adjusts sync frequency based on connection quality
+ * and uses exponential backoff on failures.
  */
 
 import { useEffect, useRef, useCallback } from 'react';
 import { playbackSyncAPI } from '../api/client';
 import type { Audio } from '../types';
+import { getNetworkInfo, getPollingInterval, apiBackoffs } from '../utils/networkQuality';
 
 // Generate a unique device ID for this browser
 const getDeviceId = (): string => {
@@ -84,17 +88,45 @@ export function usePlaybackSync({
 }: UsePlaybackSyncOptions): UsePlaybackSyncReturn {
   const lastSyncRef = useRef<number>(0);
   const lastPositionRef = useRef<number>(0);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Get network-aware sync interval
+  const getEffectiveSyncInterval = useCallback(() => {
+    // If we have failures, use backoff
+    if (!apiBackoffs.playbackSync.shouldAttempt()) {
+      const failures = apiBackoffs.playbackSync.getFailureCount();
+      console.debug(`[PlaybackSync] Using backoff interval (failures: ${failures})`);
+      return Math.min(syncInterval * Math.pow(2, failures), 120000);  // Max 2 min
+    }
+    
+    // Otherwise use network-aware interval
+    return getPollingInterval(syncInterval);
+  }, [syncInterval]);
   
   // Sync playback state to server
   const syncNow = useCallback(async () => {
     if (!enabled || !currentAudio?.youtube_id) return;
     
+    // Don't sync if we're in backoff mode (unless it's been long enough)
+    if (!apiBackoffs.playbackSync.shouldAttempt()) {
+      console.debug('[PlaybackSync] Skipping sync due to backoff');
+      return;
+    }
+    
+    // Don't sync if offline
+    const networkInfo = getNetworkInfo();
+    if (!networkInfo.isOnline) {
+      console.debug('[PlaybackSync] Skipping sync - offline');
+      return;
+    }
+    
     // Don't sync if position hasn't changed much (avoid spam)
     const positionDiff = Math.abs(currentTime - lastPositionRef.current);
     const timeSinceLastSync = Date.now() - lastSyncRef.current;
+    const effectiveInterval = getEffectiveSyncInterval();
     
-    // Sync if: position changed by >3s, or it's been >syncInterval since last sync, or we're pausing
-    if (positionDiff < 3 && timeSinceLastSync < syncInterval && isPlaying) {
+    // Sync if: position changed by >3s, or it's been >interval since last sync, or we're pausing
+    if (positionDiff < 3 && timeSinceLastSync < effectiveInterval && isPlaying) {
       return;
     }
     
@@ -113,11 +145,15 @@ export function usePlaybackSync({
       
       lastSyncRef.current = Date.now();
       lastPositionRef.current = currentTime;
+      
+      // Record success - reset backoff
+      apiBackoffs.playbackSync.recordSuccess();
     } catch (error) {
-      // Silently fail - sync is best-effort
-      console.debug('[PlaybackSync] Sync failed:', error);
+      // Record failure for backoff
+      const nextDelay = apiBackoffs.playbackSync.recordFailure();
+      console.debug(`[PlaybackSync] Sync failed, next attempt in ${Math.round(nextDelay / 1000)}s:`, error);
     }
-  }, [enabled, currentAudio, currentTime, isPlaying, volume, queue, queueIndex, syncInterval]);
+  }, [enabled, currentAudio, currentTime, isPlaying, volume, queue, queueIndex, getEffectiveSyncInterval]);
   
   // Clear the session
   const clearSession = useCallback(async () => {
@@ -128,22 +164,43 @@ export function usePlaybackSync({
     }
   }, []);
   
-  // Periodic sync while playing
+  // Periodic sync while playing - with dynamic interval based on network
   useEffect(() => {
     if (!enabled || !currentAudio?.youtube_id) return;
     
     // Sync immediately when track changes
     syncNow();
     
-    // Set up periodic sync
-    const interval = setInterval(() => {
-      if (isPlaying) {
-        syncNow();
+    // Set up dynamic periodic sync that adapts to network conditions
+    const setupInterval = () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
       }
-    }, syncInterval);
+      
+      const interval = getEffectiveSyncInterval();
+      console.debug(`[PlaybackSync] Setting sync interval: ${Math.round(interval / 1000)}s`);
+      
+      syncIntervalRef.current = setInterval(() => {
+        if (isPlaying) {
+          syncNow();
+          // Dynamically adjust interval based on current conditions
+          const newInterval = getEffectiveSyncInterval();
+          if (newInterval !== interval) {
+            setupInterval();  // Re-setup with new interval
+          }
+        }
+      }, interval);
+    };
     
-    return () => clearInterval(interval);
-  }, [enabled, currentAudio?.youtube_id, isPlaying, syncInterval, syncNow]);
+    setupInterval();
+    
+    return () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+    };
+  }, [enabled, currentAudio?.youtube_id, isPlaying, syncNow, getEffectiveSyncInterval]);
   
   // Sync when pausing (important for resume)
   useEffect(() => {

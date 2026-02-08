@@ -45,6 +45,8 @@
 - 💾 **Full Offline Playback** - Cache playlists with audio, lyrics, and metadata for offline use
 - 🔄 **Background Caching** - Non-blocking progress indicator while caching
 - 🖼️ **Media Session Artwork** - Album art in system notifications (all browsers)
+- 🔋 **Battery Efficient** - Lightweight frontend with no background polling; server handles all heavy work
+- ⚙️ **Configurable Sync** - Optional cross-device playback sync (can be disabled in settings)
 
 ### Visual & UI
 - 🌙 **Dark Theme** - Beautiful Material Design dark UI
@@ -57,6 +59,7 @@
 - 🔐 **User Management** - Multi-user support with authentication
 - ⚡ **Background Tasks** - Celery-powered async downloads and updates
 - 💾 **Persistent Storage** - Data survives container rebuilds
+- 🚫 **Smart Error Handling** - Automatically skips permanently unavailable videos (copyright blocked, private, removed)
 
 ## 🏗️ Architecture
 

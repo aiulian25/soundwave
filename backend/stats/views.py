@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from audio.models import Audio
+from audio.models import AudioProgress
 from channel.models import Channel
 from download.models import DownloadQueue
 from stats.models import ListeningHistory, Achievement
@@ -20,6 +21,7 @@ from stats.serializers import (
     AchievementSerializer,
     AchievementProgressSerializer,
     YearlyWrappedSerializer,
+    HomepageDataSerializer,
 )
 from common.views import ApiBaseView
 
@@ -768,3 +770,213 @@ class YearlyWrappedView(ApiBaseView):
             return "🎧 Dedicated Listener - Music is a big part of your life"
         else:
             return "🌱 Rising Star - Your musical journey is just beginning"
+
+
+class HomepageDataView(ApiBaseView):
+    """Homepage data endpoint - provides all data for the home page"""
+    
+    def get(self, request):
+        """Get all homepage sections data"""
+        user = request.user
+        now = timezone.now()
+        
+        # 1. CONTINUE LISTENING
+        # Get tracks with progress that are not completed
+        continue_listening = []
+        progress_entries = AudioProgress.objects.filter(
+            user=user,
+            completed=False,
+            position__gt=10  # At least 10 seconds played
+        ).select_related('audio').order_by('-last_updated')[:6]
+        
+        for entry in progress_entries:
+            audio = entry.audio
+            time_left = max(0, audio.duration - entry.position)
+            progress_pct = (entry.position / audio.duration * 100) if audio.duration > 0 else 0
+            continue_listening.append({
+                'id': audio.id,
+                'youtube_id': audio.youtube_id,
+                'title': audio.title,
+                'artist': audio.artist or '',
+                'channel_name': audio.channel_name,
+                'duration': audio.duration,
+                'thumbnail_url': audio.thumbnail_url or '',
+                'position': entry.position,
+                'time_left': time_left,
+                'progress_percent': round(progress_pct, 1),
+                'last_played': entry.last_updated,
+            })
+        
+        # 2. MADE FOR YOU - Recommendations
+        made_for_you = []
+        
+        # Get user's listening history for recommendations
+        history = ListeningHistory.objects.filter(user=user)
+        
+        # Get favorite artists/channels
+        top_artists = history.exclude(artist='').values('artist').annotate(
+            play_count=Count('id')
+        ).order_by('-play_count')[:5]
+        top_artist_names = [a['artist'] for a in top_artists]
+        
+        top_channels = history.values('channel_name').annotate(
+            play_count=Count('id')
+        ).order_by('-play_count')[:5]
+        top_channel_names = [c['channel_name'] for c in top_channels]
+        
+        # Recently played youtube_ids to exclude
+        recent_played_ids = list(history.order_by('-listened_at').values_list(
+            'audio__youtube_id', flat=True
+        )[:20])
+        
+        # FOR_YOU - Tracks from favorite artists not recently played
+        if top_artist_names:
+            for_you = Audio.objects.filter(
+                owner=user,
+                artist__in=top_artist_names
+            ).exclude(
+                youtube_id__in=recent_played_ids
+            ).order_by('?')[:2]
+            
+            for audio in for_you:
+                made_for_you.append({
+                    'id': audio.id,
+                    'youtube_id': audio.youtube_id,
+                    'title': audio.title,
+                    'artist': audio.artist or '',
+                    'channel_name': audio.channel_name,
+                    'duration': audio.duration,
+                    'thumbnail_url': audio.thumbnail_url or '',
+                    'tag': 'FOR_YOU',
+                    'reason': f'Because you like {audio.artist or audio.channel_name}',
+                })
+        
+        # DISCOVER - Hidden gems (low play count, high duration)
+        discover = Audio.objects.filter(
+            owner=user,
+            play_count__lte=2
+        ).exclude(
+            youtube_id__in=recent_played_ids
+        ).exclude(
+            youtube_id__in=[r['youtube_id'] for r in made_for_you]
+        ).order_by('?')[:2]
+        
+        for audio in discover:
+            made_for_you.append({
+                'id': audio.id,
+                'youtube_id': audio.youtube_id,
+                'title': audio.title,
+                'artist': audio.artist or '',
+                'channel_name': audio.channel_name,
+                'duration': audio.duration,
+                'thumbnail_url': audio.thumbnail_url or '',
+                'tag': 'DISCOVER',
+                'reason': 'Hidden gem in your library',
+            })
+        
+        # OTHER - Tracks from other channels the user might like
+        if top_channel_names:
+            other = Audio.objects.filter(
+                owner=user,
+                channel_name__in=top_channel_names
+            ).exclude(
+                youtube_id__in=recent_played_ids
+            ).exclude(
+                youtube_id__in=[r['youtube_id'] for r in made_for_you]
+            ).order_by('?')[:1]
+            
+            for audio in other:
+                made_for_you.append({
+                    'id': audio.id,
+                    'youtube_id': audio.youtube_id,
+                    'title': audio.title,
+                    'artist': audio.artist or '',
+                    'channel_name': audio.channel_name,
+                    'duration': audio.duration,
+                    'thumbnail_url': audio.thumbnail_url or '',
+                    'tag': 'OTHER',
+                    'reason': 'More other you might like',
+                })
+        
+        # THROWBACK - Tracks from user's collection played long ago
+        thirty_days_ago = now - timedelta(days=30)
+        throwback_history = history.filter(
+            listened_at__lt=thirty_days_ago
+        ).values('audio__youtube_id').distinct()[:50]
+        throwback_ids = [h['audio__youtube_id'] for h in throwback_history]
+        
+        if throwback_ids:
+            throwback = Audio.objects.filter(
+                owner=user,
+                youtube_id__in=throwback_ids
+            ).exclude(
+                youtube_id__in=recent_played_ids
+            ).exclude(
+                youtube_id__in=[r['youtube_id'] for r in made_for_you]
+            ).order_by('?')[:1]
+            
+            for audio in throwback:
+                made_for_you.append({
+                    'id': audio.id,
+                    'youtube_id': audio.youtube_id,
+                    'title': audio.title,
+                    'artist': audio.artist or '',
+                    'channel_name': audio.channel_name,
+                    'duration': audio.duration,
+                    'thumbnail_url': audio.thumbnail_url or '',
+                    'tag': 'THROWBACK',
+                    'reason': 'From your collection',
+                })
+        
+        # 3. RECENTLY PLAYED
+        recently_played = []
+        recent_history = history.select_related('audio').order_by('-listened_at')[:7]
+        seen_youtube_ids = set()
+        
+        for entry in recent_history:
+            if entry.audio.youtube_id not in seen_youtube_ids:
+                seen_youtube_ids.add(entry.audio.youtube_id)
+                recently_played.append({
+                    'id': entry.audio.id,
+                    'youtube_id': entry.audio.youtube_id,
+                    'title': entry.title,
+                    'artist': entry.artist or '',
+                    'channel_name': entry.channel_name,
+                    'duration': entry.audio.duration,
+                    'thumbnail_url': entry.audio.thumbnail_url or '',
+                    'played_at': entry.listened_at,
+                })
+        
+        # 4. RECENTLY ADDED
+        recently_added = []
+        recent_audio = Audio.objects.filter(owner=user).order_by('-downloaded_date')[:7]
+        
+        for audio in recent_audio:
+            recently_added.append({
+                'id': audio.id,
+                'youtube_id': audio.youtube_id,
+                'title': audio.title,
+                'artist': audio.artist or '',
+                'channel_name': audio.channel_name,
+                'duration': audio.duration,
+                'thumbnail_url': audio.thumbnail_url or '',
+                'downloaded_date': audio.downloaded_date,
+            })
+        
+        data = {
+            'continue_listening': continue_listening,
+            'made_for_you': made_for_you,
+            'recently_played': recently_played,
+            'recently_added': recently_added,
+        }
+        
+        serializer = HomepageDataSerializer(data)
+        return Response(serializer.data)
+    
+    def delete(self, request):
+        """Clear continue listening (mark all as completed)"""
+        AudioProgress.objects.filter(
+            user=request.user,
+            completed=False
+        ).update(completed=True)
+        return Response({'cleared': True})

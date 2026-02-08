@@ -125,18 +125,36 @@ class PWAManager {
       console.log('[PWA] Service Worker registered:', this.registration);
       console.log('[PWA] SW State:', this.registration.active?.state || 'no active worker');
 
+      // Listen for controller change to reload page when new SW takes over
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        console.log('[PWA] Controller changed, reloading...');
+        window.location.reload();
+      });
+
       // Check for updates
       this.registration.addEventListener('updatefound', () => {
+        console.log('[PWA] Update found! Installing new service worker...');
         const newWorker = this.registration!.installing;
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
+            console.log('[PWA] New worker state:', newWorker.state);
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New service worker available
+              // New service worker available and waiting
+              console.log('[PWA] New version available! Showing update notification...');
               this.emit('updateAvailable', newWorker);
             }
           });
         }
       });
+
+      // Check if there's already a waiting worker (from a previous page load)
+      if (this.registration.waiting && navigator.serviceWorker.controller) {
+        console.log('[PWA] Found waiting service worker from previous session');
+        this.emit('updateAvailable', this.registration.waiting);
+      }
 
       return this.registration;
     } catch (error) {
@@ -177,13 +195,19 @@ class PWAManager {
    */
   async updateServiceWorker() {
     if (!this.registration) {
+      console.warn('[PWA] No service worker registration');
       return;
     }
 
     const newWorker = this.registration.waiting;
     if (newWorker) {
+      console.log('[PWA] Telling waiting service worker to skip waiting...');
       newWorker.postMessage({ type: 'SKIP_WAITING' });
-      window.location.reload();
+      // Page will reload automatically when controllerchange fires
+    } else {
+      console.warn('[PWA] No waiting service worker to activate');
+      // Force check for updates
+      await this.registration.update();
     }
   }
 

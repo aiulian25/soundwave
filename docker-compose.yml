@@ -27,7 +27,7 @@ services:
       - REDIS_HOST=soundwave-redis
       - TZ=UTC
       - ES_URL=http://soundwave-es:9200
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8889,https://localhost:8889,https://soundwave.com}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8889,https://localhost:8889,https://soundwave.com,https://test.iulian.uk,https://test.ascunse.uk,http://192.168.1.80:8889}
     depends_on:
       - soundwave-es
       - soundwave-redis

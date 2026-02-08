@@ -1,9 +1,11 @@
 /**
  * Advanced Audio Caching System
  * Intelligently prefetches likely-to-be-played tracks for seamless playback
+ * Network-aware: adjusts behavior based on connection quality
  */
 
 import { Audio } from '../types';
+import { getNetworkInfo, shouldPrefetch, getPrefetchCount, apiBackoffs } from './networkQuality';
 
 const DB_NAME = 'soundwave-audio-cache';
 const DB_VERSION = 2;
@@ -294,12 +296,26 @@ class AudioCacheManager {
 
   /**
    * Prefetch a track in the background
+   * Network-aware: respects connection quality and save-data mode
    */
   async prefetchTrack(audio: Audio, priority: 'high' | 'normal' | 'low' = 'normal'): Promise<void> {
     const youtubeId = audio.youtube_id;
     
     // Skip local files (no youtube_id)
     if (!youtubeId) return;
+    
+    // Network quality check - skip prefetching on slow connections (unless high priority)
+    if (priority !== 'high' && !shouldPrefetch()) {
+      const networkInfo = getNetworkInfo();
+      console.log(`[AudioCache] Skipping prefetch due to network: ${networkInfo.quality}, saveData: ${networkInfo.isSaveData}`);
+      return;
+    }
+    
+    // Check backoff state for prefetch failures
+    if (!apiBackoffs.prefetch.shouldAttempt()) {
+      console.log(`[AudioCache] Skipping prefetch due to backoff (failures: ${apiBackoffs.prefetch.getFailureCount()})`);
+      return;
+    }
     
     // Fast path: check in-memory index first
     if (this.cachedTrackIds.has(youtubeId)) {
@@ -317,7 +333,8 @@ class AudioCacheManager {
     }
 
     this.prefetchingInProgress.add(youtubeId);
-    console.log(`[AudioCache] Prefetching (${priority}): ${audio.title}`);
+    const networkInfo = getNetworkInfo();
+    console.log(`[AudioCache] Prefetching (${priority}, network: ${networkInfo.quality}): ${audio.title}`);
 
     try {
       // Get stream URL
@@ -327,7 +344,10 @@ class AudioCacheManager {
         },
       });
 
-      if (!response.ok) throw new Error('Failed to get stream URL');
+      if (!response.ok) {
+        apiBackoffs.prefetch.recordFailure();
+        throw new Error('Failed to get stream URL');
+      }
       
       const data = await response.json();
       const streamUrl = data.stream_url;
@@ -336,7 +356,10 @@ class AudioCacheManager {
 
       // Fetch the actual audio file
       const audioResponse = await fetch(streamUrl);
-      if (!audioResponse.ok) throw new Error('Failed to fetch audio');
+      if (!audioResponse.ok) {
+        apiBackoffs.prefetch.recordFailure();
+        throw new Error('Failed to fetch audio');
+      }
 
       const blob = await audioResponse.blob();
 
@@ -346,6 +369,9 @@ class AudioCacheManager {
         artist: audio.channel_name,
         duration: audio.duration,
       });
+      
+      // Record success
+      apiBackoffs.prefetch.recordSuccess();
     } catch (error) {
       console.error(`[AudioCache] Failed to prefetch ${audio.title}:`, error);
     } finally {
@@ -355,25 +381,38 @@ class AudioCacheManager {
   }
 
   /**
-   * Intelligent prefetch based on queue position and play patterns
+   * Intelligent prefetch based on queue position, play patterns, and network quality
+   * Network-aware: adjusts prefetch count based on connection
    */
   async prefetchUpcoming(queue: Audio[], currentIndex: number, shuffleEnabled: boolean = false): Promise<void> {
     if (queue.length === 0) return;
 
+    // Get network-aware prefetch count
+    const networkPrefetchCount = getPrefetchCount();
+    const networkInfo = getNetworkInfo();
+    
+    // Skip all prefetching on poor connections or save-data mode
+    if (networkPrefetchCount === 0) {
+      console.log(`[AudioCache] Skipping prefetch - poor network (${networkInfo.quality}) or save-data enabled`);
+      return;
+    }
+    
+    console.log(`[AudioCache] Prefetching ${networkPrefetchCount} tracks (network: ${networkInfo.quality})`);
+
     const tracksToPrefetch: Audio[] = [];
     
-    // Always prefetch next N tracks in queue
-    for (let i = 1; i <= CACHE_CONFIG.prefetchCount; i++) {
+    // Prefetch next N tracks based on network quality (not fixed CACHE_CONFIG.prefetchCount)
+    for (let i = 1; i <= networkPrefetchCount; i++) {
       const nextIndex = currentIndex + i;
       if (nextIndex < queue.length) {
         tracksToPrefetch.push(queue[nextIndex]);
       }
     }
 
-    // If shuffle is enabled, also prefetch some random tracks from queue
-    if (shuffleEnabled && queue.length > 5) {
+    // Only add random tracks on good+ connections (not on moderate/poor)
+    if (shuffleEnabled && queue.length > 5 && networkInfo.quality === 'excellent') {
       const randomIndices = new Set<number>();
-      while (randomIndices.size < Math.min(2, queue.length - currentIndex - 1)) {
+      while (randomIndices.size < Math.min(1, queue.length - currentIndex - 1)) {
         const randomIndex = Math.floor(Math.random() * queue.length);
         if (randomIndex !== currentIndex && !tracksToPrefetch.find(t => t.id === queue[randomIndex].id)) {
           randomIndices.add(randomIndex);
@@ -382,11 +421,18 @@ class AudioCacheManager {
       randomIndices.forEach(idx => tracksToPrefetch.push(queue[idx]));
     }
 
-    // Prefetch in order of priority
-    for (let i = 0; i < tracksToPrefetch.length; i++) {
-      const priority = i === 0 ? 'high' : i < 3 ? 'normal' : 'low';
-      // Don't await - let them prefetch in parallel
-      this.prefetchTrack(tracksToPrefetch[i], priority);
+    // Prefetch sequentially on slower connections, in parallel on fast ones
+    if (networkInfo.quality === 'excellent' || networkInfo.quality === 'good') {
+      // Parallel prefetch on good connections
+      for (let i = 0; i < tracksToPrefetch.length; i++) {
+        const priority = i === 0 ? 'high' : i < 2 ? 'normal' : 'low';
+        this.prefetchTrack(tracksToPrefetch[i], priority);
+      }
+    } else {
+      // Sequential prefetch on moderate connections (one at a time)
+      for (let i = 0; i < tracksToPrefetch.length; i++) {
+        await this.prefetchTrack(tracksToPrefetch[i], 'high');
+      }
     }
   }
 

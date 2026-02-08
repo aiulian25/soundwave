@@ -175,11 +175,11 @@ export default function PlaylistsPage() {
       // Immediately reload to show pending status
       await loadPlaylists();
       setLoading(false);
-      // Poll for updates every 3 seconds for the next 30 seconds
-      const pollInterval = setInterval(async () => {
+      // Refresh once more after 30 seconds to show completed status
+      // No continuous polling - server handles the work in background
+      setTimeout(async () => {
         await loadPlaylists();
-      }, 3000);
-      setTimeout(() => clearInterval(pollInterval), 30000);
+      }, 30000);
     } catch (err: any) {
       setLoading(false);
       setError(err.response?.data?.detail || 'Failed to subscribe to playlist');
@@ -196,27 +196,22 @@ export default function PlaylistsPage() {
       
       setSnackbar({
         open: true,
-        message: '🔄 Sync started! Checking for new tracks...',
+        message: '🔄 Sync started! Server processing in background...',
         severity: 'info'
       });
       
-      // Poll for updates every 2 seconds for the next 30 seconds
-      let pollCount = 0;
-      const maxPolls = 15;
-      const pollInterval = setInterval(async () => {
-        pollCount++;
+      // Refresh once after 30 seconds to check completion - no continuous polling
+      setTimeout(async () => {
         await loadPlaylists();
+        setSyncingPlaylists(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(playlistId);
+          return newSet;
+        });
         
-        // Check if sync is complete
+        // Check final status
         const playlist = playlists.find(p => p.playlist_id === playlistId);
-        if (playlist && playlist.sync_status !== 'syncing') {
-          clearInterval(pollInterval);
-          setSyncingPlaylists(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(playlistId);
-            return newSet;
-          });
-          
+        if (playlist) {
           if (playlist.sync_status === 'success') {
             setSnackbar({
               open: true,
@@ -231,16 +226,7 @@ export default function PlaylistsPage() {
             });
           }
         }
-        
-        if (pollCount >= maxPolls) {
-          clearInterval(pollInterval);
-          setSyncingPlaylists(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(playlistId);
-            return newSet;
-          });
-        }
-      }, 2000);
+      }, 30000);
       
     } catch (err: any) {
       console.error('Failed to start download:', err);

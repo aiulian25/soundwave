@@ -176,3 +176,63 @@ class YearlyWrappedSerializer(serializers.Serializer):
     
     # Achievements unlocked this year
     achievements_unlocked = serializers.IntegerField()
+
+
+class ContinueListeningItemSerializer(serializers.Serializer):
+    """Track with playback progress for Continue Listening section"""
+    id = serializers.IntegerField()
+    youtube_id = serializers.CharField()
+    title = serializers.CharField()
+    artist = serializers.CharField(allow_blank=True)
+    channel_name = serializers.CharField()
+    duration = serializers.IntegerField()
+    thumbnail_url = serializers.CharField(allow_blank=True)
+    position = serializers.IntegerField(help_text="Current position in seconds")
+    time_left = serializers.IntegerField(help_text="Time remaining in seconds")
+    progress_percent = serializers.FloatField(help_text="Progress percentage 0-100")
+    last_played = serializers.DateTimeField()
+
+
+class RecommendationItemSerializer(serializers.Serializer):
+    """Track recommendation for Made For You section"""
+    id = serializers.IntegerField()
+    youtube_id = serializers.CharField()
+    title = serializers.CharField()
+    artist = serializers.CharField(allow_blank=True)
+    channel_name = serializers.CharField()
+    duration = serializers.IntegerField()
+    thumbnail_url = serializers.CharField(allow_blank=True)
+    tag = serializers.CharField(help_text="FOR_YOU, DISCOVER, OTHER, THROWBACK")
+    reason = serializers.CharField(help_text="Why this is recommended")
+
+
+class RecentlyPlayedItemSerializer(serializers.Serializer):
+    """Recently played track"""
+    id = serializers.IntegerField()
+    youtube_id = serializers.CharField()
+    title = serializers.CharField()
+    artist = serializers.CharField(allow_blank=True)
+    channel_name = serializers.CharField()
+    duration = serializers.IntegerField()
+    thumbnail_url = serializers.CharField(allow_blank=True)
+    played_at = serializers.DateTimeField()
+
+
+class RecentlyAddedItemSerializer(serializers.Serializer):
+    """Recently added track"""
+    id = serializers.IntegerField()
+    youtube_id = serializers.CharField()
+    title = serializers.CharField()
+    artist = serializers.CharField(allow_blank=True)
+    channel_name = serializers.CharField()
+    duration = serializers.IntegerField()
+    thumbnail_url = serializers.CharField(allow_blank=True)
+    downloaded_date = serializers.DateTimeField()
+
+
+class HomepageDataSerializer(serializers.Serializer):
+    """Complete homepage data"""
+    continue_listening = ContinueListeningItemSerializer(many=True)
+    made_for_you = RecommendationItemSerializer(many=True)
+    recently_played = RecentlyPlayedItemSerializer(many=True)
+    recently_added = RecentlyAddedItemSerializer(many=True)

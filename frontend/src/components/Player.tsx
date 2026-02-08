@@ -296,6 +296,85 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     };
   }, [audio.id, audio.youtube_id, recordListeningHistory]);
 
+  // Save playback progress for "Continue Listening" feature
+  // Saves position periodically and when pausing/changing tracks
+  // Only saves when online to reduce mobile data usage
+  const lastProgressSaveRef = useRef<number>(0);
+  const lastSavedPositionRef = useRef<number>(0);
+  
+  const saveProgress = useCallback(async (completed: boolean = false) => {
+    // Skip if offline - will sync when back online
+    if (!navigator.onLine) {
+      console.debug('[Player] Skipping progress save - offline');
+      return;
+    }
+    
+    if (!audio.youtube_id) return;
+    
+    const position = Math.floor(currentTime);
+    // Only save if position has changed by at least 10 seconds (increased from 5s)
+    if (!completed && Math.abs(position - lastSavedPositionRef.current) < 10) return;
+    
+    try {
+      await audioAPI.updateProgress(audio.youtube_id, {
+        position,
+        completed,
+      });
+      lastSavedPositionRef.current = position;
+      lastProgressSaveRef.current = Date.now();
+    } catch (error) {
+      // Silently fail - progress save is best effort
+      console.debug('[Player] Progress save failed:', error);
+    }
+  }, [audio.youtube_id, currentTime]);
+  
+  // Periodic progress save while playing
+  // Network-aware: only save when online and at reduced frequency
+  useEffect(() => {
+    if (!isPlaying || !audio.youtube_id) return;
+    
+    // Check every 30 seconds and save every 60 seconds (reduced frequency for mobile)
+    const interval = setInterval(() => {
+      if (navigator.onLine && Date.now() - lastProgressSaveRef.current > 60000) {
+        saveProgress(false);
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [isPlaying, audio.youtube_id, saveProgress]);
+  
+  // Save progress when pausing (only if online)
+  useEffect(() => {
+    if (!isPlaying && currentTime > 10 && audio.youtube_id && navigator.onLine) {
+      saveProgress(false);
+    }
+  }, [isPlaying, currentTime, audio.youtube_id, saveProgress]);
+  
+  // Save progress when track changes or unmounts (only if online)
+  useEffect(() => {
+    return () => {
+      // Skip save if offline
+      if (!navigator.onLine) return;
+      
+      if (currentTime > 10 && audio.youtube_id) {
+        // Use synchronous approach for unmount
+        const position = Math.floor(currentTime);
+        const token = localStorage.getItem('token');
+        if (token) {
+          fetch(`/api/audio/${audio.youtube_id}/progress/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+            body: JSON.stringify({ position, completed: false }),
+            keepalive: true,
+          }).catch(() => {});
+        }
+      }
+    };
+  }, [audio.youtube_id, currentTime]);
+
   // Fetch stream URL when audio changes - ALWAYS prioritize cache for battery/data savings
   useEffect(() => {
     const fetchStreamUrl = async () => {
@@ -943,6 +1022,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             onEnded={() => {
               // Record completed play
               recordListeningHistory(true);
+              // Mark progress as completed
+              saveProgress(true);
               
               // Notify sleep timer that song ended and check if we should stop
               const sleepTimerShouldStop = onSongEnded();

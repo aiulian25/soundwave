@@ -3,7 +3,11 @@
  * 
  * Provides utilities for queueing downloads that persist even when the app is closed.
  * Uses Service Worker with Background Sync API for reliability.
+ * 
+ * Network-aware: adjusts polling based on connection quality.
  */
+
+import { getNetworkInfo, getPollingInterval, apiBackoffs } from './networkQuality';
 
 export interface PendingDownload {
   id: number;
@@ -242,12 +246,19 @@ class BackgroundDownloadService {
 
   /**
    * Start polling for download status updates
+   * Network-aware: adjusts interval based on connection quality and backoff on errors
    */
-  startStatusPolling(intervalMs: number = 5000) {
+  startStatusPolling(baseIntervalMs: number = 5000) {
     if (this.statusPollingInterval) return;
 
-    this.statusPollingInterval = window.setInterval(async () => {
+    const poll = async () => {
       if (!navigator.onLine) return;
+      
+      // Check backoff state
+      if (!apiBackoffs.downloads.shouldAttempt()) {
+        console.debug('[BackgroundDownload] Skipping poll due to backoff');
+        return;
+      }
       
       try {
         const token = this.authToken || localStorage.getItem('token');
@@ -272,11 +283,35 @@ class BackgroundDownloadService {
           ];
           
           this.notifyStatusListeners(allActive);
+          apiBackoffs.downloads.recordSuccess();
+        } else {
+          apiBackoffs.downloads.recordFailure();
         }
       } catch (error) {
         console.error('[BackgroundDownload] Status polling error:', error);
+        apiBackoffs.downloads.recordFailure();
       }
-    }, intervalMs);
+    };
+
+    // Use network-aware interval
+    const setupPolling = () => {
+      const interval = getPollingInterval(baseIntervalMs);
+      const networkInfo = getNetworkInfo();
+      console.debug(`[BackgroundDownload] Setting poll interval: ${Math.round(interval / 1000)}s (network: ${networkInfo.quality})`);
+      
+      this.statusPollingInterval = window.setInterval(() => {
+        poll();
+        
+        // Check if we need to adjust interval based on new network conditions
+        const newInterval = getPollingInterval(baseIntervalMs);
+        if (Math.abs(newInterval - interval) > 1000) {
+          this.stopStatusPolling();
+          this.startStatusPolling(baseIntervalMs);
+        }
+      }, interval);
+    };
+    
+    setupPolling();
   }
 
   /**
