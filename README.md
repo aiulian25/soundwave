@@ -415,6 +415,11 @@ ports:
 - ✅ **Navigation Links** - Trophy and gift icons in sidebar
 - ✅ **AchievementNotification Component** - Modal with multi-achievement support
 
+### v1.9.2 - Media Streaming Auth Fix (February 2026)
+- ✅ **Multi-Method Auth** - Media streaming supports session, header token, and query param authentication
+- ✅ **Browser Compatibility** - Audio/video elements work with `?token=xxx` since they can't send Authorization headers
+- ✅ **Fixes 403 Errors** - Resolves media playback failures after v1.9.1 security hardening
+
 ### v1.9.1 - Deep Security Hardening (February 2026)
 
 #### SSRF Protection
