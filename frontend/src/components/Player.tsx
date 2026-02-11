@@ -412,7 +412,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           // This reduces latency and prevents buffering on track change
           if (audio.file_path) {
             const encodedPath = audio.file_path.split('/').map(part => encodeURIComponent(part)).join('/');
-            const directUrl = `/media/${encodedPath}`;
+            // Include auth token for media authentication
+            const token = localStorage.getItem('token');
+            const directUrl = `/media/${encodedPath}${token ? `?token=${token}` : ''}`;
             console.log('[Player] → Streaming directly (no API call):', audio.title);
             setStreamUrl(directUrl);
             setLoadingStream(false);

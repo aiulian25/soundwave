@@ -3,7 +3,7 @@ HTTP Range request support for media file streaming
 Enables seeking in audio/video files by supporting partial content delivery
 
 Security Features:
-- Authentication required for all media access
+- Authentication required for all media access (session, header token, or query token)
 - Path normalization to prevent directory traversal
 - File validation
 - Content-Type header enforcement
@@ -17,8 +17,53 @@ from django.http import StreamingHttpResponse, HttpResponse, Http404, HttpRespon
 from django.utils.http import http_date
 from pathlib import Path
 from wsgiref.util import FileWrapper
+from rest_framework.authtoken.models import Token
+from common.expiring_token import is_token_expired
 
 logger = logging.getLogger(__name__)
+
+
+def authenticate_media_request(request):
+    """
+    Authenticate a media request using multiple methods:
+    1. Django session (cookies - already authenticated via session middleware)
+    2. Authorization header (Token xxx)
+    3. Query parameter (?token=xxx) - for browser audio/video elements
+    
+    Returns:
+        (user, None) if authenticated
+        (None, error_message) if not authenticated
+    """
+    # Method 1: Session authentication (already handled by SessionMiddleware)
+    if request.user.is_authenticated:
+        return (request.user, None)
+    
+    # Method 2: Authorization header
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if auth_header.startswith('Token '):
+        token_key = auth_header[6:]
+        try:
+            token = Token.objects.select_related('user').get(key=token_key)
+            if not is_token_expired(token):
+                return (token.user, None)
+            else:
+                return (None, "Token expired")
+        except Token.DoesNotExist:
+            return (None, "Invalid token")
+    
+    # Method 3: Query parameter (for browser audio/video elements)
+    token_key = request.GET.get('token', '')
+    if token_key:
+        try:
+            token = Token.objects.select_related('user').get(key=token_key)
+            if not is_token_expired(token):
+                return (token.user, None)
+            else:
+                return (None, "Token expired")
+        except Token.DoesNotExist:
+            return (None, "Invalid token")
+    
+    return (None, "Authentication required")
 
 
 def range_file_iterator(file_obj, offset=0, chunk_size=8192, length=None):
@@ -74,9 +119,11 @@ def serve_media_with_range(request, path, document_root):
         404: File not found or access denied
     """
     # SECURITY: Require authentication for all media file access
-    if not request.user.is_authenticated:
-        logger.warning(f"Unauthenticated media access attempt: {path}")
-        return HttpResponseForbidden("Authentication required")
+    # Supports session auth, Authorization header, or query param token
+    user, error = authenticate_media_request(request)
+    if not user:
+        logger.warning(f"Unauthenticated media access attempt: {path} - {error}")
+        return HttpResponseForbidden(error or "Authentication required")
     
     # Security: Normalize path and prevent directory traversal attacks
     # Remove any path components that try to navigate up the directory tree

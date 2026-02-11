@@ -182,7 +182,15 @@ class AudioPlayerView(ApiBaseView):
         from urllib.parse import quote
         # Encode the file path, preserving forward slashes
         encoded_path = '/'.join(quote(part, safe='') for part in audio.file_path.split('/'))
-        stream_url = f"/media/{encoded_path}"
+        
+        # Include auth token in stream URL for browser media elements
+        # Browser audio/video elements can't send Authorization headers
+        from rest_framework.authtoken.models import Token
+        try:
+            token = Token.objects.get(user=request.user)
+            stream_url = f"/media/{encoded_path}?token={token.key}"
+        except Token.DoesNotExist:
+            stream_url = f"/media/{encoded_path}"
 
         data = {
             'audio': AudioSerializer(audio).data,
