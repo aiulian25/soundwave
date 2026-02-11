@@ -172,7 +172,7 @@ class PlaylistItemsView(ApiBaseView):
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
             logger.exception(f"Error adding track to playlist {playlist_id}: {str(e)}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': 'Failed to add track to playlist'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def delete(self, request, playlist_id):
         """Remove a track from a playlist"""
@@ -229,4 +229,4 @@ class TrackPlaylistsView(ApiBaseView):
             return Response({'data': playlists})
         except Exception as e:
             logger.exception(f"Error finding playlists for track {youtube_id}: {str(e)}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': 'Failed to find playlists for track'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

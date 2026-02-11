@@ -4,6 +4,12 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from playlist.models_smart import SmartPlaylist, SmartPlaylistRule, create_system_smart_playlists
+
+# Valid choices for input validation (prevent injection via unvalidated fields)
+ALLOWED_FIELDS = {choice[0] for choice in SmartPlaylistRule.FIELD_CHOICES}
+ALLOWED_OPERATORS = {choice[0] for choice in SmartPlaylistRule.OPERATOR_CHOICES}
+ALLOWED_ORDER_BY = {choice[0] for choice in SmartPlaylist.ORDER_BY_CHOICES}
+
 from playlist.serializers_smart import (
     SmartPlaylistSerializer,
     SmartPlaylistCreateSerializer,
@@ -175,9 +181,24 @@ class SmartPlaylistRulesView(ApiBaseView):
         
         rules_data = request.data.get('rules', [])
         
+        # Validate rule fields and operators before processing
+        for rule_data in rules_data:
+            field = rule_data.get('field')
+            operator = rule_data.get('operator')
+            if field not in ALLOWED_FIELDS:
+                return Response(
+                    {'error': f'Invalid field: {field}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if operator not in ALLOWED_OPERATORS:
+                return Response(
+                    {'error': f'Invalid operator: {operator}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         # Delete existing rules
         smart_playlist.rules.all().delete()
-        
+
         # Create new rules
         created_rules = []
         for i, rule_data in enumerate(rules_data):
@@ -263,9 +284,38 @@ class SmartPlaylistPreviewView(ApiBaseView):
         order_by = request.data.get('order_by', '-downloaded_date')
         limit = request.data.get('limit')
         
+        # Validate order_by against allowed choices (prevent field enumeration/injection)
+        if order_by not in ALLOWED_ORDER_BY:
+            return Response(
+                {'error': f'Invalid order_by value: {order_by}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate match_mode
+        if match_mode not in ('all', 'any'):
+            return Response(
+                {'error': f'Invalid match_mode: {match_mode}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate rule fields and operators
+        for rule_data in rules_data:
+            field = rule_data.get('field')
+            operator = rule_data.get('operator')
+            if field not in ALLOWED_FIELDS:
+                return Response(
+                    {'error': f'Invalid field: {field}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if operator not in ALLOWED_OPERATORS:
+                return Response(
+                    {'error': f'Invalid operator: {operator}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         # Build queryset
         queryset = Audio.objects.filter(owner=request.user)
-        
+
         if rules_data:
             # Create temporary smart playlist to use its rule evaluation
             temp_playlist = SmartPlaylist(
@@ -274,7 +324,7 @@ class SmartPlaylistPreviewView(ApiBaseView):
                 order_by=order_by,
                 limit=limit
             )
-            
+
             if match_mode == 'all':
                 for rule_data in rules_data:
                     temp_rule = SmartPlaylistRule(

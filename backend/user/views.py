@@ -45,11 +45,20 @@ class UserAccountView(ApiBaseView):
 
 
 class UserProfileView(ApiBaseView):
-    """User profile management"""
+    """User profile management with brute-force protection"""
     
     def patch(self, request):
         """Update user profile (username, email, first_name, last_name)"""
+        from common.rate_limiter import (
+            is_sensitive_action_locked,
+            record_sensitive_action_failure,
+            clear_sensitive_action_attempts,
+            SENSITIVE_ACTION_MAX_ATTEMPTS,
+        )
+        
         user = request.user
+        action_type = 'profile_update'
+        
         username = request.data.get('username')
         email = request.data.get('email')
         first_name = request.data.get('first_name')
@@ -70,10 +79,39 @@ class UserProfileView(ApiBaseView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check lockout only if password verification is needed
+        if current_password:
+            locked, remaining_seconds = is_sensitive_action_locked(user.id, action_type)
+            if locked:
+                return Response(
+                    {
+                        'error': 'Too many failed attempts. Please try again later.',
+                        'locked': True,
+                        'remaining_seconds': remaining_seconds,
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+        
         # Verify current password only if it's provided (for username/email changes)
         if current_password and not user.check_password(current_password):
+            attempts, is_now_locked, lockout_duration = record_sensitive_action_failure(user.id, action_type)
+            
+            if is_now_locked:
+                return Response(
+                    {
+                        'error': f'Too many failed attempts. Locked for {lockout_duration // 60} minutes.',
+                        'locked': True,
+                        'remaining_seconds': lockout_duration,
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            
+            remaining = SENSITIVE_ACTION_MAX_ATTEMPTS - attempts
             return Response(
-                {'error': 'Current password is incorrect'},
+                {
+                    'error': 'Current password is incorrect',
+                    'remaining_attempts': remaining,
+                },
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
@@ -120,6 +158,10 @@ class UserProfileView(ApiBaseView):
             if 'name' not in updated_fields:
                 updated_fields.append('name')
         
+        # Clear failed attempts on successful password verification
+        if current_password:
+            clear_sensitive_action_attempts(user.id, action_type)
+        
         user.save()
         
         return Response({
@@ -129,11 +171,32 @@ class UserProfileView(ApiBaseView):
 
 
 class ChangePasswordView(ApiBaseView):
-    """Change user password"""
+    """Change user password with brute-force protection"""
     
     def post(self, request):
         """Change password"""
+        from common.rate_limiter import (
+            is_sensitive_action_locked,
+            record_sensitive_action_failure,
+            clear_sensitive_action_attempts,
+            SENSITIVE_ACTION_MAX_ATTEMPTS,
+        )
+        
         user = request.user
+        action_type = 'change_password'
+        
+        # Check if locked out
+        locked, remaining_seconds = is_sensitive_action_locked(user.id, action_type)
+        if locked:
+            return Response(
+                {
+                    'error': 'Too many failed attempts. Please try again later.',
+                    'locked': True,
+                    'remaining_seconds': remaining_seconds,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
         current_password = request.data.get('current_password')
         new_password = request.data.get('new_password')
         
@@ -145,8 +208,24 @@ class ChangePasswordView(ApiBaseView):
         
         # Verify current password
         if not user.check_password(current_password):
+            attempts, is_now_locked, lockout_duration = record_sensitive_action_failure(user.id, action_type)
+            
+            if is_now_locked:
+                return Response(
+                    {
+                        'error': f'Too many failed attempts. Locked for {lockout_duration // 60} minutes.',
+                        'locked': True,
+                        'remaining_seconds': lockout_duration,
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            
+            remaining = SENSITIVE_ACTION_MAX_ATTEMPTS - attempts
             return Response(
-                {'error': 'Current password is incorrect'},
+                {
+                    'error': 'Current password is incorrect',
+                    'remaining_attempts': remaining,
+                },
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
@@ -156,6 +235,9 @@ class ChangePasswordView(ApiBaseView):
                 {'error': 'Password must be at least 8 characters long'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Clear failed attempts on success
+        clear_sensitive_action_attempts(user.id, action_type)
         
         # Set new password
         user.set_password(new_password)
@@ -406,14 +488,35 @@ class TwoFactorSetupView(ApiBaseView):
 
 
 class TwoFactorVerifyView(ApiBaseView):
-    """Verify and enable 2FA"""
+    """Verify and enable 2FA with brute-force protection"""
 
     def post(self, request):
         """Verify 2FA code and enable"""
+        from common.rate_limiter import (
+            is_sensitive_action_locked,
+            record_sensitive_action_failure,
+            clear_sensitive_action_attempts,
+            SENSITIVE_ACTION_MAX_ATTEMPTS,
+        )
+        
+        user = request.user
+        action_type = '2fa_verify'
+        
+        # Check if locked out
+        locked, remaining_seconds = is_sensitive_action_locked(user.id, action_type)
+        if locked:
+            return Response(
+                {
+                    'error': 'Too many failed attempts. Please try again later.',
+                    'locked': True,
+                    'remaining_seconds': remaining_seconds,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
         serializer = TwoFactorVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        user = request.user
         code = serializer.validated_data['code']
         
         if not user.two_factor_secret:
@@ -423,6 +526,7 @@ class TwoFactorVerifyView(ApiBaseView):
             )
         
         if verify_totp(user.two_factor_secret, code):
+            clear_sensitive_action_attempts(user.id, action_type)
             user.two_factor_enabled = True
             user.save()
             return Response({
@@ -430,21 +534,59 @@ class TwoFactorVerifyView(ApiBaseView):
                 'enabled': True
             })
         
+        # Record failed attempt
+        attempts, is_now_locked, lockout_duration = record_sensitive_action_failure(user.id, action_type)
+        
+        if is_now_locked:
+            return Response(
+                {
+                    'error': f'Too many failed attempts. Locked for {lockout_duration // 60} minutes.',
+                    'locked': True,
+                    'remaining_seconds': lockout_duration,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        remaining = SENSITIVE_ACTION_MAX_ATTEMPTS - attempts
         return Response(
-            {'error': 'Invalid verification code'},
+            {
+                'error': 'Invalid verification code',
+                'remaining_attempts': remaining,
+            },
             status=status.HTTP_400_BAD_REQUEST
         )
 
 
 class TwoFactorDisableView(ApiBaseView):
-    """Disable 2FA"""
+    """Disable 2FA with brute-force protection"""
 
     def post(self, request):
         """Disable 2FA for user"""
+        from common.rate_limiter import (
+            is_sensitive_action_locked,
+            record_sensitive_action_failure,
+            clear_sensitive_action_attempts,
+            SENSITIVE_ACTION_MAX_ATTEMPTS,
+        )
+        
+        user = request.user
+        action_type = '2fa_disable'
+        
+        # Check if locked out
+        locked, remaining_seconds = is_sensitive_action_locked(user.id, action_type)
+        if locked:
+            return Response(
+                {
+                    'error': 'Too many failed attempts. Please try again later.',
+                    'locked': True,
+                    'remaining_seconds': remaining_seconds,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
         serializer = TwoFactorVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        user = request.user
         code = serializer.validated_data['code']
         
         if not user.two_factor_enabled:
@@ -455,6 +597,7 @@ class TwoFactorDisableView(ApiBaseView):
         
         # Verify code before disabling
         if verify_totp(user.two_factor_secret, code) or code in user.backup_codes:
+            clear_sensitive_action_attempts(user.id, action_type)
             user.two_factor_enabled = False
             user.two_factor_secret = None
             user.backup_codes = []
@@ -464,24 +607,95 @@ class TwoFactorDisableView(ApiBaseView):
                 'enabled': False
             })
         
+        # Record failed attempt
+        attempts, is_now_locked, lockout_duration = record_sensitive_action_failure(user.id, action_type)
+        
+        if is_now_locked:
+            return Response(
+                {
+                    'error': f'Too many failed attempts. Locked for {lockout_duration // 60} minutes.',
+                    'locked': True,
+                    'remaining_seconds': lockout_duration,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        remaining = SENSITIVE_ACTION_MAX_ATTEMPTS - attempts
         return Response(
-            {'error': 'Invalid verification code'},
+            {
+                'error': 'Invalid verification code',
+                'remaining_attempts': remaining,
+            },
             status=status.HTTP_400_BAD_REQUEST
         )
 
 
 class TwoFactorRegenerateCodesView(ApiBaseView):
-    """Regenerate backup codes"""
+    """Regenerate backup codes - requires 2FA verification"""
 
     def post(self, request):
-        """Generate new backup codes"""
+        """Generate new backup codes (requires current 2FA code for security)"""
+        from common.rate_limiter import (
+            is_sensitive_action_locked,
+            record_sensitive_action_failure,
+            clear_sensitive_action_attempts,
+            SENSITIVE_ACTION_MAX_ATTEMPTS,
+        )
+        
         user = request.user
+        action_type = '2fa_regenerate'
         
         if not user.two_factor_enabled:
             return Response(
                 {'error': 'Two-factor authentication is not enabled'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Check if locked out
+        locked, remaining_seconds = is_sensitive_action_locked(user.id, action_type)
+        if locked:
+            return Response(
+                {
+                    'error': 'Too many failed attempts. Please try again later.',
+                    'locked': True,
+                    'remaining_seconds': remaining_seconds,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        # Require current 2FA code to regenerate backup codes
+        code = request.data.get('code', '').strip()
+        if not code:
+            return Response(
+                {'error': 'Current 2FA code is required to regenerate backup codes'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify the 2FA code (but NOT a backup code - we're regenerating those!)
+        if not verify_totp(user.two_factor_secret, code):
+            attempts, is_now_locked, lockout_duration = record_sensitive_action_failure(user.id, action_type)
+            
+            if is_now_locked:
+                return Response(
+                    {
+                        'error': f'Too many failed attempts. Locked for {lockout_duration // 60} minutes.',
+                        'locked': True,
+                        'remaining_seconds': lockout_duration,
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            
+            remaining = SENSITIVE_ACTION_MAX_ATTEMPTS - attempts
+            return Response(
+                {
+                    'error': 'Invalid 2FA code',
+                    'remaining_attempts': remaining,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Clear failed attempts on success
+        clear_sensitive_action_attempts(user.id, action_type)
         
         # Generate new backup codes
         backup_codes = generate_backup_codes()
@@ -556,8 +770,16 @@ class AvatarUploadView(APIView):
         # Create avatars directory if it doesn't exist
         self.AVATAR_DIR.mkdir(parents=True, exist_ok=True)
         
+        # Map content type to safe extension (don't trust client extension)
+        EXTENSION_MAP = {
+            'image/jpeg': '.jpg',
+            'image/png': '.png',
+            'image/gif': '.gif',
+            'image/webp': '.webp',
+        }
+        ext = EXTENSION_MAP.get(content_type, '.jpg')
+        
         # Generate safe filename: username_timestamp.ext
-        ext = Path(avatar_file.name).suffix or '.jpg'
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"{request.user.username}_{timestamp}{ext}"
         filepath = self.AVATAR_DIR / filename

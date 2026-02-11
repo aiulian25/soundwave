@@ -77,6 +77,15 @@ class LocalAudioUploadSerializer(serializers.ModelSerializer):
     # Make title optional - will be extracted from ID3 tags if not provided
     title = serializers.CharField(required=False, allow_blank=True, max_length=500)
     
+    # Allowed audio file extensions and MIME types
+    ALLOWED_EXTENSIONS = {'mp3', 'flac', 'm4a', 'ogg', 'opus', 'wav', 'wma', 'aac', 'webm'}
+    ALLOWED_MIME_TYPES = {
+        'audio/mpeg', 'audio/mp3', 'audio/flac', 'audio/x-flac',
+        'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/ogg',
+        'audio/opus', 'audio/wav', 'audio/x-wav', 'audio/x-ms-wma',
+        'audio/aac', 'audio/webm'
+    }
+    
     class Meta:
         model = LocalAudio
         fields = [
@@ -91,6 +100,35 @@ class LocalAudioUploadSerializer(serializers.ModelSerializer):
             'tags',
             'notes',
         ]
+    
+    def validate_file(self, value):
+        """Validate uploaded audio file type and size"""
+        # Check file extension
+        if '.' not in value.name:
+            raise serializers.ValidationError("File must have an extension")
+        
+        file_extension = value.name.rsplit('.', 1)[-1].lower()
+        if file_extension not in self.ALLOWED_EXTENSIONS:
+            raise serializers.ValidationError(
+                f"Invalid file type. Allowed: {', '.join(sorted(self.ALLOWED_EXTENSIONS))}"
+            )
+        
+        # Check content type if available
+        if hasattr(value, 'content_type') and value.content_type:
+            # Allow application/octet-stream since browsers may not detect audio types
+            if value.content_type != 'application/octet-stream' and value.content_type not in self.ALLOWED_MIME_TYPES:
+                raise serializers.ValidationError(
+                    f"Invalid content type: {value.content_type}"
+                )
+        
+        # Check file size (max 500MB)
+        max_size = 500 * 1024 * 1024
+        if value.size > max_size:
+            raise serializers.ValidationError(
+                f"File too large. Maximum size is 500MB."
+            )
+        
+        return value
     
     def create(self, validated_data):
         """Extract metadata and create local audio"""

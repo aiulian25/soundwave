@@ -13,6 +13,26 @@ from audio.serializers import (
 )
 from common.views import ApiBaseView, AdminWriteOnly
 
+# Allowed URL prefixes for artwork fetching (SSRF protection)
+# Only trusted external services are allowed
+ALLOWED_ARTWORK_URL_PREFIXES = (
+    'https://i.ytimg.com/',           # YouTube thumbnails
+    'https://i3.ytimg.com/',          # YouTube thumbnails alt
+    'https://i9.ytimg.com/',          # YouTube thumbnails alt
+    'https://img.youtube.com/',       # YouTube thumbnails
+    'https://coverartarchive.org/',   # MusicBrainz Cover Art Archive
+    'http://coverartarchive.org/',    # MusicBrainz Cover Art Archive (HTTP)
+    'https://assets.fanart.tv/',      # Fanart.tv
+    'https://lastfm.freetls.fastly.net/',  # Last.fm images
+)
+
+
+def is_safe_artwork_url(url: str) -> bool:
+    """Validate URL is from a trusted source to prevent SSRF attacks"""
+    if not url:
+        return False
+    return any(url.startswith(prefix) for prefix in ALLOWED_ARTWORK_URL_PREFIXES)
+
 
 class AudioListView(ApiBaseView):
     """Audio list endpoint
@@ -434,13 +454,14 @@ class AudioExportView(ApiBaseView):
             # Priority: custom URL > cover_art_url > thumbnail
             art_url = artwork_url or audio.cover_art_url or audio.thumbnail_url
             
-            if art_url:
+            # SSRF protection: validate URL is from allowed sources
+            if art_url and is_safe_artwork_url(art_url):
                 try:
                     resp = http_requests.get(art_url, timeout=10)
                     if resp.status_code == 200:
                         cover_art_data = resp.content
-                except Exception as e:
-                    print(f"Failed to download artwork: {e}")
+                except Exception:
+                    pass  # Silently fail - don't expose error details
         
         # Create temporary file for conversion
         temp_dir = tempfile.mkdtemp()
@@ -743,6 +764,7 @@ class ArtworkProxyView(APIView):
     1. Only serves publicly available artwork URLs (YouTube thumbnails, etc.)
     2. Does not expose any user data
     3. The youtube_id must exist in the database
+    4. URLs are validated to prevent SSRF attacks
     """
     authentication_classes = []
     permission_classes = []
@@ -764,6 +786,13 @@ class ArtworkProxyView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
+        # SSRF protection: validate URL is from allowed sources
+        if not is_safe_artwork_url(artwork_url):
+            return Response(
+                {'error': 'Invalid artwork source'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         try:
             # Fetch the image
             resp = http_requests.get(artwork_url, timeout=10)
@@ -781,8 +810,9 @@ class ArtworkProxyView(APIView):
                     {'error': 'Failed to fetch artwork'},
                     status=status.HTTP_502_BAD_GATEWAY
                 )
-        except Exception as e:
+        except Exception:
+            # Don't expose exception details in response
             return Response(
-                {'error': f'Error fetching artwork: {str(e)}'},
+                {'error': 'Error fetching artwork'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

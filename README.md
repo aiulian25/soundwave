@@ -415,6 +415,33 @@ ports:
 - ✅ **Navigation Links** - Trophy and gift icons in sidebar
 - ✅ **AchievementNotification Component** - Modal with multi-achievement support
 
+### v1.9.1 - Deep Security Hardening (February 2026)
+
+#### SSRF Protection
+- ✅ **URL Allowlist** - All external artwork fetching restricted to trusted domains (YouTube, MusicBrainz, Fanart.tv, Last.fm)
+- ✅ **Audio Export** - Artwork URL validation prevents server-side request forgery
+- ✅ **Tag Writer** - Cover art downloads validated against allowlist
+- ✅ **Artwork Proxy** - Centralized URL validation for all artwork requests
+
+#### Input Validation
+- ✅ **Smart Playlists** - Allowlist validation for fields, operators, and order_by parameters
+- ✅ **File Uploads** - Extension and MIME type validation for local audio uploads
+- ✅ **500MB Size Limit** - Maximum file size enforcement for uploads
+
+#### Brute Force Protection
+- ✅ **Password Change** - Per-user rate limiting (5 attempts, 30-min lockout)
+- ✅ **2FA Endpoints** - Rate limiting on verify, disable, and regenerate codes
+- ✅ **Profile Updates** - Protection against automated attacks
+
+#### Information Disclosure Fixes
+- ✅ **Error Messages** - Generic messages prevent exception detail exposure
+- ✅ **Debug Logging** - Sensitive data removed from logs (requires `DEBUG_LOGGING=true`)
+- ✅ **Auth Debug** - Token/cookie values no longer logged (requires `AUTH_DEBUG=true`)
+
+#### Media Security
+- ✅ **Authentication Required** - All `/media/*` endpoints now require authentication
+- ✅ **Streaming Protected** - Audio files no longer accessible without valid token
+
 ### v1.8.0 - Security Hardening & Session Management (February 2026)
 
 #### Login Security

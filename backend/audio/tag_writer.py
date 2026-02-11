@@ -20,15 +20,38 @@ except ImportError:
     MUTAGEN_AVAILABLE = False
     print("Warning: mutagen not available, cannot write audio tags")
 
+# Allowed URL prefixes for artwork download (SSRF protection)
+ALLOWED_ARTWORK_URL_PREFIXES = (
+    'https://i.ytimg.com/',           # YouTube thumbnails
+    'https://i3.ytimg.com/',          # YouTube thumbnails alt
+    'https://i9.ytimg.com/',          # YouTube thumbnails alt
+    'https://img.youtube.com/',       # YouTube thumbnails
+    'https://coverartarchive.org/',   # MusicBrainz Cover Art Archive
+    'http://coverartarchive.org/',    # MusicBrainz Cover Art Archive (HTTP)
+    'https://assets.fanart.tv/',      # Fanart.tv
+    'https://lastfm.freetls.fastly.net/',  # Last.fm images
+)
+
+
+def _is_safe_artwork_url(url: str) -> bool:
+    """Validate URL is from a trusted source to prevent SSRF attacks"""
+    if not url:
+        return False
+    return any(url.startswith(prefix) for prefix in ALLOWED_ARTWORK_URL_PREFIXES)
+
 
 def download_cover_art(url: str) -> Optional[bytes]:
-    """Download cover art image from URL"""
+    """Download cover art image from URL (with SSRF protection)"""
+    # SSRF protection: validate URL is from allowed sources
+    if not _is_safe_artwork_url(url):
+        return None
+    
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             return response.content
-    except Exception as e:
-        print(f"Error downloading cover art: {e}")
+    except Exception:
+        pass  # Don't expose error details
     return None
 
 

@@ -26,13 +26,12 @@ class ChannelListView(ApiBaseView):
         """Subscribe to channel - TubeArchivist pattern with Celery task"""
         from channel.serializers import ChannelSubscribeSerializer
         import logging
+        import os
         logger = logging.getLogger(__name__)
         
-        # Log request details
-        logger.error(f"=== CHANNEL SUBSCRIBE START ===")
-        logger.error(f"User: {request.user}")
-        logger.error(f"Is authenticated: {request.user.is_authenticated}")
-        logger.error(f"Request data: {request.data}")
+        # Debug logging only if explicitly enabled
+        if os.environ.get('DEBUG_LOGGING', '').lower() == 'true':
+            logger.debug(f"Channel subscribe - User: {request.user}")
         
         # Check channel quota
         if not request.user.can_add_channel:

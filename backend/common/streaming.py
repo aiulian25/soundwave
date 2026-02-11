@@ -3,21 +3,17 @@ HTTP Range request support for media file streaming
 Enables seeking in audio/video files by supporting partial content delivery
 
 Security Features:
+- Authentication required for all media access
 - Path normalization to prevent directory traversal
-- User authentication (handled by Django middleware)
 - File validation
 - Content-Type header enforcement
 - Symlink attack prevention
-
-Note: Authentication is handled by Django's authentication middleware
-before this view is reached. All media files are considered protected
-and require an authenticated user session.
 """
 
 import os
 import re
 import logging
-from django.http import StreamingHttpResponse, HttpResponse, Http404
+from django.http import StreamingHttpResponse, HttpResponse, Http404, HttpResponseForbidden
 from django.utils.http import http_date
 from pathlib import Path
 from wsgiref.util import FileWrapper
@@ -57,7 +53,7 @@ def serve_media_with_range(request, path, document_root):
     This enables seeking in audio/video files
     
     Security considerations:
-    1. Authentication: Assumes authentication is handled by Django middleware
+    1. Authentication: REQUIRES authenticated user
     2. Path Traversal: Prevents access to files outside document_root
     3. File Validation: Only serves existing files within allowed directory
     4. No Directory Listing: Returns 404 for directories
@@ -73,9 +69,15 @@ def serve_media_with_range(request, path, document_root):
     HTTP Status Codes:
         200: Full content served
         206: Partial content served (range request)
+        403: Forbidden (not authenticated)
         416: Range Not Satisfiable
         404: File not found or access denied
     """
+    # SECURITY: Require authentication for all media file access
+    if not request.user.is_authenticated:
+        logger.warning(f"Unauthenticated media access attempt: {path}")
+        return HttpResponseForbidden("Authentication required")
+    
     # Security: Normalize path and prevent directory traversal attacks
     # Remove any path components that try to navigate up the directory tree
     path = Path(path).as_posix()

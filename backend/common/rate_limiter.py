@@ -131,3 +131,72 @@ class StrictAnonThrottle(AnonRateThrottle):
     """Very strict throttle for sensitive anonymous endpoints."""
     rate = '5/minute'
     scope = 'strict_anon'
+
+
+# Sensitive action rate limiting for authenticated users
+SENSITIVE_ACTION_MAX_ATTEMPTS = 5
+SENSITIVE_ACTION_LOCKOUT_DURATION = 30 * 60  # 30 minutes
+
+
+def get_sensitive_action_key(user_id, action_type):
+    """Generate cache key for sensitive action attempts."""
+    return f"sensitive_action:{action_type}:{user_id}"
+
+
+def get_sensitive_action_lockout_key(user_id, action_type):
+    """Generate cache key for sensitive action lockout."""
+    return f"sensitive_lockout:{action_type}:{user_id}"
+
+
+def is_sensitive_action_locked(user_id, action_type):
+    """
+    Check if user is locked out from a sensitive action.
+    Returns (is_locked, remaining_seconds).
+    """
+    lockout_key = get_sensitive_action_lockout_key(user_id, action_type)
+    lockout_until = cache.get(lockout_key)
+    
+    if lockout_until:
+        now = datetime.now()
+        if now < lockout_until:
+            remaining = (lockout_until - now).total_seconds()
+            return True, int(remaining)
+        else:
+            cache.delete(lockout_key)
+    
+    return False, 0
+
+
+def record_sensitive_action_failure(user_id, action_type):
+    """
+    Record a failed sensitive action attempt.
+    Returns (attempt_count, is_now_locked, lockout_duration).
+    """
+    attempt_key = get_sensitive_action_key(user_id, action_type)
+    lockout_key = get_sensitive_action_lockout_key(user_id, action_type)
+    
+    attempts = cache.get(attempt_key, 0) + 1
+    cache.set(attempt_key, attempts, SENSITIVE_ACTION_LOCKOUT_DURATION)
+    
+    if attempts >= SENSITIVE_ACTION_MAX_ATTEMPTS:
+        lockout_until = datetime.now() + timedelta(seconds=SENSITIVE_ACTION_LOCKOUT_DURATION)
+        cache.set(lockout_key, lockout_until, SENSITIVE_ACTION_LOCKOUT_DURATION)
+        cache.delete(attempt_key)
+        return attempts, True, SENSITIVE_ACTION_LOCKOUT_DURATION
+    
+    return attempts, False, 0
+
+
+def clear_sensitive_action_attempts(user_id, action_type):
+    """Clear sensitive action attempts after success."""
+    attempt_key = get_sensitive_action_key(user_id, action_type)
+    lockout_key = get_sensitive_action_lockout_key(user_id, action_type)
+    cache.delete(attempt_key)
+    cache.delete(lockout_key)
+
+
+def get_sensitive_action_remaining_attempts(user_id, action_type):
+    """Get remaining attempts for a sensitive action."""
+    attempt_key = get_sensitive_action_key(user_id, action_type)
+    attempts = cache.get(attempt_key, 0)
+    return max(0, SENSITIVE_ACTION_MAX_ATTEMPTS - attempts)

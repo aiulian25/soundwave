@@ -543,9 +543,49 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         )}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
           <MusicNoteIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">
+          <Typography variant="h6" color="text.secondary" gutterBottom>
             Instrumental Track
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+            This track was marked as instrumental. If it has lyrics, you can search for them or upload an LRC file.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={deleting ? <CircularProgress size={16} /> : <SearchIcon />}
+              onClick={deleteLyrics}
+              disabled={deleting}
+            >
+              {deleting ? 'Clearing...' : 'Search for Lyrics'}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={uploading ? <CircularProgress size={16} /> : <UploadFileIcon />}
+              onClick={handleUploadClick}
+              disabled={uploading}
+              color="secondary"
+            >
+              {uploading ? 'Uploading...' : 'Upload .LRC'}
+            </Button>
+          </Box>
+          {/* Hidden file input for upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".lrc"
+            style={{ display: 'none' }}
+            onChange={handleLrcUpload}
+          />
+          {/* Success snackbar */}
+          <Snackbar
+            open={uploadSuccess}
+            autoHideDuration={3000}
+            onClose={() => setUploadSuccess(false)}
+            message="LRC file uploaded successfully!"
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          />
         </Box>
       </Box>
     );
