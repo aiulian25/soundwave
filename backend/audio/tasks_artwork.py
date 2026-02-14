@@ -463,7 +463,7 @@ def auto_fetch_artwork_batch(limit: int = 50):
     """
     # Find audio without artwork
     audio_without_artwork = Audio.objects.filter(
-        ~Q(artwork__isnull=False)
+        ~Q(artworks__isnull=False)
     )[:limit]
     
     count = 0
@@ -484,7 +484,7 @@ def auto_fetch_artist_info_batch(limit: int = 20):
     """
     # Find channels without artist info
     channels_without_info = Channel.objects.filter(
-        ~Q(artistinfo__isnull=False)
+        ~Q(artist_info__isnull=False)
     )[:limit]
     
     count = 0
