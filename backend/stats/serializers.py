@@ -236,3 +236,20 @@ class HomepageDataSerializer(serializers.Serializer):
     made_for_you = RecommendationItemSerializer(many=True)
     recently_played = RecentlyPlayedItemSerializer(many=True)
     recently_added = RecentlyAddedItemSerializer(many=True)
+
+
+class WidgetStatsSerializer(serializers.Serializer):
+    """
+    Widget statistics for external dashboards (TubeArchivist-compatible format).
+    Returns stats that can be consumed by homepage widgets like Homepage dashboard.
+    """
+    downloads = serializers.IntegerField(help_text="Total completed downloads")
+    audio = serializers.IntegerField(help_text="Total audio files in library")
+    channels = serializers.IntegerField(help_text="Total subscribed channels")
+    playlists = serializers.IntegerField(help_text="Total playlists")
+    
+    # Extended stats (optional, not in TubeArchivist but useful)
+    pending_downloads = serializers.IntegerField(required=False, help_text="Pending downloads in queue")
+    total_duration = serializers.IntegerField(required=False, help_text="Total library duration in seconds")
+    total_size_bytes = serializers.IntegerField(required=False, help_text="Total library size in bytes")
+    storage_used_gb = serializers.FloatField(required=False, help_text="Storage used in GB")

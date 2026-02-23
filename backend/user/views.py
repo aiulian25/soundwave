@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from common.views import ApiBaseView
-from user.models import Account
+from user.models import Account, APIKey
 from user.serializers import (
     AccountSerializer,
     LoginSerializer,
@@ -20,6 +20,9 @@ from user.serializers import (
     TwoFactorSetupSerializer,
     TwoFactorVerifySerializer,
     TwoFactorStatusSerializer,
+    APIKeySerializer,
+    APIKeyCreateSerializer,
+    APIKeyCreatedSerializer,
 )
 from user.two_factor import (
     generate_totp_secret,
@@ -887,3 +890,119 @@ class AvatarFileView(APIView):
             content_type = 'application/octet-stream'
         
         return FileResponse(open(filepath, 'rb'), content_type=content_type)
+
+
+class APIKeyListCreateView(ApiBaseView):
+    """List and create API keys"""
+    
+    def get(self, request):
+        """List all API keys for the current user"""
+        api_keys = APIKey.objects.filter(user=request.user)
+        serializer = APIKeySerializer(api_keys, many=True)
+        return Response(serializer.data)
+    
+    def post(self, request):
+        """Create a new API key"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        serializer = APIKeyCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.validated_data
+        
+        # Create the API key
+        api_key, raw_key = APIKey.create_for_user(
+            user=request.user,
+            name=data.get('name', 'Widget API Key'),
+            permission=data.get('permission', 'read'),
+        )
+        
+        # Update scopes
+        api_key.scope_stats = data.get('scope_stats', True)
+        api_key.scope_audio = data.get('scope_audio', False)
+        api_key.scope_channels = data.get('scope_channels', False)
+        api_key.scope_playlists = data.get('scope_playlists', False)
+        api_key.scope_downloads = data.get('scope_downloads', False)
+        
+        # Set expiry if specified
+        expires_in_days = data.get('expires_in_days')
+        if expires_in_days:
+            api_key.expires_at = timezone.now() + timedelta(days=expires_in_days)
+        
+        api_key.save()
+        
+        # Return the response with the raw key (only shown once!)
+        return Response({
+            'id': api_key.id,
+            'name': api_key.name,
+            'key': raw_key,
+            'key_prefix': api_key.key_prefix,
+            'permission': api_key.permission,
+            'created_at': api_key.created_at,
+            'message': 'Save this API key! It will only be shown once.',
+        }, status=status.HTTP_201_CREATED)
+
+
+class APIKeyDetailView(ApiBaseView):
+    """Manage individual API keys"""
+    
+    def get(self, request, key_id):
+        """Get API key details"""
+        try:
+            api_key = APIKey.objects.get(id=key_id, user=request.user)
+        except APIKey.DoesNotExist:
+            return Response(
+                {'error': 'API key not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = APIKeySerializer(api_key)
+        return Response(serializer.data)
+    
+    def patch(self, request, key_id):
+        """Update API key (name, permissions, active status)"""
+        try:
+            api_key = APIKey.objects.get(id=key_id, user=request.user)
+        except APIKey.DoesNotExist:
+            return Response(
+                {'error': 'API key not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Update allowed fields
+        if 'name' in request.data:
+            api_key.name = request.data['name']
+        if 'is_active' in request.data:
+            api_key.is_active = request.data['is_active']
+        if 'permission' in request.data:
+            api_key.permission = request.data['permission']
+        if 'scope_stats' in request.data:
+            api_key.scope_stats = request.data['scope_stats']
+        if 'scope_audio' in request.data:
+            api_key.scope_audio = request.data['scope_audio']
+        if 'scope_channels' in request.data:
+            api_key.scope_channels = request.data['scope_channels']
+        if 'scope_playlists' in request.data:
+            api_key.scope_playlists = request.data['scope_playlists']
+        if 'scope_downloads' in request.data:
+            api_key.scope_downloads = request.data['scope_downloads']
+        
+        api_key.save()
+        
+        serializer = APIKeySerializer(api_key)
+        return Response(serializer.data)
+    
+    def delete(self, request, key_id):
+        """Delete an API key"""
+        try:
+            api_key = APIKey.objects.get(id=key_id, user=request.user)
+        except APIKey.DoesNotExist:
+            return Response(
+                {'error': 'API key not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        api_key.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

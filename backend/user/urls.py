@@ -18,6 +18,8 @@ from user.views import (
     AvatarUploadView,
     AvatarPresetView,
     AvatarFileView,
+    APIKeyListCreateView,
+    APIKeyDetailView,
 )
 
 urlpatterns = [
@@ -38,6 +40,9 @@ urlpatterns = [
     path('avatar/upload/', AvatarUploadView.as_view(), name='avatar-upload'),
     path('avatar/preset/', AvatarPresetView.as_view(), name='avatar-preset'),
     path('avatar/file/<str:filename>/', AvatarFileView.as_view(), name='avatar-file'),
+    # API Key management (for widget/external API access)
+    path('api-keys/', APIKeyListCreateView.as_view(), name='api-key-list'),
+    path('api-keys/<int:key_id>/', APIKeyDetailView.as_view(), name='api-key-detail'),
     # Admin user management
     path('', include('user.urls_admin')),
 ]

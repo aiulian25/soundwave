@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from user.models import Account, UserYouTubeAccount, UserConfig
+from user.models import Account, UserYouTubeAccount, UserConfig, APIKey
 
 
 @admin.register(Account)
@@ -294,3 +294,68 @@ class UserConfigAdmin(admin.ModelAdmin):
         if request.user.is_superuser or request.user.is_admin:
             return qs
         return qs.filter(user=request.user)
+
+
+@admin.register(APIKey)
+class APIKeyAdmin(admin.ModelAdmin):
+    """Admin for API Keys (TubeArchivist-style widget authentication)"""
+    
+    list_display = [
+        'name',
+        'user',
+        'key_prefix',
+        'permission',
+        'is_active',
+        'scope_summary',
+        'created_at',
+        'last_used',
+    ]
+    
+    list_filter = [
+        'is_active',
+        'permission',
+        'scope_stats',
+        'scope_audio',
+        'scope_channels',
+        'scope_playlists',
+        'scope_downloads',
+    ]
+    
+    search_fields = ['name', 'user__username', 'key_prefix']
+    
+    readonly_fields = ['key_hash', 'key_prefix', 'created_at', 'last_used']
+    
+    fieldsets = (
+        ('Key Info', {
+            'fields': ('user', 'name', 'key_prefix', 'permission', 'is_active')
+        }),
+        ('Scopes', {
+            'fields': (
+                'scope_stats',
+                'scope_audio',
+                'scope_channels',
+                'scope_playlists',
+                'scope_downloads',
+            )
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'last_used', 'expires_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def scope_summary(self, obj):
+        """Display active scopes as badges"""
+        scopes = []
+        if obj.scope_stats:
+            scopes.append('stats')
+        if obj.scope_audio:
+            scopes.append('audio')
+        if obj.scope_channels:
+            scopes.append('channels')
+        if obj.scope_playlists:
+            scopes.append('playlists')
+        if obj.scope_downloads:
+            scopes.append('downloads')
+        return ', '.join(scopes) if scopes else 'none'
+    scope_summary.short_description = 'Scopes'

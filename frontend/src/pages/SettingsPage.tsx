@@ -24,6 +24,16 @@ import {
   AccordionSummary,
   AccordionDetails,
   Slider,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Tooltip,
+  Checkbox,
 } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -38,6 +48,10 @@ import FastForwardIcon from '@mui/icons-material/FastForward';
 import CachedIcon from '@mui/icons-material/Cached';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import SyncIcon from '@mui/icons-material/Sync';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI } from '../api/client';
@@ -64,6 +78,26 @@ interface TwoFactorSetup {
   backup_codes: string[];
 }
 
+interface APIKey {
+  id: number;
+  name: string;
+  key_prefix: string;
+  permission: string;
+  scope_stats: boolean;
+  scope_audio: boolean;
+  scope_channels: boolean;
+  scope_playlists: boolean;
+  scope_downloads: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_used: string | null;
+  expires_at: string | null;
+}
+
+interface NewAPIKey extends APIKey {
+  key: string; // Full key, only available when created
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { themeMode, setThemeMode } = useThemeContext();
@@ -82,12 +116,65 @@ export default function SettingsPage() {
   // Cache stats state
   const [cacheStats, setCacheStats] = useState<{ count: number; totalSize: number } | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
+  
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
+  const [newApiKeyName, setNewApiKeyName] = useState('Widget API Key');
+  const [newApiKey, setNewApiKey] = useState<NewAPIKey | null>(null);
+  const [deleteKeyId, setDeleteKeyId] = useState<number | null>(null);
 
   useEffect(() => {
     loadTwoFactorStatus();
     checkAdminStatus();
     loadCacheStats();
+    loadApiKeys();
   }, []);
+  
+  const loadApiKeys = async () => {
+    try {
+      const response = await userAPI.listApiKeys();
+      setApiKeys(response.data);
+    } catch (err) {
+      console.error('Failed to load API keys:', err);
+    }
+  };
+  
+  const handleCreateApiKey = async () => {
+    try {
+      setError('');
+      const response = await userAPI.createApiKey({ 
+        name: newApiKeyName,
+        permission: 'read',
+        scope_stats: true,
+      });
+      setNewApiKey(response.data);
+      setApiKeyDialogOpen(false);
+      loadApiKeys();
+      setSuccess('API key created! Copy it now - it will only be shown once.');
+      setTimeout(() => setSuccess(''), 10000);
+    } catch (err) {
+      setError('Failed to create API key');
+    }
+  };
+  
+  const handleDeleteApiKey = async (keyId: number) => {
+    try {
+      await userAPI.deleteApiKey(keyId);
+      setDeleteKeyId(null);
+      loadApiKeys();
+      setSuccess('API key deleted');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to delete API key');
+    }
+  };
+  
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setSuccess('Copied to clipboard!');
+    setTimeout(() => setSuccess(''), 2000);
+  };
   
   const loadCacheStats = async () => {
     try {
@@ -412,6 +499,143 @@ export default function SettingsPage() {
               </>
             )}
           </Stack>
+        </CardContent>
+      </Card>
+
+      {/* API Keys Section */}
+      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <VpnKeyIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+              <Typography variant="subtitle1" fontWeight={600}>
+                API Keys
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setApiKeyDialogOpen(true)}
+            >
+              Create Key
+            </Button>
+          </Box>
+
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+            Create API keys for external dashboard widgets (like Homepage). Keys are compatible with TubeArchivist widget format.
+          </Typography>
+
+          {newApiKey && (
+            <Alert 
+              severity="warning" 
+              sx={{ mb: 2 }}
+              action={
+                <IconButton size="small" onClick={() => copyToClipboard(newApiKey.key)}>
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              }
+            >
+              <Typography variant="body2" fontWeight={600}>Save your API key now!</Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontFamily: 'monospace', 
+                  bgcolor: 'action.hover', 
+                  p: 0.5, 
+                  borderRadius: 1,
+                  mt: 0.5,
+                  wordBreak: 'break-all'
+                }}
+              >
+                {newApiKey.key}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                This key will only be shown once. Copy it now!
+              </Typography>
+            </Alert>
+          )}
+
+          {apiKeys.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+              No API keys created yet
+            </Typography>
+          ) : (
+            <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Key</TableCell>
+                    <TableCell>Last Used</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {apiKeys.map((key) => (
+                    <TableRow key={key.id}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2">{key.name}</Typography>
+                          <Chip 
+                            label={key.is_active ? 'Active' : 'Inactive'} 
+                            size="small" 
+                            color={key.is_active ? 'success' : 'default'}
+                            sx={{ height: 20, fontSize: '0.7rem' }}
+                          />
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          {key.key_prefix}...
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">
+                          {key.last_used 
+                            ? new Date(key.last_used).toLocaleDateString() 
+                            : 'Never'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Delete key">
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            onClick={() => setDeleteKeyId(key.id)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          <Box sx={{ mt: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 0.5 }}>
+              Homepage Widget Configuration
+            </Typography>
+            <Typography 
+              variant="caption" 
+              component="pre"
+              sx={{ 
+                fontFamily: 'monospace', 
+                whiteSpace: 'pre-wrap',
+                m: 0,
+                fontSize: '0.7rem'
+              }}
+            >
+{`widget:
+  type: tubearchivist
+  url: ${window.location.origin}
+  key: YOUR_API_KEY_HERE
+  fields: ["downloads", "videos", "channels", "playlists"]`}
+            </Typography>
+          </Box>
         </CardContent>
       </Card>
 
@@ -795,6 +1019,70 @@ export default function SettingsPage() {
             disabled={disableCode.length !== 6}
           >
             Disable 2FA
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create API Key Dialog */}
+      <Dialog 
+        open={apiKeyDialogOpen} 
+        onClose={() => {
+          setApiKeyDialogOpen(false);
+          setNewApiKeyName('Widget API Key');
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create API Key</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Create an API key for external dashboard widgets. This key will allow read-only access to your statistics.
+          </Typography>
+          <TextField
+            autoFocus
+            label="Key Name"
+            fullWidth
+            value={newApiKeyName}
+            onChange={(e) => setNewApiKeyName(e.target.value)}
+            placeholder="e.g., Homepage Widget"
+            size="small"
+            sx={{ mb: 2 }}
+          />
+          <Alert severity="info" sx={{ mb: 1 }}>
+            The API key will only be shown once after creation. Make sure to copy it!
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApiKeyDialogOpen(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleCreateApiKey}
+            disabled={!newApiKeyName.trim()}
+          >
+            Create Key
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete API Key Confirmation Dialog */}
+      <Dialog
+        open={deleteKeyId !== null}
+        onClose={() => setDeleteKeyId(null)}
+      >
+        <DialogTitle>Delete API Key?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Are you sure you want to delete this API key? Any applications using this key will lose access.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteKeyId(null)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={() => deleteKeyId && handleDeleteApiKey(deleteKeyId)}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

@@ -13,6 +13,11 @@ from stats.views import (
     StreakView,
     YearlyWrappedView,
     HomepageDataView,
+    WidgetStatsView,
+    TubeArchivistDownloadView,
+    TubeArchivistVideoView,
+    TubeArchivistChannelView,
+    TubeArchivistPlaylistView,
 )
 
 urlpatterns = [
@@ -27,4 +32,12 @@ urlpatterns = [
     path('streak/', StreakView.as_view(), name='streak'),
     path('wrapped/', YearlyWrappedView.as_view(), name='yearly-wrapped'),
     path('homepage/', HomepageDataView.as_view(), name='homepage-data'),
+    # Widget API (combined endpoint)
+    path('widget/', WidgetStatsView.as_view(), name='widget-stats'),
+    # TubeArchivist-compatible individual endpoints (for Homepage dashboard widget)
+    # These match the exact endpoints that the TubeArchivist widget expects
+    path('download', TubeArchivistDownloadView.as_view(), name='ta-download-stats'),
+    path('video', TubeArchivistVideoView.as_view(), name='ta-video-stats'),
+    path('channel', TubeArchivistChannelView.as_view(), name='ta-channel-stats'),
+    path('playlist', TubeArchivistPlaylistView.as_view(), name='ta-playlist-stats'),
 ]

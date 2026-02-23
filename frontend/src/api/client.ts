@@ -242,6 +242,30 @@ export const userAPI = {
   twoFactorDisable: (data: { code: string }) => api.post('/user/2fa/disable/', data),
   twoFactorRegenerateCodes: () => api.post('/user/2fa/regenerate-codes/'),
   twoFactorDownloadCodes: () => api.get('/user/2fa/download-codes/', { responseType: 'blob' }),
+  // API Keys (for widget/external access)
+  listApiKeys: () => api.get('/user/api-keys/'),
+  createApiKey: (data: { 
+    name?: string; 
+    permission?: 'read' | 'write' | 'admin';
+    scope_stats?: boolean;
+    scope_audio?: boolean;
+    scope_channels?: boolean;
+    scope_playlists?: boolean;
+    scope_downloads?: boolean;
+    expires_in_days?: number;
+  }) => api.post('/user/api-keys/', data),
+  getApiKey: (keyId: number) => api.get(`/user/api-keys/${keyId}/`),
+  updateApiKey: (keyId: number, data: {
+    name?: string;
+    is_active?: boolean;
+    permission?: string;
+    scope_stats?: boolean;
+    scope_audio?: boolean;
+    scope_channels?: boolean;
+    scope_playlists?: boolean;
+    scope_downloads?: boolean;
+  }) => api.patch(`/user/api-keys/${keyId}/`, data),
+  deleteApiKey: (keyId: number) => api.delete(`/user/api-keys/${keyId}/`),
 };
 
 // App Settings API

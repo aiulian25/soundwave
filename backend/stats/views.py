@@ -22,8 +22,13 @@ from stats.serializers import (
     AchievementProgressSerializer,
     YearlyWrappedSerializer,
     HomepageDataSerializer,
+    WidgetStatsSerializer,
 )
 from common.views import ApiBaseView
+from common.authentication import APIKeyAuthentication
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+from playlist.models import Playlist
 
 
 class AudioStatsView(ApiBaseView):
@@ -51,8 +56,8 @@ class ChannelStatsView(ApiBaseView):
     def get(self, request):
         """Get channel statistics"""
         stats = {
-            'total_channels': Channel.objects.filter(user=request.user).count(),
-            'subscribed_channels': Channel.objects.filter(user=request.user, subscribed=True).count(),
+            'total_channels': Channel.objects.filter(owner=request.user).count(),
+            'subscribed_channels': Channel.objects.filter(owner=request.user, subscribed=True).count(),
         }
 
         serializer = ChannelStatsSerializer(stats)
@@ -65,9 +70,9 @@ class DownloadStatsView(ApiBaseView):
     def get(self, request):
         """Get download statistics"""
         stats = {
-            'pending': DownloadQueue.objects.filter(user=request.user, status='pending').count(),
-            'completed': DownloadQueue.objects.filter(user=request.user, status='completed').count(),
-            'failed': DownloadQueue.objects.filter(user=request.user, status='failed').count(),
+            'pending': DownloadQueue.objects.filter(owner=request.user, status='pending').count(),
+            'completed': DownloadQueue.objects.filter(owner=request.user, status='completed').count(),
+            'failed': DownloadQueue.objects.filter(owner=request.user, status='failed').count(),
         }
 
         serializer = DownloadStatsSerializer(stats)
@@ -980,3 +985,180 @@ class HomepageDataView(ApiBaseView):
             completed=False
         ).update(completed=True)
         return Response({'cleared': True})
+
+
+class WidgetStatsView(APIView):
+    """
+    Widget statistics endpoint for external dashboards (TubeArchivist-compatible).
+    
+    This endpoint can be accessed with:
+    - API Key authentication via header: Authorization: ApiKey <key>
+    - API Key authentication via query param: ?key=<api_key>
+    - Standard session/token authentication (for logged-in users)
+    
+    Compatible with Homepage dashboard widget configuration:
+    ```yaml
+    widget:
+      type: tubearchivist
+      url: https://your-soundwave-instance
+      key: your-api-key-here
+      fields: ["downloads", "audio", "channels", "playlists"]
+    ```
+    """
+    authentication_classes = [APIKeyAuthentication]
+    permission_classes = [AllowAny]  # Authentication check is handled by API key
+    
+    def get(self, request):
+        """Get widget statistics"""
+        # Check if authenticated via API key
+        if not hasattr(request, 'api_key') or request.api_key is None:
+            return Response(
+                {'error': 'Valid API key required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        user = request.user
+        api_key = request.api_key
+        
+        # Check if this API key has stats scope
+        if not api_key.scope_stats:
+            return Response(
+                {'error': 'API key does not have permission for stats'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get audio stats
+        audio_aggregate = Audio.objects.filter(owner=user).aggregate(
+            total_count=Count('id'),
+            total_duration=Sum('duration'),
+            total_size=Sum('file_size'),
+        )
+        
+        # Get download stats
+        downloads_completed = DownloadQueue.objects.filter(
+            owner=user, 
+            status='completed'
+        ).count()
+        downloads_pending = DownloadQueue.objects.filter(
+            owner=user, 
+            status='pending'
+        ).count()
+        
+        # Get channel stats
+        channels_subscribed = Channel.objects.filter(
+            owner=user, 
+            subscribed=True
+        ).count()
+        
+        # Get playlist stats
+        playlists_count = Playlist.objects.filter(owner=user).count()
+        
+        # Build response in TubeArchivist format
+        stats = {
+            # TubeArchivist-compatible fields
+            'downloads': downloads_completed,
+            'audio': audio_aggregate['total_count'] or 0,
+            'channels': channels_subscribed,
+            'playlists': playlists_count,
+            
+            # Extended stats
+            'pending_downloads': downloads_pending,
+            'total_duration': audio_aggregate['total_duration'] or 0,
+            'total_size_bytes': audio_aggregate['total_size'] or 0,
+            'storage_used_gb': round((audio_aggregate['total_size'] or 0) / (1024 ** 3), 2),
+        }
+        
+        serializer = WidgetStatsSerializer(stats)
+        return Response(serializer.data)
+
+
+class TubeArchivistBaseView(APIView):
+    """
+    Base view for TubeArchivist-compatible stats endpoints.
+    These endpoints match the exact format expected by Homepage dashboard's TubeArchivist widget.
+    
+    The widget calls 4 separate endpoints and expects specific response formats.
+    Authentication: Authorization: Token <api_key>
+    """
+    authentication_classes = [APIKeyAuthentication]
+    permission_classes = [AllowAny]
+    
+    def check_auth(self, request):
+        """Check if request is authenticated via API key"""
+        if not hasattr(request, 'api_key') or request.api_key is None:
+            return Response(
+                {'error': 'Valid API key required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        if not request.api_key.scope_stats:
+            return Response(
+                {'error': 'API key does not have permission for stats'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return None
+
+
+class TubeArchivistDownloadView(TubeArchivistBaseView):
+    """
+    TubeArchivist-compatible download stats endpoint.
+    Returns: {"pending": N}
+    """
+    def get(self, request):
+        auth_error = self.check_auth(request)
+        if auth_error:
+            return auth_error
+        
+        pending = DownloadQueue.objects.filter(
+            owner=request.user,
+            status='pending'
+        ).count()
+        
+        return Response({'pending': pending})
+
+
+class TubeArchivistVideoView(TubeArchivistBaseView):
+    """
+    TubeArchivist-compatible video/audio stats endpoint.
+    Returns: {"doc_count": N}
+    """
+    def get(self, request):
+        auth_error = self.check_auth(request)
+        if auth_error:
+            return auth_error
+        
+        doc_count = Audio.objects.filter(owner=request.user).count()
+        
+        return Response({'doc_count': doc_count})
+
+
+class TubeArchivistChannelView(TubeArchivistBaseView):
+    """
+    TubeArchivist-compatible channel stats endpoint.
+    Returns: {"doc_count": N}
+    """
+    def get(self, request):
+        auth_error = self.check_auth(request)
+        if auth_error:
+            return auth_error
+        
+        doc_count = Channel.objects.filter(
+            owner=request.user,
+            subscribed=True
+        ).count()
+        
+        return Response({'doc_count': doc_count})
+
+
+class TubeArchivistPlaylistView(TubeArchivistBaseView):
+    """
+    TubeArchivist-compatible playlist stats endpoint.
+    Returns: {"doc_count": N}
+    """
+    def get(self, request):
+        auth_error = self.check_auth(request)
+        if auth_error:
+            return auth_error
+        
+        doc_count = Playlist.objects.filter(owner=request.user).count()
+        
+        return Response({'doc_count': doc_count})

@@ -1,7 +1,7 @@
 """User serializers"""
 
 from rest_framework import serializers
-from user.models import Account, UserConfig
+from user.models import Account, UserConfig, APIKey
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -74,3 +74,44 @@ class TwoFactorStatusSerializer(serializers.Serializer):
     """2FA status"""
     enabled = serializers.BooleanField()
     backup_codes_count = serializers.IntegerField()
+
+
+class APIKeySerializer(serializers.ModelSerializer):
+    """API Key serializer (for listing keys)"""
+    
+    class Meta:
+        model = APIKey
+        fields = [
+            'id', 'name', 'key_prefix', 'permission',
+            'scope_stats', 'scope_audio', 'scope_channels',
+            'scope_playlists', 'scope_downloads',
+            'is_active', 'created_at', 'last_used', 'expires_at'
+        ]
+        read_only_fields = [
+            'id', 'key_prefix', 'created_at', 'last_used'
+        ]
+
+
+class APIKeyCreateSerializer(serializers.Serializer):
+    """API Key creation serializer"""
+    name = serializers.CharField(max_length=100, default='Widget API Key')
+    permission = serializers.ChoiceField(
+        choices=['read', 'write', 'admin'],
+        default='read'
+    )
+    scope_stats = serializers.BooleanField(default=True)
+    scope_audio = serializers.BooleanField(default=False)
+    scope_channels = serializers.BooleanField(default=False)
+    scope_playlists = serializers.BooleanField(default=False)
+    scope_downloads = serializers.BooleanField(default=False)
+    expires_in_days = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+
+
+class APIKeyCreatedSerializer(serializers.Serializer):
+    """Response after creating an API key (includes the actual key, shown only once)"""
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    key = serializers.CharField(help_text="The API key - save this, it's only shown once!")
+    key_prefix = serializers.CharField()
+    permission = serializers.CharField()
+    created_at = serializers.DateTimeField()

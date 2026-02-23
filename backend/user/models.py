@@ -3,6 +3,8 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 import json
+import secrets
+import hashlib
 
 
 class AccountManager(BaseUserManager):
@@ -218,3 +220,94 @@ class UserConfig(models.Model):
         """Set a setting in extra_settings"""
         self.extra_settings[key] = value
         self.save(update_fields=['extra_settings', 'updated_at'])
+
+
+class APIKey(models.Model):
+    """API Key model for widget/external API access (TubeArchivist-style)"""
+    
+    user = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name='api_keys',
+        help_text="User who owns this API key"
+    )
+    name = models.CharField(max_length=100, help_text="Friendly name for this API key")
+    
+    # Key hashed for security - we only show the key once when created
+    key_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    key_prefix = models.CharField(max_length=8, help_text="First 8 chars of the key for identification")
+    
+    # Permissions
+    PERMISSION_CHOICES = [
+        ('read', 'Read Only'),
+        ('write', 'Read & Write'),
+        ('admin', 'Full Admin'),
+    ]
+    permission = models.CharField(max_length=20, choices=PERMISSION_CHOICES, default='read')
+    
+    # Scopes - what data this key can access
+    scope_stats = models.BooleanField(default=True, help_text="Can access stats/widget API")
+    scope_audio = models.BooleanField(default=False, help_text="Can access audio API")
+    scope_channels = models.BooleanField(default=False, help_text="Can access channels API")
+    scope_playlists = models.BooleanField(default=False, help_text="Can access playlists API")
+    scope_downloads = models.BooleanField(default=False, help_text="Can access downloads API")
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True, help_text="Optional expiry date")
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'API Key'
+        verbose_name_plural = 'API Keys'
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.name} ({self.key_prefix}...)"
+    
+    @classmethod
+    def generate_key(cls):
+        """Generate a new random API key"""
+        return secrets.token_hex(20)  # 40 character hex string
+    
+    @classmethod
+    def hash_key(cls, key):
+        """Hash an API key for storage"""
+        return hashlib.sha256(key.encode()).hexdigest()
+    
+    @classmethod
+    def create_for_user(cls, user, name='Widget API Key', permission='read'):
+        """Create a new API key for a user and return the raw key (only shown once)"""
+        raw_key = cls.generate_key()
+        api_key = cls.objects.create(
+            user=user,
+            name=name,
+            key_hash=cls.hash_key(raw_key),
+            key_prefix=raw_key[:8],
+            permission=permission,
+        )
+        # Return both the model and the raw key (only available at creation time)
+        return api_key, raw_key
+    
+    @classmethod
+    def validate_key(cls, raw_key):
+        """Validate an API key and return the APIKey object if valid"""
+        if not raw_key:
+            return None
+        key_hash = cls.hash_key(raw_key)
+        try:
+            api_key = cls.objects.select_related('user').get(
+                key_hash=key_hash,
+                is_active=True
+            )
+            # Check expiry
+            from django.utils import timezone
+            if api_key.expires_at and api_key.expires_at < timezone.now():
+                return None
+            # Update last_used
+            api_key.last_used = timezone.now()
+            api_key.save(update_fields=['last_used'])
+            return api_key
+        except cls.DoesNotExist:
+            return None

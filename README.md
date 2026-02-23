@@ -179,7 +179,39 @@ Wait ~30-60 seconds for all services to initialize on first start.
 | `./cache` | Temporary cache files |
 | `./data` | Database and app data |
 
-## 📖 Usage
+## � Dashboard Integration (Homepage)
+
+SoundWave provides a TubeArchivist-compatible API for integration with [Homepage](https://gethomepage.dev/) and other dashboard applications.
+
+### Setup
+
+1. **Generate an API Key** in SoundWave: Settings → API Keys → Create
+2. **Add to your Homepage services.yaml:**
+
+```yaml
+- SoundWave:
+    icon: http://your-soundwave-host:8889/img/logo.svg
+    href: http://your-soundwave-host:8889
+    description: Self-Hosted Audio
+    widget:
+      type: tubearchivist
+      url: http://your-soundwave-host:8889/api/stats
+      key: YOUR_API_KEY_HERE
+      fields: ["downloads", "videos", "channels", "playlists"]
+```
+
+### Widget Fields
+
+| Field | Description |
+|-------|-------------|
+| `downloads` | Pending downloads |
+| `videos` | Total audio files |
+| `channels` | Subscribed channels |
+| `playlists` | Total playlists |
+
+For detailed API documentation, see [docs/WIDGET_API.md](docs/WIDGET_API.md).
+
+## �📖 Usage
 
 ### Downloading Audio
 
