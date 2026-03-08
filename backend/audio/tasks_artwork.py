@@ -7,8 +7,9 @@ import os
 import requests
 from pathlib import Path
 
-from audio.models import Audio, Channel
+from audio.models import Audio
 from audio.models_artwork import Artwork, MusicMetadata, ArtistInfo
+from channel.models import Channel
 from audio.lastfm_client import LastFMClient
 from audio.fanart_client import FanartClient
 from audio.id3_service import ID3TagService
@@ -299,12 +300,12 @@ def fetch_artist_artwork(self, channel_id: int):
             pass
         
         # Use YouTube thumbnail as fallback
-        if channel.channel_thumb_url and not Artwork.objects.filter(channel=channel, source='youtube').exists():
+        if channel.channel_thumbnail and not Artwork.objects.filter(channel=channel, source='youtube').exists():
             artwork = Artwork.objects.create(
                 channel=channel,
                 artwork_type='artist_image',
                 source='youtube',
-                url=channel.channel_thumb_url,
+                url=channel.channel_thumbnail,
                 priority=10
             )
             download_artwork.delay(artwork.id)

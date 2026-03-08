@@ -54,6 +54,7 @@ import {
   setPositionState,
   clearMediaSession,
 } from '../utils/mediaSession';
+import { requestWakeLock, releaseWakeLock } from '../utils/wakeLock';
 
 interface PlayerProps {
   audio: Audio;
@@ -606,6 +607,26 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       });
     };
   }, []);
+
+  // Wake Lock - Prevent screen sleep during audio playback (critical for mobile)
+  // This prevents the system from suspending the page and stopping audio after a few songs
+  useEffect(() => {
+    if (isPlaying && !loadingStream) {
+      // Request wake lock when playing
+      requestWakeLock().catch(() => {
+        // Wake lock request can fail on some devices, but audio will still play
+        // (just might stop if screen turns off)
+      });
+    } else {
+      // Release wake lock when not playing
+      releaseWakeLock();
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      releaseWakeLock();
+    };
+  }, [isPlaying, loadingStream]);
 
   // Initialize Web Audio API for visualizer and EQ - optimized for performance
   useEffect(() => {
