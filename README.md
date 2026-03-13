@@ -18,6 +18,7 @@
 - 🔀 **Shuffle** - Smart shuffle and regular shuffle modes
 - 📊 **Channel Subscriptions** - Subscribe to YouTube channels and automatically download new audio
 - 📝 **Playlists** - Create custom playlists or sync YouTube playlists
+- 🔄 **Force Recheck** - Per-playlist force recheck to verify and re-download missing files
 - ✨ **Smart Playlists** - Dynamic auto-updating playlists based on rules (Most Played, Recently Added, Genre filters, and more)
 
 ### Analytics & Achievements
@@ -60,6 +61,8 @@
 - ⚡ **Background Tasks** - Celery-powered async downloads and updates
 - 💾 **Persistent Storage** - Data survives container rebuilds
 - 🚫 **Smart Error Handling** - Automatically skips permanently unavailable videos (copyright blocked, private, removed)
+- 🗑️ **Deleted Video Detection** - Detects `[Deleted video]` / `[Private video]` entries from YouTube, skips download attempts, and preserves locally-kept copies
+- 👤 **Admin User Management** - Full user deletion with cascade cleanup of audio files, channels, playlists, and avatars
 
 ## 🏗️ Architecture
 
@@ -412,6 +415,35 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.10.0 - Playlist Recheck & Admin Tools (March 2026)
+
+#### Force Recheck Per Playlist
+- ✅ **Force Recheck Button** - Available on both PlaylistCard (grid view) and PlaylistDetailPage
+- ✅ **File Verification** - Verifies every track's audio file exists on disk, re-downloads missing ones
+- ✅ **Retry Unavailable** - Force mode retries previously permanently-failed videos (copyright, private)
+- ✅ **Backend `force=True` flag** - `download_playlist_task` accepts force parameter for deep recheck
+
+#### Deleted / Private Video Detection
+- ✅ **Auto-Detection** - Recognizes `[Deleted video]` and `[Private video]` entries from yt-dlp extract_flat
+- ✅ **Skip Downloads** - Never attempts to download deleted/private videos (saves time and avoids errors)
+- ✅ **Preserve Local Files** - If we already have the audio locally, it is kept even if YouTube removes the video
+- ✅ **Force Recheck Protection** - Force recheck never deletes local copies of deleted/private videos
+- ✅ **Accurate Counts** - `downloaded_count` now uses PlaylistItems to correctly count locally-kept tracks
+- ✅ **Summary Logging** - Sync messages include count of deleted/private videos skipped
+
+#### Admin: Permanent User Deletion
+- ✅ **Full Cascade Delete** - Removes user and all related data (audio, channels, playlists, queue, stats, settings)
+- ✅ **Filesystem Cleanup** - Deletes audio files and empty channel directories from disk
+- ✅ **Avatar Cleanup** - Removes user avatar files
+- ✅ **Safety Guards** - Prevents self-deletion and deletion of the last admin
+- ✅ **Username Confirmation** - Frontend requires typing the username to confirm deletion
+
+#### Playlist Sync Reliability
+- ✅ **YouTube Cookies Support** - All yt-dlp calls use cookies.txt for authenticated requests
+- ✅ **Eliminated API Amplification** - `link_audio_to_playlists` uses DB lookups instead of re-fetching YouTube
+- ✅ **Better Error Visibility** - Removed silent failures, added proper logging
+- ✅ **Task Name Collision Fix** - Renamed offline download task to avoid Celery registry conflicts
 
 ### v1.9.0 - Achievements & Yearly Wrapped (February 2026)
 

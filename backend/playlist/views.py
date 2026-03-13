@@ -97,7 +97,7 @@ class PlaylistDetailView(ApiBaseView):
         return Response(response_data)
 
     def post(self, request, playlist_id):
-        """Trigger actions on playlist (e.g., download)"""
+        """Trigger actions on playlist (e.g., download, force_recheck)"""
         playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
         action = request.data.get('action')
         
@@ -105,6 +105,11 @@ class PlaylistDetailView(ApiBaseView):
             from task.tasks import download_playlist_task
             download_playlist_task.delay(playlist.id)
             return Response({'detail': 'Download task started'}, status=status.HTTP_202_ACCEPTED)
+        
+        if action == 'force_recheck':
+            from task.tasks import download_playlist_task
+            download_playlist_task.delay(playlist.id, force=True)
+            return Response({'detail': 'Force recheck task started'}, status=status.HTTP_202_ACCEPTED)
         
         return Response({'detail': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 

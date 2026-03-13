@@ -122,6 +122,7 @@ export const playlistAPI = {
   create: (data: any) => api.post('/playlist/', data),
   delete: (playlistId: string) => api.delete(`/playlist/${playlistId}/`),
   download: (playlistId: string) => api.post(`/playlist/${playlistId}/`, { action: 'download' }),
+  forceRecheck: (playlistId: string) => api.post(`/playlist/${playlistId}/`, { action: 'force_recheck' }),
   // Item management
   getItems: (playlistId: string) => api.get(`/playlist/${playlistId}/items/`),
   addItem: (playlistId: string, youtubeId: string) => api.post(`/playlist/${playlistId}/items/`, { youtube_id: youtubeId }),

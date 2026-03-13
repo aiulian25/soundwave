@@ -39,6 +39,23 @@ PERMANENT_ERROR_PATTERNS = [
 ]
 
 
+# Titles that yt-dlp returns in extract_flat mode for deleted/private videos
+DELETED_VIDEO_TITLES = [
+    '[deleted video]',
+    '[private video]',
+]
+
+
+def is_deleted_or_private_entry(entry):
+    """Check if a playlist entry is a deleted or private video.
+    
+    In extract_flat mode, yt-dlp returns these with special titles
+    like '[Deleted video]' or '[Private video]'.
+    """
+    title = (entry.get('title') or '').strip().lower()
+    return title in DELETED_VIDEO_TITLES
+
+
 def is_permanently_unavailable(error_message):
     """Check if an error message indicates a permanently unavailable video."""
     if not error_message:
@@ -396,8 +413,13 @@ def update_subscriptions_task():
 
 
 @shared_task
-def download_playlist_task(playlist_id):
-    """Smart sync: Download only NEW audio from playlist (not already downloaded)"""
+def download_playlist_task(playlist_id, force=False):
+    """Smart sync: Download only NEW audio from playlist (not already downloaded).
+    
+    When force=True, also:
+    - Retry previously permanently-unavailable videos
+    - Verify existing audio files on disk and re-download missing ones
+    """
     from playlist.models import Playlist, PlaylistItem
     
     try:
@@ -431,18 +453,15 @@ def download_playlist_task(playlist_id):
             total_items = len([e for e in info['entries'] if e])
             playlist.item_count = total_items
             
-            # Get list of already downloaded video IDs
-            existing_ids = set(Audio.objects.filter(
-                owner=playlist.owner
-            ).values_list('youtube_id', flat=True))
-            
             # Get list of permanently unavailable videos (copyright, private, etc.)
-            unavailable_ids = get_permanently_unavailable_ids(playlist.owner)
+            # When force=True, retry everything including previously unavailable
+            unavailable_ids = set() if force else get_permanently_unavailable_ids(playlist.owner)
             
             # Queue only NEW videos (not already downloaded)
             new_videos = 0
             skipped = 0
             skipped_unavailable = 0
+            skipped_deleted = 0
             
             for idx, entry in enumerate(info['entries']):
                 if not entry:
@@ -451,6 +470,10 @@ def download_playlist_task(playlist_id):
                 video_id = entry.get('id')
                 if not video_id:
                     continue
+                
+                # Detect deleted/private videos from YouTube
+                # yt-dlp extract_flat returns these with title '[Deleted video]' or '[Private video]'
+                entry_is_deleted = is_deleted_or_private_entry(entry)
                 
                 # Check if audio already exists
                 audio_obj = Audio.objects.filter(
@@ -465,7 +488,31 @@ def download_playlist_task(playlist_id):
                         audio=audio_obj,
                         defaults={'position': idx}
                     )
-                    skipped += 1
+                    # When force=True, verify the file actually exists on disk
+                    # But NEVER delete local files for deleted/private YouTube videos
+                    if force and not entry_is_deleted and audio_obj.file_path:
+                        full_path = os.path.join('/app/audio', audio_obj.file_path)
+                        if not os.path.isfile(full_path):
+                            logger.warning('Force recheck: file missing for %s (%s), re-downloading',
+                                           audio_obj.youtube_id, audio_obj.file_path)
+                            audio_obj.delete()
+                            # Fall through to queue a new download below
+                        else:
+                            skipped += 1
+                            continue
+                    else:
+                        if entry_is_deleted:
+                            logger.info('Keeping local copy of deleted/private video: %s (%s)',
+                                        audio_obj.title, video_id)
+                        skipped += 1
+                        continue
+                
+                # If video is deleted/private on YouTube and we don't have it locally,
+                # skip it entirely — downloading would fail anyway
+                if entry_is_deleted:
+                    skipped_deleted += 1
+                    logger.debug('Skipping deleted/private video: %s (%s)',
+                                 entry.get('title', '?'), video_id)
                     continue
                 
                 # Skip permanently unavailable videos (copyright blocked, private, etc.)
@@ -494,8 +541,8 @@ def download_playlist_task(playlist_id):
                 # Create or get queue item - but skip permanently unavailable videos
                 if not existing_queue_item or existing_queue_item.status in ['failed', 'ignored']:
                     if existing_queue_item and existing_queue_item.status in ['failed', 'ignored']:
-                        # Check if this is a permanent failure - DON'T retry these
-                        if is_permanently_unavailable(existing_queue_item.error_message):
+                        # Check if this is a permanent failure - DON'T retry these (unless force=True)
+                        if not force and is_permanently_unavailable(existing_queue_item.error_message):
                             skipped_unavailable += 1
                             continue
                         # Update existing failed item (temporary failures only)
@@ -550,22 +597,28 @@ def download_playlist_task(playlist_id):
             # Update playlist status
             playlist.sync_status = 'success'
             playlist.last_refresh = timezone.now()
-            # Count only audios from THIS playlist (match by checking all video IDs in playlist)
-            all_playlist_video_ids = [e.get('id') for e in info['entries'] if e and e.get('id')]
-            playlist.downloaded_count = Audio.objects.filter(
-                owner=playlist.owner,
-                youtube_id__in=all_playlist_video_ids
-            ).count()
+            # Count downloaded tracks: include all tracks in PlaylistItems
+            # (covers both current YouTube entries AND locally-kept deleted videos)
+            playlist.downloaded_count = PlaylistItem.objects.filter(
+                playlist=playlist,
+                audio__file_path__isnull=False,
+            ).exclude(audio__file_path='').count()
             playlist.save()
             
+            mode = 'Force recheck' if force else 'Sync'
+            
             if new_videos == 0:
-                msg = f"Playlist '{playlist.title}' up to date ({skipped} already downloaded"
+                msg = f"{mode} '{playlist.title}' up to date ({skipped} already downloaded"
+                if skipped_deleted > 0:
+                    msg += f", {skipped_deleted} deleted/private skipped"
                 if skipped_unavailable > 0:
                     msg += f", {skipped_unavailable} unavailable skipped"
                 msg += ")"
                 return msg
             
-            msg = f"Playlist '{playlist.title}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+            msg = f"{mode} '{playlist.title}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+            if skipped_deleted > 0:
+                msg += f", {skipped_deleted} deleted/private skipped"
             if skipped_unavailable > 0:
                 msg += f", {skipped_unavailable} unavailable skipped"
             return msg

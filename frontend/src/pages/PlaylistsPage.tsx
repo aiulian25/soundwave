@@ -72,6 +72,7 @@ export default function PlaylistsPage() {
   const [error, setError] = useState('');
   const [offlinePlaylists, setOfflinePlaylists] = useState<Set<number>>(new Set());
   const [syncingPlaylists, setSyncingPlaylists] = useState<Set<string>>(new Set());
+  const [recheckingPlaylists, setRecheckingPlaylists] = useState<Set<string>>(new Set());
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'info' });
 
   // Drag and drop sorting with backend persistence
@@ -254,6 +255,38 @@ export default function PlaylistsPage() {
     }
   };
 
+  const handleForceRecheck = async (playlistId: string) => {
+    setRecheckingPlaylists(prev => new Set(prev).add(playlistId));
+    try {
+      await playlistAPI.forceRecheck(playlistId);
+      setSnackbar({
+        open: true,
+        message: '🔍 Force recheck started — re-downloading missing files...',
+        severity: 'info'
+      });
+      setTimeout(async () => {
+        await loadPlaylists();
+        setRecheckingPlaylists(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(playlistId);
+          return newSet;
+        });
+      }, 30000);
+    } catch (err: any) {
+      console.error('Failed to start force recheck:', err);
+      setRecheckingPlaylists(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(playlistId);
+        return newSet;
+      });
+      setSnackbar({
+        open: true,
+        message: `❌ Failed to start recheck: ${err.response?.data?.detail || err.message || 'Unknown error'}`,
+        severity: 'error'
+      });
+    }
+  };
+
   return (
     <Box>
       {/* Header */}
@@ -312,7 +345,9 @@ export default function PlaylistsPage() {
                   isOffline={offlinePlaylists.has(playlist.id)}
                   isOnline={isOnline}
                   isSyncing={syncingPlaylists.has(playlist.playlist_id) || playlist.sync_status === 'syncing'}
+                  isRechecking={recheckingPlaylists.has(playlist.playlist_id)}
                   onSync={() => handleDownload(playlist.playlist_id)}
+                  onForceRecheck={() => handleForceRecheck(playlist.playlist_id)}
                   onDelete={() => handleDelete(playlist.playlist_id)}
                   onClick={() => navigate(`/playlists/${playlist.playlist_id}`)}
                 />

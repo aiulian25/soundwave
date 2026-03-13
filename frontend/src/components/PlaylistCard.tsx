@@ -8,6 +8,7 @@ import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
 import SyncIcon from '@mui/icons-material/Sync';
+import FindReplaceIcon from '@mui/icons-material/FindReplace';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
@@ -27,7 +28,9 @@ interface PlaylistCardProps {
   isOffline?: boolean;
   isOnline?: boolean;
   isSyncing?: boolean;
+  isRechecking?: boolean;
   onSync?: () => void;
+  onForceRecheck?: () => void;
   onDelete?: () => void;
   onClick?: () => void;
 }
@@ -37,7 +40,9 @@ export default function PlaylistCard({
   isOffline = false,
   isOnline = true,
   isSyncing = false,
+  isRechecking = false,
   onSync,
+  onForceRecheck,
   onDelete,
   onClick,
 }: PlaylistCardProps) {
@@ -289,6 +294,27 @@ export default function PlaylistCard({
                   <CircularProgress size={18} color="inherit" />
                 ) : (
                   <SyncIcon sx={{ fontSize: 18 }} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+
+          <Tooltip title={isRechecking ? 'Rechecking...' : 'Force recheck missing files'}>
+            <span>
+              <IconButton
+                size="small"
+                color="warning"
+                onClick={(e) => { e.stopPropagation(); onForceRecheck?.(); }}
+                disabled={isRechecking}
+                sx={{
+                  bgcolor: 'rgba(255, 152, 0, 0.1)',
+                  '&:hover': { bgcolor: 'rgba(255, 152, 0, 0.2)' },
+                }}
+              >
+                {isRechecking ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <FindReplaceIcon sx={{ fontSize: 18 }} />
                 )}
               </IconButton>
             </span>

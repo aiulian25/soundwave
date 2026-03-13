@@ -31,6 +31,7 @@ import {
   WifiOff as WifiOffIcon,
   Storage as StorageIcon,
   OfflinePin as OfflinePinIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { playlistAPI, audioAPI } from '../api/client';
@@ -215,6 +216,20 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       } catch (err) {
         console.error(`Failed to download ${item.audio.title}:`, err);
       }
+    }
+  };
+
+  const handleForceRecheck = async () => {
+    if (!playlistId) return;
+    try {
+      await playlistAPI.forceRecheck(playlistId);
+      setSnackbarMessage('Force recheck started — checking all tracks and re-downloading missing files...');
+      setSnackbarOpen(true);
+      // Reload after delay to pick up new status
+      setTimeout(() => loadPlaylist(), 30000);
+    } catch (err: any) {
+      setSnackbarMessage(`Failed to start recheck: ${err.response?.data?.detail || err.message || 'Unknown error'}`);
+      setSnackbarOpen(true);
     }
   };
 
@@ -562,6 +577,24 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           title="Download all tracks to your device"
         >
           <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Save All</Box>
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<SyncIcon />}
+          onClick={handleForceRecheck}
+          sx={{
+            minWidth: { xs: '48px', sm: '170px' },
+            borderColor: 'warning.main',
+            color: 'warning.main',
+            fontWeight: 600,
+            '&:hover': { 
+              borderColor: 'warning.dark',
+              bgcolor: 'rgba(255, 152, 0, 0.05)'
+            },
+          }}
+          title="Re-check all tracks and re-download missing files"
+        >
+          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Force Recheck</Box>
         </Button>
       </Box>
 
