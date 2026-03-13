@@ -5,6 +5,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Sum, Q
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from pathlib import Path
+import logging
+import shutil
 
 from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
 from common.permissions import CanManageUsers
@@ -22,6 +26,7 @@ from playlist.models import Playlist
 from audio.models import Audio
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class IsAdminOrSelf(IsAuthenticated):
@@ -115,6 +120,84 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             'message': f'User {"activated" if user.is_active else "deactivated"}',
             'is_active': user.is_active
         })
+
+    @action(detail=True, methods=['delete'], url_path='delete_user')
+    def delete_user(self, request, pk=None):
+        """Permanently delete a user and ALL their data (audio files, playlists, channels, etc.)"""
+        user = self.get_object()
+
+        # Prevent self-deletion
+        if user.id == request.user.id:
+            return Response(
+                {'detail': 'Cannot delete your own account'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Prevent deleting the last admin
+        if user.is_admin or user.is_superuser:
+            admin_count = User.objects.filter(
+                Q(is_admin=True) | Q(is_superuser=True),
+                is_active=True
+            ).count()
+            if admin_count <= 1:
+                return Response(
+                    {'detail': 'Cannot delete the last admin user'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        username = user.username
+        files_deleted = 0
+        errors = []
+
+        # 1. Delete audio files from filesystem (CASCADE won't call Audio.delete())
+        audio_files = Audio.objects.filter(owner=user)
+        media_root = Path(settings.MEDIA_ROOT)
+        channel_dirs = set()
+
+        for audio in audio_files.iterator():
+            if audio.file_path:
+                full_path = media_root / audio.file_path
+                try:
+                    if full_path.exists():
+                        full_path.unlink()
+                        files_deleted += 1
+                        # Track parent dirs for cleanup
+                        if full_path.parent != media_root:
+                            channel_dirs.add(full_path.parent)
+                except (OSError, IOError) as e:
+                    errors.append(f'Could not delete {audio.file_path}: {e}')
+
+        # 2. Clean up empty channel directories
+        for channel_dir in channel_dirs:
+            try:
+                if channel_dir.exists() and not any(channel_dir.iterdir()):
+                    channel_dir.rmdir()
+            except (OSError, IOError):
+                pass
+
+        # 3. Delete avatar file if it's a custom upload (not a preset number)
+        if user.avatar and not user.avatar.isdigit():
+            avatar_path = Path(settings.BASE_DIR).parent / 'data' / 'avatars' / user.avatar
+            try:
+                if avatar_path.exists():
+                    avatar_path.unlink()
+            except (OSError, IOError):
+                pass
+
+        # 4. Delete user (CASCADE handles all DB relationships)
+        user.delete()
+
+        logger.info('User %s (id=%s) permanently deleted by %s. %d audio files removed.',
+                     username, pk, request.user.username, files_deleted)
+
+        result = {
+            'message': f'User "{username}" and all data permanently deleted',
+            'files_deleted': files_deleted,
+        }
+        if errors:
+            result['file_errors'] = errors
+
+        return Response(result, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['get'])
     def channels(self, request, pk=None):

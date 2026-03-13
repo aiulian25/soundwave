@@ -38,6 +38,7 @@ import {
   Storage as StorageIcon,
   Group as GroupIcon,
   VideoLibrary as VideoLibraryIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import api from '../api/client';
 
@@ -88,6 +89,8 @@ const AdminUsersPage = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userDetailsOpen, setUserDetailsOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -196,6 +199,27 @@ const AdminUsersPage = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to reset 2FA');
+    }
+  };
+
+  const openDeleteConfirm = (user: User) => {
+    setSelectedUser(user);
+    setDeleteConfirmText('');
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser || deleteConfirmText !== selectedUser.username) return;
+    try {
+      const response = await api.delete(`/user/admin/users/${selectedUser.id}/delete_user/`);
+      setSuccess(response.data.message || 'User deleted successfully');
+      setDeleteConfirmOpen(false);
+      setSelectedUser(null);
+      loadUsers();
+      loadSystemStats();
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete user');
     }
   };
 
@@ -408,6 +432,11 @@ const AdminUsersPage = () => {
                     <Tooltip title={user.is_active ? 'Deactivate' : 'Activate'}>
                       <IconButton size="small" onClick={() => handleToggleActive(user)}>
                         {user.is_active ? <BlockIcon /> : <CheckCircleIcon />}
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete User">
+                      <IconButton size="small" color="error" onClick={() => openDeleteConfirm(user)}>
+                        <DeleteIcon />
                       </IconButton>
                     </Tooltip>
                   </TableCell>
@@ -681,6 +710,47 @@ const AdminUsersPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUserDetailsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
+          <WarningIcon /> Permanently Delete User
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            This action is irreversible! All user data will be permanently deleted:
+          </Alert>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            &bull; All audio files and tracks from disk<br />
+            &bull; All playlists and playlist items<br />
+            &bull; All channel subscriptions<br />
+            &bull; All download queue items<br />
+            &bull; Listening history and statistics<br />
+            &bull; User account and settings
+          </Typography>
+          <Typography variant="body1" sx={{ mt: 2, mb: 1 }}>
+            To confirm, type <strong>{selectedUser?.username}</strong> below:
+          </Typography>
+          <TextField
+            fullWidth
+            placeholder={selectedUser?.username}
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleDeleteUser}
+            variant="contained"
+            color="error"
+            disabled={deleteConfirmText !== selectedUser?.username}
+          >
+            Delete Permanently
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
