@@ -142,7 +142,7 @@ export default function PlaylistsPage() {
       // Load offline status
       await loadOfflineStatus();
     } catch (err) {
-      console.error('Failed to load playlists:', err);
+      console.error('[PlaylistsPage] Failed to load playlists:', err);
       setPlaylists([]);
     } finally {
       setLoading(false);

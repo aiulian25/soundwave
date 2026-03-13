@@ -34,16 +34,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle token expiry - redirect to login when token expires
+// Handle token expiry/invalid - redirect to login when token is expired or invalid
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      const errorMessage = error.response?.data?.detail || error.response?.data?.error || '';
-      
-      // Check if token has expired
+    const status = error.response?.status;
+    const errorMessage = error.response?.data?.detail || error.response?.data?.error || '';
+    
+    // Check for invalid/expired token on both 401 and 403
+    if (status === 401 || status === 403) {
       if (errorMessage.includes('expired') || errorMessage.includes('Invalid token')) {
-        // Clear token and redirect to login
+        // Clear invalid token and redirect to login
         localStorage.removeItem('token');
         
         // Dispatch custom event for app to handle logout

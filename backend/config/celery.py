@@ -27,6 +27,11 @@ app.conf.beat_schedule = {
         'task': 'task.tasks.retry_failed_downloads',
         'schedule': crontab(minute='*/30'),  # Every 30 minutes
     },
+    # Resume pending downloads that may have been lost
+    'resume-pending-downloads': {
+        'task': 'task.tasks.resume_pending_downloads',
+        'schedule': crontab(minute='*/15'),  # Every 15 minutes
+    },
     # Auto-fetch lyrics every hour
     'auto-fetch-lyrics': {
         'task': 'audio.auto_fetch_lyrics',

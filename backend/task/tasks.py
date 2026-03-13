@@ -502,7 +502,7 @@ def download_playlist_task(playlist_id):
                         # Trigger download task for NEW video
                         download_audio_task.delay(queue_item.id)
                 else:
-                    # Item is already downloading or completed
+                    # Item is already pending, downloading, or completed
                     if existing_queue_item.status == 'completed':
                         # Verify the audio actually exists - if not, reset and redownload
                         audio_exists = Audio.objects.filter(
@@ -519,6 +519,10 @@ def download_playlist_task(playlist_id):
                             existing_queue_item.save()
                             new_videos += 1
                             download_audio_task.delay(existing_queue_item.id)
+                    elif existing_queue_item.status == 'pending':
+                        # Re-dispatch stuck pending items (task may have been lost)
+                        new_videos += 1
+                        download_audio_task.delay(existing_queue_item.id)
                 
                 # Create PlaylistItem for the downloaded audio (will be created after download completes)
                 # Note: Audio object might not exist yet, so we'll add a post-download hook
@@ -699,14 +703,16 @@ def retry_failed_downloads(max_retries=3):
 @shared_task
 def resume_pending_downloads():
     """
-    Resume any pending downloads that haven't been started.
-    Called on app startup to ensure downloads continue.
+    Resume any pending downloads that haven't been started or are stuck.
+    Runs periodically via Celery Beat to ensure downloads continue.
     """
+    stuck_threshold = timezone.now() - timedelta(minutes=10)
     pending_downloads = DownloadQueue.objects.filter(
         status='pending',
         auto_start=True,
-    ).exclude(
-        started_date__isnull=False
+    ).filter(
+        # Never started, or started more than 10 minutes ago (stuck)
+        Q(started_date__isnull=True) | Q(started_date__lt=stuck_threshold)
     )
     
     count = 0
