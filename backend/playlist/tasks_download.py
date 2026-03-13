@@ -8,10 +8,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
-def download_playlist_task(self, download_id):
+@shared_task(bind=True, max_retries=3, name='playlist.download_playlist_offline')
+def download_playlist_offline_task(self, download_id):
     """
-    Download all items in a playlist
+    Download all items in a playlist for offline playback.
     
     Args:
         download_id: PlaylistDownload ID
@@ -157,7 +157,7 @@ def resume_playlist_download(download_id):
             return {'error': 'Download cannot be resumed'}
         
         # Trigger the download task again
-        download_playlist_task.apply_async(args=[download_id])
+        download_playlist_offline_task.apply_async(args=[download_id])
         
         logger.info(f"Playlist download {download_id} resumed")
         return {'download_id': download_id, 'status': 'resumed'}
@@ -239,7 +239,7 @@ def retry_failed_items(download_id):
         download.save()
         
         # Trigger download task
-        download_playlist_task.apply_async(args=[download_id])
+        download_playlist_offline_task.apply_async(args=[download_id])
         
         logger.info(f"Retrying {failed_items.count()} failed items for download {download_id}")
         return {'download_id': download_id, 'retried_items': failed_items.count()}

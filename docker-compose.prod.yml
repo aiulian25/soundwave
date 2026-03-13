@@ -13,6 +13,7 @@ services:
       - ./audio:/app/audio
       - ./cache:/app/cache
       - ./data:/app/data
+      - ./cookies.txt:/app/cookies.txt:ro
     environment:
       - SW_HOST=http://localhost:8889
       - SW_USERNAME=admin

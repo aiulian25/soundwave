@@ -1,7 +1,18 @@
 """YouTube metadata extraction using yt-dlp"""
 
 import yt_dlp
+import os
 from typing import Dict, Optional
+
+# Path to YouTube cookies file (mounted in Docker)
+COOKIES_FILE = os.environ.get('YT_COOKIES_FILE', '/app/cookies.txt')
+
+
+def _get_cookies_opts():
+    """Return cookiefile option if cookies file exists and is non-empty."""
+    if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
+        return {'cookiefile': COOKIES_FILE}
+    return {}
 
 
 def get_playlist_metadata(playlist_id: str) -> Optional[Dict]:
@@ -21,6 +32,7 @@ def get_playlist_metadata(playlist_id: str) -> Optional[Dict]:
         'no_warnings': True,
         'extract_flat': True,
         'playlist_items': '1',  # Only fetch first item to get playlist info
+        **_get_cookies_opts(),
     }
     
     try:
@@ -73,6 +85,7 @@ def get_channel_metadata(channel_id: str) -> Optional[Dict]:
         'no_warnings': True,
         'extract_flat': True,
         'playlist_items': '0',  # Don't extract videos
+        **_get_cookies_opts(),
     }
     
     try:

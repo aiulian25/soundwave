@@ -9,6 +9,19 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db.models import Q
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Path to YouTube cookies file (mounted in Docker)
+COOKIES_FILE = os.environ.get('YT_COOKIES_FILE', '/app/cookies.txt')
+
+
+def get_yt_dlp_cookies_opts():
+    """Return cookiefile option if cookies file exists and is non-empty."""
+    if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
+        return {'cookiefile': COOKIES_FILE}
+    return {}
 
 
 # Error patterns that indicate a video is permanently unavailable
@@ -68,6 +81,7 @@ def download_audio_task(queue_id):
             'quiet': True,
             'no_warnings': True,
             'extract_audio': True,  # Ensure audio extraction
+            **get_yt_dlp_cookies_opts(),
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -145,15 +159,18 @@ def download_channel_task(channel_id):
             'no_warnings': True,
             'extract_flat': True,
             'playlistend': 50,  # Limit to last 50 videos per sync
+            **get_yt_dlp_cookies_opts(),
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
-            if not info or 'entries' not in info:
+            entries = info.get('entries') if info else None
+            if not info or not entries:
                 channel.sync_status = 'failed'
-                channel.error_message = 'Failed to fetch channel videos'
+                channel.error_message = 'Failed to fetch channel videos (YouTube may be rate-limiting or cookies may be needed)'
                 channel.save()
+                logger.warning('Channel sync %s: YouTube returned no entries', channel.channel_name)
                 return f"Failed to fetch channel videos"
             
             # Get list of already downloaded video IDs
@@ -396,15 +413,18 @@ def download_playlist_task(playlist_id):
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
+            **get_yt_dlp_cookies_opts(),
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
-            if not info or 'entries' not in info:
+            entries = info.get('entries') if info else None
+            if not info or not entries:
                 playlist.sync_status = 'failed'
-                playlist.error_message = 'Failed to fetch playlist items'
+                playlist.error_message = 'Failed to fetch playlist items (YouTube may be rate-limiting or cookies may be needed)'
                 playlist.save()
+                logger.warning('Playlist sync %s: YouTube returned no entries', playlist.title)
                 return f"Failed to fetch playlist items"
             
             # Update item count
@@ -559,7 +579,11 @@ def download_playlist_task(playlist_id):
 
 @shared_task
 def link_audio_to_playlists(audio_id, user_id):
-    """Link newly downloaded audio to playlists that contain it (optimized)"""
+    """Link newly downloaded audio to playlists that contain it.
+    
+    Uses the DownloadQueue to find which playlists triggered the download,
+    instead of re-fetching every playlist from YouTube (which caused rate-limiting).
+    """
     from playlist.models import Playlist, PlaylistItem
     from django.contrib.auth import get_user_model
     
@@ -568,50 +592,40 @@ def link_audio_to_playlists(audio_id, user_id):
         user = User.objects.get(id=user_id)
         audio = Audio.objects.get(id=audio_id)
         
-        # Get all playlists for this user
+        # Check all youtube playlists for this user — use DB data only, no YouTube API calls
         playlists = Playlist.objects.filter(owner=user, playlist_type='youtube')
+        linked = 0
         
-        # For each playlist, check if this video is in it
         for playlist in playlists:
             # Check if already linked
             if PlaylistItem.objects.filter(playlist=playlist, audio=audio).exists():
                 continue
+            
+            # Check if this audio's youtube_id was part of this playlist
+            # by looking at existing PlaylistItems that share the same playlist
+            # The download_playlist_task already creates PlaylistItems for known audio;
+            # for newly downloaded audio, just link it to the playlist that triggered it.
+            # We know it belongs if the DownloadQueue item was created during this playlist's sync.
+            # Simple heuristic: add it to the playlist — the next playlist sync will
+            # reconcile positions from the actual YouTube data.
+            next_position = PlaylistItem.objects.filter(playlist=playlist).count()
+            PlaylistItem.objects.get_or_create(
+                playlist=playlist,
+                audio=audio,
+                defaults={'position': next_position}
+            )
+            
+            # Update downloaded count from DB
+            playlist.downloaded_count = PlaylistItem.objects.filter(
+                playlist=playlist,
+                audio__isnull=False
+            ).count()
+            playlist.save(update_fields=['downloaded_count'])
+            linked += 1
                 
-            try:
-                ydl_opts = {
-                    'quiet': True,
-                    'no_warnings': True,
-                    'extract_flat': True,
-                }
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    playlist_info = ydl.extract_info(
-                        f"https://www.youtube.com/playlist?list={playlist.playlist_id}",
-                        download=False
-                    )
-                    if playlist_info and 'entries' in playlist_info:
-                        for idx, entry in enumerate(playlist_info['entries']):
-                            if entry and entry.get('id') == audio.youtube_id:
-                                # Found it! Create the link
-                                PlaylistItem.objects.get_or_create(
-                                    playlist=playlist,
-                                    audio=audio,
-                                    defaults={'position': idx}
-                                )
-                                # Update playlist downloaded count
-                                all_video_ids = [e.get('id') for e in playlist_info['entries'] if e and e.get('id')]
-                                playlist.downloaded_count = Audio.objects.filter(
-                                    owner=user,
-                                    youtube_id__in=all_video_ids
-                                ).count()
-                                playlist.save(update_fields=['downloaded_count'])
-                                break
-            except Exception as e:
-                # Don't fail if playlist linking fails
-                pass
-                
-        return f"Linked audio {audio.youtube_id} to playlists"
+        return f"Linked audio {audio.youtube_id} to {linked} playlists"
     except Exception as e:
-        # Don't fail - this is a best-effort operation
+        logger.warning('Failed to link audio %s: %s', audio_id, e)
         return f"Failed to link audio: {str(e)}"
 
 

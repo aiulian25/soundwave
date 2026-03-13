@@ -14,7 +14,7 @@ from playlist.serializers_download import (
     PlaylistDownloadItemSerializer,
 )
 from playlist.tasks_download import (
-    download_playlist_task,
+    download_playlist_offline_task,
     pause_playlist_download,
     resume_playlist_download,
     cancel_playlist_download,
@@ -59,13 +59,13 @@ class PlaylistDownloadViewSet(viewsets.ModelViewSet):
         download = serializer.save(user=self.request.user)
         
         # Trigger download task
-        download_playlist_task.apply_async(args=[download.id])
+        download_playlist_offline_task.apply_async(args=[download.id])
         
         return download
     
     @action(detail=True, methods=['post'])
     def pause(self, request, pk=None):
-        """Pause playlist download"""
+        """Pause playlist download"""""
         download = self.get_object()
         
         if download.status != 'downloading':
@@ -201,7 +201,7 @@ class PlaylistDownloadViewSet(viewsets.ModelViewSet):
         )
         
         # Trigger task
-        download_playlist_task.apply_async(args=[download.id])
+        download_playlist_offline_task.apply_async(args=[download.id])
         
         serializer = PlaylistDownloadSerializer(download)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

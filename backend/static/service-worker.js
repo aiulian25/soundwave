@@ -353,8 +353,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'SoundWave';
   const options = {
     body: data.body || 'New content available',
-    icon: '/img/icon-192x192.png',
-    badge: '/img/icon-72x72.png',
+    icon: '/img/icons/icon-192x192.png',
+    badge: '/img/icons/icon-72x72.png',
     vibrate: [200, 100, 200],
     data: data.url || '/',
     actions: [
