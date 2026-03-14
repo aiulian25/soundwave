@@ -193,12 +193,12 @@ SoundWave provides a TubeArchivist-compatible API for integration with [Homepage
 
 ```yaml
 - SoundWave:
-    icon: http://your-soundwave-host:8889/img/logo.svg
+    icon: http://your-soundwave-host:8889/img/logo.png
     href: http://your-soundwave-host:8889
     description: Self-Hosted Audio
     widget:
       type: tubearchivist
-      url: http://your-soundwave-host:8889/api/stats
+      url: http://your-soundwave-host:8889
       key: YOUR_API_KEY_HERE
       fields: ["downloads", "videos", "channels", "playlists"]
 ```

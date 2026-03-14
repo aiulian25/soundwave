@@ -10,8 +10,16 @@ from urllib.parse import urlparse
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Security settings
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key-change-in-production')
+_SECRET_KEY_DEFAULT = 'dev-secret-key-change-in-production'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _SECRET_KEY_DEFAULT)
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+
+# Fail loudly if using the default secret key in production
+if SECRET_KEY == _SECRET_KEY_DEFAULT and not DEBUG:
+    raise ValueError(
+        'DJANGO_SECRET_KEY environment variable must be set in production. '
+        'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
+    )
 
 # ALLOWED_HOSTS configuration
 # Can be set via DJANGO_ALLOWED_HOSTS env var (comma-separated)
@@ -263,9 +271,6 @@ else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:8889",
         "http://127.0.0.1:8889",
-        "http://192.168.1.100:8889",
-        "http://192.168.1.80:8889",
-        "https://test.ascunse.uk",
     ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -277,9 +282,6 @@ else:
     CSRF_TRUSTED_ORIGINS = [
         "http://localhost:8889",
         "http://127.0.0.1:8889",
-        "http://192.168.1.100:8889",
-        "http://192.168.1.80:8889",
-        "https://test.ascunse.uk",
     ]
 
 # Determine if running in production/HTTPS mode
@@ -322,6 +324,7 @@ if USE_SECURE_COOKIES:
 
 # Security headers
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin' if USE_SECURE_COOKIES else None
+SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 

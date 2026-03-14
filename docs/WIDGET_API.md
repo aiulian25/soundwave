@@ -35,7 +35,7 @@ Add SoundWave to your Homepage dashboard using the TubeArchivist widget type:
 
 ```yaml
 - SoundWave:
-    icon: soundwave
+    icon: http://your-soundwave-host:8889/img/logo.png
     href: http://your-soundwave-host:8889
     statusStyle: "dot"
     description: Self-Hosted Music
