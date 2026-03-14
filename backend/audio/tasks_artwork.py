@@ -30,8 +30,8 @@ def fetch_metadata_for_audio(self, audio_id: int):
         client = LastFMClient()
         
         # Extract artist and title from audio
-        artist = audio.channel.channel_name if audio.channel else 'Unknown Artist'
-        title = audio.audio_title
+        artist = audio.channel_name or 'Unknown Artist'
+        title = audio.title
         
         # Search Last.fm
         track_info = client.search_track(artist, title)
@@ -82,8 +82,8 @@ def fetch_artwork_for_audio(self, audio_id: int):
         
         # Try Last.fm first
         lastfm_client = LastFMClient()
-        artist = audio.channel.channel_name if audio.channel else 'Unknown Artist'
-        title = audio.audio_title
+        artist = audio.channel_name or 'Unknown Artist'
+        title = audio.title
         
         track_info = lastfm_client.search_track(artist, title)
         
@@ -520,8 +520,8 @@ def update_id3_tags_from_metadata(audio_id: int):
         
         # Prepare tags
         tags = {
-            'title': audio.audio_title,
-            'artist': audio.channel.channel_name if audio.channel else 'Unknown Artist',
+            'title': audio.title,
+            'artist': audio.channel_name or 'Unknown Artist',
         }
         
         # Add metadata if available

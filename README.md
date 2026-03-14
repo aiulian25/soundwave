@@ -128,9 +128,12 @@ chmod +x setup-dirs.sh
 ./setup-dirs.sh
 ```
 
-### Step 3: Create Environment File (Optional)
+### Step 3: Create Environment File
 
 ```bash
+# Generate a secret key (required for production)
+SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
+
 cat > .env << EOF
 SW_HOST=http://localhost:8889
 SW_USERNAME=admin
@@ -138,6 +141,7 @@ SW_PASSWORD=soundwave
 ELASTIC_PASSWORD=soundwave
 REDIS_HOST=soundwave-redis
 TZ=UTC
+DJANGO_SECRET_KEY=$SECRET_KEY
 EOF
 ```
 
@@ -173,6 +177,8 @@ Wait ~30-60 seconds for all services to initialize on first start.
 | `TOKEN_EXPIRY_HOURS` | API token lifetime in hours | `168` (7 days) |
 | `ALLOW_LOCAL_NETWORK` | Allow 192.168.x.x access | `True` |
 | `SECURE_COOKIES` | Force secure cookies (auto/true/false) | `auto` |
+| `DJANGO_SECRET_KEY` | Django secret key (**required** in production) | — |
+| `DJANGO_DEBUG` | Enable Django debug mode | `False` |
 
 ### Data Directories
 
