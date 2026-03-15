@@ -526,6 +526,7 @@ def download_playlist_task(playlist_id, force=False):
                     owner=playlist.owner,
                     youtube_id=video_id
                 ).first()
+                created = False
                 
                 # Check if item is stuck in downloading state (> 30 minutes)
                 if existing_queue_item and existing_queue_item.status == 'downloading':
@@ -563,12 +564,15 @@ def download_playlist_task(playlist_id, force=False):
                                 'auto_start': True
                             }
                         )
+                        if not created:
+                            # get_or_create found existing row by URL — treat it like existing_queue_item
+                            existing_queue_item = queue_item
                     
                     if created:
                         new_videos += 1
                         # Trigger download task for NEW video
                         download_audio_task.delay(queue_item.id)
-                else:
+                if existing_queue_item and not created:
                     # Item is already pending, downloading, or completed
                     if existing_queue_item.status == 'completed':
                         # Verify the audio actually exists - if not, reset and redownload
@@ -590,9 +594,28 @@ def download_playlist_task(playlist_id, force=False):
                         # Re-dispatch stuck pending items (task may have been lost)
                         new_videos += 1
                         download_audio_task.delay(existing_queue_item.id)
+                    elif existing_queue_item.status == 'downloading':
+                        # Already being downloaded — don't re-dispatch, just skip
+                        skipped += 1
                 
                 # Create PlaylistItem for the downloaded audio (will be created after download completes)
                 # Note: Audio object might not exist yet, so we'll add a post-download hook
+            
+            # Remove PlaylistItems for tracks that are NOT in this YouTube playlist
+            # (fixes incorrectly linked tracks from the old link_audio_to_playlists bug)
+            # Note: yt-dlp extract_flat includes [Deleted video] and [Private video] entries,
+            # so yt_video_ids covers all current AND deleted/private tracks.
+            # Any PlaylistItem whose audio youtube_id is NOT in yt_video_ids was never
+            # actually part of this YouTube playlist — only the playlist link is removed,
+            # the audio file itself is preserved.
+            yt_video_ids = {e.get('id') for e in info['entries'] if e and e.get('id')}
+            stale_items = PlaylistItem.objects.filter(playlist=playlist).exclude(
+                audio__youtube_id__in=yt_video_ids
+            )
+            removed = stale_items.count()
+            if removed:
+                stale_items.delete()
+                logger.info('Removed %d incorrectly linked items from playlist %s', removed, playlist.title)
             
             # Update playlist status
             playlist.sync_status = 'success'
@@ -645,7 +668,8 @@ def link_audio_to_playlists(audio_id, user_id):
         user = User.objects.get(id=user_id)
         audio = Audio.objects.get(id=audio_id)
         
-        # Check all youtube playlists for this user — use DB data only, no YouTube API calls
+        # Only link audio to playlists that actually contain this track on YouTube.
+        # We do a lightweight yt-dlp extract_flat check for each playlist.
         playlists = Playlist.objects.filter(owner=user, playlist_type='youtube')
         linked = 0
         
@@ -654,25 +678,45 @@ def link_audio_to_playlists(audio_id, user_id):
             if PlaylistItem.objects.filter(playlist=playlist, audio=audio).exists():
                 continue
             
-            # Check if this audio's youtube_id was part of this playlist
-            # by looking at existing PlaylistItems that share the same playlist
-            # The download_playlist_task already creates PlaylistItems for known audio;
-            # for newly downloaded audio, just link it to the playlist that triggered it.
-            # We know it belongs if the DownloadQueue item was created during this playlist's sync.
-            # Simple heuristic: add it to the playlist — the next playlist sync will
-            # reconcile positions from the actual YouTube data.
-            next_position = PlaylistItem.objects.filter(playlist=playlist).count()
+            # Verify this track is actually in this YouTube playlist
+            # by doing a quick extract_flat and checking video IDs
+            try:
+                url = f"https://www.youtube.com/playlist?list={playlist.playlist_id}"
+                ydl_opts = {
+                    'quiet': True,
+                    'no_warnings': True,
+                    'extract_flat': True,
+                    **get_yt_dlp_cookies_opts(),
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if not info or not info.get('entries'):
+                        continue
+                    playlist_video_ids = {e.get('id') for e in info['entries'] if e and e.get('id')}
+                    if audio.youtube_id not in playlist_video_ids:
+                        continue
+                    # Found! Get position from YouTube order
+                    position = next(
+                        (idx for idx, e in enumerate(info['entries'])
+                         if e and e.get('id') == audio.youtube_id),
+                        PlaylistItem.objects.filter(playlist=playlist).count()
+                    )
+            except Exception as e:
+                logger.debug('Could not verify playlist %s for audio %s: %s',
+                             playlist.playlist_id, audio.youtube_id, e)
+                continue
+            
             PlaylistItem.objects.get_or_create(
                 playlist=playlist,
                 audio=audio,
-                defaults={'position': next_position}
+                defaults={'position': position}
             )
             
             # Update downloaded count from DB
             playlist.downloaded_count = PlaylistItem.objects.filter(
                 playlist=playlist,
-                audio__isnull=False
-            ).count()
+                audio__file_path__isnull=False,
+            ).exclude(audio__file_path='').count()
             playlist.save(update_fields=['downloaded_count'])
             linked += 1
                 
