@@ -22,7 +22,7 @@ class SecurityHeadersMiddleware:
                 "default-src 'self'",
                 "script-src 'self'",
                 "style-src 'self' 'unsafe-inline'",
-                "img-src 'self' data: blob:",
+                "img-src 'self' data: blob: https://i.ytimg.com https://i3.ytimg.com https://i9.ytimg.com https://img.youtube.com https://coverartarchive.org https://assets.fanart.tv https://lastfm.freetls.fastly.net",
                 "font-src 'self' data:",
                 "connect-src 'self'",
                 "media-src 'self' blob:",
