@@ -1,7 +1,8 @@
 """Common URL patterns"""
 
 from django.urls import path
+from common.views import ping
 
 urlpatterns = [
-    # Common endpoints can be added here
+    path('ping/', ping, name='ping'),
 ]

@@ -18,3 +18,4 @@ mutagen>=1.47.0
 pylast>=5.2.0
 psutil>=5.9.0
 whitenoise>=6.5.0
+gunicorn>=22.0.0

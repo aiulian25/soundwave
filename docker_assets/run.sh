@@ -5,6 +5,12 @@ set +e
 
 echo "Starting SoundWave..."
 
+# Determine if running in production mode
+IS_PRODUCTION="false"
+if [ "${DJANGO_DEBUG}" = "False" ] || [ "${DJANGO_DEBUG}" = "false" ] || [ -z "${DJANGO_DEBUG}" ]; then
+    IS_PRODUCTION="true"
+fi
+
 # Ensure data directories exist and are writable
 echo "Checking data directories..."
 for dir in /app/data /app/audio /app/cache; do
@@ -41,12 +47,26 @@ if [ $ES_RETRIES -eq $ES_MAX_RETRIES ]; then
     echo "WARNING: ElasticSearch may not be fully ready, continuing anyway..."
 fi
 
+# Build Redis URL with optional password
+REDIS_URL="redis://${REDIS_HOST}:6379"
+if [ -n "${REDIS_PASSWORD}" ]; then
+    REDIS_URL="redis://:${REDIS_PASSWORD}@${REDIS_HOST}:6379"
+fi
+export REDIS_URL
+
 # Wait for Redis
 echo "Waiting for Redis..."
-until python -c "import redis; r = redis.Redis(host='${REDIS_HOST}', port=6379); r.ping()" 2>/dev/null; do
-    echo "Redis is unavailable - sleeping"
-    sleep 3
-done
+if [ -n "${REDIS_PASSWORD}" ]; then
+    until python -c "import redis; r = redis.Redis(host='${REDIS_HOST}', port=6379, password='${REDIS_PASSWORD}'); r.ping()" 2>/dev/null; do
+        echo "Redis is unavailable - sleeping"
+        sleep 3
+    done
+else
+    until python -c "import redis; r = redis.Redis(host='${REDIS_HOST}', port=6379); r.ping()" 2>/dev/null; do
+        echo "Redis is unavailable - sleeping"
+        sleep 3
+    done
+fi
 echo "Redis is up!"
 
 # Create migrations
@@ -111,4 +131,20 @@ celery -A config worker --loglevel=info --concurrency=2 &
 celery -A config beat --loglevel=info &
 
 # Start Django server
-python manage.py runserver 0.0.0.0:8888
+# Use gunicorn in production for security and performance; runserver in development
+if [ "$IS_PRODUCTION" = "true" ]; then
+    echo "Starting gunicorn (production mode)..."
+    exec gunicorn config.wsgi:application \
+        --bind 0.0.0.0:8888 \
+        --workers 3 \
+        --threads 2 \
+        --timeout 120 \
+        --max-requests 1000 \
+        --max-requests-jitter 100 \
+        --access-logfile - \
+        --error-logfile - \
+        --log-level info
+else
+    echo "Starting Django runserver (development mode)..."
+    python manage.py runserver 0.0.0.0:8888
+fi

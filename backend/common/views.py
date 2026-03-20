@@ -1,8 +1,16 @@
 """Common views"""
 
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.views import APIView
 from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
+
+
+@require_GET
+def ping(request):
+    """Unauthenticated health check endpoint for Docker HEALTHCHECK."""
+    return JsonResponse({"status": "ok"})
 
 
 class ApiBaseView(APIView):

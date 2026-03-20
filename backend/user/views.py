@@ -1,5 +1,6 @@
 """User API views"""
 
+import logging
 import os
 import mimetypes
 from pathlib import Path
@@ -12,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from common.views import ApiBaseView
+from common.rate_limiter import get_client_ip
 from user.models import Account, APIKey
 from user.serializers import (
     AccountSerializer,
@@ -33,6 +35,8 @@ from user.two_factor import (
     generate_backup_codes_pdf,
 )
 from datetime import datetime
+
+audit_log = logging.getLogger('security.audit')
 
 
 class UserAccountView(ApiBaseView):
@@ -303,9 +307,14 @@ class LoginView(APIView):
         if not user:
             # Record failed attempt
             attempts, is_now_locked, lockout_duration = record_failed_attempt(request, username)
+            client_ip = get_client_ip(request)
             
             if is_now_locked:
                 lockout_minutes = lockout_duration // 60
+                audit_log.warning(
+                    "Login lockout triggered for user=%s ip=%s attempts=%d",
+                    username, client_ip, attempts
+                )
                 return Response(
                     {
                         'error': f'Too many failed login attempts. Account locked for {lockout_minutes} minutes.',
@@ -317,6 +326,10 @@ class LoginView(APIView):
                 )
             
             remaining = MAX_LOGIN_ATTEMPTS - attempts
+            audit_log.warning(
+                "Failed login attempt for user=%s ip=%s remaining=%d",
+                username, client_ip, remaining
+            )
             return Response(
                 {
                     'error': 'Invalid credentials',
@@ -366,6 +379,10 @@ class LoginView(APIView):
 
         # Successful login - clear any failed attempts
         clear_login_attempts(request, username)
+        audit_log.info(
+            "Successful login user=%s ip=%s 2fa=%s",
+            username, get_client_ip(request), user.two_factor_enabled
+        )
         
         login(request, user)
         token, _ = Token.objects.get_or_create(user=user)
@@ -382,6 +399,10 @@ class LogoutView(ApiBaseView):
         """Logout user and delete token"""
         # Delete the user's token for security
         if request.user.is_authenticated:
+            audit_log.info(
+                "Logout user=%s ip=%s",
+                request.user.username, get_client_ip(request)
+            )
             try:
                 Token.objects.filter(user=request.user).delete()
             except Token.DoesNotExist:

@@ -134,12 +134,15 @@ chmod +x setup-dirs.sh
 # Generate a secret key (required for production)
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
 
+REDIS_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+
 cat > .env << EOF
 SW_HOST=http://localhost:8889
 SW_USERNAME=admin
 SW_PASSWORD=soundwave
 ELASTIC_PASSWORD=soundwave
 REDIS_HOST=soundwave-redis
+REDIS_PASSWORD=$REDIS_PASS
 TZ=UTC
 DJANGO_SECRET_KEY=$SECRET_KEY
 EOF
@@ -178,6 +181,7 @@ Wait ~30-60 seconds for all services to initialize on first start.
 | `ALLOW_LOCAL_NETWORK` | Allow 192.168.x.x access | `True` |
 | `SECURE_COOKIES` | Force secure cookies (auto/true/false) | `auto` |
 | `DJANGO_SECRET_KEY` | Django secret key (**required** in production) | — |
+| `REDIS_PASSWORD` | Redis authentication password (**required** in production) | — |
 | `DJANGO_DEBUG` | Enable Django debug mode | `False` |
 
 ### Data Directories
@@ -421,6 +425,39 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.10.1 - Security Hardening (March 2026)
+
+#### Container Hardening
+- ✅ **Drop All Capabilities** - `cap_drop: ALL` on all containers in production
+- ✅ **No Privilege Escalation** - `security_opt: no-new-privileges:true` on all services
+- ✅ **Read-Only Root Filesystem** - Production container runs with `read_only: true` + tmpfs for /tmp
+- ✅ **Resource Limits** - CPU and memory limits on all containers to reduce DoS risk
+- ✅ **Docker HEALTHCHECK** - Dockerfile-level health check for the application
+- ✅ **OS Security Patches** - `apt-get upgrade` in Dockerfile applies latest patches at build time
+- ✅ **Service Health Dependencies** - `depends_on: condition: service_healthy` for proper startup ordering
+
+#### Redis Authentication
+- ✅ **Password-Protected Redis** - Redis requires authentication in production (`REDIS_PASSWORD` env var)
+- ✅ **Authenticated Celery Broker** - Celery connects to Redis with password
+- ✅ **Authenticated Django Cache** - Cache backend uses Redis password
+
+#### Application Security Headers
+- ✅ **Content-Security-Policy** - Restrictive CSP preventing XSS, clickjacking, and injection attacks
+- ✅ **Referrer-Policy** - `strict-origin-when-cross-origin` to prevent URL leakage
+- ✅ **Permissions-Policy** - Disables camera, geolocation, microphone, payment, USB APIs
+- ✅ **Cross-Origin-Resource-Policy** - `same-origin` on non-media responses
+- ✅ **Cross-Origin-Opener-Policy** - Always `same-origin` (previously HTTPS-only)
+
+#### Production Server
+- ✅ **Gunicorn** - Production uses gunicorn instead of Django runserver (3 workers, 2 threads)
+- ✅ **Worker Recycling** - `max-requests` prevents memory leaks in long-running workers
+- ✅ **Custom Session Cookie Name** - `sw_session` reduces fingerprinting surface
+
+#### Security Logging & Monitoring
+- ✅ **Audit Logging** - Login success/failure, lockouts, and logouts logged with IP (no secrets logged)
+- ✅ **Django Security Logger** - `django.security` and `django.request` loggers configured
+- ✅ **Vulnerability Scanning** - `make scan` target runs Trivy, Grype, and Hadolint
 
 ### v1.10.0 - Playlist Recheck & Admin Tools (March 2026)
 

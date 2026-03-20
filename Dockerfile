@@ -27,7 +27,8 @@ RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -d /app -s /sbi
 
 # Install only runtime dependencies (no build-essential)
 # Use --no-install-recommends to skip unnecessary packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt-get upgrade applies latest security patches to base OS packages
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
@@ -71,5 +72,8 @@ RUN chmod +x /app/docker_assets/run.sh
 USER appuser
 
 EXPOSE 8888
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -sf http://localhost:8888/api/ping/ || exit 1
 
 CMD ["/app/docker_assets/run.sh"]

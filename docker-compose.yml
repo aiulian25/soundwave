@@ -10,6 +10,11 @@ services:
       context: .
       dockerfile: Dockerfile
     user: "1000:1000"  # Run as host user to prevent file ownership issues
+    # Security: drop all capabilities and prevent privilege escalation
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "8889:8888"
     volumes:
@@ -30,8 +35,10 @@ services:
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8889}
       - DJANGO_DEBUG=True
     depends_on:
-      - soundwave-es
-      - soundwave-redis
+      soundwave-es:
+        condition: service_healthy
+      soundwave-redis:
+        condition: service_healthy
     restart: unless-stopped
 
   soundwave-es:
@@ -71,6 +78,11 @@ services:
       - "6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   es_data:

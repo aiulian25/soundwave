@@ -120,6 +120,8 @@ MIDDLEWARE = [
     'common.middleware.AuthDebugMiddleware',  # Debug authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Security headers (CSP, Referrer-Policy, Permissions-Policy)
+    'config.security_middleware.SecurityHeadersMiddleware',
     # Custom middleware for multi-tenancy
     'config.middleware.UserIsolationMiddleware',
     'config.middleware.StorageQuotaMiddleware',
@@ -228,10 +230,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Cache configuration (using Redis for rate limiting, with fallback)
 REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
+_REDIS_AUTH = f":{REDIS_PASSWORD}@" if REDIS_PASSWORD else ""
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': f"redis://{REDIS_HOST}:6379/1",
+        'LOCATION': f"redis://{_REDIS_AUTH}{REDIS_HOST}:6379/1",
         'KEY_PREFIX': 'soundwave',
         'TIMEOUT': 3600,  # 1 hour default timeout
     }
@@ -308,6 +312,7 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = USE_SECURE_COOKIES
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 7 days session expiry
+SESSION_COOKIE_NAME = 'sw_session'  # Non-default name to reduce fingerprinting
 
 # Additional security settings for production
 if USE_SECURE_COOKIES:
@@ -323,7 +328,7 @@ if USE_SECURE_COOKIES:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Security headers
-SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin' if USE_SECURE_COOKIES else None
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
@@ -336,8 +341,8 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Celery settings
-CELERY_BROKER_URL = f"redis://{os.environ.get('REDIS_HOST', 'localhost')}:6379/0"
-CELERY_RESULT_BACKEND = f"redis://{os.environ.get('REDIS_HOST', 'localhost')}:6379/0"
+CELERY_BROKER_URL = f"redis://{_REDIS_AUTH}{os.environ.get('REDIS_HOST', 'localhost')}:6379/0"
+CELERY_RESULT_BACKEND = f"redis://{_REDIS_AUTH}{os.environ.get('REDIS_HOST', 'localhost')}:6379/0"
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -360,3 +365,39 @@ LASTFM_API_SECRET = os.environ.get('LASTFM_API_SECRET', '')
 # Fanart.tv API settings
 # Register for API key at: https://fanart.tv/get-an-api-key/
 FANART_API_KEY = os.environ.get('FANART_API_KEY', '')
+
+# Security logging — log auth events and security-relevant actions
+# Avoids logging sensitive personal data; focuses on events for anomaly detection
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'security': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'security',
+        },
+    },
+    'loggers': {
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'security.audit': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
