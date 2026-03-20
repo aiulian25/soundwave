@@ -113,6 +113,10 @@ services:
     # Security hardening for Redis
     cap_drop:
       - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -120,6 +124,8 @@ services:
         limits:
           memory: 256m
           cpus: "0.5"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # Require authentication
     command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env} --maxmemory 200mb --maxmemory-policy allkeys-lru
     expose:
@@ -127,10 +133,10 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping | grep PONG"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
     networks:
       - backend
 
