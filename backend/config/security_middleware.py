@@ -20,7 +20,7 @@ class SecurityHeadersMiddleware:
         if 'Content-Security-Policy' not in response:
             csp_parts = [
                 "default-src 'self'",
-                "script-src 'self'",
+                "script-src 'self' 'sha256-sWLrIVTUnFiy0N7x1NO1yKDmaTBJhrDRK/9XUbpDsFw='",
                 "style-src 'self' 'unsafe-inline'",
                 "img-src 'self' data: blob: https://i.ytimg.com https://i3.ytimg.com https://i9.ytimg.com https://img.youtube.com https://coverartarchive.org https://assets.fanart.tv https://lastfm.freetls.fastly.net",
                 "font-src 'self' data:",
