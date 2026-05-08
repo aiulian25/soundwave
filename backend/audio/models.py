@@ -92,29 +92,6 @@ class Audio(models.Model):
         super().delete(*args, **kwargs)
 
 
-class Channel(models.Model):
-    """YouTube channel model"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audio_channels')
-    channel_id = models.CharField(max_length=100)
-    channel_name = models.CharField(max_length=255)
-    channel_description = models.TextField(blank=True)
-    channel_thumbnail = models.URLField(blank=True)
-    subscribed = models.BooleanField(default=False)
-    subscriber_count = models.IntegerField(default=0)
-    video_count = models.IntegerField(default=0)
-    last_updated = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('user', 'channel_id')
-        indexes = [
-            models.Index(fields=['user', 'channel_id']),
-            models.Index(fields=['user', 'subscribed']),
-        ]
-
-    def __str__(self):
-        return f"{self.channel_name} ({self.user.username})"
-
-
 class AudioProgress(models.Model):
     """Track user progress on audio files"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audio_progress')

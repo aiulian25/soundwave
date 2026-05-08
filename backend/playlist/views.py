@@ -2,6 +2,7 @@
 
 import logging
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django.db.models import Max
 from rest_framework import status
 from rest_framework.response import Response
@@ -114,10 +115,31 @@ class PlaylistDetailView(ApiBaseView):
         return Response({'detail': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, playlist_id):
-        """Delete playlist"""
+        """Delete playlist and all associated audio files"""
         playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
-        playlist.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        playlist_title = playlist.title
+
+        # Delete all audio entries linked to this playlist. Audio.delete() also removes
+        # local files from disk, and dependent playlist items are removed via cascade.
+        audio_files = Audio.objects.filter(
+            owner=request.user,
+            playlist_items__playlist=playlist,
+        ).distinct()
+
+        deleted_audio_count = 0
+        with transaction.atomic():
+            for audio in audio_files.iterator():
+                audio.delete()
+                deleted_audio_count += 1
+
+            playlist.delete()
+
+        return Response({
+            'message': (
+                f'Playlist "{playlist_title}" deleted successfully. '
+                f'Removed {deleted_audio_count} audio files.'
+            )
+        }, status=status.HTTP_200_OK)
 
 
 class PlaylistItemsView(ApiBaseView):

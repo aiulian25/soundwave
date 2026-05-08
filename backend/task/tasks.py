@@ -13,6 +13,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Auto-disable invalid channel subscriptions after repeated deterministic failures.
+# This does NOT remove local audio files.
+INVALID_CHANNEL_FAILURE_THRESHOLD = int(os.environ.get('INVALID_CHANNEL_FAILURE_THRESHOLD', '3'))
+
 # Path to YouTube cookies file (mounted in Docker)
 COOKIES_FILE = os.environ.get('YT_COOKIES_FILE', '/app/cookies.txt')
 
@@ -62,6 +66,67 @@ def is_permanently_unavailable(error_message):
         return False
     error_lower = error_message.lower()
     return any(pattern in error_lower for pattern in PERMANENT_ERROR_PATTERNS)
+
+
+def is_invalid_channel_subscription_error(error_message):
+    """Return True when YouTube reports an invalid channel subscription reference.
+
+    These errors are usually deterministic and require fixing channel ID/handle.
+    """
+    if not error_message:
+        return False
+
+    error_lower = error_message.lower()
+    has_tab_error = 'youtube:tab' in error_lower
+    has_400 = 'http error 400' in error_lower or 'bad request' in error_lower
+    missing_channel = 'channel does not exist' in error_lower or 'unable to find' in error_lower
+    return (has_tab_error and has_400) or missing_channel
+
+
+def register_channel_sync_failure(channel, error_message):
+    """Record channel sync failure and optionally auto-disable invalid subscriptions."""
+    safe_error = (error_message or '')[:1000]
+    channel.sync_status = 'failed'
+    channel.error_message = safe_error
+    channel.last_failed_sync = timezone.now()
+    channel.consecutive_sync_failures += 1
+
+    if (
+        is_invalid_channel_subscription_error(safe_error)
+        and channel.consecutive_sync_failures >= INVALID_CHANNEL_FAILURE_THRESHOLD
+        and channel.subscribed
+    ):
+        channel.subscribed = False
+        channel.auto_download = False
+        channel.active = False
+        channel.auto_disabled = True
+        channel.auto_disabled_reason = (
+            'Auto-disabled after repeated invalid channel errors '
+            f'({channel.consecutive_sync_failures} consecutive failures). '
+            'Update to a valid channel ID/handle before re-enabling.'
+        )
+        logger.warning(
+            '[ChannelSync] Auto-disabled invalid channel subscription "%s" '
+            '(owner: %s, channel_id: %s, failures: %s)',
+            channel.channel_name,
+            channel.owner.username,
+            channel.channel_id,
+            channel.consecutive_sync_failures,
+        )
+
+    channel.save(
+        update_fields=[
+            'sync_status',
+            'error_message',
+            'last_failed_sync',
+            'consecutive_sync_failures',
+            'subscribed',
+            'auto_download',
+            'active',
+            'auto_disabled',
+            'auto_disabled_reason',
+        ]
+    )
 
 
 def get_permanently_unavailable_ids(owner):
@@ -162,11 +227,12 @@ def download_audio_task(queue_id):
 @shared_task
 def download_channel_task(channel_id):
     """Smart sync: Download only NEW audio from channel (not already downloaded)"""
+    channel = None
     try:
         channel = Channel.objects.get(id=channel_id)
         channel.sync_status = 'syncing'
         channel.error_message = ''
-        channel.save()
+        channel.save(update_fields=['sync_status', 'error_message'])
         
         url = f"https://www.youtube.com/channel/{channel.channel_id}/videos"
         
@@ -176,88 +242,96 @@ def download_channel_task(channel_id):
             'no_warnings': True,
             'extract_flat': True,
             'playlistend': 50,  # Limit to last 50 videos per sync
+            'socket_timeout': 30,
             **get_yt_dlp_cookies_opts(),
         }
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except Exception as yt_error:
+            register_channel_sync_failure(channel, str(yt_error))
+            logger.warning('[ChannelSync] YouTube fetch failed for "%s": %s', channel.channel_name, yt_error)
+            return 'Failed to fetch channel videos'
+
+        entries = info.get('entries') if info else None
+        if not info or not entries:
+            register_channel_sync_failure(
+                channel,
+                'Failed to fetch channel videos (YouTube may be rate-limiting or cookies may be needed)'
+            )
+            logger.warning('[ChannelSync] Empty response for channel "%s" (ID: %s)',
+                          channel.channel_name, channel.channel_id)
+            return 'Failed to fetch channel videos'
             
-            entries = info.get('entries') if info else None
-            if not info or not entries:
-                channel.sync_status = 'failed'
-                channel.error_message = 'Failed to fetch channel videos (YouTube may be rate-limiting or cookies may be needed)'
-                channel.save()
-                logger.warning('Channel sync %s: YouTube returned no entries', channel.channel_name)
-                return f"Failed to fetch channel videos"
+        # Get list of already downloaded video IDs
+        existing_ids = set(Audio.objects.filter(
+            owner=channel.owner
+        ).values_list('youtube_id', flat=True))
             
-            # Get list of already downloaded video IDs
-            existing_ids = set(Audio.objects.filter(
-                owner=channel.owner
-            ).values_list('youtube_id', flat=True))
+        # Get list of permanently unavailable videos (copyright, private, etc.)
+        unavailable_ids = get_permanently_unavailable_ids(channel.owner)
             
-            # Get list of permanently unavailable videos (copyright, private, etc.)
-            unavailable_ids = get_permanently_unavailable_ids(channel.owner)
+        # Queue only NEW videos
+        new_videos = 0
+        skipped = 0
+        skipped_unavailable = 0
             
-            # Queue only NEW videos
-            new_videos = 0
-            skipped = 0
-            skipped_unavailable = 0
-            
-            for entry in info['entries']:
-                if not entry:
-                    continue
-                    
-                video_id = entry.get('id')
-                if not video_id:
-                    continue
+        for entry in info['entries']:
+            if not entry:
+                continue
                 
-                # SMART SYNC: Skip if already downloaded
-                if video_id in existing_ids:
-                    skipped += 1
-                    continue
+            video_id = entry.get('id')
+            if not video_id:
+                continue
                 
-                # Skip permanently unavailable videos (copyright blocked, private, etc.)
-                if video_id in unavailable_ids:
-                    skipped_unavailable += 1
-                    continue
+            # SMART SYNC: Skip if already downloaded
+            if video_id in existing_ids:
+                skipped += 1
+                continue
                 
-                # This is NEW content
-                queue_item, created = DownloadQueue.objects.get_or_create(
-                    owner=channel.owner,
-                    url=f"https://www.youtube.com/watch?v={video_id}",
-                    defaults={
-                        'youtube_id': video_id,
-                        'title': entry.get('title', 'Unknown'),
-                        'status': 'pending',
-                        'auto_start': True
-                    }
-                )
+            # Skip permanently unavailable videos (copyright blocked, private, etc.)
+            if video_id in unavailable_ids:
+                skipped_unavailable += 1
+                continue
                 
-                if created:
-                    new_videos += 1
-                    download_audio_task.delay(queue_item.id)
+            # This is NEW content
+            queue_item, created = DownloadQueue.objects.get_or_create(
+                owner=channel.owner,
+                url=f"https://www.youtube.com/watch?v={video_id}",
+                defaults={
+                    'youtube_id': video_id,
+                    'title': entry.get('title', 'Unknown'),
+                    'status': 'pending',
+                    'auto_start': True
+                }
+            )
             
-            # Update channel status
-            channel.sync_status = 'success'
-            channel.downloaded_count = len(existing_ids)
-            channel.save()
+            if created:
+                new_videos += 1
+                download_audio_task.delay(queue_item.id)
             
-            if new_videos == 0:
-                msg = f"Channel '{channel.channel_name}' up to date ({skipped} already downloaded"
-                if skipped_unavailable > 0:
-                    msg += f", {skipped_unavailable} unavailable skipped"
-                msg += ")"
-                return msg
+        # Update channel status
+        channel.sync_status = 'success'
+        channel.downloaded_count = len(existing_ids)
+        channel.error_message = ''
+        channel.consecutive_sync_failures = 0
+        channel.save(update_fields=['sync_status', 'downloaded_count', 'error_message', 'consecutive_sync_failures'])
             
-            msg = f"Channel '{channel.channel_name}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+        if new_videos == 0:
+            msg = f"Channel '{channel.channel_name}' up to date ({skipped} already downloaded"
             if skipped_unavailable > 0:
                 msg += f", {skipped_unavailable} unavailable skipped"
+            msg += ")"
             return msg
+            
+        msg = f"Channel '{channel.channel_name}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+        if skipped_unavailable > 0:
+            msg += f", {skipped_unavailable} unavailable skipped"
+        return msg
     
     except Exception as e:
-        channel.sync_status = 'failed'
-        channel.error_message = str(e)
-        channel.save()
+        if channel is not None:
+            register_channel_sync_failure(channel, str(e))
         raise
 
 
@@ -394,39 +468,91 @@ def subscribe_to_channel(self, user_id, channel_url):
 @shared_task(name="update_subscriptions")
 def update_subscriptions_task():
     """
-    TubeArchivist pattern: Periodic task to check ALL subscriptions for NEW audio
-    Runs every 2 hours via Celery Beat
+    Periodic task: Check ALL subscriptions for NEW audio and queue downloads.
+    
+    Runs every 15 minutes via Celery Beat (configured in config/celery.py).
+    This is the main entry point for automatic YouTube playlist/channel sync.
+    
+    Flow:
+    1. Query all active subscriptions (subscribed=True, auto_download=True)
+    2. Dispatch download_playlist_task or download_channel_task for each
+    3. Each task fetches metadata from YouTube (extract_flat mode - fast)
+    4. Compares with local database to find NEW content
+    5. Queues NEW videos for download via download_audio_task
     """
     from playlist.models import Playlist
+    from django.utils import timezone as dj_timezone
     
-    # Sync all subscribed playlists
-    playlists = Playlist.objects.filter(subscribed=True, auto_download=True)
-    for playlist in playlists:
-        download_playlist_task.delay(playlist.id)
+    task_start = dj_timezone.now()
+    logger.info('[SyncTask] ===== SYNC CYCLE STARTING =====')
     
-    # Sync all subscribed channels
-    channels = Channel.objects.filter(subscribed=True, auto_download=True)
-    for channel in channels:
-        download_channel_task.delay(channel.id)
-
-    return f"Syncing {playlists.count()} playlists and {channels.count()} channels"
+    try:
+        # Fetch active subscriptions
+        playlists = Playlist.objects.filter(subscribed=True, auto_download=True)
+        channels = Channel.objects.filter(subscribed=True, auto_download=True)
+        
+        playlist_count = playlists.count()
+        channel_count = channels.count()
+        
+        if playlist_count == 0 and channel_count == 0:
+            logger.warning('[SyncTask] No active subscriptions found')
+            return f"No active subscriptions to sync"
+        
+        # Dispatch playlist sync tasks
+        for playlist in playlists:
+            try:
+                download_playlist_task.delay(playlist.id)
+                logger.debug('[SyncTask] Queued playlist: %s (ID: %s)', playlist.title, playlist.id)
+            except Exception as e:
+                logger.error('[SyncTask] Failed to queue playlist %s: %s', playlist.id, e)
+        
+        # Dispatch channel sync tasks
+        for channel in channels:
+            try:
+                download_channel_task.delay(channel.id)
+                logger.debug('[SyncTask] Queued channel: %s (ID: %s)', channel.channel_name, channel.id)
+            except Exception as e:
+                logger.error('[SyncTask] Failed to queue channel %s: %s', channel.id, e)
+        
+        elapsed = (dj_timezone.now() - task_start).total_seconds()
+        logger.info('[SyncTask] ===== SYNC CYCLE COMPLETE ===== (Queued: %d playlists, %d channels | Elapsed: %.2fs)',
+                    playlist_count, channel_count, elapsed)
+        
+        return f"Syncing {playlist_count} playlists and {channel_count} channels"
+    
+    except Exception as e:
+        logger.error('[SyncTask] ===== SYNC CYCLE FAILED ===== Error: %s', e, exc_info=True)
+        return f"Sync cycle failed: {str(e)}"
 
 
 @shared_task
 def download_playlist_task(playlist_id, force=False):
     """Smart sync: Download only NEW audio from playlist (not already downloaded).
     
-    When force=True, also:
+    Strategy (TubeArchivist-inspired):
+    1. Use yt-dlp extract_flat (FAST - metadata only, no download)
+    2. Get video IDs from YouTube
+    3. Compare with local Audio objects
+    4. Queue NEW videos for download
+    5. Link audio to playlist AFTER download (avoid blocking)
+    
+    When force=True:
     - Retry previously permanently-unavailable videos
     - Verify existing audio files on disk and re-download missing ones
     """
     from playlist.models import Playlist, PlaylistItem
+    from django.utils import timezone as dj_timezone
+    
+    sync_start = dj_timezone.now()
     
     try:
         playlist = Playlist.objects.get(id=playlist_id)
+        logger.info('[PlaylistSync] Starting sync for "%s" (owner: %s, force: %s)', 
+                    playlist.title, playlist.owner.username, force)
+        
         playlist.sync_status = 'syncing'
         playlist.error_message = ''
-        playlist.save()
+        playlist.save(update_fields=['sync_status', 'error_message'])
         
         url = f"https://www.youtube.com/playlist?list={playlist.playlist_id}"
         
@@ -435,216 +561,227 @@ def download_playlist_task(playlist_id, force=False):
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
+            'socket_timeout': 30,  # Timeout after 30s for YouTube latency
             **get_yt_dlp_cookies_opts(),
         }
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            
-            entries = info.get('entries') if info else None
-            if not info or not entries:
-                playlist.sync_status = 'failed'
-                playlist.error_message = 'Failed to fetch playlist items (YouTube may be rate-limiting or cookies may be needed)'
-                playlist.save()
-                logger.warning('Playlist sync %s: YouTube returned no entries', playlist.title)
-                return f"Failed to fetch playlist items"
-            
-            # Update item count
-            total_items = len([e for e in info['entries'] if e])
-            playlist.item_count = total_items
-            
-            # Get list of permanently unavailable videos (copyright, private, etc.)
-            # When force=True, retry everything including previously unavailable
-            unavailable_ids = set() if force else get_permanently_unavailable_ids(playlist.owner)
-            
-            # Queue only NEW videos (not already downloaded)
-            new_videos = 0
-            skipped = 0
-            skipped_unavailable = 0
-            skipped_deleted = 0
-            
-            for idx, entry in enumerate(info['entries']):
-                if not entry:
-                    continue
-                    
-                video_id = entry.get('id')
-                if not video_id:
-                    continue
-                
-                # Detect deleted/private videos from YouTube
-                # yt-dlp extract_flat returns these with title '[Deleted video]' or '[Private video]'
-                entry_is_deleted = is_deleted_or_private_entry(entry)
-                
-                # Check if audio already exists
-                audio_obj = Audio.objects.filter(
-                    owner=playlist.owner,
-                    youtube_id=video_id
-                ).first()
-                
-                # Create PlaylistItem if audio exists but not in playlist yet
-                if audio_obj:
-                    PlaylistItem.objects.get_or_create(
-                        playlist=playlist,
-                        audio=audio_obj,
-                        defaults={'position': idx}
-                    )
-                    # When force=True, verify the file actually exists on disk
-                    # But NEVER delete local files for deleted/private YouTube videos
-                    if force and not entry_is_deleted and audio_obj.file_path:
-                        full_path = os.path.join('/app/audio', audio_obj.file_path)
-                        if not os.path.isfile(full_path):
-                            logger.warning('Force recheck: file missing for %s (%s), re-downloading',
-                                           audio_obj.youtube_id, audio_obj.file_path)
-                            audio_obj.delete()
-                            # Fall through to queue a new download below
-                        else:
-                            skipped += 1
-                            continue
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except Exception as yt_error:
+            # YouTube may be rate-limiting, down, or blocking our IP/region
+            error_msg = f'YouTube fetch failed: {str(yt_error)[:200]}'
+            playlist.sync_status = 'failed'
+            playlist.error_message = error_msg
+            playlist.save(update_fields=['sync_status', 'error_message'])
+            logger.warning('[PlaylistSync] YouTube fetch failed for "%s": %s', playlist.title, yt_error)
+            return f"Failed to fetch playlist"
+        
+        entries = info.get('entries') if info else None
+        if not info or not entries:
+            playlist.sync_status = 'failed'
+            playlist.error_message = 'YouTube returned empty playlist (removed or rate-limited)'
+            playlist.save(update_fields=['sync_status', 'error_message'])
+            logger.warning('[PlaylistSync] Empty response for playlist "%s" (ID: %s)', 
+                          playlist.title, playlist.playlist_id)
+            return f"Failed to fetch playlist items"
+
+        # Update item count
+        total_items = len([e for e in info['entries'] if e])
+        playlist.item_count = total_items
+
+        # Get list of permanently unavailable videos (copyright, private, etc.)
+        # When force=True, retry everything including previously unavailable
+        unavailable_ids = set() if force else get_permanently_unavailable_ids(playlist.owner)
+
+        # Queue only NEW videos (not already downloaded)
+        new_videos = 0
+        skipped = 0
+        skipped_unavailable = 0
+        skipped_deleted = 0
+
+        for idx, entry in enumerate(info['entries']):
+            if not entry:
+                continue
+
+            video_id = entry.get('id')
+            if not video_id:
+                continue
+
+            # Detect deleted/private videos from YouTube
+            # yt-dlp extract_flat returns these with title '[Deleted video]' or '[Private video]'
+            entry_is_deleted = is_deleted_or_private_entry(entry)
+
+            # Check if audio already exists
+            audio_obj = Audio.objects.filter(
+                owner=playlist.owner,
+                youtube_id=video_id
+            ).first()
+
+            # Create PlaylistItem if audio exists but not in playlist yet
+            if audio_obj:
+                PlaylistItem.objects.get_or_create(
+                    playlist=playlist,
+                    audio=audio_obj,
+                    defaults={'position': idx}
+                )
+                # When force=True, verify the file actually exists on disk
+                # But NEVER delete local files for deleted/private YouTube videos
+                if force and not entry_is_deleted and audio_obj.file_path:
+                    full_path = os.path.join('/app/audio', audio_obj.file_path)
+                    if not os.path.isfile(full_path):
+                        logger.warning('Force recheck: file missing for %s (%s), re-downloading',
+                                       audio_obj.youtube_id, audio_obj.file_path)
+                        audio_obj.delete()
+                        # Fall through to queue a new download below
                     else:
-                        if entry_is_deleted:
-                            logger.info('Keeping local copy of deleted/private video: %s (%s)',
-                                        audio_obj.title, video_id)
                         skipped += 1
                         continue
-                
-                # If video is deleted/private on YouTube and we don't have it locally,
-                # skip it entirely — downloading would fail anyway
-                if entry_is_deleted:
-                    skipped_deleted += 1
-                    logger.debug('Skipping deleted/private video: %s (%s)',
-                                 entry.get('title', '?'), video_id)
+                else:
+                    if entry_is_deleted:
+                        logger.info('Keeping local copy of deleted/private video: %s (%s)',
+                                    audio_obj.title, video_id)
+                    skipped += 1
                     continue
-                
-                # Skip permanently unavailable videos (copyright blocked, private, etc.)
-                if video_id in unavailable_ids:
-                    skipped_unavailable += 1
-                    continue
-                
-                # This is NEW content - add to download queue
-                # First check for existing queue item
-                existing_queue_item = DownloadQueue.objects.filter(
-                    owner=playlist.owner,
-                    youtube_id=video_id
-                ).first()
-                created = False
-                
-                # Check if item is stuck in downloading state (> 30 minutes)
-                if existing_queue_item and existing_queue_item.status == 'downloading':
-                    if existing_queue_item.started_date:
-                        stuck_threshold = timezone.now() - timedelta(minutes=30)
-                        if existing_queue_item.started_date < stuck_threshold:
-                            # Reset stuck download
-                            existing_queue_item.status = 'failed'
-                            existing_queue_item.error_message = 'Download stuck, resetting for retry'
-                            existing_queue_item.save()
-                            existing_queue_item = None  # Allow recreation
-                
-                # Create or get queue item - but skip permanently unavailable videos
-                if not existing_queue_item or existing_queue_item.status in ['failed', 'ignored']:
-                    if existing_queue_item and existing_queue_item.status in ['failed', 'ignored']:
-                        # Check if this is a permanent failure - DON'T retry these (unless force=True)
-                        if not force and is_permanently_unavailable(existing_queue_item.error_message):
-                            skipped_unavailable += 1
-                            continue
-                        # Update existing failed item (temporary failures only)
-                        existing_queue_item.status = 'pending'
-                        existing_queue_item.error_message = ''
+
+            # If video is deleted/private on YouTube and we don't have it locally,
+            # skip it entirely — downloading would fail anyway
+            if entry_is_deleted:
+                skipped_deleted += 1
+                logger.debug('Skipping deleted/private video: %s (%s)',
+                             entry.get('title', '?'), video_id)
+                continue
+
+            # Skip permanently unavailable videos (copyright blocked, private, etc.)
+            if video_id in unavailable_ids:
+                skipped_unavailable += 1
+                continue
+
+            # This is NEW content - add to download queue
+            # First check for existing queue item
+            existing_queue_item = DownloadQueue.objects.filter(
+                owner=playlist.owner,
+                youtube_id=video_id
+            ).first()
+            created = False
+
+            # Check if item is stuck in downloading state (> 30 minutes)
+            if existing_queue_item and existing_queue_item.status == 'downloading':
+                if existing_queue_item.started_date:
+                    stuck_threshold = timezone.now() - timedelta(minutes=30)
+                    if existing_queue_item.started_date < stuck_threshold:
+                        # Reset stuck download
+                        existing_queue_item.status = 'failed'
+                        existing_queue_item.error_message = 'Download stuck, resetting for retry'
                         existing_queue_item.save()
-                        queue_item = existing_queue_item
-                        created = True  # Treat as newly created for triggering download
+                        existing_queue_item = None  # Allow recreation
+
+            # Create or get queue item - but skip permanently unavailable videos
+            if not existing_queue_item or existing_queue_item.status in ['failed', 'ignored']:
+                if existing_queue_item and existing_queue_item.status in ['failed', 'ignored']:
+                    # Check if this is a permanent failure - DON'T retry these (unless force=True)
+                    if not force and is_permanently_unavailable(existing_queue_item.error_message):
+                        skipped_unavailable += 1
+                        continue
+                    # Update existing failed item (temporary failures only)
+                    existing_queue_item.status = 'pending'
+                    existing_queue_item.error_message = ''
+                    existing_queue_item.save()
+                    queue_item = existing_queue_item
+                    created = True  # Treat as newly created for triggering download
+                else:
+                    # Create new item
+                    queue_item, created = DownloadQueue.objects.get_or_create(
+                        owner=playlist.owner,
+                        url=f"https://www.youtube.com/watch?v={video_id}",
+                        defaults={
+                            'youtube_id': video_id,
+                            'title': entry.get('title', 'Unknown'),
+                            'status': 'pending',
+                            'auto_start': True
+                        }
+                    )
+                    if not created:
+                        # get_or_create found existing row by URL — treat it like existing_queue_item
+                        existing_queue_item = queue_item
+
+                if created:
+                    new_videos += 1
+                    # Trigger download task for NEW video
+                    download_audio_task.delay(queue_item.id)
+            if existing_queue_item and not created:
+                # Item is already pending, downloading, or completed
+                if existing_queue_item.status == 'completed':
+                    # Verify the audio actually exists - if not, reset and redownload
+                    audio_exists = Audio.objects.filter(
+                        owner=playlist.owner,
+                        youtube_id=video_id
+                    ).exists()
+
+                    if audio_exists:
+                        skipped += 1
                     else:
-                        # Create new item
-                        queue_item, created = DownloadQueue.objects.get_or_create(
-                            owner=playlist.owner,
-                            url=f"https://www.youtube.com/watch?v={video_id}",
-                            defaults={
-                                'youtube_id': video_id,
-                                'title': entry.get('title', 'Unknown'),
-                                'status': 'pending',
-                                'auto_start': True
-                            }
-                        )
-                        if not created:
-                            # get_or_create found existing row by URL — treat it like existing_queue_item
-                            existing_queue_item = queue_item
-                    
-                    if created:
-                        new_videos += 1
-                        # Trigger download task for NEW video
-                        download_audio_task.delay(queue_item.id)
-                if existing_queue_item and not created:
-                    # Item is already pending, downloading, or completed
-                    if existing_queue_item.status == 'completed':
-                        # Verify the audio actually exists - if not, reset and redownload
-                        audio_exists = Audio.objects.filter(
-                            owner=playlist.owner,
-                            youtube_id=video_id
-                        ).exists()
-                        
-                        if audio_exists:
-                            skipped += 1
-                        else:
-                            # Queue shows completed but audio doesn't exist - reset and redownload
-                            existing_queue_item.status = 'pending'
-                            existing_queue_item.error_message = 'Audio missing, re-downloading'
-                            existing_queue_item.save()
-                            new_videos += 1
-                            download_audio_task.delay(existing_queue_item.id)
-                    elif existing_queue_item.status == 'pending':
-                        # Re-dispatch stuck pending items (task may have been lost)
+                        # Queue shows completed but audio doesn't exist - reset and redownload
+                        existing_queue_item.status = 'pending'
+                        existing_queue_item.error_message = 'Audio missing, re-downloading'
+                        existing_queue_item.save()
                         new_videos += 1
                         download_audio_task.delay(existing_queue_item.id)
-                    elif existing_queue_item.status == 'downloading':
-                        # Already being downloaded — don't re-dispatch, just skip
-                        skipped += 1
-                
-                # Create PlaylistItem for the downloaded audio (will be created after download completes)
-                # Note: Audio object might not exist yet, so we'll add a post-download hook
-            
-            # Remove PlaylistItems for tracks that are NOT in this YouTube playlist
-            # (fixes incorrectly linked tracks from the old link_audio_to_playlists bug)
-            # Note: yt-dlp extract_flat includes [Deleted video] and [Private video] entries,
-            # so yt_video_ids covers all current AND deleted/private tracks.
-            # Any PlaylistItem whose audio youtube_id is NOT in yt_video_ids was never
-            # actually part of this YouTube playlist — only the playlist link is removed,
-            # the audio file itself is preserved.
-            yt_video_ids = {e.get('id') for e in info['entries'] if e and e.get('id')}
-            stale_items = PlaylistItem.objects.filter(playlist=playlist).exclude(
-                audio__youtube_id__in=yt_video_ids
-            )
-            removed = stale_items.count()
-            if removed:
-                stale_items.delete()
-                logger.info('Removed %d incorrectly linked items from playlist %s', removed, playlist.title)
-            
-            # Update playlist status
-            playlist.sync_status = 'success'
-            playlist.last_refresh = timezone.now()
-            # Count downloaded tracks: include all tracks in PlaylistItems
-            # (covers both current YouTube entries AND locally-kept deleted videos)
-            playlist.downloaded_count = PlaylistItem.objects.filter(
-                playlist=playlist,
-                audio__file_path__isnull=False,
-            ).exclude(audio__file_path='').count()
-            playlist.save()
-            
-            mode = 'Force recheck' if force else 'Sync'
-            
-            if new_videos == 0:
-                msg = f"{mode} '{playlist.title}' up to date ({skipped} already downloaded"
-                if skipped_deleted > 0:
-                    msg += f", {skipped_deleted} deleted/private skipped"
-                if skipped_unavailable > 0:
-                    msg += f", {skipped_unavailable} unavailable skipped"
-                msg += ")"
-                return msg
-            
-            msg = f"{mode} '{playlist.title}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+                elif existing_queue_item.status == 'pending':
+                    # Re-dispatch stuck pending items (task may have been lost)
+                    new_videos += 1
+                    download_audio_task.delay(existing_queue_item.id)
+                elif existing_queue_item.status == 'downloading':
+                    # Already being downloaded — don't re-dispatch, just skip
+                    skipped += 1
+
+            # Create PlaylistItem for the downloaded audio (will be created after download completes)
+            # Note: Audio object might not exist yet, so we'll add a post-download hook
+
+        # Remove PlaylistItems for tracks that are NOT in this YouTube playlist
+        # (fixes incorrectly linked tracks from the old link_audio_to_playlists bug)
+        # Note: yt-dlp extract_flat includes [Deleted video] and [Private video] entries,
+        # so yt_video_ids covers all current AND deleted/private tracks.
+        # Any PlaylistItem whose audio youtube_id is NOT in yt_video_ids was never
+        # actually part of this YouTube playlist — only the playlist link is removed,
+        # the audio file itself is preserved.
+        yt_video_ids = {e.get('id') for e in info['entries'] if e and e.get('id')}
+        stale_items = PlaylistItem.objects.filter(playlist=playlist).exclude(
+            audio__youtube_id__in=yt_video_ids
+        )
+        removed = stale_items.count()
+        if removed:
+            stale_items.delete()
+            logger.info('Removed %d incorrectly linked items from playlist %s', removed, playlist.title)
+
+        # Update playlist status
+        playlist.sync_status = 'success'
+        playlist.last_refresh = timezone.now()
+        # Count downloaded tracks: include all tracks in PlaylistItems
+        # (covers both current YouTube entries AND locally-kept deleted videos)
+        playlist.downloaded_count = PlaylistItem.objects.filter(
+            playlist=playlist,
+            audio__file_path__isnull=False,
+        ).exclude(audio__file_path='').count()
+        playlist.save()
+
+        mode = 'Force recheck' if force else 'Sync'
+
+        if new_videos == 0:
+            msg = f"{mode} '{playlist.title}' up to date ({skipped} already downloaded"
             if skipped_deleted > 0:
                 msg += f", {skipped_deleted} deleted/private skipped"
             if skipped_unavailable > 0:
                 msg += f", {skipped_unavailable} unavailable skipped"
+            msg += ")"
             return msg
+
+        msg = f"{mode} '{playlist.title}': {new_videos} new audio(s) queued, {skipped} already downloaded"
+        if skipped_deleted > 0:
+            msg += f", {skipped_deleted} deleted/private skipped"
+        if skipped_unavailable > 0:
+            msg += f", {skipped_unavailable} unavailable skipped"
+        return msg
     
     except Exception as e:
         playlist.sync_status = 'failed'

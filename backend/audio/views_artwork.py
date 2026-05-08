@@ -6,14 +6,13 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
 
-from audio.models import Audio, Channel
+from audio.models import Audio
 from audio.models_artwork import Artwork, MusicMetadata, ArtistInfo
 from audio.serializers_artwork import (
     ArtworkSerializer,
     MusicMetadataSerializer,
     ArtistInfoSerializer,
     AudioWithArtworkSerializer,
-    ChannelWithArtworkSerializer,
 )
 from audio.tasks_artwork import (
     fetch_metadata_for_audio,
@@ -177,8 +176,8 @@ class AudioArtworkViewSet(viewsets.ViewSet):
         
         data = {
             'audio_id': audio.id,
-            'audio_title': audio.audio_title,
-            'artist': audio.channel.channel_name if audio.channel else 'Unknown Artist',
+            'audio_title': audio.title,
+            'artist': audio.artist or audio.channel_name,
             'artwork': ArtworkSerializer(artwork, many=True).data,
             'metadata': MusicMetadataSerializer(metadata).data if metadata else None,
         }

@@ -124,16 +124,34 @@ END
 # Collect static files
 python manage.py collectstatic --noinput
 
-# Start Celery worker in background with limited concurrency to avoid SQLite locks
-celery -A config worker --loglevel=info --concurrency=2 &
+# Start Celery worker in background with proper error handling
+# Limit concurrency to avoid SQLite locks
+echo "Starting Celery worker..."
+celery -A config worker \
+    --loglevel=info \
+    --concurrency=2 \
+    --max-tasks-per-child=100 \
+    --time-limit=600 \
+    --soft-time-limit=580 \
+    --logfile=/tmp/celery-worker.log \
+    >> /tmp/celery-worker.log 2>&1 &
+WORKER_PID=$!
+echo "Celery worker started (PID: $WORKER_PID)"
 
-# Start Celery beat in background
-celery -A config beat --loglevel=info &
+# Start Celery beat scheduler in background
+echo "Starting Celery beat scheduler..."
+celery -A config beat \
+    --loglevel=info \
+    --logfile=/tmp/celery-beat.log \
+    >> /tmp/celery-beat.log 2>&1 &
+BEAT_PID=$!
+echo "Celery beat started (PID: $BEAT_PID)"
 
-# Start Django server
+# Start Django/Gunicorn server
 # Use gunicorn in production for security and performance; runserver in development
+echo "Starting Django application..."
 if [ "$IS_PRODUCTION" = "true" ]; then
-    echo "Starting gunicorn (production mode)..."
+    echo "→ Production mode: Gunicorn"
     exec gunicorn config.wsgi:application \
         --bind 0.0.0.0:8888 \
         --workers 3 \
@@ -145,6 +163,6 @@ if [ "$IS_PRODUCTION" = "true" ]; then
         --error-logfile - \
         --log-level info
 else
-    echo "Starting Django runserver (development mode)..."
+    echo "→ Development mode: Django runserver"
     python manage.py runserver 0.0.0.0:8888
 fi

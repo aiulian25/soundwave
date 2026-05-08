@@ -49,6 +49,23 @@ class Channel(models.Model):
         help_text="Current sync status"
     )
     error_message = models.TextField(blank=True, help_text="Last error message if sync failed")
+    consecutive_sync_failures = models.PositiveIntegerField(
+        default=0,
+        help_text="Consecutive sync failures for this subscription"
+    )
+    last_failed_sync = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time a sync attempt failed"
+    )
+    auto_disabled = models.BooleanField(
+        default=False,
+        help_text="Auto-disabled because repeated invalid channel errors were detected"
+    )
+    auto_disabled_reason = models.TextField(
+        blank=True,
+        help_text="Reason why this subscription was auto-disabled"
+    )
     downloaded_count = models.IntegerField(default=0, help_text="Downloaded videos count")
     
     # Download settings per channel
