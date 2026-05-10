@@ -77,7 +77,8 @@
 
 ## 📋 Prerequisites
 
-- Docker & Docker Compose
+- **Docker** (version 20.10+) and **Docker Compose V2** (`docker compose`, not the old `docker-compose`)
+- **Python 3** on the host (for generating secrets in Step 3 — usually pre-installed)
 - 2-4GB available RAM
 - Dual-core CPU (quad-core recommended)
 - Storage space for your audio library
@@ -136,27 +137,29 @@ chmod +x setup-dirs.sh
 ### Step 3: Create Environment File
 
 ```bash
-# Generate a secret key (required for production)
+# Generate all secrets
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
-
+SW_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(16))")
 REDIS_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
 PG_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 ES_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
 
 cat > .env << EOF
+# Change SW_HOST to your server's IP/hostname if accessing from other machines
 SW_HOST=http://localhost:8889
 SW_USERNAME=admin
-SW_PASSWORD=soundwave
+SW_PASSWORD=$SW_PASS
 ELASTIC_PASSWORD=$ES_PASS
 REDIS_HOST=soundwave-redis
 REDIS_PASSWORD=$REDIS_PASS
+# Change to your local timezone (e.g. Europe/London, America/New_York, Europe/Bucharest)
 TZ=UTC
 DJANGO_SECRET_KEY=$SECRET_KEY
 # PostgreSQL
 POSTGRES_DB=soundwave
 POSTGRES_USER=soundwave
 POSTGRES_PASSWORD=$PG_PASS
-# Optional: set to your server's hostname or IP if accessing from other devices
+# Optional: uncomment and set to your server hostname/IP if getting 400 Bad Request errors
 # DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.100
 # Optional: auto-update yt-dlp on startup (recommended for production)
 # SW_AUTO_UPDATE_YTDLP=true
@@ -165,6 +168,9 @@ POSTGRES_PASSWORD=$PG_PASS
 # LASTFM_API_SECRET=
 # FANART_API_KEY=
 EOF
+
+# Show your generated admin password — save this somewhere safe!
+echo "Admin password: $SW_PASS"
 ```
 
 ### Step 4: Start SoundWave
@@ -178,8 +184,15 @@ Docker will automatically create the `pg_data` volume for PostgreSQL data. No ma
 ### Step 5: Access the Application
 
 - **URL:** http://localhost:8889
-- **Username:** admin
-- **Password:** soundwave
+- **Username:** `admin`
+- **Password:** the value of `SW_PASSWORD` from your `.env` (generated in Step 3)
+
+```bash
+# Retrieve your admin password
+grep SW_PASSWORD .env
+```
+
+> ⚠️ **First login:** Go to **Settings → Account** and change your admin password to something memorable.
 
 Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to initialize before SoundWave starts.
 
@@ -191,7 +204,7 @@ Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to
 |----------|-------------|---------|
 | `SW_HOST` | Application URL | `http://localhost:8889` |
 | `SW_USERNAME` | Initial admin username | `admin` |
-| `SW_PASSWORD` | Initial admin password | `soundwave` |
+| `SW_PASSWORD` | Initial admin password (**change after first login**) | — |
 | `ELASTIC_PASSWORD` | ElasticSearch password (**required** in production) | — |
 | `REDIS_HOST` | Redis hostname | `soundwave-redis` |
 | `TZ` | Timezone | `UTC` |
