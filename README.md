@@ -158,6 +158,12 @@ POSTGRES_USER=soundwave
 POSTGRES_PASSWORD=$PG_PASS
 # Optional: set to your server's hostname or IP if accessing from other devices
 # DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.100
+# Optional: auto-update yt-dlp on startup (recommended for production)
+# SW_AUTO_UPDATE_YTDLP=true
+# Optional: API keys for lyrics and artwork enrichment
+# LASTFM_API_KEY=
+# LASTFM_API_SECRET=
+# FANART_API_KEY=
 EOF
 ```
 
@@ -186,21 +192,24 @@ Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to
 | `SW_HOST` | Application URL | `http://localhost:8889` |
 | `SW_USERNAME` | Initial admin username | `admin` |
 | `SW_PASSWORD` | Initial admin password | `soundwave` |
-| `ELASTIC_PASSWORD` | ElasticSearch password | `soundwave` |
+| `ELASTIC_PASSWORD` | ElasticSearch password (**required** in production) | — |
 | `REDIS_HOST` | Redis hostname | `soundwave-redis` |
 | `TZ` | Timezone | `UTC` |
-| `SW_AUTO_UPDATE_YTDLP` | Auto-update yt-dlp | `false` |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins | `http://localhost:8889` |
-| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hosts | Auto-detected |
-| `TOKEN_EXPIRY_HOURS` | API token lifetime in hours | `168` (7 days) |
-| `ALLOW_LOCAL_NETWORK` | Allow 192.168.x.x access | `True` |
-| `SECURE_COOKIES` | Force secure cookies (auto/true/false) | `auto` |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hosts | Auto-detected from `SW_HOST` |
 | `DJANGO_SECRET_KEY` | Django secret key (**required** in production) | — |
 | `REDIS_PASSWORD` | Redis authentication password (**required** in production) | — |
 | `POSTGRES_DB` | PostgreSQL database name | `soundwave` |
 | `POSTGRES_USER` | PostgreSQL username | `soundwave` |
 | `POSTGRES_PASSWORD` | PostgreSQL password (**required** in production) | — |
 | `DJANGO_DEBUG` | Enable Django debug mode | `False` |
+| `ALLOW_LOCAL_NETWORK` | Allow access from 192.168.x.x local network IPs | `false` |
+| `SECURE_COOKIES` | Cookie security: `auto`, `true`, or `false` | `auto` |
+| `TOKEN_EXPIRY_HOURS` | API token lifetime in hours | `168` (7 days) |
+| `SW_AUTO_UPDATE_YTDLP` | Auto-update yt-dlp on startup | `false` |
+| `LASTFM_API_KEY` | Last.fm API key for artist/track metadata | — |
+| `LASTFM_API_SECRET` | Last.fm API secret | — |
+| `FANART_API_KEY` | Fanart.tv API key for high-res artwork | — |
 
 ### Data Directories
 
