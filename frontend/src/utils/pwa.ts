@@ -125,13 +125,13 @@ class PWAManager {
       console.log('[PWA] Service Worker registered:', this.registration);
       console.log('[PWA] SW State:', this.registration.active?.state || 'no active worker');
 
-      // Listen for controller change to reload page when new SW takes over
-      let refreshing = false;
+      // When the new SW takes over (skipWaiting + clients.claim), log it.
+      // We intentionally do NOT auto-reload here — the new SW immediately
+      // controls the page via clients.claim() so future fetches use the new
+      // caching strategy. A hard reload would interrupt audio playback.
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        console.log('[PWA] Controller changed, reloading...');
-        window.location.reload();
+        console.log('[PWA] New service worker is now active.');
+        this.emit('update', true);
       });
 
       // Check for updates

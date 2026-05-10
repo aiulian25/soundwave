@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v15';
+const CACHE_NAME = 'soundwave-v16';
 const API_CACHE_NAME = 'soundwave-api-v3';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
-const IMAGE_CACHE_NAME = 'soundwave-images-v3';
+const IMAGE_CACHE_NAME = 'soundwave-images-v4';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -13,10 +13,10 @@ const STATIC_ASSETS = [
   '/favicon.ico',
 ];
 
-// Install event - cache static assets
-// NOTE: Do NOT call skipWaiting() here - we want the user to be notified of updates
-// The waiting service worker will be activated when the user clicks "Update" in the UI
-// which triggers a SKIP_WAITING message
+// Install event - cache static assets and immediately activate.
+// skipWaiting() ensures the new SW takes over right away without waiting
+// for the user to click an "Update" button. This is important for critical
+// fixes (e.g. broken image caching) that need to reach users immediately.
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing new version...');
   event.waitUntil(
@@ -26,8 +26,8 @@ self.addEventListener('install', (event) => {
         console.error('[Service Worker] Failed to cache static assets:', err);
       });
     }).then(() => {
-      console.log('[Service Worker] Installed - waiting for activation');
-      // Don't call skipWaiting() here - let the UI control when to activate
+      console.log('[Service Worker] Installed - activating immediately');
+      return self.skipWaiting();
     })
   );
 });
