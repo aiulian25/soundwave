@@ -137,6 +137,7 @@ chmod +x setup-dirs.sh
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
 
 REDIS_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+PG_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 
 cat > .env << EOF
 SW_HOST=http://localhost:8889
@@ -147,6 +148,10 @@ REDIS_HOST=soundwave-redis
 REDIS_PASSWORD=$REDIS_PASS
 TZ=UTC
 DJANGO_SECRET_KEY=$SECRET_KEY
+# PostgreSQL
+POSTGRES_DB=soundwave
+POSTGRES_USER=soundwave
+POSTGRES_PASSWORD=$PG_PASS
 EOF
 ```
 
@@ -156,13 +161,15 @@ EOF
 docker compose up -d
 ```
 
+Docker will automatically create the `pg_data` volume for PostgreSQL data. No manual volume creation is needed.
+
 ### Step 5: Access the Application
 
 - **URL:** http://localhost:8889
 - **Username:** admin
 - **Password:** soundwave
 
-Wait ~30-60 seconds for all services to initialize on first start.
+Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to initialize before SoundWave starts.
 
 ## 🔧 Configuration
 
@@ -184,15 +191,20 @@ Wait ~30-60 seconds for all services to initialize on first start.
 | `SECURE_COOKIES` | Force secure cookies (auto/true/false) | `auto` |
 | `DJANGO_SECRET_KEY` | Django secret key (**required** in production) | — |
 | `REDIS_PASSWORD` | Redis authentication password (**required** in production) | — |
+| `POSTGRES_DB` | PostgreSQL database name | `soundwave` |
+| `POSTGRES_USER` | PostgreSQL username | `soundwave` |
+| `POSTGRES_PASSWORD` | PostgreSQL password (**required** in production) | — |
 | `DJANGO_DEBUG` | Enable Django debug mode | `False` |
 
 ### Data Directories
 
-| Directory | Purpose |
-|-----------|---------|
+| Directory / Volume | Purpose |
+|-------------------|--------|
 | `./audio` | Downloaded audio files |
 | `./cache` | Temporary cache files |
-| `./data` | Database and app data |
+| `./data` | App data (avatars, migration scripts) |
+| `pg_data` (Docker volume) | PostgreSQL database — created automatically by Docker Compose |
+| `es_data` (Docker volume) | Elasticsearch index — created automatically by Docker Compose |
 
 ## � Dashboard Integration (Homepage)
 
@@ -402,8 +414,64 @@ docker compose logs soundwave
 # Check ElasticSearch
 docker compose logs soundwave-es
 
+# Check PostgreSQL
+docker compose logs soundwave-pg
+
 # Restart services
 docker compose restart
+```
+
+### PostgreSQL Won't Start
+
+Ensure `POSTGRES_PASSWORD` is set in your `.env` file — it is required in production.
+
+```bash
+# Check PostgreSQL health
+docker inspect --format='{{.State.Health.Status}}' soundwave-pg
+
+# View PostgreSQL logs
+docker compose logs soundwave-pg
+```
+
+If the `pg_data` volume is corrupted, you can reset it (⚠️ **this deletes all data**):
+
+```bash
+docker compose down
+docker volume rm soundwave_pg_data
+docker compose up -d
+```
+
+### Upgrading from SQLite (existing v1.10.x installations)
+
+If you are upgrading from a version that used SQLite (`./data/db.sqlite3`), your data needs to be migrated once to PostgreSQL.
+
+**Before starting**, make sure your `.env` contains the new `POSTGRES_*` variables (see Step 3 in Quick Start).
+
+```bash
+# 1. Pull the new images
+docker compose pull
+
+# 2. Stop the old soundwave container (keep other services running)
+docker compose stop soundwave
+
+# 3. Start PostgreSQL
+docker compose up -d soundwave-pg
+
+# Wait for it to become healthy
+until [ "$(docker inspect --format='{{.State.Health.Status}}' soundwave-pg 2>/dev/null)" = "healthy" ]; do
+  echo -n "."; sleep 2
+done && echo " PostgreSQL ready!"
+
+# 4. Create the PostgreSQL schema
+docker compose run --rm soundwave python /app/backend/manage.py migrate --no-input
+
+# 5. Download and run the data migration script
+wget https://raw.githubusercontent.com/aiulian25/soundwave/main/scripts/migrate_sqlite_to_pg.py -O ./data/migrate.py
+docker compose run --rm soundwave python /app/data/migrate.py
+rm ./data/migrate.py
+
+# 6. Start everything
+docker compose up -d
 ```
 
 ### Download Failures
