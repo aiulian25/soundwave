@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v14';
+const CACHE_NAME = 'soundwave-v15';
 const API_CACHE_NAME = 'soundwave-api-v3';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
-const IMAGE_CACHE_NAME = 'soundwave-images-v2';
+const IMAGE_CACHE_NAME = 'soundwave-images-v3';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -102,13 +102,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Images - Cache first, fallback to network
+  // Images - Cache first, same-origin only.
+  // Cross-origin images (YouTube thumbnails from i.ytimg.com, yt3.ggpht.com, etc.)
+  // are NOT intercepted. Returning opaque (no-cors) responses from a service worker
+  // for cross-origin images breaks CSS background-image display on mobile Chrome PWA.
+  // The browser handles external images directly — correct, performant, no side effects.
   if (
-    url.pathname.includes('/img/') ||
-    url.pathname.includes('/media/') ||
-    url.pathname.includes('thumbnail') ||
-    url.pathname.includes('cover') ||
-    request.destination === 'image'
+    url.origin === self.location.origin && (
+      url.pathname.includes('/img/') ||
+      url.pathname.includes('/media/') ||
+      url.pathname.includes('/avatars/') ||
+      request.destination === 'image'
+    )
   ) {
     event.respondWith(cacheFirstStrategy(request, IMAGE_CACHE_NAME));
     return;
