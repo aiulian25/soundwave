@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v16';
+const CACHE_NAME = 'soundwave-v17';
 const API_CACHE_NAME = 'soundwave-api-v3';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
 const IMAGE_CACHE_NAME = 'soundwave-images-v4';
@@ -64,6 +64,17 @@ self.addEventListener('fetch', (event) => {
 
   // Skip chrome extensions and non-http(s) requests
   if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // CRITICAL: Do NOT intercept cross-origin requests.
+  // Cross-origin resources (YouTube thumbnails from i.ytimg.com, yt3.ggpht.com, etc.)
+  // must be handled by the browser natively. If we call event.respondWith() for them,
+  // any fetch() inside the SW uses CORS mode by default — YouTube CDN doesn't support CORS
+  // so the fetch fails, and background-image renders blank on all devices.
+  // Returning without event.respondWith() lets the browser make the request directly
+  // in no-cors mode, which works correctly.
+  if (url.origin !== self.location.origin) {
     return;
   }
 
