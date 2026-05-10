@@ -9,6 +9,12 @@ echo "=============================="
 echo "Creating directories..."
 mkdir -p ./audio ./cache ./data
 
+# Create cookies.txt if it doesn't exist (required by the container)
+if [ ! -f ./cookies.txt ]; then
+    touch ./cookies.txt
+    echo "Created cookies.txt (empty — add YouTube cookies here if needed)"
+fi
+
 # Set permissions (user 1000:1000 for Docker container)
 echo "Setting permissions..."
 sudo chown -R 1000:1000 ./audio ./cache ./data

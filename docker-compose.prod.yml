@@ -49,7 +49,7 @@ services:
       - TZ=${TZ:-UTC}
       - ES_URL=http://soundwave-es:9200
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8889}
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,192.168.1.80}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
       - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
     depends_on:

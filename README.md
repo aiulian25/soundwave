@@ -113,11 +113,14 @@ wget https://raw.githubusercontent.com/aiulian25/soundwave/main/docker-compose.p
 
 ### Step 2: Create Data Directories
 
-**Important:** Docker needs these directories to exist with proper permissions before starting.
+**Important:** Docker needs these directories and files to exist before starting.
 
 ```bash
 # Create directories
 mkdir -p ./audio ./cache ./data
+
+# Create an empty cookies.txt (required by the container — add YouTube cookies here if needed)
+touch ./cookies.txt
 
 # Set permissions for container user (1000:1000)
 sudo chown -R 1000:1000 ./audio ./cache ./data
@@ -138,12 +141,13 @@ SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
 
 REDIS_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
 PG_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+ES_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
 
 cat > .env << EOF
 SW_HOST=http://localhost:8889
 SW_USERNAME=admin
 SW_PASSWORD=soundwave
-ELASTIC_PASSWORD=soundwave
+ELASTIC_PASSWORD=$ES_PASS
 REDIS_HOST=soundwave-redis
 REDIS_PASSWORD=$REDIS_PASS
 TZ=UTC
@@ -152,6 +156,8 @@ DJANGO_SECRET_KEY=$SECRET_KEY
 POSTGRES_DB=soundwave
 POSTGRES_USER=soundwave
 POSTGRES_PASSWORD=$PG_PASS
+# Optional: set to your server's hostname or IP if accessing from other devices
+# DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.100
 EOF
 ```
 
@@ -203,8 +209,10 @@ Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to
 | `./audio` | Downloaded audio files |
 | `./cache` | Temporary cache files |
 | `./data` | App data (avatars, migration scripts) |
+| `./cookies.txt` | YouTube cookies file (must exist; can be empty) |
 | `pg_data` (Docker volume) | PostgreSQL database — created automatically by Docker Compose |
 | `es_data` (Docker volume) | Elasticsearch index — created automatically by Docker Compose |
+| `redis_data` (Docker volume) | Redis persistence — created automatically by Docker Compose |
 
 ## � Dashboard Integration (Homepage)
 
