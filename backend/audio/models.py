@@ -32,8 +32,8 @@ class Audio(models.Model):
     thumbnail_url = models.URLField(max_length=500, blank=True)
     published_date = models.DateTimeField()
     downloaded_date = models.DateTimeField(auto_now_add=True)
-    view_count = models.IntegerField(default=0)
-    like_count = models.IntegerField(default=0)
+    view_count = models.BigIntegerField(default=0)
+    like_count = models.BigIntegerField(default=0)
     audio_format = models.CharField(max_length=20, default='m4a')
     bitrate = models.IntegerField(null=True, blank=True, help_text="Bitrate in kbps")
     
