@@ -22,16 +22,9 @@ import CloseIcon from '@mui/icons-material/Close';
 import TuneIcon from '@mui/icons-material/Tune';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useRadio, type RadioMode } from '../context/RadioContext';
 import { radioAPI } from '../api/client';
-
-const modeLabels: Record<RadioMode, string> = {
-  track: 'Track Radio',
-  artist: 'Artist Radio',
-  favorites: 'Favorites Mix',
-  discovery: 'Discovery Mode',
-  recent: 'New Additions',
-};
 
 const modeIcons: Record<RadioMode, string> = {
   track: '🎵',
@@ -46,9 +39,17 @@ interface RadioIndicatorProps {
 }
 
 export default function RadioIndicator({ compact = false }: RadioIndicatorProps) {
+  const { t } = useTranslation();
   const { isRadioMode, radioSession, stopRadio, currentReason, isLoading } = useRadio();
   const [settingsAnchor, setSettingsAnchor] = useState<null | HTMLElement>(null);
   const [varietyLevel, setVarietyLevel] = useState(radioSession?.variety_level ?? 50);
+  const modeLabels: Record<RadioMode, string> = {
+    track: t('radioIndicator.modes.track'),
+    artist: t('radioIndicator.modes.artist'),
+    favorites: t('radioIndicator.modes.favorites'),
+    discovery: t('radioIndicator.modes.discovery'),
+    recent: t('radioIndicator.modes.recent'),
+  };
   
   if (!isRadioMode || !radioSession) return null;
   
@@ -85,7 +86,7 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
       <Tooltip title={`${modeLabels[radioSession.mode]}: ${radioSession.seed_title}`}>
         <Chip
           icon={<RadioIcon sx={{ fontSize: 16 }} />}
-          label="RADIO"
+          label={t('player.radio')}
           size="small"
           color="primary"
           onDelete={stopRadio}
@@ -146,17 +147,20 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
         )}
         
         <Typography variant="caption" sx={{ opacity: 0.7 }}>
-          {radioSession.tracks_played} played • {radioSession.tracks_skipped} skipped
+          {t('radioIndicator.sessionStats', {
+            played: radioSession.tracks_played,
+            skipped: radioSession.tracks_skipped,
+          })}
         </Typography>
       </Box>
       
-      <Tooltip title="Radio Settings">
+      <Tooltip title={t('radioIndicator.actions.settings')}>
         <IconButton size="small" onClick={handleOpenSettings} sx={{ color: 'inherit' }}>
           <TuneIcon fontSize="small" />
         </IconButton>
       </Tooltip>
       
-      <Tooltip title="Stop Radio">
+      <Tooltip title={t('radioIndicator.actions.stop')}>
         <IconButton size="small" onClick={stopRadio} sx={{ color: 'inherit' }}>
           <CloseIcon fontSize="small" />
         </IconButton>
@@ -187,10 +191,10 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
       >
         <Box sx={{ px: 2, py: 1 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Variety Level
+            {t('radioIndicator.settings.varietyLevel')}
           </Typography>
           <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block', mb: 1 }}>
-            Lower = stick to similar tracks, Higher = more variety
+            {t('radioIndicator.settings.varietyHelp')}
           </Typography>
           <Slider
             value={varietyLevel}
@@ -199,9 +203,9 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
             max={100}
             valueLabelDisplay="auto"
             marks={[
-              { value: 0, label: 'Similar' },
-              { value: 50, label: 'Balanced' },
-              { value: 100, label: 'Varied' },
+              { value: 0, label: t('radioIndicator.settings.marks.similar') },
+              { value: 50, label: t('radioIndicator.settings.marks.balanced') },
+              { value: 100, label: t('radioIndicator.settings.marks.varied') },
             ]}
           />
         </Box>
@@ -209,7 +213,7 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
         <Divider sx={{ my: 1 }} />
         
         <MenuItem onClick={handleResetLearning}>
-          Reset Learning Data
+          {t('radioIndicator.settings.resetLearningData')}
         </MenuItem>
       </Menu>
     </Box>

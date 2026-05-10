@@ -16,6 +16,7 @@ import {
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
+import { useTranslation } from 'react-i18next';
 import { audioAPI } from '../api/client';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
@@ -28,6 +29,7 @@ interface FavoritesPageProps {
 }
 
 export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
+  const { t } = useTranslation();
   const [favorites, setFavorites] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(true);
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
@@ -58,7 +60,7 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
     if (!updatedTrack.is_favorite) {
       // If track is unfavorited, remove it from the list
       setFavorites(prev => prev.filter(fav => fav.id !== updatedTrack.id));
-      setSnackbarMessage('Removed from favorites');
+      setSnackbarMessage(t('favorites.messages.removed'));
       setSnackbarOpen(true);
     } else {
       // Update the track in place
@@ -68,19 +70,19 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
 
   const handlePlayAll = () => {
     if (favorites.length === 0) {
-      setSnackbarMessage('No favorites to play');
+      setSnackbarMessage(t('favorites.errors.noFavoritesToPlay'));
       setSnackbarOpen(true);
       return;
     }
     
     setCurrentAudio(favorites[0], favorites);
-    setSnackbarMessage(`Playing ${favorites.length} favorite tracks`);
+    setSnackbarMessage(t('favorites.messages.playingTracks', { count: favorites.length }));
     setSnackbarOpen(true);
   };
 
   const handleShuffle = () => {
     if (favorites.length === 0) {
-      setSnackbarMessage('No favorites to shuffle');
+      setSnackbarMessage(t('favorites.errors.noFavoritesToShuffle'));
       setSnackbarOpen(true);
       return;
     }
@@ -93,7 +95,7 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
     }
     
     setCurrentAudio(shuffled[0], shuffled);
-    setSnackbarMessage(`Shuffled ${shuffled.length} favorite tracks`);
+    setSnackbarMessage(t('favorites.messages.shuffledTracks', { count: shuffled.length }));
     setSnackbarOpen(true);
   };
 
@@ -112,9 +114,9 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
     return (
       <Box>
         <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
-          Favorites
+          {t('favorites.title')}
         </Typography>
-        <Typography>Loading favorites...</Typography>
+        <Typography>{t('favorites.loading')}</Typography>
       </Box>
     );
   }
@@ -123,7 +125,7 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-          Favorites
+          {t('favorites.title')}
         </Typography>
         
         {favorites.length > 0 && (
@@ -140,7 +142,7 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
                 fontWeight: 600,
               }}
             >
-              Play All
+              {t('favorites.actions.playAll')}
             </Button>
             <Button
               variant="outlined"
@@ -154,7 +156,7 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
                 fontWeight: 600,
               }}
             >
-              Shuffle
+              {t('favorites.actions.shuffle')}
             </Button>
           </Box>
         )}
@@ -173,10 +175,10 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
         >
           <FavoriteIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
           <Typography variant="subtitle1" color="text.secondary">
-            No favorites yet
+            {t('favorites.empty.title')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Start adding songs to your favorites
+            {t('favorites.empty.description')}
           </Typography>
         </Box>
       ) : (
@@ -185,12 +187,12 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
             <TableHead>
               <TableRow>
                 <TableCell width={50} sx={{ fontWeight: 600 }}>#</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Channel</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Duration</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Size</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Plays</TableCell>
-                <TableCell align="center" width={100} sx={{ fontWeight: 600 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>{t('favorites.columns.title')}</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>{t('favorites.columns.channel')}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>{t('favorites.columns.duration')}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>{t('favorites.columns.size')}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>{t('favorites.columns.plays')}</TableCell>
+                <TableCell align="center" width={100} sx={{ fontWeight: 600 }}>{t('favorites.columns.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

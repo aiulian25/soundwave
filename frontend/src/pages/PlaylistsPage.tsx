@@ -34,6 +34,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
+import { useTranslation } from 'react-i18next';
 import { playlistAPI } from '../api/client';
 import { fetchAllPlaylists } from '../utils/fetchAll';
 import { usePWA } from '../context/PWAContext';
@@ -63,6 +64,7 @@ interface Playlist {
 
 export default function PlaylistsPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { isOnline } = usePWA();
   const { getExtraSetting, updateExtraSetting } = useSettings();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -114,14 +116,14 @@ export default function PlaylistsPage() {
             id: p.id,
             playlist_id: p.playlist_id,
             title: p.title,
-            channel_name: p.channel_name || 'Offline',
+            channel_name: p.channel_name || t('playlists.offlineChannelName'),
             thumbnail_url: p.thumbnail_url,
             subscribed: true,
             item_count: p.item_count || p.items?.length || 0,
             downloaded_count: p.downloaded_count || p.items?.length || 0,
             last_refresh: null,
             sync_status: 'success' as const,
-            status_display: 'Offline',
+            status_display: t('playlists.status.offline'),
             error_message: '',
             active: true,
             progress_percent: 100,
@@ -172,7 +174,7 @@ export default function PlaylistsPage() {
       setPlaylistUrl('');
       setOpenDialog(false);
       // Show success message
-      alert('✅ Playlist subscription started! Fetching metadata and downloading audio...');
+      alert(t('playlists.messages.subscriptionStarted'));
       // Immediately reload to show pending status
       await loadPlaylists();
       setLoading(false);
@@ -183,7 +185,7 @@ export default function PlaylistsPage() {
       }, 30000);
     } catch (err: any) {
       setLoading(false);
-      setError(err.response?.data?.detail || 'Failed to subscribe to playlist');
+      setError(err.response?.data?.detail || t('playlists.errors.subscribeFailed'));
     }
   };
 
@@ -197,7 +199,7 @@ export default function PlaylistsPage() {
       
       setSnackbar({
         open: true,
-        message: '🔄 Sync started! Server processing in background...',
+        message: t('playlists.messages.syncStarted'),
         severity: 'info'
       });
       
@@ -216,13 +218,13 @@ export default function PlaylistsPage() {
           if (playlist.sync_status === 'success') {
             setSnackbar({
               open: true,
-              message: `✅ Sync complete! ${playlist.downloaded_count}/${playlist.item_count} tracks available`,
+              message: t('playlists.messages.syncComplete', { downloaded: playlist.downloaded_count, total: playlist.item_count }),
               severity: 'success'
             });
           } else if (playlist.sync_status === 'failed') {
             setSnackbar({
               open: true,
-              message: `❌ Sync failed: ${playlist.error_message || 'Unknown error'}`,
+              message: t('playlists.messages.syncFailed', { error: playlist.error_message || t('playlists.errors.unknownError') }),
               severity: 'error'
             });
           }
@@ -238,14 +240,14 @@ export default function PlaylistsPage() {
       });
       setSnackbar({
         open: true,
-        message: `❌ Failed to start sync: ${err.response?.data?.detail || err.message || 'Unknown error'}`,
+        message: t('playlists.messages.syncStartFailed', { error: err.response?.data?.detail || err.message || t('playlists.errors.unknownError') }),
         severity: 'error'
       });
     }
   };
 
   const handleDelete = async (playlistId: string) => {
-    if (!confirm('Are you sure you want to remove this playlist?')) return;
+    if (!confirm(t('playlists.confirm.delete'))) return;
     
     try {
       await playlistAPI.delete(playlistId);
@@ -261,7 +263,7 @@ export default function PlaylistsPage() {
       await playlistAPI.forceRecheck(playlistId);
       setSnackbar({
         open: true,
-        message: '🔍 Force recheck started — re-downloading missing files...',
+        message: t('playlists.messages.forceRecheckStarted'),
         severity: 'info'
       });
       setTimeout(async () => {
@@ -281,7 +283,7 @@ export default function PlaylistsPage() {
       });
       setSnackbar({
         open: true,
-        message: `❌ Failed to start recheck: ${err.response?.data?.detail || err.message || 'Unknown error'}`,
+        message: t('playlists.messages.forceRecheckFailed', { error: err.response?.data?.detail || err.message || t('playlists.errors.unknownError') }),
         severity: 'error'
       });
     }
@@ -293,10 +295,10 @@ export default function PlaylistsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, px: 0.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-            YouTube Playlists
+            {t('playlists.title')}
           </Typography>
           {hasCustomOrder && (
-            <Tooltip title="Reset to default order">
+            <Tooltip title={t('playlists.actions.resetOrder')}>
               <IconButton size="small" onClick={resetOrder} sx={{ opacity: 0.7 }}>
                 <ResetIcon fontSize="small" />
               </IconButton>
@@ -310,7 +312,7 @@ export default function PlaylistsPage() {
           onClick={() => setOpenDialog(true)}
           sx={{ borderRadius: '9999px', textTransform: 'none', fontWeight: 600 }}
         >
-          Add Playlist
+          {t('playlists.actions.addPlaylist')}
         </Button>
       </Box>
 
@@ -368,24 +370,24 @@ export default function PlaylistsPage() {
         >
           <PlaylistIcon sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />
           <Typography variant="h6" gutterBottom>
-            No playlists added
+            {t('playlists.empty.title')}
           </Typography>
           <Typography variant="body2" sx={{ mb: 3 }}>
-            Add YouTube playlists to automatically download all their videos
+            {t('playlists.empty.description')}
           </Typography>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setOpenDialog(true)}
           >
-            Add Playlist
+            {t('playlists.actions.addPlaylist')}
           </Button>
         </Box>
       )}
 
       {/* Add Playlist Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add YouTube Playlist</DialogTitle>
+        <DialogTitle>{t('playlists.dialog.title')}</DialogTitle>
         <DialogContent>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -395,18 +397,18 @@ export default function PlaylistsPage() {
           <TextField
             autoFocus
             margin="dense"
-            label="Playlist URL"
-            placeholder="https://www.youtube.com/playlist?list=..."
+            label={t('playlists.dialog.urlLabel')}
+            placeholder={t('playlists.dialog.urlPlaceholder')}
             fullWidth
             value={playlistUrl}
             onChange={(e) => setPlaylistUrl(e.target.value)}
-            helperText="Enter a YouTube playlist URL"
+            helperText={t('playlists.dialog.urlHelp')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={() => setOpenDialog(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleSubscribe} variant="contained" disabled={!playlistUrl}>
-            Add Playlist
+            {t('playlists.actions.addPlaylist')}
           </Button>
         </DialogActions>
       </Dialog>

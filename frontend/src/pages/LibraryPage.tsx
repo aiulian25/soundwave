@@ -17,6 +17,7 @@ import ShuffleIcon from '@mui/icons-material/Shuffle';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { audioAPI } from '../api/client';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
@@ -29,6 +30,7 @@ interface LibraryPageProps {
 }
 
 export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
+  const { t } = useTranslation();
   const [audioList, setAudioList] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(false);
   const location = useLocation();
@@ -67,19 +69,19 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
 
   const handlePlayAll = () => {
     if (audioList.length === 0) {
-      setSnackbarMessage('No tracks in library');
+      setSnackbarMessage(t('library.errors.noTracks'));
       setSnackbarOpen(true);
       return;
     }
     
     setCurrentAudio(audioList[0], audioList);
-    setSnackbarMessage(`Playing ${audioList.length} tracks`);
+    setSnackbarMessage(t('library.messages.playingTracks', { count: audioList.length }));
     setSnackbarOpen(true);
   };
 
   const handleShuffle = () => {
     if (audioList.length === 0) {
-      setSnackbarMessage('No tracks to shuffle');
+      setSnackbarMessage(t('library.errors.noTracksToShuffle'));
       setSnackbarOpen(true);
       return;
     }
@@ -92,7 +94,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
     }
     
     setCurrentAudio(shuffled[0], shuffled);
-    setSnackbarMessage(`Shuffled ${shuffled.length} tracks`);
+    setSnackbarMessage(t('library.messages.shuffledTracks', { count: shuffled.length }));
     setSnackbarOpen(true);
   };
 
@@ -100,7 +102,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-          Library
+          {t('library.title')}
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -118,7 +120,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
               '&:disabled': { bgcolor: 'rgba(255, 255, 255, 0.1)' },
             }}
           >
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Play All</Box>
+            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('library.actions.playAll')}</Box>
           </Button>
           <Button
             variant="outlined"
@@ -140,7 +142,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
               },
             }}
           >
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Shuffle</Box>
+            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('library.actions.shuffle')}</Box>
           </Button>
           <IconButton
             onClick={loadAudio}
@@ -149,7 +151,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
               color: 'text.secondary',
               '&:hover': { color: 'primary.main' },
             }}
-            title="Refresh library"
+            title={t('library.actions.refresh')}
           >
             <RefreshIcon sx={{ animation: loading ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
           </IconButton>
@@ -157,7 +159,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {audioList.length} tracks in your library
+        {t('library.trackCount', { count: audioList.length })}
       </Typography>
 
       <TableContainer 
@@ -176,12 +178,12 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
           <TableHead>
             <TableRow>
               <TableCell width={50} sx={{ fontWeight: 600 }}>#</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Channel</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>Duration</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>Size</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>Plays</TableCell>
-              <TableCell align="center" width={100} sx={{ fontWeight: 600 }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t('library.columns.title')}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t('library.columns.channel')}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>{t('library.columns.duration')}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>{t('library.columns.size')}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>{t('library.columns.plays')}</TableCell>
+              <TableCell align="center" width={100} sx={{ fontWeight: 600 }}>{t('library.columns.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

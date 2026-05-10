@@ -40,6 +40,7 @@ import {
   VideoLibrary as VideoLibraryIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import api from '../api/client';
 
 interface User {
@@ -80,6 +81,7 @@ interface SystemStats {
 }
 
 const AdminUsersPage = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,7 +121,7 @@ const AdminUsersPage = () => {
       setUsers(response.data.results || response.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load users');
+      setError(err.response?.data?.detail || t('adminUsers.errors.loadUsersFailed'));
     } finally {
       setLoading(false);
     }
@@ -137,14 +139,14 @@ const AdminUsersPage = () => {
   const handleCreateUser = async () => {
     try {
       await api.post('/user/admin/users/', formData);
-      setSuccess('User created successfully');
+      setSuccess(t('adminUsers.messages.userCreated'));
       setCreateDialogOpen(false);
       resetForm();
       loadUsers();
       loadSystemStats();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create user');
+      setError(err.response?.data?.detail || t('adminUsers.errors.createUserFailed'));
     }
   };
 
@@ -160,45 +162,45 @@ const AdminUsersPage = () => {
         max_playlists: formData.max_playlists,
         user_notes: formData.user_notes,
       });
-      setSuccess('User updated successfully');
+      setSuccess(t('adminUsers.messages.userUpdated'));
       setEditDialogOpen(false);
       loadUsers();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update user');
+      setError(err.response?.data?.detail || t('adminUsers.errors.updateUserFailed'));
     }
   };
 
   const handleToggleActive = async (user: User) => {
     try {
       await api.post(`/user/admin/users/${user.id}/toggle_active/`);
-      setSuccess(`User ${user.is_active ? 'deactivated' : 'activated'}`);
+      setSuccess(t(user.is_active ? 'adminUsers.messages.userDeactivated' : 'adminUsers.messages.userActivated'));
       loadUsers();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to toggle user status');
+      setError(err.response?.data?.detail || t('adminUsers.errors.toggleStatusFailed'));
     }
   };
 
   const handleResetStorage = async (user: User) => {
     try {
       await api.post(`/user/admin/users/${user.id}/reset_storage/`);
-      setSuccess('Storage reset successfully');
+      setSuccess(t('adminUsers.messages.storageReset'));
       loadUsers();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to reset storage');
+      setError(err.response?.data?.detail || t('adminUsers.errors.resetStorageFailed'));
     }
   };
 
   const handleReset2FA = async (user: User) => {
     try {
       await api.post(`/user/admin/users/${user.id}/reset_2fa/`);
-      setSuccess('2FA reset successfully');
+      setSuccess(t('adminUsers.messages.twoFaReset'));
       loadUsers();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to reset 2FA');
+      setError(err.response?.data?.detail || t('adminUsers.errors.resetTwoFaFailed'));
     }
   };
 
@@ -212,14 +214,14 @@ const AdminUsersPage = () => {
     if (!selectedUser || deleteConfirmText !== selectedUser.username) return;
     try {
       const response = await api.delete(`/user/admin/users/${selectedUser.id}/delete_user/`);
-      setSuccess(response.data.message || 'User deleted successfully');
+      setSuccess(response.data.message || t('adminUsers.messages.userDeleted'));
       setDeleteConfirmOpen(false);
       setSelectedUser(null);
       loadUsers();
       loadSystemStats();
       setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete user');
+      setError(err.response?.data?.detail || t('adminUsers.errors.deleteUserFailed'));
     }
   };
 
@@ -270,7 +272,7 @@ const AdminUsersPage = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" fontWeight="bold">
-          User Management
+          {t('adminUsers.title')}
         </Typography>
         <Box>
           <IconButton onClick={loadUsers} sx={{ mr: 1 }}>
@@ -281,7 +283,7 @@ const AdminUsersPage = () => {
             startIcon={<PersonAddIcon />}
             onClick={() => setCreateDialogOpen(true)}
           >
-            Create User
+            {t('adminUsers.actions.createUser')}
           </Button>
         </Box>
       </Box>
@@ -306,11 +308,11 @@ const AdminUsersPage = () => {
               <CardContent>
                 <Box display="flex" alignItems="center" mb={1}>
                   <GroupIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Users</Typography>
+                  <Typography variant="h6">{t('adminUsers.stats.users')}</Typography>
                 </Box>
                 <Typography variant="h4">{systemStats.users.total}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {systemStats.users.active} active, {systemStats.users.admin} admins
+                  {t('adminUsers.stats.usersSummary', { active: systemStats.users.active, admins: systemStats.users.admin })}
                 </Typography>
               </CardContent>
             </Card>
@@ -320,11 +322,11 @@ const AdminUsersPage = () => {
               <CardContent>
                 <Box display="flex" alignItems="center" mb={1}>
                   <VideoLibraryIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Content</Typography>
+                  <Typography variant="h6">{t('adminUsers.stats.content')}</Typography>
                 </Box>
                 <Typography variant="h4">{systemStats.content.channels}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {systemStats.content.playlists} playlists, {systemStats.content.audio_files} audio
+                  {t('adminUsers.stats.contentSummary', { playlists: systemStats.content.playlists, audio: systemStats.content.audio_files })}
                 </Typography>
               </CardContent>
             </Card>
@@ -334,11 +336,11 @@ const AdminUsersPage = () => {
               <CardContent>
                 <Box display="flex" alignItems="center" mb={1}>
                   <StorageIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Storage</Typography>
+                  <Typography variant="h6">{t('adminUsers.stats.storage')}</Typography>
                 </Box>
                 <Typography variant="h4">{systemStats.storage.used_gb.toFixed(1)} GB</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  / {systemStats.storage.quota_gb} GB allocated
+                  {t('adminUsers.stats.storageAllocated', { quota: systemStats.storage.quota_gb })}
                 </Typography>
               </CardContent>
             </Card>
@@ -351,13 +353,13 @@ const AdminUsersPage = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Username</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Storage</TableCell>
-              <TableCell>Content</TableCell>
-              <TableCell>Joined</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell>{t('adminUsers.table.username')}</TableCell>
+              <TableCell>{t('adminUsers.table.email')}</TableCell>
+              <TableCell>{t('adminUsers.table.status')}</TableCell>
+              <TableCell>{t('adminUsers.table.storage')}</TableCell>
+              <TableCell>{t('adminUsers.table.content')}</TableCell>
+              <TableCell>{t('adminUsers.table.joined')}</TableCell>
+              <TableCell>{t('adminUsers.table.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -370,7 +372,7 @@ const AdminUsersPage = () => {
             ) : users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} align="center">
-                  No users found
+                  {t('adminUsers.empty.noUsers')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -380,14 +382,14 @@ const AdminUsersPage = () => {
                     <Box display="flex" alignItems="center">
                       {user.username}
                       {user.is_admin && (
-                        <Chip label="Admin" size="small" color="primary" sx={{ ml: 1 }} />
+                        <Chip label={t('adminUsers.role.admin')} size="small" color="primary" sx={{ ml: 1 }} />
                       )}
                     </Box>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Chip
-                      label={user.is_active ? 'Active' : 'Inactive'}
+                      label={user.is_active ? t('adminUsers.status.active') : t('adminUsers.status.inactive')}
                       color={user.is_active ? 'success' : 'default'}
                       size="small"
                       icon={user.is_active ? <CheckCircleIcon /> : <BlockIcon />}
@@ -407,10 +409,10 @@ const AdminUsersPage = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {user.stats.total_channels} channels
+                      {t('adminUsers.content.channelsCount', { count: user.stats.total_channels })}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {user.stats.total_playlists} playlists, {user.stats.total_audio_files} audio
+                      {t('adminUsers.content.summary', { playlists: user.stats.total_playlists, audio: user.stats.total_audio_files })}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -419,22 +421,22 @@ const AdminUsersPage = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="User Details">
+                    <Tooltip title={t('adminUsers.actions.userDetails')}>
                       <IconButton size="small" onClick={() => openUserDetails(user)}>
                         <InfoIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Edit User">
+                    <Tooltip title={t('adminUsers.actions.editUser')}>
                       <IconButton size="small" onClick={() => openEditDialog(user)}>
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={user.is_active ? 'Deactivate' : 'Activate'}>
+                    <Tooltip title={user.is_active ? t('adminUsers.actions.deactivate') : t('adminUsers.actions.activate')}>
                       <IconButton size="small" onClick={() => handleToggleActive(user)}>
                         {user.is_active ? <BlockIcon /> : <CheckCircleIcon />}
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Delete User">
+                    <Tooltip title={t('adminUsers.actions.deleteUser')}>
                       <IconButton size="small" color="error" onClick={() => openDeleteConfirm(user)}>
                         <DeleteIcon />
                       </IconButton>
@@ -449,18 +451,18 @@ const AdminUsersPage = () => {
 
       {/* Create User Dialog */}
       <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New User</DialogTitle>
+        <DialogTitle>{t('adminUsers.dialogs.create.title')}</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Username"
+              label={t('adminUsers.fields.username')}
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               fullWidth
               required
             />
             <TextField
-              label="Email"
+              label={t('adminUsers.fields.email')}
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -468,7 +470,7 @@ const AdminUsersPage = () => {
               required
             />
             <TextField
-              label="Password"
+              label={t('adminUsers.fields.password')}
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -476,7 +478,7 @@ const AdminUsersPage = () => {
               required
             />
             <TextField
-              label="Confirm Password"
+              label={t('adminUsers.fields.confirmPassword')}
               type="password"
               value={formData.password_confirm}
               onChange={(e) => setFormData({ ...formData, password_confirm: e.target.value })}
@@ -484,28 +486,28 @@ const AdminUsersPage = () => {
               required
             />
             <TextField
-              label="Storage Quota (GB)"
+              label={t('adminUsers.fields.storageQuotaGb')}
               type="number"
               value={formData.storage_quota_gb}
               onChange={(e) => setFormData({ ...formData, storage_quota_gb: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Max Channels"
+              label={t('adminUsers.fields.maxChannels')}
               type="number"
               value={formData.max_channels}
               onChange={(e) => setFormData({ ...formData, max_channels: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Max Playlists"
+              label={t('adminUsers.fields.maxPlaylists')}
               type="number"
               value={formData.max_playlists}
               onChange={(e) => setFormData({ ...formData, max_playlists: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Notes"
+              label={t('adminUsers.fields.notes')}
               multiline
               rows={3}
               value={formData.user_notes}
@@ -519,7 +521,7 @@ const AdminUsersPage = () => {
                   onChange={(e) => setFormData({ ...formData, is_admin: e.target.checked })}
                 />
               }
-              label="Admin User"
+              label={t('adminUsers.fields.adminUser')}
             />
             <FormControlLabel
               control={
@@ -528,46 +530,46 @@ const AdminUsersPage = () => {
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                 />
               }
-              label="Active"
+              label={t('adminUsers.fields.active')}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setCreateDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleCreateUser} variant="contained">
-            Create User
+            {t('adminUsers.actions.createUser')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit User: {selectedUser?.username}</DialogTitle>
+        <DialogTitle>{t('adminUsers.dialogs.edit.title', { username: selectedUser?.username || '' })}</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Storage Quota (GB)"
+              label={t('adminUsers.fields.storageQuotaGb')}
               type="number"
               value={formData.storage_quota_gb}
               onChange={(e) => setFormData({ ...formData, storage_quota_gb: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Max Channels"
+              label={t('adminUsers.fields.maxChannels')}
               type="number"
               value={formData.max_channels}
               onChange={(e) => setFormData({ ...formData, max_channels: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Max Playlists"
+              label={t('adminUsers.fields.maxPlaylists')}
               type="number"
               value={formData.max_playlists}
               onChange={(e) => setFormData({ ...formData, max_playlists: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Notes"
+              label={t('adminUsers.fields.notes')}
               multiline
               rows={3}
               value={formData.user_notes}
@@ -581,7 +583,7 @@ const AdminUsersPage = () => {
                   onChange={(e) => setFormData({ ...formData, is_admin: e.target.checked })}
                 />
               }
-              label="Admin User"
+              label={t('adminUsers.fields.adminUser')}
             />
             <FormControlLabel
               control={
@@ -590,7 +592,7 @@ const AdminUsersPage = () => {
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                 />
               }
-              label="Active"
+              label={t('adminUsers.fields.active')}
             />
             {selectedUser && (
               <Box display="flex" gap={1}>
@@ -600,7 +602,7 @@ const AdminUsersPage = () => {
                   onClick={() => handleResetStorage(selectedUser)}
                   fullWidth
                 >
-                  Reset Storage
+                  {t('adminUsers.actions.resetStorage')}
                 </Button>
                 <Button
                   variant="outlined"
@@ -608,56 +610,56 @@ const AdminUsersPage = () => {
                   onClick={() => handleReset2FA(selectedUser)}
                   fullWidth
                 >
-                  Reset 2FA
+                  {t('adminUsers.actions.reset2fa')}
                 </Button>
               </Box>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setEditDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleUpdateUser} variant="contained">
-            Save Changes
+            {t('adminUsers.actions.saveChanges')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* User Details Dialog */}
       <Dialog open={userDetailsOpen} onClose={() => setUserDetailsOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>User Details: {selectedUser?.username}</DialogTitle>
+        <DialogTitle>{t('adminUsers.dialogs.details.title', { username: selectedUser?.username || '' })}</DialogTitle>
         <DialogContent>
           {selectedUser && (
             <Box sx={{ pt: 2 }}>
               <Grid container spacing={2}>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Email
+                    {t('adminUsers.fields.email')}
                   </Typography>
                   <Typography variant="body1">{selectedUser.email}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Status
+                    {t('adminUsers.fields.status')}
                   </Typography>
                   <Chip
-                    label={selectedUser.is_active ? 'Active' : 'Inactive'}
+                    label={selectedUser.is_active ? t('adminUsers.status.active') : t('adminUsers.status.inactive')}
                     color={selectedUser.is_active ? 'success' : 'default'}
                     size="small"
                   />
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Role
+                    {t('adminUsers.fields.role')}
                   </Typography>
                   <Chip
-                    label={selectedUser.is_admin ? 'Admin' : 'User'}
+                    label={selectedUser.is_admin ? t('adminUsers.role.admin') : t('adminUsers.role.user')}
                     color={selectedUser.is_admin ? 'primary' : 'default'}
                     size="small"
                   />
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Storage Usage
+                    {t('adminUsers.fields.storageUsage')}
                   </Typography>
                   <Typography variant="body1">
                     {selectedUser.storage_used_gb.toFixed(2)} / {selectedUser.storage_quota_gb} GB
@@ -666,7 +668,7 @@ const AdminUsersPage = () => {
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Channels
+                    {t('adminUsers.fields.channels')}
                   </Typography>
                   <Typography variant="body1">
                     {selectedUser.stats.total_channels} / {selectedUser.max_channels}
@@ -674,7 +676,7 @@ const AdminUsersPage = () => {
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Playlists
+                    {t('adminUsers.fields.playlists')}
                   </Typography>
                   <Typography variant="body1">
                     {selectedUser.stats.total_playlists} / {selectedUser.max_playlists}
@@ -682,13 +684,13 @@ const AdminUsersPage = () => {
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Audio Files
+                    {t('adminUsers.fields.audioFiles')}
                   </Typography>
                   <Typography variant="body1">{selectedUser.stats.total_audio_files}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Date Joined
+                    {t('adminUsers.fields.dateJoined')}
                   </Typography>
                   <Typography variant="body1">
                     {new Date(selectedUser.date_joined).toLocaleString()}
@@ -696,12 +698,12 @@ const AdminUsersPage = () => {
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Last Login
+                    {t('adminUsers.fields.lastLogin')}
                   </Typography>
                   <Typography variant="body1">
                     {selectedUser.last_login
                       ? new Date(selectedUser.last_login).toLocaleString()
-                      : 'Never'}
+                      : t('adminUsers.values.never')}
                   </Typography>
                 </Grid>
               </Grid>
@@ -709,29 +711,29 @@ const AdminUsersPage = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUserDetailsOpen(false)}>Close</Button>
+          <Button onClick={() => setUserDetailsOpen(false)}>{t('common.close')}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete User Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
-          <WarningIcon /> Permanently Delete User
+          <WarningIcon /> {t('adminUsers.dialogs.delete.title')}
         </DialogTitle>
         <DialogContent>
           <Alert severity="error" sx={{ mb: 2 }}>
-            This action is irreversible! All user data will be permanently deleted:
+            {t('adminUsers.dialogs.delete.warning')}
           </Alert>
           <Typography variant="body2" sx={{ mb: 1 }}>
-            &bull; All audio files and tracks from disk<br />
-            &bull; All playlists and playlist items<br />
-            &bull; All channel subscriptions<br />
-            &bull; All download queue items<br />
-            &bull; Listening history and statistics<br />
-            &bull; User account and settings
+            {t('adminUsers.dialogs.delete.bullets.audio')}<br />
+            {t('adminUsers.dialogs.delete.bullets.playlists')}<br />
+            {t('adminUsers.dialogs.delete.bullets.channels')}<br />
+            {t('adminUsers.dialogs.delete.bullets.downloads')}<br />
+            {t('adminUsers.dialogs.delete.bullets.history')}<br />
+            {t('adminUsers.dialogs.delete.bullets.account')}
           </Typography>
           <Typography variant="body1" sx={{ mt: 2, mb: 1 }}>
-            To confirm, type <strong>{selectedUser?.username}</strong> below:
+            {t('adminUsers.dialogs.delete.confirmPrompt', { username: selectedUser?.username || '' })}
           </Typography>
           <TextField
             fullWidth
@@ -742,14 +744,14 @@ const AdminUsersPage = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>{t('common.cancel')}</Button>
           <Button
             onClick={handleDeleteUser}
             variant="contained"
             color="error"
             disabled={deleteConfirmText !== selectedUser?.username}
           >
-            Delete Permanently
+            {t('adminUsers.actions.deletePermanently')}
           </Button>
         </DialogActions>
       </Dialog>

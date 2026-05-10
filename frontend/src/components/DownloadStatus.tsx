@@ -29,6 +29,7 @@ import {
   CloudOff as OfflineIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { useBackgroundDownload } from '../hooks/useBackgroundDownload';
 
 interface DownloadStatusProps {
@@ -36,6 +37,7 @@ interface DownloadStatusProps {
 }
 
 export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const {
@@ -115,7 +117,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
   return (
     <>
       {variant === 'icon' ? (
-        <Tooltip title={isOnline ? 'Download Status' : 'Offline - Downloads will sync when online'}>
+        <Tooltip title={isOnline ? t('downloadStatus.tooltip.online') : t('downloadStatus.tooltip.offline')}>
           <IconButton
             onClick={handleClick}
             sx={{
@@ -149,7 +151,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
           onClick={handleClick}
           sx={{ position: 'relative' }}
         >
-          Downloads
+          {t('downloadStatus.title')}
           {totalActive > 0 && (
             <Chip
               label={totalActive}
@@ -182,24 +184,24 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
       >
         <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Downloads
+            {t('downloadStatus.title')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             {!isOnline && (
               <Chip
                 icon={<OfflineIcon />}
-                label="Offline"
+                label={t('downloadStatus.offline')}
                 size="small"
                 color="warning"
               />
             )}
-            <Tooltip title="Refresh">
+            <Tooltip title={t('downloadStatus.actions.refresh')}>
               <IconButton size="small" onClick={refreshStatus} disabled={isLoading}>
                 <RefreshIcon sx={{ fontSize: 20 }} />
               </IconButton>
             </Tooltip>
             {!isOnline && pendingDownloads.length > 0 && (
-              <Tooltip title="Sync when online">
+              <Tooltip title={t('downloadStatus.actions.syncWhenOnline')}>
                 <IconButton size="small" onClick={handleSync} disabled={isLoading || !isOnline}>
                   <SyncIcon sx={{ fontSize: 20 }} />
                 </IconButton>
@@ -214,7 +216,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
         {isSupported && (
           <Box sx={{ px: 2, py: 1, bgcolor: alpha(theme.palette.success.main, 0.1) }}>
             <Typography variant="caption" color="success.main">
-              ✓ Background downloads enabled - Downloads continue when app is closed
+              {t('downloadStatus.backgroundEnabled')}
             </Typography>
           </Box>
         )}
@@ -226,7 +228,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
           <>
             <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover' }}>
               <Typography variant="overline" color="text.secondary">
-                Active Downloads ({activeDownloads.length})
+                {t('downloadStatus.sections.activeDownloads', { count: activeDownloads.length })}
               </Typography>
             </Box>
             <List dense disablePadding>
@@ -268,7 +270,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
           <>
             <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover' }}>
               <Typography variant="overline" color="text.secondary">
-                Queued for Sync ({pendingDownloads.length})
+                {t('downloadStatus.sections.queuedForSync', { count: pendingDownloads.length })}
               </Typography>
             </Box>
             <List dense disablePadding>
@@ -319,12 +321,12 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <DownloadIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
             <Typography variant="body2" color="text.secondary">
-              No active downloads
+              {t('downloadStatus.empty.title')}
             </Typography>
             <Typography variant="caption" color="text.disabled">
               {isOnline 
-                ? 'Downloads you start will appear here'
-                : 'Queue downloads offline and they will sync when online'
+                ? t('downloadStatus.empty.online')
+                : t('downloadStatus.empty.offline')
               }
             </Typography>
           </Box>
@@ -339,7 +341,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
               startIcon={<SyncIcon />}
               disabled
             >
-              Will sync when online ({pendingDownloads.filter(d => d.status === 'pending').length} pending)
+              {t('downloadStatus.syncWhenOnlinePending', { count: pendingDownloads.filter(d => d.status === 'pending').length })}
             </Button>
           </Box>
         )}

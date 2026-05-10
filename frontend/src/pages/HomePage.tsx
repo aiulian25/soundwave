@@ -3,6 +3,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { statsAPI } from '../api/client';
 import type { Audio } from '../types';
 
@@ -74,26 +75,48 @@ const tagColors: Record<string, { bg: string; text: string }> = {
   THROWBACK: { bg: '#FF5722', text: '#fff' },
 };
 
-// Tag display names
-const tagLabels: Record<string, string> = {
-  FOR_YOU: 'FOR YOU',
-  DISCOVER: 'DISCOVER',
-  OTHER: 'OTHER',
-  THROWBACK: 'THROWBACK',
-};
-
 // Format time remaining
-const formatTimeLeft = (seconds: number): string => {
+const formatTimeLeft = (seconds: number, format: (minutes: number, seconds: number) => string): string => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}m ${secs}s left`;
+  return format(mins, secs);
 };
 
 export default function HomePage({ setCurrentAudio }: HomePageProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [data, setData] = useState<HomepageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const formatHomeTimeLeft = useCallback(
+    (minutes: number, seconds: number) => t('home.timeLeft', { minutes, seconds }),
+    [t]
+  );
+
+  const getTagLabel = useCallback(
+    (tag: RecommendationItem['tag']) => t(`home.tags.${tag}`),
+    [t]
+  );
+
+  const getRecommendationReason = useCallback(
+    (item: RecommendationItem) => {
+      if (item.tag === 'FOR_YOU') {
+        return t('home.reasons.forYou', { artist: item.artist || item.channel_name });
+      }
+
+      if (item.tag === 'DISCOVER') {
+        return t('home.reasons.discover');
+      }
+
+      if (item.tag === 'THROWBACK') {
+        return t('home.reasons.throwback');
+      }
+
+      return t('home.reasons.other');
+    },
+    [t]
+  );
 
   const loadData = useCallback(async (isRefresh = false) => {
     try {
@@ -200,14 +223,14 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
         <Box sx={{ mb: 5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, px: 0.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-              Continue Listening
+              {t('home.sections.continueListening')}
             </Typography>
             <Typography
               variant="body2"
               onClick={handleClearContinueListening}
               sx={{ color: 'primary.main', cursor: 'pointer', fontWeight: 500, '&:hover': { opacity: 0.8 } }}
             >
-              Clear
+              {t('home.actions.clear')}
             </Typography>
           </Box>
 
@@ -298,7 +321,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                       }}
                     />
                     <Typography variant="caption" color="primary.main" sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
-                      {formatTimeLeft(item.time_left)}
+                      {formatTimeLeft(item.time_left, formatHomeTimeLeft)}
                     </Typography>
                   </Box>
                 </Box>
@@ -313,9 +336,9 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
         <Box sx={{ mb: 5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, px: 0.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-              Made For You
+              {t('home.sections.madeForYou')}
             </Typography>
-            <Tooltip title="Refresh recommendations">
+            <Tooltip title={t('home.actions.refreshRecommendations')}>
               <IconButton
                 size="small"
                 onClick={handleRefreshRecommendations}
@@ -367,7 +390,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                 >
                   {/* Tag Badge */}
                   <Chip
-                    label={tagLabels[item.tag]}
+                    label={getTagLabel(item.tag)}
                     size="small"
                     sx={{
                       position: 'absolute',
@@ -429,7 +452,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   {item.title}
                 </Typography>
                 <Typography variant="caption" color="primary.main" noWrap sx={{ fontWeight: 500 }}>
-                  {item.reason}
+                  {getRecommendationReason(item)}
                 </Typography>
               </Box>
             ))}
@@ -442,14 +465,14 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
         <Box sx={{ mb: 5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, px: 0.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-              Recently Played
+              {t('home.sections.recentlyPlayed')}
             </Typography>
             <Typography
               variant="body2"
               onClick={() => navigate('/history')}
               sx={{ color: 'primary.main', cursor: 'pointer', fontWeight: 500, '&:hover': { opacity: 0.8 } }}
             >
-              See All
+              {t('home.actions.seeAll')}
             </Typography>
           </Box>
 
@@ -548,14 +571,14 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
         <Box sx={{ mb: 5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, px: 0.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-              Recently Added
+              {t('home.sections.recentlyAdded')}
             </Typography>
             <Typography
               variant="body2"
               onClick={() => navigate('/library')}
               sx={{ color: 'primary.main', cursor: 'pointer', fontWeight: 500, '&:hover': { opacity: 0.8 } }}
             >
-              See All
+              {t('home.actions.seeAll')}
             </Typography>
           </Box>
 
@@ -664,10 +687,10 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
           color: 'text.secondary'
         }}>
           <Typography variant="h6" sx={{ mb: 1 }}>
-            Welcome to Soundwave!
+            {t('home.empty.title')}
           </Typography>
           <Typography variant="body2">
-            Start by downloading some music or exploring your library.
+            {t('home.empty.description')}
           </Typography>
         </Box>
       )}

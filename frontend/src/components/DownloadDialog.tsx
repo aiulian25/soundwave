@@ -28,6 +28,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import LyricsIcon from '@mui/icons-material/Lyrics';
 import ImageIcon from '@mui/icons-material/Image';
 import HighQualityIcon from '@mui/icons-material/HighQuality';
+import { useTranslation } from 'react-i18next';
 import api from '../api/client';
 
 interface ArtworkSource {
@@ -66,6 +67,7 @@ interface DownloadDialogProps {
 }
 
 export default function DownloadDialog({ open, onClose, youtubeId, title }: DownloadDialogProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
@@ -100,7 +102,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
       }
     } catch (err: any) {
       console.error('[Export] Error:', err);
-      setError(err.response?.data?.error || 'Failed to load export options');
+      setError(err.response?.data?.error || t('downloadDialog.errors.loadOptionsFailed'));
     } finally {
       setLoading(false);
     }
@@ -127,7 +129,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
       
       // Get filename from Content-Disposition header
       const contentDisposition = response.headers['content-disposition'];
-      let filename = `${options?.title || 'audio'}.${format}`;
+      let filename = `${options?.title || t('downloadDialog.fallback.audioFilename')}.${format}`;
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="(.+)"/);
         if (match) {
@@ -151,7 +153,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
       onClose();
     } catch (err: any) {
       console.error('Export failed:', err);
-      setError(err.response?.data?.error || 'Export failed. Please try again.');
+      setError(err.response?.data?.error || t('downloadDialog.errors.exportFailed'));
     } finally {
       setExporting(false);
     }
@@ -160,9 +162,9 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
   const getFormatLabel = (fmt: string) => {
     switch (fmt) {
       case 'mp3':
-        return 'MP3 (Compressed, smaller file)';
+        return t('downloadDialog.format.mp3');
       case 'flac':
-        return 'FLAC (Lossless, larger file)';
+        return t('downloadDialog.format.flac');
       default:
         return fmt.toUpperCase();
     }
@@ -171,11 +173,11 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
   const getQualityLabel = (q: string) => {
     switch (q) {
       case 'high':
-        return 'High (320 kbps)';
+        return t('downloadDialog.quality.high');
       case 'medium':
-        return 'Medium (192 kbps)';
+        return t('downloadDialog.quality.medium');
       case 'low':
-        return 'Low (128 kbps)';
+        return t('downloadDialog.quality.low');
       default:
         return q;
     }
@@ -185,7 +187,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <DownloadIcon />
-        Export Track
+        {t('downloadDialog.title')}
       </DialogTitle>
       
       <DialogContent dividers>
@@ -227,7 +229,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
             <FormControl component="fieldset">
               <FormLabel component="legend" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <MusicNoteIcon fontSize="small" />
-                Output Format
+                {t('downloadDialog.sections.outputFormat')}
               </FormLabel>
               <RadioGroup
                 value={format}
@@ -240,7 +242,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
                     <Box>
                       <Typography variant="body2">MP3</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Compressed, universal compatibility, embedded synced lyrics (SYLT)
+                        {t('downloadDialog.format.mp3Description')}
                       </Typography>
                     </Box>
                   }
@@ -252,7 +254,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
                     <Box>
                       <Typography variant="body2">FLAC</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Lossless quality, larger file, embedded LRC in metadata
+                        {t('downloadDialog.format.flacDescription')}
                       </Typography>
                     </Box>
                   }
@@ -266,13 +268,13 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
                 <InputLabel>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <HighQualityIcon fontSize="small" />
-                    Quality
+                    {t('downloadDialog.sections.quality')}
                   </Box>
                 </InputLabel>
                 <Select
                   value={quality}
                   onChange={(e) => setQuality(e.target.value as 'high' | 'medium' | 'low')}
-                  label="Quality"
+                  label={t('downloadDialog.sections.quality')}
                 >
                   <MenuItem value="high">{getQualityLabel('high')}</MenuItem>
                   <MenuItem value="medium">{getQualityLabel('medium')}</MenuItem>
@@ -287,7 +289,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
             <Box>
               <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <LyricsIcon fontSize="small" />
-                Lyrics
+                {t('downloadDialog.sections.lyrics')}
               </Typography>
               <FormControlLabel
                 control={
@@ -300,24 +302,24 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
                 label={
                   <Box>
                     <Typography variant="body2">
-                      Embed lyrics in file
+                      {t('downloadDialog.lyrics.embed')}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
                       {options.has_synced_lyrics ? (
                         <Chip 
-                          label={`✓ Synced lyrics will be embedded${format === 'mp3' ? ' (SYLT)' : ' (LRC)'}`} 
+                          label={t('downloadDialog.lyrics.syncedEmbedded', { tag: format === 'mp3' ? 'SYLT' : 'LRC' })} 
                           size="small" 
                           color="success" 
                         />
                       ) : options.has_lyrics ? (
                         <Chip 
-                          label="✓ Plain lyrics will be embedded" 
+                          label={t('downloadDialog.lyrics.plainEmbedded')} 
                           size="small" 
                           color="info" 
                         />
                       ) : (
                         <Chip 
-                          label="No lyrics to embed" 
+                          label={t('downloadDialog.lyrics.none')} 
                           size="small" 
                           color="default" 
                           variant="outlined"
@@ -332,7 +334,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
             <Box>
               <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <ImageIcon fontSize="small" />
-                Album Artwork
+                {t('downloadDialog.sections.artwork')}
               </Typography>
               <FormControlLabel
                 control={
@@ -342,16 +344,16 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
                     disabled={!options.has_artwork}
                   />
                 }
-                label="Embed album artwork"
+                label={t('downloadDialog.artwork.embed')}
               />
               
               {embedArtwork && options.artwork_sources && options.artwork_sources.length > 0 && (
                 <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-                  <InputLabel>Artwork Source</InputLabel>
+                  <InputLabel>{t('downloadDialog.artwork.source')}</InputLabel>
                   <Select
                     value={selectedArtwork}
                     onChange={(e) => setSelectedArtwork(e.target.value)}
-                    label="Artwork Source"
+                    label={t('downloadDialog.artwork.source')}
                   >
                     {options.artwork_sources.map((art, idx) => (
                       <MenuItem key={idx} value={art.url}>
@@ -381,7 +383,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
       
       <DialogActions>
         <Button onClick={onClose} disabled={exporting}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           variant="contained"
@@ -389,7 +391,7 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
           disabled={loading || exporting || !options}
           startIcon={exporting ? <CircularProgress size={20} /> : <DownloadIcon />}
         >
-          {exporting ? 'Exporting...' : `Export as ${format.toUpperCase()}`}
+          {exporting ? t('downloadDialog.actions.exporting') : t('downloadDialog.actions.exportAs', { format: format.toUpperCase() })}
         </Button>
       </DialogActions>
     </Dialog>

@@ -1,5 +1,6 @@
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Drawer, Chip } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import HomeIcon from '@mui/icons-material/Home';
 import SearchIcon from '@mui/icons-material/Search';
 import LibraryMusicIcon from '@mui/icons-material/LibraryMusic';
@@ -21,22 +22,23 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { title: 'Home', path: '/', icon: <HomeIcon /> },
-  { title: 'Search', path: '/search', icon: <SearchIcon /> },
-  { title: 'Library', path: '/library', icon: <LibraryMusicIcon /> },
-  { title: 'Favorites', path: '/favorites', icon: <FavoriteIcon /> },
-  { title: 'History', path: '/history', icon: <HistoryIcon /> },
-  { title: 'Channels', path: '/channels', icon: <YouTubeIcon /> },
-  { title: 'Playlists', path: '/playlists', icon: <PlaylistPlayIcon /> },
-  { title: 'Smart Playlists', path: '/smart-playlists', icon: <AutoAwesomeIcon /> },
-  { title: 'Analytics', path: '/analytics', icon: <InsightsIcon /> },
-  { title: 'Achievements', path: '/achievements', icon: <EmojiEventsIcon /> },
-  { title: 'Yearly Wrapped', path: '/wrapped', icon: <CardGiftcardIcon /> },
-  { title: 'Local Files', path: '/local-files', icon: <CloudUploadIcon /> },
-  { title: 'Offline', path: '/offline', icon: <CloudDoneIcon />, isPWA: true },
+  { titleKey: 'sidebar.home', path: '/', icon: <HomeIcon /> },
+  { titleKey: 'sidebar.search', path: '/search', icon: <SearchIcon /> },
+  { titleKey: 'sidebar.library', path: '/library', icon: <LibraryMusicIcon /> },
+  { titleKey: 'sidebar.favorites', path: '/favorites', icon: <FavoriteIcon /> },
+  { titleKey: 'sidebar.history', path: '/history', icon: <HistoryIcon /> },
+  { titleKey: 'sidebar.channels', path: '/channels', icon: <YouTubeIcon /> },
+  { titleKey: 'sidebar.playlists', path: '/playlists', icon: <PlaylistPlayIcon /> },
+  { titleKey: 'sidebar.smartPlaylists', path: '/smart-playlists', icon: <AutoAwesomeIcon /> },
+  { titleKey: 'sidebar.analytics', path: '/analytics', icon: <InsightsIcon /> },
+  { titleKey: 'sidebar.achievements', path: '/achievements', icon: <EmojiEventsIcon /> },
+  { titleKey: 'sidebar.yearlyWrapped', path: '/wrapped', icon: <CardGiftcardIcon /> },
+  { titleKey: 'sidebar.localFiles', path: '/local-files', icon: <CloudUploadIcon /> },
+  { titleKey: 'sidebar.offline', path: '/offline', icon: <CloudDoneIcon />, isPWA: true },
 ];
 
 export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -107,10 +109,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
               <ListItemText 
                 primary={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    {item.title}
+                    {t(item.titleKey)}
                     {(item as any).isPWA && (
                       <Chip 
-                        label="PWA" 
+                        label={t('sidebar.pwaBadge')} 
                         size="small" 
                         sx={{ 
                           height: 16, 
@@ -164,7 +166,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             <SettingsIcon />
           </ListItemIcon>
           <ListItemText 
-            primary="Settings" 
+            primary={t('sidebar.settings')} 
             primaryTypographyProps={{ 
               fontWeight: location.pathname === '/settings' ? 600 : 500,
               fontSize: '0.875rem'

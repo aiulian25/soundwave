@@ -28,6 +28,7 @@ import {
   Recommend,
   MusicNote,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { audioAPI } from '../api/client';
 import type { Audio } from '../types';
 
@@ -62,6 +63,7 @@ export default function RelatedTracks({
   onFavoriteToggle,
   compact = false 
 }: RelatedTracksProps) {
+  const { t } = useTranslation();
   const [recommendations, setRecommendations] = useState<Audio[]>([]);
   const [similarTracks, setSimilarTracks] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +78,7 @@ export default function RelatedTracks({
 
   const loadRelatedTracks = async () => {
     if (!currentAudio.youtube_id) {
-      setError('Recommendations not available for local files');
+      setError(t('relatedTracks.errors.notAvailableForLocalFiles'));
       setLoading(false);
       return;
     }
@@ -103,11 +105,11 @@ export default function RelatedTracks({
       }
 
       if (recResponse.status === 'rejected' && simResponse.status === 'rejected') {
-        setError('Failed to load recommendations');
+        setError(t('relatedTracks.errors.loadFailed'));
       }
     } catch (err) {
       console.error('Error loading related tracks:', err);
-      setError('Failed to load recommendations');
+      setError(t('relatedTracks.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -137,7 +139,7 @@ export default function RelatedTracks({
           </ListItemAvatar>
           <ListItemText 
             primary={title}
-            secondary={`${tracks.length} tracks`}
+            secondary={t('relatedTracks.trackCount', { count: tracks.length })}
             sx={{
               '& .MuiListItemText-primary': {
                 fontSize: '0.95rem',
@@ -206,7 +208,7 @@ export default function RelatedTracks({
                         />
                       )}
                       
-                      <Tooltip title={track.is_favorite ? "Remove from favorites" : "Add to favorites"}>
+                      <Tooltip title={track.is_favorite ? t('relatedTracks.actions.removeFromFavorites') : t('relatedTracks.actions.addToFavorites')}>
                         <IconButton
                           size="small"
                           onClick={(e) => handleFavoriteClick(track, e)}
@@ -241,7 +243,7 @@ export default function RelatedTracks({
           
           {tracks.length > (compact ? 3 : 8) && (
             <Typography variant="caption" sx={{ px: 2, color: 'text.disabled' }}>
-              +{tracks.length - (compact ? 3 : 8)} more tracks
+              {t('relatedTracks.moreTracks', { count: tracks.length - (compact ? 3 : 8) })}
             </Typography>
           )}
         </Collapse>
@@ -256,7 +258,7 @@ export default function RelatedTracks({
       <Box sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Recommend color="primary" />
-          Related Tracks
+          {t('relatedTracks.title')}
         </Typography>
         {Array.from({ length: 5 }).map((_, index) => (
           <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -277,7 +279,7 @@ export default function RelatedTracks({
       <Box sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Recommend color="primary" />
-          Related Tracks
+          {t('relatedTracks.title')}
         </Typography>
         <Alert severity="info" variant="outlined">
           {error}
@@ -291,10 +293,10 @@ export default function RelatedTracks({
       <Box sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Recommend color="primary" />
-          Related Tracks
+          {t('relatedTracks.title')}
         </Typography>
         <Alert severity="info" variant="outlined">
-          No related tracks found. Start listening to more music to get personalized recommendations!
+          {t('relatedTracks.empty.description')}
         </Alert>
       </Box>
     );
@@ -304,18 +306,18 @@ export default function RelatedTracks({
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <Recommend color="primary" />
-        Related Tracks
+        {t('relatedTracks.title')}
       </Typography>
       
       {algorithmInfo && !compact && (
         <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
-          Based on your listening patterns, favorites, and popular tracks
+          {t('relatedTracks.algorithmHint')}
         </Typography>
       )}
       
       {renderTrackList(
         recommendations,
-        "Recommended for You",
+        t('relatedTracks.sections.recommendedForYou'),
         <TrendingUp color="primary" sx={{ fontSize: 20 }} />,
         showRecommendations,
         () => setShowRecommendations(!showRecommendations)
@@ -323,7 +325,7 @@ export default function RelatedTracks({
       
       {renderTrackList(
         similarTracks,
-        `More from ${currentAudio.channel_name}`,
+        t('relatedTracks.sections.moreFrom', { channel: currentAudio.channel_name }),
         <History color="action" sx={{ fontSize: 20 }} />,
         showSimilar,
         () => setShowSimilar(!showSimilar)

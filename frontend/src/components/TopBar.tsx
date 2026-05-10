@@ -4,6 +4,8 @@ import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AvatarDialog from './AvatarDialog';
 import DownloadStatus from './DownloadStatus';
+import { userAPI } from '../api/client';
+import { useTranslation } from 'react-i18next';
 
 interface TopBarProps {
   onLogout: () => void;
@@ -19,32 +21,21 @@ interface UserData {
 }
 
 export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
+  const { t } = useTranslation();
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      fetchUserData();
-    }
+    fetchUserData();
   }, []);
 
   const fetchUserData = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    
     try {
-      const response = await fetch('/api/user/account/', {
-        headers: {
-          'Authorization': `Token ${token}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(data);
-        setAvatarUrl(data.avatar_url);
-      }
+      const response = await userAPI.account();
+      const data = response.data;
+      setUserData(data);
+      setAvatarUrl(data.avatar_url);
     } catch (error) {
       console.error('Failed to fetch user data:', error);
     }
@@ -52,9 +43,9 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return t('topbar.greeting.morning');
+    if (hour < 18) return t('topbar.greeting.afternoon');
+    return t('topbar.greeting.evening');
   };
 
   const handleAvatarChange = (newAvatarUrl: string | null) => {
@@ -74,7 +65,7 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
         {/* Mobile Menu Button */}
         <IconButton
           color="inherit"
-          aria-label="open drawer"
+          aria-label={t('topbar.openDrawer')}
           edge="start"
           onClick={onMenuClick}
           sx={{ mr: 2, display: { md: 'none' } }}
@@ -123,7 +114,7 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, display: { xs: 'none', sm: 'block' } }}>
               {userData?.first_name || userData?.last_name 
                 ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim() 
-                : userData?.username || 'Music Lover'}
+                  : userData?.username || t('topbar.musicLover')}
             </Typography>
           </Box>
         </Box>
@@ -132,7 +123,7 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
           {/* Download Status */}
           <DownloadStatus />
           
-          <Tooltip title="Logout" arrow>
+          <Tooltip title={t('topbar.logout')} arrow>
             <IconButton 
               onClick={onLogout}
               sx={{ 

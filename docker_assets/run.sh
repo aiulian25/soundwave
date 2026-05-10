@@ -69,6 +69,58 @@ else
 fi
 echo "Redis is up!"
 
+# Wait for PostgreSQL when the app is configured to use it.
+if [ -n "${DATABASE_URL}" ] || [ -n "${POSTGRES_HOST}" ]; then
+    echo "Waiting for PostgreSQL..."
+    PG_RETRIES=0
+    PG_MAX_RETRIES=30
+    while [ $PG_RETRIES -lt $PG_MAX_RETRIES ]; do
+        python - <<'PY'
+import os
+import sys
+from urllib.parse import urlparse
+
+try:
+    import psycopg
+except Exception:
+    sys.exit(1)
+
+database_url = os.environ.get('DATABASE_URL', '').strip()
+host = os.environ.get('POSTGRES_HOST', '').strip() or 'localhost'
+port = os.environ.get('POSTGRES_PORT', '5432').strip() or '5432'
+dbname = os.environ.get('POSTGRES_DB', 'soundwave').strip() or 'soundwave'
+user = os.environ.get('POSTGRES_USER', 'soundwave').strip() or 'soundwave'
+password = os.environ.get('POSTGRES_PASSWORD', '').strip()
+
+if database_url:
+    parsed = urlparse(database_url)
+    host = parsed.hostname or host
+    port = str(parsed.port or port)
+    dbname = parsed.path.lstrip('/') or dbname
+    user = parsed.username or user
+    password = parsed.password or password
+
+dsn = f'host={host} port={port} dbname={dbname} user={user}'
+if password:
+    dsn = f'{dsn} password={password}'
+
+conn = psycopg.connect(dsn, connect_timeout=3)
+conn.close()
+PY
+        if [ $? -eq 0 ]; then
+            echo "PostgreSQL is up!"
+            break
+        fi
+        echo "PostgreSQL is unavailable - sleeping"
+        sleep 3
+        PG_RETRIES=$((PG_RETRIES + 1))
+    done
+
+    if [ $PG_RETRIES -eq $PG_MAX_RETRIES ]; then
+        echo "WARNING: PostgreSQL may not be fully ready, continuing anyway..."
+    fi
+fi
+
 # Create migrations
 echo "=== Creating migrations ==="
 python manage.py makemigrations
@@ -93,8 +145,7 @@ from django.db import connection
 cursor = connection.cursor()
 try:
     # Check what tables exist
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [row[0] for row in cursor.fetchall()]
+        tables = connection.introspection.table_names()
     print(f"Existing tables: {tables}")
     
     if 'django_migrations' in tables:

@@ -37,6 +37,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
+import { useTranslation } from 'react-i18next';
 import { channelAPI } from '../api/client';
 import { fetchAllChannels } from '../utils/fetchAll';
 import { useSettings } from '../context/SettingsContext';
@@ -64,6 +65,7 @@ interface Channel {
 
 export default function ChannelsPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { getExtraSetting, updateExtraSetting } = useSettings();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,13 +129,13 @@ export default function ChannelsPage() {
     try {
       const response = await channelAPI.subscribe({ url: channelUrl });
       const taskId = response.data?.task_id;
-      const message = response.data?.message || 'Channel subscription started';
+      const message = response.data?.message || t('channels.messages.subscriptionStarted');
       
       // Extract channel name from URL for better UX
       const urlMatch = channelUrl.match(/@([^/?]+)/);
-      const channelName = urlMatch ? `@${urlMatch[1]}` : 'channel';
+      const channelName = urlMatch ? `@${urlMatch[1]}` : t('channels.genericChannelName');
       
-      setSuccessMessage(`✓ Subscribing to ${channelName}... Downloading channel info and videos in background.`);
+      setSuccessMessage(t('channels.messages.subscribingToChannel', { channelName }));
       setChannelUrl('');
       setOpenDialog(false);
       
@@ -151,14 +153,14 @@ export default function ChannelsPage() {
         loadChannels();
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to subscribe to channel');
+      setError(err.response?.data?.error || err.response?.data?.detail || t('channels.errors.subscribeFailed'));
     } finally {
       setSubscribing(false);
     }
   };
 
   const handleUnsubscribe = async (channelId: string) => {
-    if (!confirm('Are you sure you want to unsubscribe from this channel?')) return;
+    if (!confirm(t('channels.confirm.unsubscribeOne'))) return;
     
     try {
       await channelAPI.unsubscribe(channelId);
@@ -171,7 +173,7 @@ export default function ChannelsPage() {
   const handleBulkDelete = async () => {
     if (selectedChannels.size === 0) return;
     
-    if (!confirm(`Are you sure you want to unsubscribe from ${selectedChannels.size} channel(s)?`)) return;
+    if (!confirm(t('channels.confirm.unsubscribeMany', { count: selectedChannels.size }))) return;
     
     try {
       // Delete all selected channels
@@ -215,10 +217,10 @@ export default function ChannelsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="h4" fontWeight="bold">
-            YouTube Channels
+            {t('channels.title')}
           </Typography>
           {hasCustomOrder && (
-            <Tooltip title="Reset to default order">
+            <Tooltip title={t('channels.actions.resetOrder')}>
               <IconButton size="small" onClick={resetOrder} sx={{ opacity: 0.7 }}>
                 <ResetIcon fontSize="small" />
               </IconButton>
@@ -234,7 +236,7 @@ export default function ChannelsPage() {
               onClick={toggleSelectionMode}
               color={selectionMode ? "primary" : "inherit"}
             >
-              {selectionMode ? 'Cancel' : 'Select'}
+              {selectionMode ? t('channels.actions.cancel') : t('channels.actions.select')}
             </Button>
           )}
           <Button
@@ -243,7 +245,7 @@ export default function ChannelsPage() {
             startIcon={<AddIcon />}
             onClick={() => setOpenDialog(true)}
           >
-            Subscribe to Channel
+            {t('channels.actions.subscribeToChannel')}
           </Button>
         </Box>
       </Box>
@@ -253,10 +255,10 @@ export default function ChannelsPage() {
         <Alert severity="info" sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2">
-              📡 Processing {pendingTasks.length} channel subscription{pendingTasks.length > 1 ? 's' : ''}...
+              {t('channels.pending.processing', { count: pendingTasks.length })}
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.7 }}>
-              Server is downloading in background - will auto-refresh
+              {t('channels.pending.description')}
             </Typography>
           </Box>
         </Alert>
@@ -288,10 +290,10 @@ export default function ChannelsPage() {
                 }
               }}
             >
-              {selectedChannels.size === channels.length ? 'Deselect All' : 'Select All'}
+              {selectedChannels.size === channels.length ? t('channels.actions.deselectAll') : t('channels.actions.selectAll')}
             </Button>
             <Typography variant="body2">
-              {selectedChannels.size} of {channels.length} selected
+              {t('channels.selection.selectedCount', { selected: selectedChannels.size, total: channels.length })}
             </Typography>
           </Box>
           <Button
@@ -302,7 +304,7 @@ export default function ChannelsPage() {
             onClick={handleBulkDelete}
             disabled={selectedChannels.size === 0}
           >
-            Delete Selected
+            {t('channels.actions.deleteSelected')}
           </Button>
         </Box>
       )}
@@ -347,24 +349,24 @@ export default function ChannelsPage() {
         >
           <YouTubeIcon sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />
           <Typography variant="h6" gutterBottom>
-            No channels subscribed
+            {t('channels.empty.title')}
           </Typography>
           <Typography variant="body2" sx={{ mb: 3 }}>
-            Subscribe to YouTube channels to automatically download their content
+            {t('channels.empty.description')}
           </Typography>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setOpenDialog(true)}
           >
-            Subscribe to Channel
+            {t('channels.actions.subscribeToChannel')}
           </Button>
         </Box>
       )}
 
       {/* Subscribe Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Subscribe to YouTube Channel</DialogTitle>
+        <DialogTitle>{t('channels.dialog.title')}</DialogTitle>
         <DialogContent>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -374,22 +376,22 @@ export default function ChannelsPage() {
           <TextField
             autoFocus
             margin="dense"
-            label="Channel URL"
-            placeholder="https://www.youtube.com/@channelname or channel ID"
+            label={t('channels.dialog.channelUrlLabel')}
+            placeholder={t('channels.dialog.channelUrlPlaceholder')}
             fullWidth
             value={channelUrl}
             onChange={(e) => setChannelUrl(e.target.value)}
-            helperText="Enter a YouTube channel URL or channel ID"
+            helperText={t('channels.dialog.channelUrlHelp')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)} disabled={subscribing}>Cancel</Button>
+          <Button onClick={() => setOpenDialog(false)} disabled={subscribing}>{t('channels.actions.cancel')}</Button>
           <Button 
             onClick={handleSubscribe} 
             variant="contained" 
             disabled={!channelUrl || subscribing}
           >
-            {subscribing ? 'Subscribing...' : 'Subscribe'}
+            {subscribing ? t('channels.actions.subscribing') : t('channels.actions.subscribe')}
           </Button>
         </DialogActions>
       </Dialog>

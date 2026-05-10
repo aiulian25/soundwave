@@ -16,8 +16,10 @@ import {
   Update as UpdateIcon,
 } from '@mui/icons-material';
 import { usePWA } from '../context/PWAContext';
+import { useTranslation } from 'react-i18next';
 
 const PWAPrompts: React.FC = () => {
+  const { t } = useTranslation();
   const {
     isOnline,
     canInstall,
@@ -98,10 +100,10 @@ const PWAPrompts: React.FC = () => {
           sx={{ width: '100%' }}
         >
           <Typography variant="body2" fontWeight={600}>
-            You're offline
+            {t('pwa.offlineTitle')}
           </Typography>
           <Typography variant="caption">
-            Cached content is still available
+            {t('pwa.offlineDescription')}
           </Typography>
         </Alert>
       </Snackbar>
@@ -120,7 +122,7 @@ const PWAPrompts: React.FC = () => {
           onClose={() => setShowOnlineAlert(false)}
           sx={{ width: '100%' }}
         >
-          You're back online!
+          {t('pwa.onlineBack')}
         </Alert>
       </Snackbar>
 
@@ -142,7 +144,7 @@ const PWAPrompts: React.FC = () => {
                 onClick={handleInstall}
                 sx={{ fontWeight: 600 }}
               >
-                Install
+                {t('pwa.installAction')}
               </Button>
               <IconButton
                 size="small"
@@ -157,10 +159,10 @@ const PWAPrompts: React.FC = () => {
         >
           <Box>
             <Typography variant="body2" fontWeight={600} gutterBottom>
-              Install SoundWave
+              {t('pwa.installTitle')}
             </Typography>
             <Typography variant="caption">
-              Install the app for faster access and offline playback
+              {t('pwa.installDescription')}
             </Typography>
           </Box>
         </Alert>
@@ -184,7 +186,7 @@ const PWAPrompts: React.FC = () => {
                 onClick={handleUpdate}
                 sx={{ fontWeight: 600 }}
               >
-                Update
+                {t('pwa.updateAction')}
               </Button>
               <IconButton
                 size="small"
@@ -199,10 +201,10 @@ const PWAPrompts: React.FC = () => {
         >
           <Box>
             <Typography variant="body2" fontWeight={600} gutterBottom>
-              Update Available
+              {t('pwa.updateTitle')}
             </Typography>
             <Typography variant="caption">
-              A new version of SoundWave is ready to install
+              {t('pwa.updateDescription')}
             </Typography>
           </Box>
         </Alert>
@@ -229,7 +231,7 @@ const PWAPrompts: React.FC = () => {
         >
           <OfflineIcon fontSize="small" />
           <Typography variant="caption" fontWeight={600}>
-            Offline Mode
+            {t('pwa.offlineModeBadge')}
           </Typography>
         </Box>
       )}

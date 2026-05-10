@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111827" />
+    <title>SoundWave Offline</title>
+    <style>
+      :root {
+        --bg-a: #081222;
+        --bg-b: #142844;
+        --text: #eaf2ff;
+        --muted: #9db6d4;
+        --card: rgba(10, 22, 40, 0.78);
+        --accent: #39d6c0;
+        --accent-2: #84ccff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 12% 18%, rgba(132, 204, 255, 0.2), transparent 38%),
+          radial-gradient(circle at 86% 80%, rgba(57, 214, 192, 0.22), transparent 36%),
+          linear-gradient(135deg, var(--bg-a), var(--bg-b));
+        display: grid;
+        place-items: center;
+        padding: 1.25rem;
+      }
+
+      .panel {
+        width: min(720px, 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: var(--card);
+        backdrop-filter: blur(7px);
+        border-radius: 18px;
+        padding: 1.25rem 1.1rem;
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.3);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        margin-bottom: 0.7rem;
+      }
+
+      .brand-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 0 0 6px rgba(57, 214, 192, 0.15);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.25rem, 3.5vw, 1.9rem);
+        letter-spacing: 0.2px;
+      }
+
+      p {
+        margin: 0.5rem 0 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .actions {
+        margin-top: 1.05rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .btn {
+        appearance: none;
+        border: 0;
+        text-decoration: none;
+        border-radius: 12px;
+        padding: 0.68rem 0.95rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #062139;
+      }
+
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text);
+      }
+
+      .hint {
+        margin-top: 0.85rem;
+        font-size: 0.86rem;
+        color: #c8dbf3;
+      }
+
+      .summary {
+        margin-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        padding-top: 0.9rem;
+      }
+
+      .summary h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .summary p {
+        margin-top: 0.35rem;
+      }
+
+      .summary ul {
+        margin: 0.55rem 0 0;
+        padding-left: 1.1rem;
+      }
+
+      .summary li {
+        color: #dceafe;
+        margin: 0.2rem 0;
+      }
+
+      .summary-empty {
+        margin-top: 0.5rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="panel" role="main" aria-live="polite">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <strong>SoundWave</strong>
+      </div>
+      <h1 id="title">You are offline</h1>
+      <p id="subtitle">Connection is unavailable. Open Library to play tracks that were already cached on this device.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="/library" id="libraryLink">Open Library</a>
+        <button class="btn btn-secondary" type="button" onclick="location.reload()" id="retryBtn">Try again</button>
+      </div>
+      <p class="hint" id="hint">When internet is back, SoundWave will resume sync automatically.</p>
+
+      <section class="summary" aria-live="polite">
+        <h2 id="summaryTitle">Cached tracks available offline</h2>
+        <p id="summaryStats">Checking offline library...</p>
+        <ul id="summaryList"></ul>
+        <p class="summary-empty" id="summaryEmpty" hidden>No cached tracks were found yet.</p>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        var TEXT = {
+          en: {
+            title: 'You are offline',
+            subtitle: 'Connection is unavailable. Open Library to play tracks that were already cached on this device.',
+            libraryLink: 'Open Library',
+            retryBtn: 'Try again',
+            hint: 'When internet is back, SoundWave will resume sync automatically.',
+            summaryTitle: 'Cached tracks available offline',
+            summaryChecking: 'Checking offline library...',
+            summaryEmpty: 'No cached tracks were found yet.',
+            summaryStats: '{{tracks}} tracks from {{playlists}} playlists are ready offline.',
+            summaryMore: '{{count}} more...'
+          },
+          ro: {
+            title: 'Esti offline',
+            subtitle: 'Conexiunea nu este disponibila. Deschide Biblioteca pentru a reda piesele deja salvate pe acest dispozitiv.',
+            libraryLink: 'Deschide Biblioteca',
+            retryBtn: 'Incearca din nou',
+            hint: 'Cand internetul revine, SoundWave va relua sincronizarea automat.',
+            summaryTitle: 'Piese disponibile offline',
+            summaryChecking: 'Verific biblioteca offline...',
+            summaryEmpty: 'Nu au fost gasite inca piese in cache.',
+            summaryStats: '{{tracks}} piese din {{playlists}} playlisturi sunt gata offline.',
+            summaryMore: 'Inca {{count}}...'
+          }
+        };
+
+        function resolveLang() {
+          var fromLocalStorage = null;
+          try {
+            fromLocalStorage = localStorage.getItem('i18nextLng');
+          } catch (e) {
+            // ignore storage access errors
+          }
+
+          var raw = (fromLocalStorage || navigator.language || 'en').toLowerCase();
+          if (raw.indexOf('ro') === 0) return 'ro';
+          return 'en';
+        }
+
+        function translate(template, data) {
+          return template
+            .replace('{{tracks}}', String(data.tracks || 0))
+            .replace('{{playlists}}', String(data.playlists || 0))
+            .replace('{{count}}', String(data.count || 0));
+        }
+
+        function setText(lang) {
+          var t = TEXT[lang] || TEXT.en;
+          document.documentElement.lang = lang;
+          document.getElementById('title').textContent = t.title;
+          document.getElementById('subtitle').textContent = t.subtitle;
+          document.getElementById('libraryLink').textContent = t.libraryLink;
+          document.getElementById('retryBtn').textContent = t.retryBtn;
+          document.getElementById('hint').textContent = t.hint;
+          document.getElementById('summaryTitle').textContent = t.summaryTitle;
+          document.getElementById('summaryStats').textContent = t.summaryChecking;
+          document.getElementById('summaryEmpty').textContent = t.summaryEmpty;
+        }
+
+        async function readOfflineSummary(lang) {
+          var t = TEXT[lang] || TEXT.en;
+          var summaryStats = document.getElementById('summaryStats');
+          var summaryList = document.getElementById('summaryList');
+          var summaryEmpty = document.getElementById('summaryEmpty');
+
+          if (!('indexedDB' in window)) {
+            summaryStats.textContent = t.summaryEmpty;
+            summaryEmpty.hidden = false;
+            return;
+          }
+
+          try {
+            var playlists = await new Promise(function (resolve, reject) {
+              var req = indexedDB.open('soundwave-offline');
+              req.onerror = function () { reject(req.error || new Error('indexeddb open failed')); };
+              req.onsuccess = function () {
+                var db = req.result;
+                if (!db.objectStoreNames.contains('playlists')) {
+                  db.close();
+                  resolve([]);
+                  return;
+                }
+
+                var tx = db.transaction('playlists', 'readonly');
+                var store = tx.objectStore('playlists');
+                var getAllReq = store.getAll();
+                getAllReq.onerror = function () {
+                  db.close();
+                  reject(getAllReq.error || new Error('indexeddb read failed'));
+                };
+                getAllReq.onsuccess = function () {
+                  var result = Array.isArray(getAllReq.result) ? getAllReq.result : [];
+                  db.close();
+                  resolve(result);
+                };
+              };
+            });
+
+            var offlinePlaylists = playlists.filter(function (p) { return !!p && p.offline !== false; });
+            var playlistCount = offlinePlaylists.length;
+            var trackCount = offlinePlaylists.reduce(function (sum, p) {
+              var downloaded = Number(p.downloaded_count || 0);
+              var items = Array.isArray(p.items) ? p.items.length : 0;
+              return sum + (downloaded || items || 0);
+            }, 0);
+
+            if (playlistCount === 0 || trackCount === 0) {
+              summaryStats.textContent = t.summaryEmpty;
+              summaryEmpty.hidden = false;
+              return;
+            }
+
+            summaryStats.textContent = translate(t.summaryStats, {
+              tracks: trackCount,
+              playlists: playlistCount
+            });
+            summaryEmpty.hidden = true;
+
+            // Render up to 5 known track titles safely with textContent only.
+            var titles = [];
+            for (var i = 0; i < offlinePlaylists.length; i++) {
+              var pl = offlinePlaylists[i];
+              if (!Array.isArray(pl.items)) continue;
+              for (var j = 0; j < pl.items.length; j++) {
+                var item = pl.items[j] || {};
+                var audio = item.audio || {};
+                var title = typeof audio.title === 'string' ? audio.title : '';
+                if (title) titles.push(title);
+                if (titles.length >= 5) break;
+              }
+              if (titles.length >= 5) break;
+            }
+
+            if (titles.length > 0) {
+              summaryList.innerHTML = '';
+              titles.forEach(function (title) {
+                var li = document.createElement('li');
+                li.textContent = title;
+                summaryList.appendChild(li);
+              });
+
+              if (trackCount > titles.length) {
+                var liMore = document.createElement('li');
+                liMore.textContent = translate(t.summaryMore, {
+                  count: trackCount - titles.length
+                });
+                summaryList.appendChild(liMore);
+              }
+            }
+          } catch (err) {
+            summaryStats.textContent = t.summaryEmpty;
+            summaryEmpty.hidden = false;
+          }
+        }
+
+        var lang = resolveLang();
+        setText(lang);
+        readOfflineSummary(lang);
+      })();
+    </script>
+  </body>
+</html>

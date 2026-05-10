@@ -3,11 +3,15 @@ Write metadata tags to audio files using mutagen
 Supports MP3 (ID3), M4A/MP4 (MP4Tags), OGG, FLAC, etc.
 """
 
+import logging
 import os
 import requests
 from pathlib import Path
 from typing import Optional
 from django.conf import settings
+
+
+logger = logging.getLogger(__name__)
 
 try:
     from mutagen.mp3 import MP3
@@ -18,7 +22,7 @@ try:
     MUTAGEN_AVAILABLE = True
 except ImportError:
     MUTAGEN_AVAILABLE = False
-    print("Warning: mutagen not available, cannot write audio tags")
+    logger.warning("mutagen not available, cannot write audio tags")
 
 # Allowed URL prefixes for artwork download (SSRF protection)
 ALLOWED_ARTWORK_URL_PREFIXES = (
@@ -127,7 +131,7 @@ def write_metadata_to_file(
         True if successful, False otherwise
     """
     if not MUTAGEN_AVAILABLE:
-        print("mutagen not available")
+        logger.warning("mutagen not available")
         return False
     
     # Build full path - handle both relative and absolute paths
@@ -137,7 +141,7 @@ def write_metadata_to_file(
         full_path = Path(settings.MEDIA_ROOT) / file_path
     
     if not full_path.exists():
-        print(f"File not found: {full_path}")
+        logger.warning("File not found: %s", full_path)
         return False
     
     # Get file extension
@@ -158,10 +162,10 @@ def write_metadata_to_file(
         elif ext == '.flac':
             return _write_flac_tags(full_path, title, artist, album, year, genre, track_number, cover_data, lyrics, synced_lyrics)
         else:
-            print(f"Unsupported format: {ext}")
+            logger.warning("Unsupported format: %s", ext)
             return False
     except Exception as e:
-        print(f"Error writing tags to {full_path}: {e}")
+        logger.warning("Error writing tags to %s: %s", full_path, e)
         return False
 
 
@@ -240,7 +244,7 @@ def _write_mp3_tags(
             ))
     
     audio.save(file_path)
-    print(f"Written MP3 tags to {file_path}")
+    logger.info("Written MP3 tags to %s", file_path)
     return True
 
 
@@ -288,7 +292,7 @@ def _write_mp4_tags(
         audio['covr'] = [MP4Cover(cover_data, imageformat=img_format)]
     
     audio.save()
-    print(f"Written MP4 tags to {file_path}")
+    logger.info("Written MP4 tags to %s", file_path)
     return True
 
 
@@ -321,7 +325,7 @@ def _write_ogg_tags(
         audio['lyrics'] = [lyrics]
     
     audio.save()
-    print(f"Written OGG tags to {file_path}")
+    logger.info("Written OGG tags to %s", file_path)
     return True
 
 
@@ -380,5 +384,5 @@ def _write_flac_tags(
         audio.add_picture(picture)
     
     audio.save()
-    print(f"Written FLAC tags to {file_path}")
+    logger.info("Written FLAC tags to %s", file_path)
     return True

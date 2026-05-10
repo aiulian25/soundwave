@@ -12,6 +12,7 @@ import FindReplaceIcon from '@mui/icons-material/FindReplace';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import { useTranslation } from 'react-i18next';
 
 interface PlaylistCardProps {
   playlist: {
@@ -46,12 +47,13 @@ export default function PlaylistCard({
   onDelete,
   onClick,
 }: PlaylistCardProps) {
+  const { t } = useTranslation();
   const progress = playlist.item_count > 0 
     ? Math.round((playlist.downloaded_count / playlist.item_count) * 100) 
     : 0;
 
   const getLastRefreshText = (lastRefresh: string | null) => {
-    if (!lastRefresh) return 'Never synced';
+    if (!lastRefresh) return t('playlistCard.lastRefresh.never');
     const date = new Date(lastRefresh);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -59,10 +61,10 @@ export default function PlaylistCard({
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
     
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    if (diffMins < 1) return t('playlistCard.lastRefresh.justNow');
+    if (diffMins < 60) return t('playlistCard.lastRefresh.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('playlistCard.lastRefresh.hoursAgo', { count: diffHours });
+    return t('playlistCard.lastRefresh.daysAgo', { count: diffDays });
   };
 
   return (
@@ -184,7 +186,7 @@ export default function PlaylistCard({
         {isOffline && (
           <Chip
             icon={<CloudDoneIcon sx={{ fontSize: 14 }} />}
-            label="Offline"
+            label={t('playlistCard.status.offline')}
             size="small"
             sx={{
               position: 'absolute',
@@ -204,7 +206,7 @@ export default function PlaylistCard({
         {!isOnline && !isOffline && (
           <Chip
             icon={<WifiOffIcon sx={{ fontSize: 14 }} />}
-            label="Unavailable"
+            label={t('playlistCard.status.unavailable')}
             size="small"
             sx={{
               position: 'absolute',
@@ -278,7 +280,7 @@ export default function PlaylistCard({
 
         {/* Actions */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Tooltip title={isSyncing ? 'Syncing...' : 'Sync playlist'}>
+          <Tooltip title={isSyncing ? t('playlistCard.actions.syncing') : t('playlistCard.actions.syncPlaylist')}>
             <span>
               <IconButton
                 size="small"
@@ -299,7 +301,7 @@ export default function PlaylistCard({
             </span>
           </Tooltip>
 
-          <Tooltip title={isRechecking ? 'Rechecking...' : 'Force recheck missing files'}>
+          <Tooltip title={isRechecking ? t('playlistCard.actions.rechecking') : t('playlistCard.actions.forceRecheck')}>
             <span>
               <IconButton
                 size="small"
@@ -320,7 +322,7 @@ export default function PlaylistCard({
             </span>
           </Tooltip>
 
-          <Tooltip title="Remove playlist">
+          <Tooltip title={t('playlistCard.actions.removePlaylist')}>
             <IconButton
               size="small"
               color="error"

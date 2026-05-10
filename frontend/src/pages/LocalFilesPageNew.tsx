@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -32,6 +33,7 @@ interface LocalFilesPageProps {
 }
 
 export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps) {
+  const { t } = useTranslation();
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
@@ -60,7 +62,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
         const localFile: LocalAudioFile = {
           id: `${Date.now()}-${Math.random()}`,
           title: metadata.title || file.name,
-          artist: metadata.artist || 'Unknown Artist',
+          artist: metadata.artist || t('player.unknownArtist'),
           album: metadata.album || '',
           year: metadata.year || null,
           genre: metadata.genre || '',
@@ -97,7 +99,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
         if (files.length === 0) return;
 
         setLoading(true);
-        setAlert({ message: `Processing ${files.length} files...`, severity: 'info' });
+        setAlert({ message: t('localFilesNew.alerts.processingFiles', { count: files.length }), severity: 'info' });
 
         const processedFiles = await processFiles(files);
 
@@ -105,13 +107,13 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
         await loadFiles();
         
         setLoading(false);
-        setAlert({ message: `Added ${processedFiles.length} files successfully!`, severity: 'success' });
+        setAlert({ message: t('localFilesNew.alerts.addedFiles', { count: processedFiles.length }), severity: 'success' });
       };
 
       input.click();
     } catch (error) {
       console.error('Error selecting files:', error);
-      setAlert({ message: 'Failed to select files', severity: 'error' });
+      setAlert({ message: t('localFilesNew.alerts.failedSelectFiles'), severity: 'error' });
       setLoading(false);
     }
   };
@@ -121,7 +123,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       // Check if File System Access API is supported
       if (!('showDirectoryPicker' in window)) {
         setAlert({ 
-          message: 'Folder selection not supported in this browser. Use Chrome, Edge, or Opera.', 
+          message: t('localFilesNew.alerts.folderNotSupported'), 
           severity: 'error' 
         });
         return;
@@ -131,7 +133,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       const isSecureContext = window.isSecureContext;
       if (!isSecureContext) {
         setAlert({ 
-          message: 'Folder selection requires HTTPS or localhost. For local network access, use "Select Files" instead or access via HTTPS.', 
+          message: t('localFilesNew.alerts.folderRequiresHttps'), 
           severity: 'info' 
         });
         return;
@@ -142,7 +144,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       });
 
       setLoading(true);
-      setAlert({ message: 'Scanning folder and subfolders...', severity: 'info' });
+      setAlert({ message: t('localFilesNew.alerts.scanningFolder'), severity: 'info' });
 
       const audioFiles: File[] = [];
       const audioExtensions = ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.opus', '.aac', '.wma'];
@@ -168,11 +170,11 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
 
       if (audioFiles.length === 0) {
         setLoading(false);
-        setAlert({ message: 'No audio files found in the selected folder', severity: 'info' });
+        setAlert({ message: t('localFilesNew.alerts.noAudioFiles'), severity: 'info' });
         return;
       }
 
-      setAlert({ message: `Processing ${audioFiles.length} audio files...`, severity: 'info' });
+      setAlert({ message: t('localFilesNew.alerts.processingAudioFiles', { count: audioFiles.length }), severity: 'info' });
 
       const processedFiles = await processFiles(audioFiles);
 
@@ -181,15 +183,15 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       
       setLoading(false);
       setAlert({ 
-        message: `Successfully added ${processedFiles.length} files from folder!`, 
+        message: t('localFilesNew.alerts.successfullyAdded', { count: processedFiles.length }), 
         severity: 'success' 
       });
     } catch (error: any) {
       console.error('Error selecting folder:', error);
       if (error.name === 'AbortError') {
-        setAlert({ message: 'Folder selection cancelled', severity: 'info' });
+        setAlert({ message: t('localFilesNew.alerts.folderCancelled'), severity: 'info' });
       } else {
-        setAlert({ message: 'Failed to read folder', severity: 'error' });
+        setAlert({ message: t('localFilesNew.alerts.failedReadFolder'), severity: 'error' });
       }
       setLoading(false);
     }
@@ -257,33 +259,33 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       setCurrentAudio(audio, queue);
     } catch (error) {
       console.error('Error playing file:', error);
-      setAlert({ message: 'Failed to play file', severity: 'error' });
+      setAlert({ message: t('localFilesNew.alerts.failedPlayFile'), severity: 'error' });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remove this file from your library?')) return;
+    if (!confirm(t('localFilesNew.confirmations.removeFile'))) return;
     
     try {
       await localAudioDB.delete(id);
       await loadFiles();
-      setAlert({ message: 'File removed', severity: 'success' });
+      setAlert({ message: t('localFilesNew.alerts.fileRemoved'), severity: 'success' });
     } catch (error) {
       console.error('Error deleting file:', error);
-      setAlert({ message: 'Failed to remove file', severity: 'error' });
+      setAlert({ message: t('localFilesNew.alerts.failedRemoveFile'), severity: 'error' });
     }
   };
 
   const handleClearAll = async () => {
-    if (!confirm('Remove ALL files from your library? This cannot be undone.')) return;
+    if (!confirm(t('localFilesNew.confirmations.removeAllFiles'))) return;
 
     try {
       await localAudioDB.clear();
       await loadFiles();
-      setAlert({ message: 'All files removed', severity: 'success' });
+      setAlert({ message: t('localFilesNew.alerts.allFilesRemoved'), severity: 'success' });
     } catch (error) {
       console.error('Error clearing library:', error);
-      setAlert({ message: 'Failed to clear library', severity: 'error' });
+      setAlert({ message: t('localFilesNew.alerts.failedClearLibrary'), severity: 'error' });
     }
   };
 
@@ -303,7 +305,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, px: 0.5, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-          My Local Files
+          {t('localFilesNew.title')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
@@ -320,7 +322,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
               fontSize: '0.813rem'
             }}
           >
-            Refresh
+            {t('localFilesNew.buttons.refresh')}
           </Button>
           {audioFiles.length > 0 && (
             <Button
@@ -337,7 +339,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                 fontSize: '0.813rem'
               }}
             >
-              Clear All
+              {t('localFilesNew.buttons.clearAll')}
             </Button>
           )}
           <Button
@@ -356,12 +358,12 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
               fontSize: '0.813rem'
             }}
           >
-            Select Files
+            {t('localFilesNew.buttons.selectFiles')}
           </Button>
           <Tooltip 
             title={!window.isSecureContext 
-              ? 'Folder selection requires HTTPS or localhost. Currently viewing over HTTP. Use "Select Files" instead, or access via HTTPS.' 
-              : 'Select a folder to scan recursively including all subfolders'
+              ? t('localFilesNew.tooltips.selectFolderHttps')
+              : t('localFilesNew.tooltips.selectFolderHint')
             }
             arrow
           >
@@ -383,7 +385,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                   fontSize: '0.813rem'
                 }}
               >
-                Select Folder {!window.isSecureContext && '🔒'}
+                {t('localFilesNew.buttons.selectFolder')} {!window.isSecureContext && '🔒'}
               </Button>
             </span>
           </Tooltip>
@@ -394,10 +396,10 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       {audioFiles.length === 0 && !loading && (
         <Alert severity="info" sx={{ mb: 3, borderRadius: 3 }}>
           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-            No local files yet
+            {t('localFilesNew.alerts.noFilesTitle')}
           </Typography>
           <Typography variant="caption">
-            Click "Select Files" to choose individual audio files (works everywhere), or "Select Folder" to scan an entire folder including subfolders (requires HTTPS or localhost). Files are stored in your browser and play locally without uploading.
+            {t('localFilesNew.alerts.noFilesDescription')}
           </Typography>
         </Alert>
       )}
@@ -428,12 +430,12 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell width={30} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>#</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Title</TableCell>
-                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' }, fontSize: '0.75rem' }}>Artist</TableCell>
-                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', md: 'table-cell' }, fontSize: '0.75rem' }}>Album</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Duration</TableCell>
-                <TableCell align="center" width={80} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Actions</TableCell>
+                <TableCell width={30} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('localFilesNew.table.columnNumber')}</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('library.columns.title')}</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' }, fontSize: '0.75rem' }}>{t('localFilesNew.table.columnArtist')}</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', md: 'table-cell' }, fontSize: '0.75rem' }}>{t('localFilesNew.table.columnAlbum')}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('library.columns.duration')}</TableCell>
+                <TableCell align="center" width={80} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('library.columns.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

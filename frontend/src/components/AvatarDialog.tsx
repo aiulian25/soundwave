@@ -17,6 +17,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { useTranslation } from 'react-i18next';
+import { ensureCsrfCookie, getCsrfToken } from '../api/client';
 
 interface AvatarDialogProps {
   open: boolean;
@@ -26,6 +28,7 @@ interface AvatarDialogProps {
 }
 
 export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarChange }: AvatarDialogProps) {
+  const { t } = useTranslation();
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,24 +42,26 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
     setSelectedPreset(preset);
 
     try {
+      await ensureCsrfCookie();
       const response = await fetch('/api/user/avatar/preset/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Token ${localStorage.getItem('token')}`,
+          'X-CSRFToken': getCsrfToken() || '',
         },
+        credentials: 'include',
         body: JSON.stringify({ preset }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to set preset avatar');
+        throw new Error(t('avatarDialog.errors.setPresetFailed'));
       }
 
       const data = await response.json();
-      setSuccess('Avatar updated successfully!');
+      setSuccess(t('avatarDialog.success.updated'));
       onAvatarChange(`/avatars/preset_${preset}.svg`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to set preset avatar');
+      setError(err instanceof Error ? err.message : t('avatarDialog.errors.setPresetFailed'));
     }
   };
 
@@ -66,13 +71,13 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
 
     // Validate file size (20MB)
     if (file.size > 20 * 1024 * 1024) {
-      setError('File too large. Maximum size is 20MB');
+      setError(t('avatarDialog.errors.fileTooLarge'));
       return;
     }
 
     // Validate file type
     if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
-      setError('Invalid file type. Please upload JPEG, PNG, GIF, or WebP');
+      setError(t('avatarDialog.errors.invalidFileType'));
       return;
     }
 
@@ -85,27 +90,29 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
     formData.append('avatar', file);
 
     try {
+      await ensureCsrfCookie();
       const response = await fetch('/api/user/avatar/upload/', {
         method: 'POST',
         headers: {
-          'Authorization': `Token ${localStorage.getItem('token')}`,
+          'X-CSRFToken': getCsrfToken() || '',
         },
+        credentials: 'include',
         body: formData,
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to upload avatar');
+        throw new Error(data.error || t('avatarDialog.errors.uploadFailed'));
       }
 
       const data = await response.json();
-      setSuccess('Avatar uploaded successfully!');
+      setSuccess(t('avatarDialog.success.uploaded'));
       
       // Construct the avatar URL
       const filename = data.avatar.split('/').pop();
       onAvatarChange(`/api/user/avatar/file/${filename}/`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload avatar');
+      setError(err instanceof Error ? err.message : t('avatarDialog.errors.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -116,22 +123,24 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
     setSuccess(null);
 
     try {
+      await ensureCsrfCookie();
       const response = await fetch('/api/user/avatar/upload/', {
         method: 'DELETE',
         headers: {
-          'Authorization': `Token ${localStorage.getItem('token')}`,
+          'X-CSRFToken': getCsrfToken() || '',
         },
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to remove avatar');
+        throw new Error(t('avatarDialog.errors.removeFailed'));
       }
 
-      setSuccess('Avatar removed successfully!');
+      setSuccess(t('avatarDialog.success.removed'));
       setSelectedPreset(null);
       onAvatarChange(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove avatar');
+      setError(err instanceof Error ? err.message : t('avatarDialog.errors.removeFailed'));
     }
   };
 
@@ -143,7 +152,7 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Box display="flex" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6">Choose Your Avatar</Typography>
+          <Typography variant="h6">{t('avatarDialog.title')}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -164,7 +173,7 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
 
         {/* Preset Avatars */}
         <Typography variant="subtitle2" gutterBottom sx={{ mt: 1 }}>
-          Preset Avatars
+          {t('avatarDialog.sections.presets')}
         </Typography>
         <Grid container spacing={2} sx={{ mb: 3 }}>
           {presets.map((preset) => (
@@ -207,7 +216,7 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
 
         {/* Upload Custom Avatar */}
         <Typography variant="subtitle2" gutterBottom>
-          Custom Avatar
+          {t('avatarDialog.sections.custom')}
         </Typography>
         <Box
           sx={{
@@ -237,11 +246,11 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
                   startIcon={<CloudUploadIcon />}
                   sx={{ mb: 1 }}
                 >
-                  Upload Image
+                  {t('avatarDialog.actions.uploadImage')}
                 </Button>
               </label>
               <Typography variant="caption" display="block" color="text.secondary">
-                Max 20MB • JPEG, PNG, GIF, WebP
+                {t('avatarDialog.helpers.fileTypes')}
               </Typography>
             </>
           )}
@@ -256,10 +265,10 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
             color="error"
             sx={{ mr: 'auto' }}
           >
-            Remove Avatar
+            {t('avatarDialog.actions.removeAvatar')}
           </Button>
         )}
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t('common.close')}</Button>
       </DialogActions>
     </Dialog>
   );

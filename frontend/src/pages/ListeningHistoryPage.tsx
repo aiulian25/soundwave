@@ -54,6 +54,7 @@ import {
   Refresh as RefreshIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { statsAPI } from '../api/client';
 import type { Audio } from '../types';
 
@@ -81,6 +82,7 @@ interface OnThisDayData {
 }
 
 interface GroupedHistory {
+  key: string;
   label: string;
   entries: HistoryEntry[];
 }
@@ -97,7 +99,7 @@ const formatDuration = (seconds: number) => {
 };
 
 // Format time ago helper
-const formatTimeAgo = (dateStr: string) => {
+const formatTimeAgo = (dateStr: string, t: (key: string, options?: Record<string, unknown>) => string) => {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -105,10 +107,10 @@ const formatTimeAgo = (dateStr: string) => {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffMins < 1) return t('listeningHistory.timeAgo.justNow');
+  if (diffMins < 60) return t('listeningHistory.timeAgo.minutesAgo', { count: diffMins });
+  if (diffHours < 24) return t('listeningHistory.timeAgo.hoursAgo', { count: diffHours });
+  if (diffDays < 7) return t('listeningHistory.timeAgo.daysAgo', { count: diffDays });
   return date.toLocaleDateString();
 };
 
@@ -116,9 +118,11 @@ const formatTimeAgo = (dateStr: string) => {
 const HistoryEntryItem = memo(({ 
   entry, 
   onPlay,
+  t,
 }: { 
   entry: HistoryEntry;
   onPlay: (entry: HistoryEntry) => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) => {
   const theme = useTheme();
   
@@ -176,7 +180,7 @@ const HistoryEntryItem = memo(({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Tooltip title={new Date(entry.listened_at).toLocaleString()}>
             <Typography variant="caption" color="text.secondary">
-              {formatTimeAgo(entry.listened_at)}
+              {formatTimeAgo(entry.listened_at, t)}
             </Typography>
           </Tooltip>
           <IconButton 
@@ -197,11 +201,13 @@ const HistoryEntryItem = memo(({
 
 // Memoized Section Header
 const SectionHeader = memo(({ 
+  sectionKey,
   label, 
   count, 
   isExpanded, 
   onToggle 
 }: { 
+  sectionKey: string;
   label: string; 
   count: number; 
   isExpanded: boolean; 
@@ -219,9 +225,9 @@ const SectionHeader = memo(({
     }}
     onClick={onToggle}
   >
-    {label === 'Today' && <TodayIcon color="primary" fontSize="small" />}
-    {label === 'Yesterday' && <TimeIcon color="secondary" fontSize="small" />}
-    {!['Today', 'Yesterday'].includes(label) && <CalendarIcon color="action" fontSize="small" />}
+    {sectionKey === 'today' && <TodayIcon color="primary" fontSize="small" />}
+    {sectionKey === 'yesterday' && <TimeIcon color="secondary" fontSize="small" />}
+    {!['today', 'yesterday'].includes(sectionKey) && <CalendarIcon color="action" fontSize="small" />}
     <Typography variant="subtitle1" fontWeight={600} color="text.primary">
       {label}
     </Typography>
@@ -239,6 +245,7 @@ const SectionHeader = memo(({
 ));
 
 export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistoryPageProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [onThisDay, setOnThisDay] = useState<OnThisDayData>({});
@@ -337,12 +344,12 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
       setPage(pageNum);
       setTotalPages(response.data.total_pages);
     } catch (err: any) {
-      setError(err.message || 'Failed to load history');
+      setError(err.message || t('listeningHistory.errors.loadFailed'));
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [t]);
 
   // Load "On This Day" data
   const loadOnThisDay = useCallback(async () => {
@@ -377,19 +384,19 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
       let groupKey: string;
 
       if (date >= today) {
-        groupKey = 'Today';
+        groupKey = 'today';
       } else if (date >= yesterday) {
-        groupKey = 'Yesterday';
+        groupKey = 'yesterday';
       } else if (date >= thisWeekStart) {
-        groupKey = 'This Week';
+        groupKey = 'thisWeek';
       } else if (date >= lastWeekStart) {
-        groupKey = 'Last Week';
+        groupKey = 'lastWeek';
       } else if (date >= thisMonthStart) {
-        groupKey = 'This Month';
+        groupKey = 'thisMonth';
       } else if (date >= lastMonthStart) {
-        groupKey = 'Last Month';
+        groupKey = 'lastMonth';
       } else {
-        groupKey = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        groupKey = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
       }
 
       if (!groups[groupKey]) {
@@ -398,12 +405,20 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
       groups[groupKey].push(entry);
     }
 
-    const orderedKeys = ['Today', 'Yesterday', 'This Week', 'Last Week', 'This Month', 'Last Month'];
+    const orderedKeys = ['today', 'yesterday', 'thisWeek', 'lastWeek', 'thisMonth', 'lastMonth'];
     const result: GroupedHistory[] = [];
+    const sectionLabels: Record<string, string> = {
+      today: t('listeningHistory.groups.today'),
+      yesterday: t('listeningHistory.groups.yesterday'),
+      thisWeek: t('listeningHistory.groups.thisWeek'),
+      lastWeek: t('listeningHistory.groups.lastWeek'),
+      thisMonth: t('listeningHistory.groups.thisMonth'),
+      lastMonth: t('listeningHistory.groups.lastMonth'),
+    };
 
     for (const key of orderedKeys) {
       if (groups[key]) {
-        result.push({ label: key, entries: groups[key] });
+        result.push({ key, label: sectionLabels[key], entries: groups[key] });
         delete groups[key];
       }
     }
@@ -416,11 +431,11 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
     });
 
     for (const key of remainingKeys) {
-      result.push({ label: key, entries: groups[key] });
+      result.push({ key, label: key, entries: groups[key] });
     }
 
     return result;
-  }, [history]);
+  }, [history, t]);
 
   // Handle track play - memoized to prevent child re-renders
   const handlePlayTrack = useCallback((entry: HistoryEntry) => {
@@ -494,10 +509,10 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CelebrationIcon color="secondary" />
               <Typography variant="h6" fontWeight={600}>
-                On This Day
+                {t('listeningHistory.onThisDay.title')}
               </Typography>
               <Chip 
-                label={`${Object.keys(onThisDay).length} memories`} 
+                label={t('listeningHistory.onThisDay.memoriesCount', { count: Object.keys(onThisDay).length })}
                 size="small" 
                 color="secondary"
                 variant="outlined"
@@ -579,7 +594,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                     </List>
                     {period.tracks.length > 3 && (
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                        +{period.tracks.length - 3} more tracks
+                        {t('listeningHistory.moreTracks', { count: period.tracks.length - 3 })}
                       </Typography>
                     )}
                   </Paper>
@@ -590,7 +605,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
         </CardContent>
       </Card>
     );
-  }, [onThisDay, onThisDayExpanded, theme, handlePlayTrack]);
+  }, [onThisDay, onThisDayExpanded, theme, handlePlayTrack, t]);
 
   if (loading) {
     return (
@@ -607,7 +622,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-        <Button variant="contained" onClick={() => loadHistory()}>Retry</Button>
+        <Button variant="contained" onClick={() => loadHistory()}>{t('listeningHistory.actions.retry')}</Button>
       </Box>
     );
   }
@@ -620,15 +635,15 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
           <HistoryIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           <Box>
             <Typography variant="h4" fontWeight={700}>
-              Listening History
+              {t('listeningHistory.title')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {history.length} tracks in your history
+              {t('listeningHistory.trackCount', { count: history.length })}
             </Typography>
           </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Tooltip title="Refresh">
+          <Tooltip title={t('listeningHistory.actions.refresh')}>
             <IconButton onClick={() => { loadHistory(); loadOnThisDay(); }}>
               <RefreshIcon />
             </IconButton>
@@ -639,7 +654,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
             startIcon={<DeleteIcon />}
             onClick={() => setClearDialogOpen(true)}
           >
-            Clear
+            {t('listeningHistory.actions.clear')}
           </Button>
         </Box>
       </Box>
@@ -652,22 +667,23 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
         <Card sx={{ textAlign: 'center', py: 8 }}>
           <MusicNoteIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
-            No listening history yet
+            {t('listeningHistory.empty.title')}
           </Typography>
           <Typography variant="body2" color="text.disabled">
-            Start playing some music to build your history!
+            {t('listeningHistory.empty.description')}
           </Typography>
         </Card>
       ) : (
         groupedHistory.map((group) => {
-          const isExpanded = !collapsedSections.has(group.label);
+          const isExpanded = !collapsedSections.has(group.key);
           return (
-            <Box key={group.label} sx={{ mb: 3 }}>
+            <Box key={group.key} sx={{ mb: 3 }}>
               <SectionHeader
+                sectionKey={group.key}
                 label={group.label}
                 count={group.entries.length}
                 isExpanded={isExpanded}
-                onToggle={() => toggleSection(group.label)}
+                onToggle={() => toggleSection(group.key)}
               />
               
               <Collapse in={isExpanded} timeout={150} unmountOnExit>
@@ -678,6 +694,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                         <HistoryEntryItem
                           entry={entry}
                           onPlay={handlePlayTrack}
+                          t={t}
                         />
                         {index < Math.min(group.entries.length, 50) - 1 && <Divider variant="inset" />}
                       </Box>
@@ -685,7 +702,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                     {group.entries.length > 50 && (
                       <Box sx={{ p: 2, textAlign: 'center' }}>
                         <Typography variant="caption" color="text.secondary">
-                          Showing first 50 of {group.entries.length} tracks
+                          {t('listeningHistory.showingFirst50', { count: group.entries.length })}
                         </Typography>
                       </Box>
                     )}
@@ -706,17 +723,17 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
             disabled={loadingMore}
             startIcon={loadingMore ? <CircularProgress size={16} /> : null}
           >
-            {loadingMore ? 'Loading...' : 'Load More'}
+            {loadingMore ? t('listeningHistory.actions.loading') : t('listeningHistory.actions.loadMore')}
           </Button>
         </Box>
       )}
 
       {/* Clear History Dialog */}
       <Dialog open={clearDialogOpen} onClose={() => setClearDialogOpen(false)}>
-        <DialogTitle>Clear Listening History</DialogTitle>
+        <DialogTitle>{t('listeningHistory.clearDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography gutterBottom>
-            Choose how much history to clear:
+            {t('listeningHistory.clearDialog.chooseAmount')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
             <Button 
@@ -724,21 +741,21 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
               onClick={() => handleClearHistory(7)}
               fullWidth
             >
-              Clear older than 1 week
+              {t('listeningHistory.clearDialog.olderThan1Week')}
             </Button>
             <Button 
               variant="outlined" 
               onClick={() => handleClearHistory(30)}
               fullWidth
             >
-              Clear older than 1 month
+              {t('listeningHistory.clearDialog.olderThan1Month')}
             </Button>
             <Button 
               variant="outlined" 
               onClick={() => handleClearHistory(90)}
               fullWidth
             >
-              Clear older than 3 months
+              {t('listeningHistory.clearDialog.olderThan3Months')}
             </Button>
             <Divider sx={{ my: 1 }} />
             <Button 
@@ -747,12 +764,12 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
               onClick={() => handleClearHistory()}
               fullWidth
             >
-              Clear All History
+              {t('listeningHistory.clearDialog.clearAll')}
             </Button>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setClearDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setClearDialogOpen(false)}>{t('common.cancel')}</Button>
         </DialogActions>
       </Dialog>
 
@@ -768,7 +785,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
             right: 24,
             zIndex: 1000,
           }}
-          aria-label="scroll to top"
+          aria-label={t('listeningHistory.actions.scrollToTop')}
         >
           <KeyboardArrowUpIcon />
         </Fab>

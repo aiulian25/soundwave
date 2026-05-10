@@ -28,9 +28,11 @@ import {
   CloudDone as OnlineIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { usePWA } from '../context/PWAContext';
 
 const PWASettingsCard: React.FC = () => {
+  const { t } = useTranslation();
   const {
     isOnline,
     canInstall,
@@ -52,9 +54,9 @@ const PWASettingsCard: React.FC = () => {
   const handleInstall = async () => {
     const installed = await showInstallPrompt();
     if (installed) {
-      setAlert({ message: 'App installed successfully!', severity: 'success' });
+      setAlert({ message: t('pwaSettings.alerts.installed'), severity: 'success' });
     } else {
-      setAlert({ message: 'Installation cancelled or not available', severity: 'info' });
+      setAlert({ message: t('pwaSettings.alerts.installCancelled'), severity: 'info' });
     }
   };
 
@@ -67,12 +69,12 @@ const PWASettingsCard: React.FC = () => {
     try {
       const success = await clearCache();
       if (success) {
-        setAlert({ message: 'Cache cleared successfully', severity: 'success' });
+        setAlert({ message: t('pwaSettings.alerts.cacheCleared'), severity: 'success' });
       } else {
-        setAlert({ message: 'Failed to clear cache', severity: 'error' });
+        setAlert({ message: t('pwaSettings.alerts.cacheClearFailed'), severity: 'error' });
       }
     } catch (error) {
-      setAlert({ message: 'Error clearing cache', severity: 'error' });
+      setAlert({ message: t('pwaSettings.alerts.cacheClearError'), severity: 'error' });
     } finally {
       setClearing(false);
     }
@@ -83,9 +85,9 @@ const PWASettingsCard: React.FC = () => {
       const permission = await requestNotifications();
       setNotificationsEnabled(permission === 'granted');
       if (permission === 'granted') {
-        setAlert({ message: 'Notifications enabled', severity: 'success' });
+        setAlert({ message: t('pwaSettings.alerts.notificationsEnabled'), severity: 'success' });
       } else {
-        setAlert({ message: 'Notifications permission denied', severity: 'error' });
+        setAlert({ message: t('pwaSettings.alerts.notificationsDenied'), severity: 'error' });
       }
     }
   };
@@ -107,7 +109,7 @@ const PWASettingsCard: React.FC = () => {
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <CloudDownloadIcon color="primary" sx={{ fontSize: '1.25rem' }} />
-          <Typography variant="subtitle1" fontWeight={600}>Progressive Web App (PWA)</Typography>
+          <Typography variant="subtitle1" fontWeight={600}>{t('pwaSettings.title')}</Typography>
         </Box>
 
         {alert && (
@@ -120,18 +122,18 @@ const PWASettingsCard: React.FC = () => {
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
             <Typography variant="subtitle2" color="textSecondary">
-              Connection Status
+              {t('pwaSettings.connectionStatus')}
             </Typography>
             <Chip
               icon={isOnline ? <OnlineIcon /> : <OfflineIcon />}
-              label={isOnline ? 'Online' : 'Offline'}
+              label={isOnline ? t('pwaSettings.status.online') : t('pwaSettings.status.offline')}
               color={isOnline ? 'success' : 'warning'}
               size="small"
             />
           </Box>
           {!isOnline && (
             <Alert severity="info" icon={<InfoIcon />} sx={{ mt: 1 }}>
-              You're working offline. Cached content is still available.
+              {t('pwa.offlineDescription')}
             </Alert>
           )}
         </Box>
@@ -141,29 +143,29 @@ const PWASettingsCard: React.FC = () => {
         {/* Installation Status */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="textSecondary" gutterBottom display="block" fontWeight={600}>
-            Installation
+            {t('pwaSettings.installation')}
           </Typography>
           {isInstalled ? (
             <Alert severity="success" icon={<InstallIcon />}>
-              App is installed and ready to use
+              {t('pwaSettings.installedReady')}
             </Alert>
           ) : canInstall ? (
             <Box>
               <Typography variant="caption" color="textSecondary" sx={{ mb: 0.75, display: 'block' }}>
-                Install SoundWave for:
+                {t('pwaSettings.installFor')}
               </Typography>
               <List dense sx={{ py: 0 }}>
                 <ListItem sx={{ py: 0.25 }}>
-                  <ListItemText primary={<Typography variant="caption">• Faster startup and better performance</Typography>} />
+                  <ListItemText primary={<Typography variant="caption">{t('pwaSettings.installBenefits.fasterStartup')}</Typography>} />
                 </ListItem>
                 <ListItem sx={{ py: 0.25 }}>
-                  <ListItemText primary={<Typography variant="caption">• Offline access to cached content</Typography>} />
+                  <ListItemText primary={<Typography variant="caption">{t('pwaSettings.installBenefits.offlineAccess')}</Typography>} />
                 </ListItem>
                 <ListItem sx={{ py: 0.25 }}>
-                  <ListItemText primary={<Typography variant="caption">• Native app-like experience</Typography>} />
+                  <ListItemText primary={<Typography variant="caption">{t('pwaSettings.installBenefits.nativeExperience')}</Typography>} />
                 </ListItem>
                 <ListItem sx={{ py: 0.25 }}>
-                  <ListItemText primary={<Typography variant="caption">• Desktop shortcut access</Typography>} />
+                  <ListItemText primary={<Typography variant="caption">{t('pwaSettings.installBenefits.desktopShortcut')}</Typography>} />
                 </ListItem>
               </List>
               <Button
@@ -173,7 +175,7 @@ const PWASettingsCard: React.FC = () => {
                 onClick={handleInstall}
                 fullWidth
               >
-                Install App
+                {t('pwa.installAction')}
               </Button>
             </Box>
           ) : (
@@ -188,19 +190,19 @@ const PWASettingsCard: React.FC = () => {
                   return (
                     <Alert severity="info" sx={{ mb: 2 }} icon={<InstallIcon />}>
                       <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Install on iPhone/iPad:</strong>
+                        <strong>{t('pwaSettings.installHelp.ios.title')}</strong>
                       </Typography>
                       <Typography variant="caption" component="div" sx={{ mb: 0.5 }}>
-                        1️⃣ Tap the <strong>Share</strong> button (box with arrow) at the bottom of Safari
+                        {t('pwaSettings.installHelp.ios.step1')}
                       </Typography>
                       <Typography variant="caption" component="div" sx={{ mb: 0.5 }}>
-                        2️⃣ Scroll down and tap <strong>"Add to Home Screen"</strong>
+                        {t('pwaSettings.installHelp.ios.step2')}
                       </Typography>
                       <Typography variant="caption" component="div" sx={{ mb: 0.5 }}>
-                        3️⃣ Tap <strong>"Add"</strong> in the top right corner
+                        {t('pwaSettings.installHelp.ios.step3')}
                       </Typography>
                       <Typography variant="caption" component="div" sx={{ mt: 1, fontStyle: 'italic' }}>
-                        ✨ On iOS 26+, any website can be installed as a full PWA!
+                        {t('pwaSettings.installHelp.ios.hint')}
                       </Typography>
                     </Alert>
                   );
@@ -209,26 +211,26 @@ const PWASettingsCard: React.FC = () => {
                 return (
                   <Alert severity="info" sx={{ mb: 2 }}>
                     <Typography variant="body2" sx={{ mb: 1 }}>
-                      <strong>To install SoundWave:</strong>
+                      <strong>{t('pwaSettings.installHelp.generic.title')}</strong>
                     </Typography>
                     <Typography variant="caption" component="div">
-                      <strong>Chrome/Edge:</strong> Click the install icon (⊕) in the address bar, or Menu → "Install SoundWave"
+                      {t('pwaSettings.installHelp.generic.chromeEdge')}
                     </Typography>
                     <Typography variant="caption" component="div">
-                      <strong>Safari (Mac):</strong> File → "Add to Dock..."
+                      {t('pwaSettings.installHelp.generic.safariMac')}
                     </Typography>
                     <Typography variant="caption" component="div">
-                      <strong>Firefox:</strong> Menu → "Install" (if available)
+                      {t('pwaSettings.installHelp.generic.firefox')}
                     </Typography>
                   </Alert>
                 );
               })()}
               <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
-                Requirements: HTTPS connection, valid manifest, service worker
+                {t('pwaSettings.requirements')}
               </Typography>
               <Typography variant="caption" color="textSecondary" display="block">
-                Status: {window.location.protocol === 'https:' || window.location.hostname === 'localhost' ? '✅ Secure context' : '❌ Not HTTPS'} | 
-                {'serviceWorker' in navigator ? ' ✅ SW supported' : ' ❌ No SW support'}
+                {t('pwaSettings.installHelp.status')}: {window.location.protocol === 'https:' || window.location.hostname === 'localhost' ? t('pwaSettings.installHelp.secureContext') : t('pwaSettings.installHelp.notHttps')} | 
+                {'serviceWorker' in navigator ? t('pwaSettings.installHelp.swSupported') : t('pwaSettings.installHelp.noSwSupport')}
               </Typography>
             </Box>
           )}
@@ -245,11 +247,11 @@ const PWASettingsCard: React.FC = () => {
                 icon={<UpdateIcon />}
                 action={
                   <Button color="inherit" size="small" onClick={handleUpdate}>
-                    Update
+                    {t('pwa.updateAction')}
                   </Button>
                 }
               >
-                New version available! Update now to get the latest features.
+                {t('pwa.updateDescription')}
               </Alert>
             </Box>
             <Divider sx={{ my: 2 }} />
@@ -259,7 +261,7 @@ const PWASettingsCard: React.FC = () => {
         {/* Cache Management */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-            Cache Storage
+            {t('pwaSettings.cacheStorage')}
           </Typography>
           {cacheSize && (
             <>
@@ -279,7 +281,7 @@ const PWASettingsCard: React.FC = () => {
                 />
               </Box>
               <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 2 }}>
-                Cached data allows offline access to previously viewed content and improves loading times.
+                {t('pwaSettings.cacheDescription')}
               </Typography>
             </>
           )}
@@ -290,7 +292,7 @@ const PWASettingsCard: React.FC = () => {
             disabled={clearing}
             fullWidth
           >
-            {clearing ? 'Clearing Cache...' : 'Clear Cache'}
+            {clearing ? t('pwaSettings.actions.clearingCache') : t('pwaSettings.actions.clearCache')}
           </Button>
         </Box>
 
@@ -299,7 +301,7 @@ const PWASettingsCard: React.FC = () => {
         {/* Notifications */}
         <Box>
           <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-            Notifications
+            {t('pwaSettings.notifications.title')}
           </Typography>
           <FormControlLabel
             control={
@@ -312,10 +314,10 @@ const PWASettingsCard: React.FC = () => {
             label={
               <Box>
                 <Typography variant="body2">
-                  Enable push notifications
+                  {t('pwaSettings.notifications.enable')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Get notified about downloads, updates, and more
+                  {t('pwaSettings.notifications.description')}
                 </Typography>
               </Box>
             }
@@ -327,34 +329,34 @@ const PWASettingsCard: React.FC = () => {
         {/* PWA Features Info */}
         <Box>
           <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-            PWA Features
+            {t('pwaSettings.features.title')}
           </Typography>
           <List dense>
             <ListItem>
               <ListItemText
-                primary="Offline Mode"
-                secondary="Access cached content without internet"
+                primary={t('pwa.offlineModeBadge')}
+                secondary={t('pwaSettings.features.offlineMode')}
               />
               <ListItemSecondaryAction>
-                <Chip label="Active" color="success" size="small" />
+                <Chip label={t('pwaSettings.features.active')} color="success" size="small" />
               </ListItemSecondaryAction>
             </ListItem>
             <ListItem>
               <ListItemText
-                primary="Background Sync"
-                secondary="Sync data when connection is restored"
+                primary={t('pwaSettings.features.backgroundSyncTitle')}
+                secondary={t('pwaSettings.features.backgroundSync')}
               />
               <ListItemSecondaryAction>
-                <Chip label="Active" color="success" size="small" />
+                <Chip label={t('pwaSettings.features.active')} color="success" size="small" />
               </ListItemSecondaryAction>
             </ListItem>
             <ListItem>
               <ListItemText
-                primary="Audio Caching"
-                secondary="Cache audio files for offline playback"
+                primary={t('pwaSettings.features.audioCachingTitle')}
+                secondary={t('pwaSettings.features.audioCaching')}
               />
               <ListItemSecondaryAction>
-                <Chip label="Active" color="success" size="small" />
+                <Chip label={t('pwaSettings.features.active')} color="success" size="small" />
               </ListItemSecondaryAction>
             </ListItem>
           </List>

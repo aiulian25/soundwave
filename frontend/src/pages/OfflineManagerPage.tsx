@@ -31,6 +31,7 @@ import {
 import { usePWA } from '../context/PWAContext';
 import { offlineStorage } from '../utils/offlineStorage';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface CachedPlaylist {
   id: number;
@@ -44,6 +45,7 @@ interface CachedPlaylist {
 }
 
 export default function OfflineManagerPage() {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { isOnline, cacheSize, clearCache, removePlaylistCache } = usePWA();
   const [cachedPlaylists, setCachedPlaylists] = useState<CachedPlaylist[]>([]);
@@ -87,7 +89,7 @@ export default function OfflineManagerPage() {
       setConfirmDialog({ open: false });
     } catch (err) {
       console.error('Failed to remove playlist:', err);
-      alert('Failed to remove offline data');
+      alert(t('offlineManager.errors.removeOfflineDataFailed'));
     }
   };
 
@@ -105,7 +107,7 @@ export default function OfflineManagerPage() {
       setClearAllDialog(false);
     } catch (err) {
       console.error('Failed to clear all:', err);
-      alert('Failed to clear all offline data');
+      alert(t('offlineManager.errors.clearAllFailed'));
     }
   };
 
@@ -119,7 +121,7 @@ export default function OfflineManagerPage() {
 
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(i18n.language || undefined, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -140,17 +142,17 @@ export default function OfflineManagerPage() {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '-0.02em', mb: 1 }}>
-          Offline Storage
+          {t('offlineManager.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Manage playlists cached for offline playback
+          {t('offlineManager.subtitle')}
         </Typography>
       </Box>
 
       {/* Online Status */}
       {!isOnline && (
         <Alert severity="warning" icon={<CloudOffIcon />} sx={{ mb: 3 }}>
-          You are currently offline. You can only play cached content.
+          {t('offlineManager.offlineWarning')}
         </Alert>
       )}
 
@@ -162,7 +164,7 @@ export default function OfflineManagerPage() {
               <StorageIcon color="primary" sx={{ fontSize: 32 }} />
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  Storage Used
+                  {t('offlineManager.storage.used')}
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
                   {formatBytes(cacheSize.usage)}
@@ -170,7 +172,7 @@ export default function OfflineManagerPage() {
               </Box>
               <Box sx={{ textAlign: 'right' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Available
+                  {t('offlineManager.storage.available')}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {formatBytes(cacheSize.quota - cacheSize.usage)}
@@ -183,7 +185,10 @@ export default function OfflineManagerPage() {
               sx={{ height: 8, borderRadius: 1 }}
             />
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              {((cacheSize.usage / cacheSize.quota) * 100).toFixed(1)}% of {formatBytes(cacheSize.quota)} used
+              {t('offlineManager.storage.usageOfQuota', {
+                percent: ((cacheSize.usage / cacheSize.quota) * 100).toFixed(1),
+                quota: formatBytes(cacheSize.quota),
+              })}
             </Typography>
           </CardContent>
         </Card>
@@ -196,7 +201,7 @@ export default function OfflineManagerPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CloudDoneIcon color="success" />
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                Offline Playlists
+                {t('offlineManager.sections.offlinePlaylists')}
               </Typography>
               <Chip label={cachedPlaylists.length} size="small" color="success" />
             </Box>
@@ -206,7 +211,7 @@ export default function OfflineManagerPage() {
                 startIcon={<RefreshIcon />}
                 onClick={loadCachedPlaylists}
               >
-                Refresh
+                {t('offlineManager.actions.refresh')}
               </Button>
               {cachedPlaylists.length > 0 && (
                 <Button
@@ -215,7 +220,7 @@ export default function OfflineManagerPage() {
                   startIcon={<DeleteIcon />}
                   onClick={() => setClearAllDialog(true)}
                 >
-                  Clear All
+                  {t('offlineManager.actions.clearAll')}
                 </Button>
               )}
             </Box>
@@ -227,10 +232,10 @@ export default function OfflineManagerPage() {
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <CloudOffIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2, opacity: 0.3 }} />
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                No playlists cached for offline use
+                {t('offlineManager.empty.title')}
               </Typography>
               <Button variant="contained" onClick={() => navigate('/playlists')}>
-                Browse Playlists
+                {t('offlineManager.actions.browsePlaylists')}
               </Button>
             </Box>
           ) : (
@@ -264,12 +269,12 @@ export default function OfflineManagerPage() {
                           </Typography>
                           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                             <Chip
-                              label={`${playlist.downloaded_count} tracks`}
+                              label={t('offlineManager.trackCount', { count: playlist.downloaded_count })}
                               size="small"
                               sx={{ height: 20, fontSize: '0.7rem' }}
                             />
                             <Chip
-                              label={`Cached ${formatDate(playlist.lastSync)}`}
+                              label={t('offlineManager.cachedAt', { date: formatDate(playlist.lastSync) })}
                               size="small"
                               sx={{ height: 20, fontSize: '0.7rem' }}
                               variant="outlined"
@@ -308,15 +313,15 @@ export default function OfflineManagerPage() {
         onClose={() => setConfirmDialog({ open: false })}
       >
         <DialogTitle>Remove Offline Playlist?</DialogTitle>
+        <DialogTitle>{t('offlineManager.removeDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to remove "{confirmDialog.title}" from offline storage? 
-            You'll need to re-download it to play offline.
+            {t('offlineManager.removeDialog.description', { title: confirmDialog.title || '' })}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDialog({ open: false })}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             color="error"
@@ -328,29 +333,28 @@ export default function OfflineManagerPage() {
               if (playlist) handleRemovePlaylist(playlist);
             }}
           >
-            Remove
+            {t('offlineManager.actions.remove')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Clear All Confirmation Dialog */}
       <Dialog open={clearAllDialog} onClose={() => setClearAllDialog(false)}>
-        <DialogTitle>Clear All Offline Data?</DialogTitle>
+        <DialogTitle>{t('offlineManager.clearAllDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography sx={{ mb: 2 }}>
-            This will remove all cached playlists and free up storage space.
-            You'll need to re-download playlists to use them offline.
+            {t('offlineManager.clearAllDialog.description')}
           </Typography>
           <Alert severity="warning">
-            This action cannot be undone.
+            {t('offlineManager.clearAllDialog.warning')}
           </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setClearAllDialog(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button color="error" variant="contained" onClick={handleClearAll}>
-            Clear All
+            {t('offlineManager.actions.clearAll')}
           </Button>
         </DialogActions>
       </Dialog>

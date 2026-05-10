@@ -2,12 +2,14 @@
 Django settings for SoundWave project.
 """
 
+import logging
 import os
 from pathlib import Path
 from urllib.parse import urlparse
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
+logger = logging.getLogger(__name__)
 
 # Security settings
 _SECRET_KEY_DEFAULT = 'dev-secret-key-change-in-production'
@@ -22,63 +24,50 @@ if SECRET_KEY == _SECRET_KEY_DEFAULT and not DEBUG:
     )
 
 # ALLOWED_HOSTS configuration
-# Can be set via DJANGO_ALLOWED_HOSTS env var (comma-separated)
-# Falls back to extracting hostname from SW_HOST, or defaults to localhost
+# Can be set via DJANGO_ALLOWED_HOSTS env var (comma-separated).
+# Falls back to SW_HOST / CORS origins and safe localhost defaults.
+def _env_bool(name, default=False):
+    return os.environ.get(name, 'True' if default else 'False').strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _split_env_list(name):
+    value = os.environ.get(name, '')
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
 def get_allowed_hosts():
     """Build ALLOWED_HOSTS from environment variables."""
-    import re
-    
-    hosts = set()
-    
-    # Check for explicit DJANGO_ALLOWED_HOSTS
-    env_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
-    if env_hosts:
-        hosts.update(h.strip() for h in env_hosts.split(',') if h.strip())
-    
-    # Extract hostname from SW_HOST
+    hosts = set(_split_env_list('DJANGO_ALLOWED_HOSTS'))
+
+    # Support a wildcard host only when explicitly allowed for development.
+    if '*' in hosts:
+        if not DEBUG and not _env_bool('ALLOW_LOCAL_NETWORK', False):
+            raise ValueError(
+                'Wildcard ALLOWED_HOSTS is only allowed when DEBUG is enabled or ALLOW_LOCAL_NETWORK is true.'
+            )
+        return ['*']
+
+    # Extract hostname from SW_HOST.
     sw_host = os.environ.get('SW_HOST', '')
     if sw_host:
         parsed = urlparse(sw_host)
         if parsed.hostname:
             hosts.add(parsed.hostname)
-    
-    # Extract hostnames from CORS_ALLOWED_ORIGINS
-    cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
-    if cors_origins:
-        for origin in cors_origins.split(','):
-            parsed = urlparse(origin.strip())
-            if parsed.hostname:
-                hosts.add(parsed.hostname)
-    
-    # Default safe hosts for development
-    if not hosts:
-        hosts = {'localhost', '127.0.0.1'}
-    
-    # Always include localhost for health checks
-    hosts.add('localhost')
-    hosts.add('127.0.0.1')
-    
-    # Allow local network access (private IP ranges)
-    # This is safe as these IPs are not routable from the internet
-    if os.environ.get('ALLOW_LOCAL_NETWORK', 'True') == 'True':
-        # Add Docker internal hosts
+
+    # Extract hostnames from CORS_ORIGINS (with backward-compatible fallback).
+    for origin in _split_env_list('CORS_ORIGINS') or _split_env_list('CORS_ALLOWED_ORIGINS'):
+        parsed = urlparse(origin)
+        if parsed.hostname:
+            hosts.add(parsed.hostname)
+
+    # Safe localhost defaults for development and health checks.
+    hosts.update({'localhost', '127.0.0.1'})
+
+    # Local-network access is opt-in and uses explicit hosts only.
+    if _env_bool('ALLOW_LOCAL_NETWORK', DEBUG):
         hosts.add('host.docker.internal')
-        
-        # Add explicit local network IPs from env var
-        local_ips = os.environ.get('LOCAL_NETWORK_IPS', '')
-        if local_ips:
-            hosts.update(ip.strip() for ip in local_ips.split(',') if ip.strip())
-        
-        # Add common local network subnets (192.168.0.x and 192.168.1.x)
-        # These are the most common home network ranges
-        for subnet in [0, 1]:
-            for host_num in range(1, 255):
-                hosts.add(f'192.168.{subnet}.{host_num}')
-        
-        # Add 10.0.0.x range as well (common for some routers)
-        for host_num in range(1, 255):
-            hosts.add(f'10.0.0.{host_num}')
-    
+        hosts.update(_split_env_list('LOCAL_NETWORK_IPS'))
+
     return list(hosts)
 
 
@@ -109,6 +98,8 @@ INSTALLED_APPS = [
     'stats',
 ]
 
+ROOT_URLCONF = 'config.urls'
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -117,7 +108,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'common.middleware.AuthDebugMiddleware',  # Debug authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Security headers (CSP, Referrer-Policy, Permissions-Policy)
@@ -127,7 +117,8 @@ MIDDLEWARE = [
     'config.middleware.StorageQuotaMiddleware',
 ]
 
-ROOT_URLCONF = 'config.urls'
+if os.environ.get('AUTH_DEBUG', 'false').lower() == 'true':
+    MIDDLEWARE.insert(7, 'common.middleware.AuthDebugMiddleware')
 
 TEMPLATES = [
     {
@@ -154,21 +145,77 @@ DATA_DIR = os.environ.get('DATA_DIR', '/app/data')
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR, exist_ok=True)
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(DATA_DIR, 'db.sqlite3'),
-        'OPTIONS': {
-            'timeout': 30,  # Wait up to 30 seconds for lock to be released
-        },
+
+def _build_database_config():
+    database_url = os.environ.get('DATABASE_URL', '').strip()
+    postgres_host = os.environ.get('POSTGRES_HOST', '').strip()
+    postgres_port = os.environ.get('POSTGRES_PORT', '5432').strip() or '5432'
+    postgres_db = os.environ.get('POSTGRES_DB', '').strip() or 'soundwave'
+    postgres_user = os.environ.get('POSTGRES_USER', '').strip() or 'soundwave'
+    postgres_password = os.environ.get('POSTGRES_PASSWORD', '').strip()
+
+    if database_url:
+        parsed = urlparse(database_url)
+        if parsed.scheme in {'postgres', 'postgresql'}:
+            return {
+                'default': {
+                    'ENGINE': 'django.db.backends.postgresql',
+                    'NAME': parsed.path.lstrip('/') or postgres_db,
+                    'USER': parsed.username or postgres_user,
+                    'PASSWORD': parsed.password or postgres_password,
+                    'HOST': parsed.hostname or postgres_host or 'localhost',
+                    'PORT': str(parsed.port or postgres_port),
+                    'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
+                }
+            }
+        if parsed.scheme == 'sqlite':
+            sqlite_path = parsed.path or os.path.join(DATA_DIR, 'db.sqlite3')
+            return {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': sqlite_path,
+                    'OPTIONS': {
+                        'timeout': 30,
+                    },
+                }
+            }
+
+    if postgres_host or os.environ.get('POSTGRES_DB') or os.environ.get('POSTGRES_USER') or os.environ.get('POSTGRES_PASSWORD'):
+        return {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': postgres_db,
+                'USER': postgres_user,
+                'PASSWORD': postgres_password,
+                'HOST': postgres_host or 'localhost',
+                'PORT': postgres_port,
+                'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
+            }
+        }
+
+    return {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(DATA_DIR, 'db.sqlite3'),
+            'OPTIONS': {
+                'timeout': 30,  # Wait up to 30 seconds for lock to be released
+            },
+        }
     }
-}
+
+
+DATABASES = _build_database_config()
+
 
 # Enable SQLite WAL mode for better concurrent access performance
 # This is set via direct connection on module load
 def enable_wal_mode():
     """Enable WAL mode for SQLite to prevent 'database is locked' errors"""
+    if DATABASES['default']['ENGINE'] != 'django.db.backends.sqlite3':
+        return
+
     import sqlite3
+
     db_path = os.path.join(DATA_DIR, 'db.sqlite3')
     if os.path.exists(db_path):
         try:
@@ -177,9 +224,9 @@ def enable_wal_mode():
             conn.execute("PRAGMA synchronous=NORMAL;")
             conn.execute("PRAGMA busy_timeout=30000;")  # 30 second timeout
             conn.close()
-            print(f"[Settings] Enabled WAL mode for SQLite: {db_path}")
+            logger.info("[Settings] Enabled WAL mode for SQLite: %s", db_path)
         except Exception as e:
-            print(f"[Settings] Failed to enable WAL mode: {e}")
+            logger.warning("[Settings] Failed to enable WAL mode: %s", e)
 
 # Try to enable WAL mode on module load
 enable_wal_mode()
@@ -249,13 +296,19 @@ LOGIN_LOCKOUT_DURATION = 60 * 60  # 60 minutes in seconds
 TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY_HOURS', 24 * 7))  # Default: 7 days
 TOKEN_EXPIRY_HOURS_EXTENDED = int(os.environ.get('TOKEN_EXPIRY_HOURS_EXTENDED', 24 * 30))  # Default: 30 days (for "remember me")
 # REST Framework
+RATELIMIT_ENABLED = _env_bool('RATELIMIT_ENABLED', True)
+RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '').strip()
+MEDIA_RATE_LIMIT_ENABLED = _env_bool('MEDIA_RATE_LIMIT_ENABLED', RATELIMIT_ENABLED)
+MEDIA_MAX_CONCURRENT_STREAMS_USER = int(os.environ.get('MEDIA_MAX_CONCURRENT_STREAMS_USER', '20'))
+MEDIA_MAX_CONCURRENT_STREAMS_IP = int(os.environ.get('MEDIA_MAX_CONCURRENT_STREAMS_IP', '30'))
+MEDIA_STREAM_SLOT_TTL = int(os.environ.get('MEDIA_STREAM_SLOT_TTL', '300'))
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_THROTTLE_CLASSES': [
         'common.rate_limiter.SustainedRateThrottle',
-    ],
+    ] if RATELIMIT_ENABLED else [],
     'DEFAULT_THROTTLE_RATES': {
         'login': '10/minute',
         'burst': '60/minute',
@@ -268,9 +321,9 @@ REST_FRAMEWORK = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS_ENV = os.environ.get('CORS_ALLOWED_ORIGINS', '')
-if CORS_ALLOWED_ORIGINS_ENV:
-    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ALLOWED_ORIGINS_ENV.split(',')]
+_cors_origins = _split_env_list('CORS_ORIGINS') or _split_env_list('CORS_ALLOWED_ORIGINS')
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS = _cors_origins
 else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:8889",
@@ -279,25 +332,36 @@ else:
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF settings for development cross-origin access
-CSRF_TRUSTED_ORIGINS_ENV = os.environ.get('CORS_ALLOWED_ORIGINS', '')
-if CSRF_TRUSTED_ORIGINS_ENV:
-    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_TRUSTED_ORIGINS_ENV.split(',')]
+_csrf_trusted_origins = _split_env_list('CORS_ORIGINS') or _split_env_list('CORS_ALLOWED_ORIGINS')
+if _csrf_trusted_origins:
+    CSRF_TRUSTED_ORIGINS = _csrf_trusted_origins
 else:
     CSRF_TRUSTED_ORIGINS = [
         "http://localhost:8889",
         "http://127.0.0.1:8889",
     ]
 
+# Compatibility flag for deployment templates that expect a CSRF toggle.
+# Django's CSRF protection remains enabled via middleware.
+WTF_CSRF_ENABLED = _env_bool('WTF_CSRF_ENABLED', True)
+
 # Determine if running in production/HTTPS mode
 # Set SECURE_COOKIES=True in production with HTTPS
 _USE_SECURE_COOKIES = os.environ.get('SECURE_COOKIES', 'auto').lower()
 if _USE_SECURE_COOKIES == 'auto':
-    # Auto-detect: secure if any CORS origin uses HTTPS (excluding localhost)
-    _has_https = any(
-        origin.startswith('https://') and 'localhost' not in origin
-        for origin in CSRF_TRUSTED_ORIGINS
-    )
-    USE_SECURE_COOKIES = _has_https
+    # If SW_HOST is explicitly HTTP, force non-secure cookies for LAN/dev usability.
+    # This avoids setting `Secure` cookies that browsers will not send over HTTP.
+    _sw_host = os.environ.get('SW_HOST', '').strip()
+    _sw_scheme = urlparse(_sw_host).scheme.lower() if _sw_host else ''
+    if _sw_scheme == 'http':
+        USE_SECURE_COOKIES = False
+    else:
+        # Auto-detect: secure if any CORS origin uses HTTPS (excluding localhost)
+        _has_https = any(
+            origin.startswith('https://') and 'localhost' not in origin
+            for origin in CSRF_TRUSTED_ORIGINS
+        )
+        USE_SECURE_COOKIES = _has_https
 elif _USE_SECURE_COOKIES in ('true', '1', 'yes'):
     USE_SECURE_COOKIES = True
 else:
@@ -306,7 +370,7 @@ else:
 # Cookie security settings
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = USE_SECURE_COOKIES
-CSRF_COOKIE_HTTPONLY = True  # Prevent JavaScript access to CSRF cookie
+CSRF_COOKIE_HTTPONLY = False  # SPA must read csrf cookie to send X-CSRFToken header
 
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = USE_SECURE_COOKIES
@@ -347,6 +411,7 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_RESULT_EXPIRES = int(os.environ.get('CELERY_RESULT_EXPIRES', str(60 * 60)))
 
 # ElasticSearch settings
 ES_URL = os.environ.get('ES_URL', 'http://localhost:92000')

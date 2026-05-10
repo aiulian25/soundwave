@@ -29,6 +29,7 @@ import TimerIcon from '@mui/icons-material/Timer';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import CloseIcon from '@mui/icons-material/Close';
+import { useTranslation } from 'react-i18next';
 import { useSleepTimer, type SleepTimerMode, type SleepTimerSettings } from '../context/SleepTimerContext';
 
 interface SleepTimerDialogProps {
@@ -40,6 +41,7 @@ const PRESET_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120];
 const PRESET_SONGS = [1, 3, 5, 10, 15, 20];
 
 export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProps) {
+  const { t } = useTranslation();
   const { timerState, startTimer, stopTimer } = useSleepTimer();
   
   const [mode, setMode] = useState<SleepTimerMode>(timerState.mode || 'minutes');
@@ -73,14 +75,14 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
   
   const formatTime = (mins: number): string => {
     if (mins < 60) {
-      return `${Math.round(mins)} min`;
+      return t('sleepTimer.minutesShort', { count: Math.round(mins) });
     }
     const hours = Math.floor(mins / 60);
     const remainingMins = Math.round(mins % 60);
     if (remainingMins === 0) {
-      return `${hours} hr`;
+      return t('sleepTimer.hoursShort', { count: hours });
     }
-    return `${hours} hr ${remainingMins} min`;
+    return t('sleepTimer.hoursMinutesShort', { hours, minutes: remainingMins });
   };
   
   const formatRemainingTime = (): string => {
@@ -89,13 +91,13 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
     if (timerState.mode === 'minutes') {
       const mins = timerState.remainingMinutes;
       if (mins < 1) {
-        return `${Math.round(mins * 60)} seconds remaining`;
+        return t('sleepTimer.remaining.seconds', { count: Math.round(mins * 60) });
       }
-      return `${formatTime(mins)} remaining`;
+      return t('sleepTimer.remaining.time', { time: formatTime(mins) });
     } else if (timerState.mode === 'songs') {
-      return `${timerState.remainingSongs} song${timerState.remainingSongs !== 1 ? 's' : ''} remaining`;
+      return t('sleepTimer.remaining.songs', { count: timerState.remainingSongs });
     } else {
-      return 'Stopping after this track';
+      return t('sleepTimer.remaining.afterThisTrack');
     }
   };
   
@@ -114,7 +116,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <BedtimeIcon sx={{ color: 'primary.main' }} />
-        Sleep Timer
+        {t('sleepTimer.title')}
         <IconButton
           onClick={onClose}
           sx={{ ml: 'auto' }}
@@ -138,14 +140,14 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
             }}
           >
             <Typography variant="body2" sx={{ opacity: 0.9, mb: 0.5 }}>
-              Timer Active
+              {t('sleepTimer.timerActive')}
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               {formatRemainingTime()}
             </Typography>
             {timerState.isFading && (
               <Chip
-                label="Fading out..."
+                label={t('sleepTimer.fadingOut')}
                 size="small"
                 sx={{ mt: 1, bgcolor: 'rgba(255,255,255,0.2)' }}
               />
@@ -155,7 +157,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
         
         {/* Timer Mode Selection */}
         <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-          Stop playback after
+          {t('sleepTimer.stopPlaybackAfter')}
         </Typography>
         
         <ToggleButtonGroup
@@ -168,19 +170,19 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
           <ToggleButton value="minutes" sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 0.5 }}>
               <TimerIcon sx={{ mb: 0.5 }} />
-              <Typography variant="caption">Time</Typography>
+              <Typography variant="caption">{t('sleepTimer.modes.time')}</Typography>
             </Box>
           </ToggleButton>
           <ToggleButton value="songs" sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 0.5 }}>
               <MusicNoteIcon sx={{ mb: 0.5 }} />
-              <Typography variant="caption">Songs</Typography>
+              <Typography variant="caption">{t('sleepTimer.modes.songs')}</Typography>
             </Box>
           </ToggleButton>
           <ToggleButton value="endOfTrack" sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 0.5 }}>
               <LastPageIcon sx={{ mb: 0.5 }} />
-              <Typography variant="caption">This Track</Typography>
+              <Typography variant="caption">{t('sleepTimer.modes.thisTrack')}</Typography>
             </Box>
           </ToggleButton>
         </ToggleButtonGroup>
@@ -227,7 +229,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
         {mode === 'songs' && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="body2" sx={{ mb: 1.5, textAlign: 'center', fontWeight: 500 }}>
-              {songs} song{songs !== 1 ? 's' : ''}
+                {t('sleepTimer.songsCount', { count: songs })}
             </Typography>
             
             <Slider
@@ -249,7 +251,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
               {PRESET_SONGS.map((preset) => (
                 <Chip
                   key={preset}
-                  label={`${preset} song${preset !== 1 ? 's' : ''}`}
+                  label={t('sleepTimer.songsCount', { count: preset })}
                   size="small"
                   variant={songs === preset ? 'filled' : 'outlined'}
                   color={songs === preset ? 'primary' : 'default'}
@@ -265,7 +267,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
         {mode === 'endOfTrack' && (
           <Box sx={{ mb: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
-              Playback will stop when the current track ends.
+              {t('sleepTimer.endOfTrackDescription')}
             </Typography>
           </Box>
         )}
@@ -290,9 +292,9 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
             }
             label={
               <Box>
-                <Typography variant="body2">Fade out before stopping</Typography>
+                <Typography variant="body2">{t('sleepTimer.fadeOutBeforeStopping')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Gradually reduce volume for a smoother ending
+                  {t('sleepTimer.fadeOutDescription')}
                 </Typography>
               </Box>
             }
@@ -301,7 +303,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
           {fadeOut && mode === 'minutes' && (
             <Box sx={{ mt: 2, pl: 2 }}>
               <Typography variant="caption" color="text.secondary" gutterBottom>
-                Fade duration: {fadeDuration} seconds
+                {t('sleepTimer.fadeDuration', { count: fadeDuration })}
               </Typography>
               <Slider
                 value={fadeDuration}
@@ -330,14 +332,14 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
               color="error"
               fullWidth
             >
-              Cancel Timer
+              {t('sleepTimer.actions.cancelTimer')}
             </Button>
             <Button 
               onClick={handleStart} 
               variant="contained"
               fullWidth
             >
-              Update Timer
+              {t('sleepTimer.actions.updateTimer')}
             </Button>
           </>
         ) : (
@@ -347,7 +349,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
             fullWidth
             startIcon={<BedtimeIcon />}
           >
-            Start Sleep Timer
+            {t('sleepTimer.actions.startSleepTimer')}
           </Button>
         )}
       </DialogActions>

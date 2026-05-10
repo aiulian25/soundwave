@@ -373,13 +373,6 @@ class PWAManager {
     try {
       const registration = await navigator.serviceWorker.ready;
       const messageChannel = new MessageChannel();
-      
-      // Get auth token from localStorage to pass to service worker
-      const authToken = localStorage.getItem('token');
-      if (!authToken) {
-        console.error('[PWA] No auth token available for caching');
-        return { success: false, cached: 0, failed: 0 };
-      }
 
       return new Promise((resolve) => {
         // Set a timeout to avoid hanging
@@ -419,7 +412,7 @@ class PWAManager {
         };
 
         registration.active?.postMessage(
-          { type: 'CACHE_PLAYLIST', playlistId, audioUrls, authToken },
+          { type: 'CACHE_PLAYLIST', playlistId, audioUrls },
           [messageChannel.port2]
         );
       });

@@ -3,11 +3,15 @@ Metadata fetcher for audio files
 Fetches metadata from online sources like MusicBrainz, Last.fm, etc.
 """
 
+import logging
 import re
 import time
 import requests
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -146,7 +150,7 @@ class MetadataFetcher:
             )
             
             if response.status_code != 200:
-                print(f"MusicBrainz search failed: {response.status_code}")
+                logger.warning("MusicBrainz search failed: %s", response.status_code)
                 return results
             
             data = response.json()
@@ -196,7 +200,7 @@ class MetadataFetcher:
                 results.append(result)
             
         except Exception as e:
-            print(f"Error searching MusicBrainz: {e}")
+            logger.warning("Error searching MusicBrainz: %s", e)
         
         return results
     
@@ -261,7 +265,7 @@ class MetadataFetcher:
             return result
             
         except Exception as e:
-            print(f"Error getting recording details: {e}")
+            logger.warning("Error getting recording details: %s", e)
             return None
     
     def fetch_cover_art(self, release_id: str) -> Optional[str]:
@@ -278,7 +282,7 @@ class MetadataFetcher:
                 return f"{self.COVERART_API}/release/{release_id}/front-500"
             
         except Exception as e:
-            print(f"Error fetching cover art: {e}")
+            logger.warning("Error fetching cover art: %s", e)
         
         return None
 

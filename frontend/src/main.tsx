@@ -11,6 +11,7 @@ import { SleepTimerProvider } from './context/SleepTimerContext'
 import { QueueProvider } from './context/QueueContext'
 import { EqualizerProvider } from './context/EqualizerContext'
 import { AchievementNotificationProvider } from './context/AchievementNotificationContext'
+import './i18n'
 import './style.css'
 import './styles/pwa.css'
 

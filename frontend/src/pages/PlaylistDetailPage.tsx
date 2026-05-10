@@ -33,6 +33,7 @@ import {
   OfflinePin as OfflinePinIcon,
   Sync as SyncIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { playlistAPI, audioAPI } from '../api/client';
 import { usePWA, CacheProgress } from '../context/PWAContext';
@@ -75,6 +76,7 @@ interface PlaylistDetailPageProps {
 export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPageProps) {
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const { isOnline, cachePlaylist, removePlaylistCache, cacheSize } = usePWA();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
@@ -140,14 +142,14 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           setPlaylist({
             ...cachedPlaylist,
             sync_status: 'success',
-            status_display: 'Offline',
+            status_display: t('playlistDetail.status.offline'),
             progress_percent: 100,
           } as PlaylistDetail);
           setIsOfflineAvailable(true);
           setError('');
           return;
         } else {
-          setError('Playlist not available offline');
+          setError(t('playlistDetail.errors.notAvailableOffline'));
           return;
         }
       }
@@ -167,7 +169,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           setPlaylist({
             ...cachedPlaylist,
             sync_status: 'success',
-            status_display: 'Cached',
+            status_display: t('playlistDetail.status.cached'),
             progress_percent: 100,
           } as PlaylistDetail);
           setIsOfflineAvailable(true);
@@ -178,7 +180,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         console.error('Failed to load from cache:', cacheErr);
       }
       
-      setError(err.response?.data?.detail || 'Failed to load playlist');
+      setError(err.response?.data?.detail || t('playlistDetail.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -189,12 +191,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     const downloadedTracks = playlist.items.filter(item => item.audio.file_path && item.audio.youtube_id);
     
     if (downloadedTracks.length === 0) {
-      setSnackbarMessage('No downloaded tracks to save');
+      setSnackbarMessage(t('playlistDetail.errors.noDownloadedTracksToSave'));
       setSnackbarOpen(true);
       return;
     }
     
-    setSnackbarMessage(`Downloading ${downloadedTracks.length} tracks to your device`);
+    setSnackbarMessage(t('playlistDetail.messages.downloadingTracks', { count: downloadedTracks.length }));
     setSnackbarOpen(true);
     
     // Download each track with authentication
@@ -223,12 +225,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     if (!playlistId) return;
     try {
       await playlistAPI.forceRecheck(playlistId);
-      setSnackbarMessage('Force recheck started — checking all tracks and re-downloading missing files...');
+      setSnackbarMessage(t('playlistDetail.messages.forceRecheckStarted'));
       setSnackbarOpen(true);
       // Reload after delay to pick up new status
       setTimeout(() => loadPlaylist(), 30000);
     } catch (err: any) {
-      setSnackbarMessage(`Failed to start recheck: ${err.response?.data?.detail || err.message || 'Unknown error'}`);
+      setSnackbarMessage(t('playlistDetail.messages.forceRecheckFailed', { error: err.response?.data?.detail || err.message || t('common.unknownError') }));
       setSnackbarOpen(true);
     }
   };
@@ -250,20 +252,20 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
 
   const handleCacheForOffline = async () => {
     if (!playlist?.items || !isOnline) {
-      setSnackbarMessage(isOnline ? 'No tracks to cache' : 'Must be online to download for offline use');
+      setSnackbarMessage(isOnline ? t('playlistDetail.errors.noTracksToCache') : t('playlistDetail.errors.mustBeOnline'));
       setSnackbarOpen(true);
       return;
     }
 
     const downloadedTracks = playlist.items.filter(item => item.audio.file_path);
     if (downloadedTracks.length === 0) {
-      setSnackbarMessage('No tracks downloaded yet. Download tracks first.');
+      setSnackbarMessage(t('playlistDetail.errors.noTracksDownloadedYet'));
       setSnackbarOpen(true);
       return;
     }
 
     setIsDownloadingOffline(true);
-    setOfflineProgress({ current: 0, total: downloadedTracks.length + 1, percent: 0, currentItem: 'Starting...', status: 'downloading' });
+    setOfflineProgress({ current: 0, total: downloadedTracks.length + 1, percent: 0, currentItem: t('playlistDetail.messages.starting'), status: 'downloading' });
 
     try {
       // Build audio URLs for caching
@@ -300,9 +302,8 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         for (const item of downloadedTracks) {
           if (item.audio.youtube_id) {
             try {
-              const token = localStorage.getItem('token');
               const lyricsResponse = await fetch(`/api/audio/${item.audio.youtube_id}/lyrics/`, {
-                headers: { 'Authorization': `Token ${token}` }
+                credentials: 'include',
               });
               if (lyricsResponse.ok) {
                 const lyricsData = await lyricsResponse.json();
@@ -321,16 +322,16 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         await checkOfflineTracks();
         
         if (result.failed > 0) {
-          setSnackbarMessage(`✅ ${result.cached} tracks cached, ${result.failed} failed`);
+          setSnackbarMessage(t('playlistDetail.messages.cachePartial', { cached: result.cached, failed: result.failed }));
         } else {
-          setSnackbarMessage(`✅ ${result.cached} tracks available offline!`);
+          setSnackbarMessage(t('playlistDetail.messages.cacheSuccess', { count: result.cached }));
         }
       } else {
-        setSnackbarMessage('Failed to cache playlist');
+        setSnackbarMessage(t('playlistDetail.errors.cacheFailed'));
       }
     } catch (err) {
       console.error('Failed to cache offline:', err);
-      setSnackbarMessage('Offline caching failed');
+      setSnackbarMessage(t('playlistDetail.errors.offlineCachingFailed'));
     } finally {
       setIsDownloadingOffline(false);
       setOfflineProgress(null);
@@ -355,18 +356,18 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       setIsOfflineAvailable(false);
       // Clear offline tracks display
       setOfflineTracks(new Set());
-      setSnackbarMessage('Offline data removed');
+      setSnackbarMessage(t('playlistDetail.messages.offlineDataRemoved'));
       setSnackbarOpen(true);
     } catch (err) {
       console.error('Failed to remove offline data:', err);
-      setSnackbarMessage('Failed to remove offline data');
+      setSnackbarMessage(t('playlistDetail.errors.removeOfflineFailed'));
       setSnackbarOpen(true);
     }
   };
   
   const handleDownloadTrackToDevice = async (youtubeId: string, title: string) => {
     try {
-      setSnackbarMessage(`Downloading "${title}" to your device`);
+      setSnackbarMessage(t('playlistDetail.messages.downloadingTrack', { title }));
       setSnackbarOpen(true);
       
       const blob = await audioAPI.downloadFile(youtubeId);
@@ -381,7 +382,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download failed:', err);
-      setSnackbarMessage('Download failed');
+      setSnackbarMessage(t('playlistDetail.errors.downloadFailed'));
       setSnackbarOpen(true);
     }
   };
@@ -394,10 +395,10 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     
     if (downloadedTracks.length > 0) {
       setCurrentAudio(downloadedTracks[0], downloadedTracks);
-      setSnackbarMessage(`Playing ${downloadedTracks.length} tracks`);
+      setSnackbarMessage(t('playlistDetail.messages.playingTracks', { count: downloadedTracks.length }));
       setSnackbarOpen(true);
     } else {
-      setSnackbarMessage('No downloaded tracks to play');
+      setSnackbarMessage(t('playlistDetail.errors.noDownloadedTracksToPlay'));
       setSnackbarOpen(true);
     }
   };
@@ -416,10 +417,10 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
       setCurrentAudio(shuffled[0], shuffled);
-      setSnackbarMessage(`Shuffled ${shuffled.length} tracks`);
+      setSnackbarMessage(t('playlistDetail.messages.shuffledTracks', { count: shuffled.length }));
       setSnackbarOpen(true);
     } else {
-      setSnackbarMessage('No downloaded tracks to shuffle');
+      setSnackbarMessage(t('playlistDetail.errors.noDownloadedTracksToShuffle'));
       setSnackbarOpen(true);
     }
   };
@@ -432,7 +433,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(i18n.language === 'ro' ? 'ro-RO' : 'en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -463,7 +464,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         <IconButton onClick={() => navigate('/playlists')} sx={{ mb: 2 }}>
           <BackIcon />
         </IconButton>
-        <Alert severity="error">{error || 'Playlist not found'}</Alert>
+        <Alert severity="error">{error || t('playlistDetail.errors.notFound')}</Alert>
       </Box>
     );
   }
@@ -503,12 +504,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             <WifiOffIcon sx={{ color: 'warning.main' }} />
             <Box sx={{ flex: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'warning.main' }}>
-                Offline Mode
+                {t('playlistDetail.offlineMode.title')}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {isOfflineAvailable 
-                  ? 'This playlist is available offline' 
-                  : 'You are offline. Cache playlists when online for offline access.'}
+                  ? t('playlistDetail.offlineMode.available') 
+                  : t('playlistDetail.offlineMode.unavailableHint')}
               </Typography>
             </Box>
           </Box>
@@ -531,7 +532,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             '&:disabled': { bgcolor: 'rgba(255, 255, 255, 0.1)' },
           }}
         >
-          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Play All</Box>
+          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('playlistDetail.actions.playAll')}</Box>
         </Button>
         <Button
           variant="outlined"
@@ -553,7 +554,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             },
           }}
         >
-          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Shuffle</Box>
+          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('playlistDetail.actions.shuffle')}</Box>
         </Button>
         <Button
           variant="outlined"
@@ -574,9 +575,9 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
               color: 'rgba(255, 255, 255, 0.3)'
             },
           }}
-          title="Download all tracks to your device"
+          title={t('playlistDetail.actions.downloadAllTitle')}
         >
-          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Save All</Box>
+          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('playlistDetail.actions.saveAll')}</Box>
         </Button>
         <Button
           variant="outlined"
@@ -592,9 +593,9 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
               bgcolor: 'rgba(255, 152, 0, 0.05)'
             },
           }}
-          title="Re-check all tracks and re-download missing files"
+          title={t('playlistDetail.actions.forceRecheckTitle')}
         >
-          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Force Recheck</Box>
+          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('playlistDetail.actions.forceRecheck')}</Box>
         </Button>
       </Box>
 
@@ -613,12 +614,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             )}
             <Box sx={{ flex: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                {isOfflineAvailable ? '📱 Offline Ready' : '💾 Cache for Offline'}
+                {isOfflineAvailable ? t('playlistDetail.cacheCard.readyTitle') : t('playlistDetail.cacheCard.cacheTitle')}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {isOfflineAvailable 
-                  ? `${playlist.downloaded_count} tracks cached and available without internet`
-                  : 'Download this playlist to listen without an internet connection'}
+                  ? t('playlistDetail.cacheCard.readyDescription', { count: playlist.downloaded_count })
+                  : t('playlistDetail.cacheCard.cacheDescription')}
               </Typography>
             </Box>
           </Box>
@@ -639,11 +640,11 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                   '&:disabled': { bgcolor: 'rgba(255, 255, 255, 0.1)' },
                 }}
               >
-                {isDownloadingOffline ? 'Caching...' : 'Make Available Offline'}
+                {isDownloadingOffline ? t('playlistDetail.actions.caching') : t('playlistDetail.actions.makeAvailableOffline')}
               </Button>
             ) : (
               <>
-                <Tooltip title="Remove offline cache to free up storage space">
+                <Tooltip title={t('playlistDetail.actions.removeOfflineTitle')}>
                   <Button
                     variant="outlined"
                     startIcon={<DeleteIcon />}
@@ -659,12 +660,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                       },
                     }}
                   >
-                    Remove Offline
+                    {t('playlistDetail.actions.removeOffline')}
                   </Button>
                 </Tooltip>
                 <Chip 
                   icon={<CloudDoneIcon />}
-                  label="Cached"
+                  label={t('playlistDetail.status.cached')}
                   color="success"
                   size="small"
                   sx={{ fontWeight: 600 }}
@@ -674,7 +675,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             {cacheSize && (
               <Box sx={{ ml: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Storage Used
+                  {t('playlistDetail.cacheCard.storageUsed')}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 600 }}>
                   {(cacheSize.usage / 1024 / 1024).toFixed(1)} MB / {(cacheSize.quota / 1024 / 1024 / 1024).toFixed(1)} GB
@@ -690,10 +691,10 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              Download Progress
+              {t('playlistDetail.progress.title')}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {playlist.downloaded_count} / {playlist.item_count} tracks
+              {t('playlistDetail.progress.count', { downloaded: playlist.downloaded_count, total: playlist.item_count })}
             </Typography>
           </Box>
           <LinearProgress
@@ -708,7 +709,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
         <Box>
           <Typography variant="caption" color="text.secondary">
-            Total Tracks
+            {t('playlistDetail.stats.totalTracks')}
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
             {playlist.item_count}
@@ -716,7 +717,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         </Box>
         <Box>
           <Typography variant="caption" color="text.secondary">
-            Downloaded
+            {t('playlistDetail.stats.downloaded')}
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
             {playlist.downloaded_count}
@@ -725,7 +726,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         {playlist.last_refresh && (
           <Box>
             <Typography variant="caption" color="text.secondary">
-              Last Updated
+              {t('playlistDetail.stats.lastUpdated')}
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
               {formatDate(playlist.last_refresh)}
@@ -740,10 +741,10 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           <TableHead>
             <TableRow>
               <TableCell width={60} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>#</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Title</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' }, display: { xs: 'none', md: 'table-cell' } }}>Channel</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Duration</TableCell>
-              <TableCell align="center" width={120} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('playlistDetail.columns.title')}</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' }, display: { xs: 'none', md: 'table-cell' } }}>{t('playlistDetail.columns.channel')}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('playlistDetail.columns.duration')}</TableCell>
+              <TableCell align="center" width={120} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('playlistDetail.columns.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -788,14 +789,14 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                           {item.audio.title}
                         </Typography>
                         {item.audio.youtube_id && offlineTracks.has(item.audio.youtube_id) && (
-                          <Tooltip title="Available offline">
+                          <Tooltip title={t('playlistDetail.status.availableOffline')}>
                             <OfflinePinIcon sx={{ fontSize: 14, color: 'success.main', flexShrink: 0 }} />
                           </Tooltip>
                         )}
                       </Box>
                       {!item.audio.file_path && (
                         <Chip 
-                          label="Not Downloaded" 
+                          label={t('playlistDetail.status.notDownloaded')} 
                           size="small" 
                           color="warning"
                           sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }}
@@ -829,7 +830,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                           color: 'primary.main',
                           '&:disabled': { color: 'rgba(255, 255, 255, 0.3)' },
                         }}
-                        title="Play"
+                        title={t('playlistDetail.actions.play')}
                       >
                         <PlayIcon />
                       </IconButton>
@@ -840,7 +841,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                           sx={{
                             color: 'primary.main',
                           }}
-                          title="Download to device"
+                          title={t('playlistDetail.actions.downloadToDevice')}
                         >
                           <DownloadIcon />
                         </IconButton>
@@ -857,7 +858,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    No tracks found in this playlist
+                    {t('playlistDetail.empty.noTracks')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -885,7 +886,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         >
           <Box>
             <Typography variant="body2" fontWeight={600}>
-              Caching for Offline
+              {t('playlistDetail.progress.cachingForOffline')}
             </Typography>
             {offlineProgress && (
               <Box sx={{ mt: 0.5 }}>

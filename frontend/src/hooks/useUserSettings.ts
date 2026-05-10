@@ -118,16 +118,11 @@ export const useUserSettings = () => {
 
   // Load settings on mount - only if authenticated
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    console.log('[Settings] Mount check - token exists:', !!token);
-    // Only try to load settings if authenticated
-    if (token) {
-      loadSettings();
-    } else {
-      // Use defaults if not authenticated
+    loadSettings().catch(() => {
+      // Use defaults when unauthenticated
       setSettings(DEFAULT_SETTINGS);
       setLoading(false);
-    }
+    });
   }, [loadSettings]);
 
   return {

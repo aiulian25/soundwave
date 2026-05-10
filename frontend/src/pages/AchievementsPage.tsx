@@ -15,6 +15,7 @@ import {
   Button,
   Snackbar,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import {
   EmojiEvents as TrophyIcon,
   LocalFireDepartment as FireIcon,
@@ -46,6 +47,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function AchievementsPage() {
+  const { t } = useTranslation();
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -70,7 +72,7 @@ export default function AchievementsPage() {
       setError('');
     } catch (err: any) {
       console.error('Failed to load achievements:', err);
-      setError('Failed to load achievements data');
+      setError(t('achievements.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -80,19 +82,32 @@ export default function AchievementsPage() {
     try {
       const response = await statsAPI.checkAchievements();
       if (response.data.new_achievements?.length > 0) {
-        setSnackbarMessage(`🎉 ${response.data.total_new} new achievement(s) unlocked!`);
+        setSnackbarMessage(t('achievements.messages.newUnlocked', { count: response.data.total_new }));
         setSnackbarOpen(true);
         // Reload achievements to show updated state
         loadData();
       } else {
-        setSnackbarMessage('No new achievements yet. Keep listening!');
+        setSnackbarMessage(t('achievements.messages.noneYet'));
         setSnackbarOpen(true);
       }
     } catch (err) {
       console.error('Failed to check achievements:', err);
-      setSnackbarMessage('Failed to check achievements');
+      setSnackbarMessage(t('achievements.errors.checkFailed'));
       setSnackbarOpen(true);
     }
+  };
+
+  const translateDayName = (dayName: string) => {
+    const normalized = dayName.toLowerCase();
+    // Handle both full names (Monday) and abbreviated names (Mon) from backend strftime('%a')
+    if (normalized === 'monday' || normalized === 'mon') return t('common.days.monday');
+    if (normalized === 'tuesday' || normalized === 'tue') return t('common.days.tuesday');
+    if (normalized === 'wednesday' || normalized === 'wed') return t('common.days.wednesday');
+    if (normalized === 'thursday' || normalized === 'thu') return t('common.days.thursday');
+    if (normalized === 'friday' || normalized === 'fri') return t('common.days.friday');
+    if (normalized === 'saturday' || normalized === 'sat') return t('common.days.saturday');
+    if (normalized === 'sunday' || normalized === 'sun') return t('common.days.sunday');
+    return dayName;
   };
 
   // Group achievements by category
@@ -136,10 +151,10 @@ export default function AchievementsPage() {
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-            🏆 Achievements
+            {t('achievements.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Track your listening milestones and earn badges
+            {t('achievements.description')}
           </Typography>
         </Box>
         <Button
@@ -147,7 +162,7 @@ export default function AchievementsPage() {
           startIcon={<RefreshIcon />}
           onClick={handleCheckAchievements}
         >
-          Check for New
+          {t('achievements.actions.checkForNew')}
         </Button>
       </Box>
 
@@ -185,18 +200,18 @@ export default function AchievementsPage() {
               <Box sx={{ flex: 1, minWidth: 200 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                    {streak.current_streak} Day Streak
+                    {t('achievements.streak.currentStreak', { count: streak.current_streak })}
                   </Typography>
                   {streak.streak_at_risk && (
                     <Chip 
-                      label="⚠️ At Risk!" 
+                      label={t('achievements.streak.atRisk')} 
                       color="warning" 
                       size="small" 
                     />
                   )}
                   {streak.current_streak >= 7 && (
                     <Chip 
-                      label="🔥 On Fire!" 
+                      label={t('achievements.streak.onFire')} 
                       color="error" 
                       size="small" 
                     />
@@ -204,32 +219,32 @@ export default function AchievementsPage() {
                 </Box>
                 <Typography variant="body2" color="text.secondary">
                   {streak.listened_today 
-                    ? "Great job! You've listened today. Keep it up!" 
-                    : "Listen to a track today to maintain your streak!"}
+                    ? t('achievements.streak.listenedToday') 
+                    : t('achievements.streak.listenToday')}
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'center', px: 2, borderLeft: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Best Streak
+                  {t('achievements.streak.bestStreak')}
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>
                   {streak.longest_streak}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  days
+                  {t('achievements.streak.days')}
                 </Typography>
               </Box>
             </Box>
 
             {/* Weekly Activity Grid */}
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              This Week
+              {t('achievements.streak.thisWeek')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'space-between' }}>
               {streak.recent_days.map((day) => (
                 <Tooltip 
                   key={day.date} 
-                  title={`${day.day_name}: ${day.tracks_played} tracks played`}
+                  title={t('achievements.streak.dayTooltip', { day: translateDayName(day.day_name), count: day.tracks_played })}
                   arrow
                 >
                   <Box sx={{ textAlign: 'center', flex: 1 }}>
@@ -240,7 +255,7 @@ export default function AchievementsPage() {
                         fontWeight: day.has_activity ? 600 : 400,
                       }}
                     >
-                      {day.day_name}
+                      {translateDayName(day.day_name)}
                     </Typography>
                     <Box
                       sx={{
@@ -276,10 +291,10 @@ export default function AchievementsPage() {
               <Box sx={{ mt: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Next milestone: <strong>{streak.next_milestone}-day streak</strong>
+                    {t('achievements.streak.nextMilestone', { count: streak.next_milestone })}
                   </Typography>
                   <Typography variant="body2" color="primary.main" fontWeight={600}>
-                    {streak.days_to_milestone} days to go
+                    {t('achievements.streak.daysToGo', { count: streak.days_to_milestone })}
                   </Typography>
                 </Box>
                 <LinearProgress 
@@ -300,7 +315,7 @@ export default function AchievementsPage() {
             <TrophyIcon sx={{ fontSize: 48, color: 'warning.main' }} />
             <Box sx={{ flex: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                {totalUnlocked} of {totalAchievements} Achievements Unlocked
+                {t('achievements.progress.unlockedOfTotal', { unlocked: totalUnlocked, total: totalAchievements })}
               </Typography>
               <LinearProgress 
                 variant="determinate" 
@@ -333,32 +348,32 @@ export default function AchievementsPage() {
         }}
       >
         <Tab 
-          label={`All (${totalUnlocked}/${totalAchievements})`} 
+          label={t('achievements.tabs.all', { unlocked: totalUnlocked, total: totalAchievements })} 
           icon={<TrophyIcon sx={{ fontSize: 20 }} />} 
           iconPosition="start" 
         />
         <Tab 
-          label={`Tracks (${groupedAchievements.tracks.filter(a => a.unlocked).length})`} 
+          label={t('achievements.tabs.tracks', { count: groupedAchievements.tracks.filter(a => a.unlocked).length })} 
           icon={<MusicIcon sx={{ fontSize: 20 }} />} 
           iconPosition="start" 
         />
         <Tab 
-          label={`Time (${groupedAchievements.time.filter(a => a.unlocked).length})`} 
+          label={t('achievements.tabs.time', { count: groupedAchievements.time.filter(a => a.unlocked).length })} 
           icon={<TimeIcon sx={{ fontSize: 20 }} />} 
           iconPosition="start" 
         />
         <Tab 
-          label={`Streaks (${groupedAchievements.streaks.filter(a => a.unlocked).length})`} 
+          label={t('achievements.tabs.streaks', { count: groupedAchievements.streaks.filter(a => a.unlocked).length })} 
           icon={<FireIcon sx={{ fontSize: 20 }} />} 
           iconPosition="start" 
         />
         <Tab 
-          label={`Variety (${groupedAchievements.variety.filter(a => a.unlocked).length})`} 
+          label={t('achievements.tabs.variety', { count: groupedAchievements.variety.filter(a => a.unlocked).length })} 
           icon={<TrendingIcon sx={{ fontSize: 20 }} />} 
           iconPosition="start" 
         />
         <Tab 
-          label={`Special (${groupedAchievements.special.filter(a => a.unlocked).length})`} 
+          label={t('achievements.tabs.special', { count: groupedAchievements.special.filter(a => a.unlocked).length })} 
           icon={<SpecialIcon sx={{ fontSize: 20 }} />} 
           iconPosition="start" 
         />
@@ -396,6 +411,7 @@ export default function AchievementsPage() {
 
 // Achievement Grid Component
 function AchievementGrid({ achievements }: { achievements: AchievementProgress[] }) {
+  const { t } = useTranslation();
   // Sort: unlocked first, then by progress descending
   const sorted = [...achievements].sort((a, b) => {
     if (a.unlocked && !b.unlocked) return -1;
@@ -406,7 +422,7 @@ function AchievementGrid({ achievements }: { achievements: AchievementProgress[]
   if (sorted.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
-        <Typography color="text.secondary">No achievements in this category</Typography>
+        <Typography color="text.secondary">{t('achievements.empty.noAchievementsInCategory')}</Typography>
       </Box>
     );
   }
@@ -458,7 +474,7 @@ function AchievementGrid({ achievements }: { achievements: AchievementProgress[]
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {achievement.name}
+                      {t(`achievements.items.${achievement.type}.name`, { defaultValue: achievement.name })}
                     </Typography>
                     {achievement.unlocked ? (
                       <CheckIcon sx={{ fontSize: 18, color: 'success.main', flexShrink: 0 }} />
@@ -467,7 +483,7 @@ function AchievementGrid({ achievements }: { achievements: AchievementProgress[]
                     )}
                   </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                    {achievement.description}
+                    {t(`achievements.items.${achievement.type}.description`, { defaultValue: achievement.description })}
                   </Typography>
                 </Box>
               </Box>
@@ -476,7 +492,7 @@ function AchievementGrid({ achievements }: { achievements: AchievementProgress[]
               <Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="caption" color="text.secondary">
-                    {achievement.unlocked ? 'Completed!' : 'Progress'}
+                    {achievement.unlocked ? t('achievements.card.completed') : t('achievements.card.progress')}
                   </Typography>
                   <Typography 
                     variant="caption" 

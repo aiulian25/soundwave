@@ -16,13 +16,15 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import LockClockIcon from '@mui/icons-material/LockClock';
-import { userAPI } from '../api/client';
+import { userAPI, ensureCsrfCookie } from '../api/client';
+import { useTranslation } from 'react-i18next';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -61,6 +63,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     if (isLocked) return;
     
     try {
+      await ensureCsrfCookie();
       setRemainingAttempts(null);
       const response = await userAPI.login({ 
         username, 
@@ -70,11 +73,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       
       if (response.data.requires_2fa) {
         setRequires2FA(true);
-        setError('Please enter your two-factor authentication code');
+        setError(t('login.errors.enter2fa'));
         return;
       }
       
-      localStorage.setItem('token', response.data.token);
       onLoginSuccess();
     } catch (err: any) {
       const data = err.response?.data;
@@ -83,7 +85,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       if (err.response?.status === 429 && data?.locked) {
         setIsLocked(true);
         setLockoutRemaining(data.remaining_seconds || 3600);
-        setError(data.error || 'Account temporarily locked');
+        setError(t('login.errors.accountLocked'));
         setRemainingAttempts(null);
         return;
       }
@@ -91,15 +93,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       // Check for remaining attempts warning
       if (data?.remaining_attempts !== undefined) {
         setRemainingAttempts(data.remaining_attempts);
-        setError(data.message || 'Invalid credentials');
+        setError(t('login.errors.invalidCredentials'));
         return;
       }
       
       if (data?.requires_2fa) {
         setRequires2FA(true);
-        setError('Please enter your two-factor authentication code');
+        setError(t('login.errors.enter2fa'));
       } else {
-        setError(data?.error || 'Invalid credentials or verification code');
+        setError(t('login.errors.invalidCredentialsOrCode'));
       }
     }
   };
@@ -138,7 +140,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         <Box
           component="img"
           src="/img/logo.png"
-          alt="SoundWave Logo"
+          alt={t('login.logoAlt')}
           sx={{
             width: { xs: 180, sm: 220 },
             height: { xs: 180, sm: 220 },
@@ -183,7 +185,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             fontWeight: 500,
           }}
         >
-          Your Personal Music Hub
+          {t('login.tagline')}
         </Typography>
       </Box>
 
@@ -221,13 +223,13 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               textAlign: 'center',
             }}
           >
-            Welcome Back
+            {t('login.welcomeBack')}
           </Typography>
 
           {/* Username Field */}
           <TextField
             fullWidth
-            placeholder="Username"
+            placeholder={t('login.username')}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -269,7 +271,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <TextField
             fullWidth
             type={showPassword ? 'text' : 'password'}
-            placeholder="Password"
+            placeholder={t('login.password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -308,6 +310,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                   <IconButton
                     onClick={() => setShowPassword(!showPassword)}
                     edge="end"
+                    aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                     sx={{
                       backgroundColor: 'rgba(34, 211, 238, 0.2)',
                       borderRadius: '50%',
@@ -333,7 +336,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           {requires2FA && (
             <TextField
               fullWidth
-              placeholder="Two-Factor Code"
+              placeholder={t('login.twoFactorCode')}
               value={twoFactorCode}
               onChange={(e) => setTwoFactorCode(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -391,7 +394,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             }
             label={
               <Typography sx={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-                Remember Password
+                {t('login.rememberPassword')}
               </Typography>
             }
             sx={{ marginBottom: { xs: 2.5, sm: 3 } }}
@@ -427,7 +430,9 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             endIcon={isLocked ? <LockClockIcon /> : <ArrowForwardIcon />}
             disabled={isLocked}
           >
-            {isLocked ? `Locked (${formatLockoutTime(lockoutRemaining)})` : 'Login'}
+            {isLocked
+              ? t('login.lockedCountdown', { time: formatLockoutTime(lockoutRemaining) })
+              : t('login.loginButton')}
           </Button>
 
           {/* Lockout Warning */}
@@ -443,10 +448,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               }}
             >
               <Typography variant="body2" fontWeight={600}>
-                Account Temporarily Locked
+                {t('login.accountTemporarilyLocked')}
               </Typography>
               <Typography variant="caption">
-                Too many failed login attempts. Please wait {formatLockoutTime(lockoutRemaining)} before trying again.
+                {t('login.lockoutWait', { time: formatLockoutTime(lockoutRemaining) })}
               </Typography>
             </Alert>
           )}
@@ -466,12 +471,14 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               }}
             >
               <Typography variant="body2" fontWeight={600}>
-                {remainingAttempts <= 1 ? '⚠️ Last Attempt!' : 'Invalid Credentials'}
+                {remainingAttempts <= 1 ? t('login.lastAttempt') : t('login.invalidCredentials')}
               </Typography>
               <Typography variant="caption">
                 {remainingAttempts === 0 
-                  ? 'Account will be locked on next failed attempt.'
-                  : `${remainingAttempts} attempt${remainingAttempts !== 1 ? 's' : ''} remaining before your account is locked for 60 minutes.`
+                  ? t('login.accountWillLockNext')
+                  : remainingAttempts === 1
+                    ? t('login.attemptsRemainingOne')
+                    : t('login.attemptsRemainingOther', { count: remainingAttempts })
                 }
               </Typography>
             </Alert>

@@ -29,14 +29,6 @@ export function useBackgroundDownload(): UseBackgroundDownloadReturn {
   const [activeDownloads, setActiveDownloads] = useState<DownloadProgress[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Set auth token when component mounts
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      backgroundDownload.setAuthToken(token);
-    }
-  }, []);
-
   // Handle online/offline status
   useEffect(() => {
     const handleOnline = () => {
@@ -108,14 +100,13 @@ export function useBackgroundDownload(): UseBackgroundDownloadReturn {
       await loadPendingDownloads();
       
       // Also fetch active downloads from server
-      const token = localStorage.getItem('token');
-      if (token && navigator.onLine) {
+      if (navigator.onLine) {
         const [pendingRes, downloadingRes] = await Promise.all([
           fetch('/api/download/?filter=pending', {
-            headers: { 'Authorization': `Token ${token}` },
+            credentials: 'include',
           }),
           fetch('/api/download/?filter=downloading', {
-            headers: { 'Authorization': `Token ${token}` },
+            credentials: 'include',
           }),
         ]);
 

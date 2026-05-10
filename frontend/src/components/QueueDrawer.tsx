@@ -38,6 +38,7 @@ import {
   MusicNote as MusicNoteIcon,
   Equalizer as EqualizerIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import type { Audio } from '../types';
 
 interface QueueDrawerProps {
@@ -69,6 +70,7 @@ export default function QueueDrawer({
   onReorderTrack,
   onClearQueue,
 }: QueueDrawerProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -157,7 +159,7 @@ export default function QueueDrawer({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {!isCurrentTrack && (
               <>
-                <Tooltip title="Play">
+                <Tooltip title={t('queueDrawer.tooltips.play')}>
                   <IconButton
                     size="small"
                     onClick={() => onPlayTrack(index)}
@@ -166,7 +168,7 @@ export default function QueueDrawer({
                     <PlayIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Remove from queue">
+                <Tooltip title={t('queueDrawer.tooltips.removeFromQueue')}>
                   <IconButton
                     size="small"
                     onClick={() => onRemoveTrack(index)}
@@ -232,7 +234,7 @@ export default function QueueDrawer({
           secondary={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="caption" color="text.secondary" noWrap>
-                {track.channel_name || track.artist || 'Unknown Artist'}
+                {track.channel_name || track.artist || t('player.unknownArtist')}
               </Typography>
               <Typography variant="caption" color="text.disabled">
                 {formatDuration(track.duration)}
@@ -274,7 +276,7 @@ export default function QueueDrawer({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <QueueIcon color="primary" />
             <Typography variant="h6" fontWeight={600}>
-              Queue
+              {t('queueDrawer.title')}
             </Typography>
             <Chip
               label={queue.length}
@@ -284,7 +286,7 @@ export default function QueueDrawer({
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {queue.length > 1 && (
-              <Tooltip title="Clear queue (except current)">
+              <Tooltip title={t('queueDrawer.tooltips.clearQueueExceptCurrent')}>
                 <IconButton
                   size="small"
                   onClick={onClearQueue}
@@ -315,10 +317,10 @@ export default function QueueDrawer({
             >
               <QueueIcon sx={{ fontSize: 64, mb: 2, color: 'text.disabled' }} />
               <Typography color="text.secondary">
-                Your queue is empty
+                {t('queueDrawer.empty.title')}
               </Typography>
               <Typography variant="caption" color="text.disabled" sx={{ mt: 1 }}>
-                Play something or add tracks to the queue
+                {t('queueDrawer.empty.description')}
               </Typography>
             </Box>
           ) : (
@@ -330,7 +332,7 @@ export default function QueueDrawer({
                     variant="overline"
                     sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}
                   >
-                    Now Playing
+                    {t('queueDrawer.sections.nowPlaying')}
                   </Typography>
                   {renderTrackItem(currentTrack, currentIndex)}
                 </>
@@ -344,7 +346,7 @@ export default function QueueDrawer({
                     variant="overline"
                     sx={{ px: 2, py: 1, display: 'block', color: 'text.secondary' }}
                   >
-                    Up Next ({upcomingTracks.length})
+                    {t('queueDrawer.sections.upNext', { count: upcomingTracks.length })}
                   </Typography>
                   {upcomingTracks.map((track, idx) => 
                     renderTrackItem(track, currentIndex + 1 + idx)
@@ -360,7 +362,7 @@ export default function QueueDrawer({
                     variant="overline"
                     sx={{ px: 2, py: 1, display: 'block', color: 'text.disabled' }}
                   >
-                    Previously Played ({playedTracks.length})
+                    {t('queueDrawer.sections.previouslyPlayed', { count: playedTracks.length })}
                   </Typography>
                   {playedTracks.map((track, idx) => 
                     renderTrackItem(track, idx, true)
@@ -382,9 +384,9 @@ export default function QueueDrawer({
             }}
           >
             <Typography variant="caption" color="text.secondary">
-              {upcomingTracks.length} track{upcomingTracks.length !== 1 ? 's' : ''} remaining
+              {t('queueDrawer.footer.remainingTracks', { count: upcomingTracks.length })}
               {' • '}
-              {formatTotalDuration(upcomingTracks)}
+              {formatTotalDuration(upcomingTracks, t)}
             </Typography>
           </Box>
         )}
@@ -394,15 +396,15 @@ export default function QueueDrawer({
 }
 
 // Helper to format total duration
-function formatTotalDuration(tracks: Audio[]): string {
+function formatTotalDuration(tracks: Audio[], t: (key: string, options?: any) => string): string {
   const totalSeconds = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
-  if (totalSeconds <= 0) return 'Unknown duration';
-  
+  if (totalSeconds <= 0) return t('queueDrawer.footer.unknownDuration');
+
   const hours = Math.floor(totalSeconds / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
-  
+
   if (hours > 0) {
-    return `${hours}h ${mins}m`;
+    return t('queueDrawer.footer.durationHoursMinutes', { hours, minutes: mins });
   }
-  return `${mins} min`;
+  return t('queueDrawer.footer.durationMinutes', { minutes: mins });
 }

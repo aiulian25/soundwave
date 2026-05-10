@@ -65,7 +65,7 @@ import PWASettingsCard from '../components/PWASettingsCard';
 import UserProfileCard from '../components/UserProfileCard';
 import { useSettings } from '../context/SettingsContext';
 import { visualizerThemes } from '../config/visualizerThemes';
-import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 interface TwoFactorStatus {
   enabled: boolean;
@@ -99,6 +99,7 @@ interface NewAPIKey extends APIKey {
 }
 
 export default function SettingsPage() {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { themeMode, setThemeMode } = useThemeContext();
   const { settings, updateSetting } = useSettings();
@@ -151,10 +152,10 @@ export default function SettingsPage() {
       setNewApiKey(response.data);
       setApiKeyDialogOpen(false);
       loadApiKeys();
-      setSuccess('API key created! Copy it now - it will only be shown once.');
+      setSuccess(t('settings.alerts.apiKeyCreated'));
       setTimeout(() => setSuccess(''), 10000);
     } catch (err) {
-      setError('Failed to create API key');
+      setError(t('settings.alerts.apiKeyCreateFailed'));
     }
   };
   
@@ -163,16 +164,16 @@ export default function SettingsPage() {
       await userAPI.deleteApiKey(keyId);
       setDeleteKeyId(null);
       loadApiKeys();
-      setSuccess('API key deleted');
+      setSuccess(t('settings.alerts.apiKeyDeleted'));
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Failed to delete API key');
+      setError(t('settings.alerts.apiKeyDeleteFailed'));
     }
   };
   
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    setSuccess('Copied to clipboard!');
+    setSuccess(t('settings.alerts.copiedToClipboard'));
     setTimeout(() => setSuccess(''), 2000);
   };
   
@@ -190,9 +191,9 @@ export default function SettingsPage() {
     try {
       await audioCache.clearCache();
       await loadCacheStats();
-      setSuccess('Audio cache cleared successfully');
+      setSuccess(t('settings.alerts.audioCacheCleared'));
     } catch (err) {
-      setError('Failed to clear cache');
+      setError(t('settings.alerts.audioCacheClearFailed'));
     } finally {
       setClearingCache(false);
     }
@@ -200,11 +201,7 @@ export default function SettingsPage() {
   
   const checkAdminStatus = async () => {
     try {
-      const response = await axios.get('/api/user/account/', {
-        headers: {
-          'Authorization': `Token ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await userAPI.account();
       setIsAdmin(response.data.is_admin || response.data.is_superuser);
     } catch (err) {
       console.error('Failed to check admin status:', err);
@@ -228,7 +225,7 @@ export default function SettingsPage() {
       setSetupDialogOpen(true);
       setShowBackupCodes(false);
     } catch (err) {
-      setError('Failed to setup 2FA');
+      setError(t('settings.alerts.setup2faFailed'));
     }
   };
 
@@ -236,13 +233,13 @@ export default function SettingsPage() {
     try {
       setError('');
       await userAPI.twoFactorVerify({ code: verificationCode });
-      setSuccess('Two-factor authentication enabled successfully!');
+      setSuccess(t('settings.alerts.twoFactorEnabled'));
       setSetupDialogOpen(false);
       setVerificationCode('');
       loadTwoFactorStatus();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Invalid verification code');
+      setError(t('settings.alerts.invalidVerificationCode'));
     }
   };
 
@@ -250,13 +247,13 @@ export default function SettingsPage() {
     try {
       setError('');
       await userAPI.twoFactorDisable({ code: disableCode });
-      setSuccess('Two-factor authentication disabled');
+      setSuccess(t('settings.alerts.twoFactorDisabled'));
       setDisableDialogOpen(false);
       setDisableCode('');
       loadTwoFactorStatus();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Invalid verification code');
+      setError(t('settings.alerts.invalidVerificationCode'));
     }
   };
 
@@ -266,11 +263,11 @@ export default function SettingsPage() {
       const response = await userAPI.twoFactorRegenerateCodes();
       setSetupData({ ...setupData!, backup_codes: response.data.backup_codes });
       setShowBackupCodes(true);
-      setSuccess('Backup codes regenerated successfully!');
+      setSuccess(t('settings.alerts.backupCodesRegenerated'));
       loadTwoFactorStatus();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Failed to regenerate backup codes');
+      setError(t('settings.alerts.regenerateBackupCodesFailed'));
     }
   };
 
@@ -296,47 +293,51 @@ export default function SettingsPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError('Failed to download backup codes');
+      setError(t('settings.alerts.downloadBackupCodesFailed'));
     }
   };
 
+  const handleLanguageChange = async (language: string) => {
+    await i18n.changeLanguage(language);
+  };
+
   return (
-    <Box>
+    <Box sx={{ pb: 4 }}>
       <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
-        Settings
+        {t('settings.title')}
       </Typography>
 
       {success && (
-        <Alert severity="success" sx={{ mb: 1.5, maxWidth: 600 }}>
+        <Alert severity="success" sx={{ mb: 1.5 }}>
           {success}
         </Alert>
       )}
 
       {error && (
-        <Alert severity="error" sx={{ mb: 1.5, maxWidth: 600 }}>
+        <Alert severity="error" sx={{ mb: 1.5 }}>
           {error}
         </Alert>
       )}
 
       {/* Appearance Settings */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
             <PaletteIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
             <Typography variant="subtitle1" fontWeight={600}>
-              Appearance
+              {t('settings.appearance.title')}
             </Typography>
           </Box>
 
           <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-            Customize the look and feel of SoundWave with different color themes.
+            {t('settings.appearance.description')}
           </Typography>
 
           <FormControl fullWidth sx={{ mb: 1.5 }} size="small">
-            <InputLabel>Theme</InputLabel>
+            <InputLabel>{t('settings.appearance.themeLabel')}</InputLabel>
             <Select
               value={themeMode}
-              label="Theme"
+              label={t('settings.appearance.themeLabel')}
               onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
             >
               {Object.entries(themeNames).map(([mode, name]) => (
@@ -362,18 +363,46 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Visualizer Settings */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+      {/* Language Settings */}
+      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-            <EqualizerIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+            <PaletteIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
             <Typography variant="subtitle1" fontWeight={600}>
-              Audio Visualizer
+              {t('settings.language.title')}
             </Typography>
           </Box>
 
           <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-            Choose a visualization style for the audio player. Different themes offer unique animations and color schemes.
+            {t('settings.language.description')}
+          </Typography>
+
+          <FormControl fullWidth size="small">
+            <InputLabel>{t('settings.language.label')}</InputLabel>
+            <Select
+              value={i18n.resolvedLanguage?.startsWith('ro') ? 'ro' : 'en'}
+              label={t('settings.language.label')}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+            >
+              <MenuItem value="en">{t('settings.language.options.en')}</MenuItem>
+              <MenuItem value="ro">{t('settings.language.options.ro')}</MenuItem>
+            </Select>
+          </FormControl>
+        </CardContent>
+      </Card>
+
+      {/* Visualizer Settings */}
+      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+            <EqualizerIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+            <Typography variant="subtitle1" fontWeight={600}>
+              {t('settings.visualizer.title')}
+            </Typography>
+          </Box>
+
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+            {t('settings.visualizer.description')}
           </Typography>
 
           <FormControlLabel
@@ -384,7 +413,7 @@ export default function SettingsPage() {
                 onChange={(e) => updateSetting('visualizer_enabled', e.target.checked)}
               />
             }
-            label={<Typography variant="body2">Enable visualizer</Typography>}
+            label={<Typography variant="body2">{t('settings.visualizer.enableLabel')}</Typography>}
             sx={{ mb: 2, display: 'block' }}
           />
 
@@ -398,12 +427,12 @@ export default function SettingsPage() {
                     onChange={(e) => updateSetting('visualizer_glow', e.target.checked)}
                   />
                 }
-                label={<Typography variant="body2">Enable glow effect</Typography>}
+                label={<Typography variant="body2">{t('settings.visualizer.glowLabel')}</Typography>}
                 sx={{ mb: 2, display: 'block' }}
               />
 
               <Typography variant="body2" fontWeight={500} sx={{ mb: 1.5 }}>
-                Visualizer Theme
+                {t('settings.visualizer.themeSection')}
               </Typography>
 
               <Grid container spacing={1.5}>
@@ -426,29 +455,28 @@ export default function SettingsPage() {
       <PWASettingsCard />
 
       {/* Security Settings */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
             <SecurityIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
             <Typography variant="subtitle1" fontWeight={600}>
-              Two-Factor Authentication
+              {t('settings.twoFactor.title')}
             </Typography>
           </Box>
 
           <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-            Add an extra layer of security to your account. You'll need to enter a code from your
-            authenticator app when you sign in.
+            {t('settings.twoFactor.description')}
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
             <Chip
-              label={twoFactorStatus.enabled ? 'Enabled' : 'Disabled'}
+              label={twoFactorStatus.enabled ? t('settings.twoFactor.enabled') : t('settings.twoFactor.disabled')}
               color={twoFactorStatus.enabled ? 'success' : 'default'}
               size="small"
             />
             {twoFactorStatus.enabled && (
               <Typography variant="caption" color="text.secondary">
-                {twoFactorStatus.backup_codes_count} backup codes remaining
+                {t('settings.twoFactor.backupCodesRemaining', { count: twoFactorStatus.backup_codes_count })}
               </Typography>
             )}
           </Box>
@@ -461,7 +489,7 @@ export default function SettingsPage() {
                 onClick={handleSetup2FA}
                 startIcon={<SecurityIcon />}
               >
-                Enable Two-Factor Authentication
+                {t('settings.twoFactor.enableButton')}
               </Button>
             ) : (
               <>
@@ -470,12 +498,12 @@ export default function SettingsPage() {
                   color="error"
                   onClick={() => setDisableDialogOpen(true)}
                 >
-                  Disable Two-Factor Authentication
+                  {t('settings.twoFactor.disableButton')}
                 </Button>
                 <Divider />
                 <Box>
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Backup Codes
+                    {t('settings.twoFactor.backupCodesTitle')}
                   </Typography>
                   <Stack direction="row" spacing={1}>
                     <Button
@@ -484,7 +512,7 @@ export default function SettingsPage() {
                       startIcon={<DownloadIcon />}
                       onClick={handleDownloadCodes}
                     >
-                      Download Backup Codes
+                      {t('settings.twoFactor.downloadCodesButton')}
                     </Button>
                     <Button
                       variant="outlined"
@@ -492,7 +520,7 @@ export default function SettingsPage() {
                       startIcon={<RefreshIcon />}
                       onClick={handleRegenerateCodes}
                     >
-                      Regenerate Codes
+                      {t('settings.twoFactor.regenerateCodesButton')}
                     </Button>
                   </Stack>
                 </Box>
@@ -503,13 +531,13 @@ export default function SettingsPage() {
       </Card>
 
       {/* API Keys Section */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <VpnKeyIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
               <Typography variant="subtitle1" fontWeight={600}>
-                API Keys
+                {t('settings.apiKeys.title')}
               </Typography>
             </Box>
             <Button
@@ -518,12 +546,12 @@ export default function SettingsPage() {
               startIcon={<AddIcon />}
               onClick={() => setApiKeyDialogOpen(true)}
             >
-              Create Key
+              {t('settings.apiKeys.createKeyButton')}
             </Button>
           </Box>
 
           <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-            Create API keys for external dashboard widgets (like Homepage). Keys are compatible with TubeArchivist widget format.
+            {t('settings.apiKeys.description')}
           </Typography>
 
           {newApiKey && (
@@ -536,7 +564,7 @@ export default function SettingsPage() {
                 </IconButton>
               }
             >
-              <Typography variant="body2" fontWeight={600}>Save your API key now!</Typography>
+              <Typography variant="body2" fontWeight={600}>{t('settings.apiKeys.saveKeyWarning')}</Typography>
               <Typography 
                 variant="body2" 
                 sx={{ 
@@ -551,24 +579,24 @@ export default function SettingsPage() {
                 {newApiKey.key}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                This key will only be shown once. Copy it now!
+                {t('settings.apiKeys.saveKeyCaption')}
               </Typography>
             </Alert>
           )}
 
           {apiKeys.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-              No API keys created yet
+              {t('settings.apiKeys.noKeysYet')}
             </Typography>
           ) : (
             <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Key</TableCell>
-                    <TableCell>Last Used</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    <TableCell>{t('settings.apiKeys.table.name')}</TableCell>
+                    <TableCell>{t('settings.apiKeys.table.key')}</TableCell>
+                    <TableCell>{t('settings.apiKeys.table.lastUsed')}</TableCell>
+                    <TableCell align="right">{t('settings.apiKeys.table.actions')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -578,7 +606,7 @@ export default function SettingsPage() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="body2">{key.name}</Typography>
                           <Chip 
-                            label={key.is_active ? 'Active' : 'Inactive'} 
+                            label={key.is_active ? t('adminUsers.status.active') : t('adminUsers.status.inactive')} 
                             size="small" 
                             color={key.is_active ? 'success' : 'default'}
                             sx={{ height: 20, fontSize: '0.7rem' }}
@@ -594,11 +622,11 @@ export default function SettingsPage() {
                         <Typography variant="caption" color="text.secondary">
                           {key.last_used 
                             ? new Date(key.last_used).toLocaleDateString() 
-                            : 'Never'}
+                            : t('adminUsers.values.never')}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        <Tooltip title="Delete key">
+                        <Tooltip title={t('settings.apiKeys.deleteKeyTooltip')}>
                           <IconButton 
                             size="small" 
                             color="error"
@@ -617,7 +645,7 @@ export default function SettingsPage() {
 
           <Box sx={{ mt: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 0.5 }}>
-              Homepage Widget Configuration
+              {t('settings.apiKeys.widgetConfig')}
             </Typography>
             <Typography 
               variant="caption" 
@@ -640,18 +668,18 @@ export default function SettingsPage() {
       </Card>
 
       {/* Playback Settings */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
             <SpeedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
             <Typography variant="subtitle1" fontWeight={600}>
-              Playback
+              {t('settings.playback.title')}
             </Typography>
           </Box>
 
           <FormControlLabel
             control={<Switch defaultChecked size="small" />}
-            label={<Typography variant="body2">Autoplay</Typography>}
+            label={<Typography variant="body2">{t('settings.playback.autoplayLabel')}</Typography>}
             sx={{ mb: 2, display: 'block' }}
           />
 
@@ -660,11 +688,11 @@ export default function SettingsPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <ShuffleIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
               <Typography variant="body2" fontWeight={500}>
-                Smart Shuffle
+                {t('settings.playback.smartShuffle.title')}
               </Typography>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-              When enabled, shuffle mode will avoid playing recently heard songs, creating a more varied listening experience.
+              {t('settings.playback.smartShuffle.description')}
             </Typography>
             <FormControlLabel
               control={
@@ -674,13 +702,13 @@ export default function SettingsPage() {
                   onChange={(e) => updateSetting('smart_shuffle_enabled', e.target.checked)}
                 />
               }
-              label={<Typography variant="body2">Enable smart shuffle</Typography>}
+              label={<Typography variant="body2">{t('settings.playback.smartShuffle.enableLabel')}</Typography>}
               sx={{ mb: 1, display: 'block' }}
             />
             {settings.smart_shuffle_enabled && (
               <Box sx={{ pl: 2 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                  History size: {settings.smart_shuffle_history_size} tracks
+                  {t('settings.playback.smartShuffle.historySize', { count: settings.smart_shuffle_history_size })}
                 </Typography>
                 <Slider
                   value={settings.smart_shuffle_history_size}
@@ -697,7 +725,7 @@ export default function SettingsPage() {
                   sx={{ maxWidth: 300 }}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  Number of recently played songs to avoid when shuffling
+                  {t('settings.playback.smartShuffle.historySizeHelp')}
                 </Typography>
               </Box>
             )}
@@ -710,20 +738,20 @@ export default function SettingsPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <FastForwardIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
               <Typography variant="body2" fontWeight={500}>
-                Seek Duration
+                {t('settings.playback.seekDuration.title')}
               </Typography>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-              Choose how many seconds to skip forward or backward when using seek controls (media keys, headphones, etc.).
+              {t('settings.playback.seekDuration.description')}
             </Typography>
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <Select
                 value={settings.seek_duration || 3}
                 onChange={(e) => updateSetting('seek_duration', Number(e.target.value) as 3 | 5 | 10)}
               >
-                <MenuItem value={3}>3 seconds</MenuItem>
-                <MenuItem value={5}>5 seconds</MenuItem>
-                <MenuItem value={10}>10 seconds</MenuItem>
+                <MenuItem value={3}>{t('settings.playback.seekDuration.seconds', { count: 3 })}</MenuItem>
+                <MenuItem value={5}>{t('settings.playback.seekDuration.seconds', { count: 5 })}</MenuItem>
+                <MenuItem value={10}>{t('settings.playback.seekDuration.seconds', { count: 10 })}</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -735,11 +763,11 @@ export default function SettingsPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <CachedIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
               <Typography variant="body2" fontWeight={500}>
-                Intelligent Prefetch & Caching
+                {t('settings.playback.prefetch.title')}
               </Typography>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-              Automatically download upcoming tracks for instant playback. Cached tracks play without network delay.
+              {t('settings.playback.prefetch.description')}
             </Typography>
             <FormControlLabel
               control={
@@ -749,7 +777,7 @@ export default function SettingsPage() {
                   onChange={(e) => updateSetting('prefetch_enabled', e.target.checked)}
                 />
               }
-              label={<Typography variant="body2">Enable intelligent prefetching</Typography>}
+              label={<Typography variant="body2">{t('settings.playback.prefetch.enableLabel')}</Typography>}
               sx={{ mb: 1, display: 'block' }}
             />
             
@@ -757,11 +785,11 @@ export default function SettingsPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, mt: 2 }}>
               <SyncIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
               <Typography variant="body2" fontWeight={500}>
-                Cross-Device Playback Sync
+                {t('settings.playback.sync.title')}
               </Typography>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-              Sync playback position across devices. Disable to reduce battery and data usage on mobile.
+              {t('settings.playback.sync.description')}
             </Typography>
             <FormControlLabel
               control={
@@ -771,7 +799,7 @@ export default function SettingsPage() {
                   onChange={(e) => updateSetting('playback_sync_enabled', e.target.checked)}
                 />
               }
-              label={<Typography variant="body2">Enable playback sync</Typography>}
+              label={<Typography variant="body2">{t('settings.playback.sync.enableLabel')}</Typography>}
               sx={{ mb: 1, display: 'block' }}
             />
             
@@ -786,7 +814,7 @@ export default function SettingsPage() {
                 borderColor: 'divider'
               }}>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  Cache Statistics
+                  {t('settings.playback.cacheStats.title')}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 3, mb: 1.5 }}>
                   <Box>
@@ -794,7 +822,7 @@ export default function SettingsPage() {
                       {cacheStats.count}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Cached tracks
+                      {t('settings.playback.cacheStats.cachedTracks')}
                     </Typography>
                   </Box>
                   <Box>
@@ -802,7 +830,7 @@ export default function SettingsPage() {
                       {(cacheStats.totalSize / 1024 / 1024).toFixed(1)} MB
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Cache size
+                      {t('settings.playback.cacheStats.cacheSize')}
                     </Typography>
                   </Box>
                   <Box>
@@ -810,7 +838,7 @@ export default function SettingsPage() {
                       {(AUDIO_CACHE_CONFIG.maxCacheSize / 1024 / 1024).toFixed(0)} MB
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Max size
+                      {t('settings.playback.cacheStats.maxSize')}
                     </Typography>
                   </Box>
                 </Box>
@@ -823,7 +851,7 @@ export default function SettingsPage() {
                   disabled={clearingCache || cacheStats.count === 0}
                   sx={{ mt: 1 }}
                 >
-                  {clearingCache ? 'Clearing...' : 'Clear Cache'}
+                  {clearingCache ? t('settings.playback.cacheStats.clearing') : t('settings.playback.cacheStats.clearButton')}
                 </Button>
               </Box>
             )}
@@ -833,47 +861,47 @@ export default function SettingsPage() {
 
           <FormControlLabel
             control={<Switch defaultChecked size="small" />}
-            label={<Typography variant="body2">Normalize audio</Typography>}
+            label={<Typography variant="body2">{t('settings.playback.normalizeLabel')}</Typography>}
             sx={{ display: 'block' }}
           />
         </CardContent>
       </Card>
 
       {/* Download Quality */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 1.5 }}>
+      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
-            Download Quality
+            {t('settings.downloadQuality.title')}
           </Typography>
 
           <FormControlLabel
             control={<Switch defaultChecked size="small" />}
-            label={<Typography variant="body2">Download in best quality</Typography>}
+            label={<Typography variant="body2">{t('settings.downloadQuality.bestQualityLabel')}</Typography>}
             sx={{ display: 'block' }}
           />
         </CardContent>
       </Card>
 
       {/* Lyrics Settings */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper' }}>
+      <Card sx={{ bgcolor: 'background.paper' }}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
-            Lyrics
+            {t('settings.lyrics.title')}
           </Typography>
 
           <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-            Automatically fetch and cache synchronized lyrics for your audio files using LRCLIB API.
+            {t('settings.lyrics.description')}
           </Typography>
 
           <FormControlLabel
             control={<Switch defaultChecked />}
-            label="Auto-fetch lyrics for new downloads"
+            label={t('settings.lyrics.autoFetchLabel')}
             sx={{ mb: 2, display: 'block' }}
           />
 
           <FormControlLabel
             control={<Switch defaultChecked />}
-            label="Show synchronized lyrics in player"
+            label={t('settings.lyrics.showInPlayerLabel')}
             sx={{ display: 'block' }}
           />
         </CardContent>
@@ -881,14 +909,14 @@ export default function SettingsPage() {
 
       {/* Setup 2FA Dialog */}
       <Dialog open={setupDialogOpen} onClose={() => setSetupDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Enable Two-Factor Authentication</DialogTitle>
+        <DialogTitle>{t('settings.twoFactor.setupDialog.title')}</DialogTitle>
         <DialogContent>
           {setupData && (
             <Box>
               {!showBackupCodes ? (
                 <>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                    {t('settings.twoFactor.setupDialog.scanQrCode')}
                   </Typography>
 
                   <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
@@ -896,7 +924,7 @@ export default function SettingsPage() {
                   </Box>
 
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Or enter this code manually:
+                    {t('settings.twoFactor.setupDialog.orEnterManually')}
                   </Typography>
                   <TextField
                     fullWidth
@@ -906,7 +934,7 @@ export default function SettingsPage() {
                   />
 
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Enter the 6-digit code from your app to verify:
+                    {t('settings.twoFactor.setupDialog.enterCodeToVerify')}
                   </Typography>
                   <TextField
                     fullWidth
@@ -928,13 +956,13 @@ export default function SettingsPage() {
                     onClick={() => setShowBackupCodes(true)}
                     sx={{ mt: 2 }}
                   >
-                    View Backup Codes
+                    {t('settings.twoFactor.setupDialog.viewBackupCodes')}
                   </Button>
                 </>
               ) : (
                 <>
                   <Alert severity="warning" sx={{ mb: 2 }}>
-                    Save these backup codes in a safe place. Each code can only be used once.
+                    {t('settings.twoFactor.setupDialog.saveBackupCodesWarning')}
                   </Alert>
 
                   <Box sx={{ bgcolor: 'background.default', p: 2, borderRadius: 1, mb: 2 }}>
@@ -959,7 +987,7 @@ export default function SettingsPage() {
                     }}
                     sx={{ mb: 2 }}
                   >
-                    Download Backup Codes
+                    {t('settings.twoFactor.downloadCodesButton')}
                   </Button>
 
                   <Button
@@ -967,7 +995,7 @@ export default function SettingsPage() {
                     variant="text"
                     onClick={() => setShowBackupCodes(false)}
                   >
-                    Back to Setup
+                    {t('settings.twoFactor.setupDialog.backToSetup')}
                   </Button>
                 </>
               )}
@@ -975,10 +1003,10 @@ export default function SettingsPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSetupDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setSetupDialogOpen(false)}>{t('common.cancel')}</Button>
           {!showBackupCodes && (
             <Button onClick={handleVerify2FA} variant="contained" disabled={verificationCode.length !== 6}>
-              Verify and Enable
+              {t('settings.twoFactor.setupDialog.verifyAndEnable')}
             </Button>
           )}
         </DialogActions>
@@ -986,14 +1014,14 @@ export default function SettingsPage() {
 
       {/* Disable 2FA Dialog */}
       <Dialog open={disableDialogOpen} onClose={() => setDisableDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Disable Two-Factor Authentication</DialogTitle>
+        <DialogTitle>{t('settings.twoFactor.disableDialog.title')}</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Disabling two-factor authentication will make your account less secure.
+            {t('settings.twoFactor.disableDialog.warning')}
           </Alert>
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Enter a verification code from your authenticator app or use a backup code:
+            {t('settings.twoFactor.disableDialog.enterCode')}
           </Typography>
 
           <TextField
@@ -1011,14 +1039,14 @@ export default function SettingsPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDisableDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setDisableDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button
             onClick={handleDisable2FA}
             variant="contained"
             color="error"
             disabled={disableCode.length !== 6}
           >
-            Disable 2FA
+            {t('settings.twoFactor.disableDialog.disableButton')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1033,33 +1061,33 @@ export default function SettingsPage() {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Create API Key</DialogTitle>
+        <DialogTitle>{t('settings.apiKeys.createDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Create an API key for external dashboard widgets. This key will allow read-only access to your statistics.
+            {t('settings.apiKeys.createDialog.description')}
           </Typography>
           <TextField
             autoFocus
-            label="Key Name"
+            label={t('settings.apiKeys.createDialog.keyNameLabel')}
             fullWidth
             value={newApiKeyName}
             onChange={(e) => setNewApiKeyName(e.target.value)}
-            placeholder="e.g., Homepage Widget"
+            placeholder={t('settings.apiKeys.createDialog.keyNamePlaceholder')}
             size="small"
             sx={{ mb: 2 }}
           />
           <Alert severity="info" sx={{ mb: 1 }}>
-            The API key will only be shown once after creation. Make sure to copy it!
+            {t('settings.apiKeys.createDialog.copyWarning')}
           </Alert>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setApiKeyDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setApiKeyDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button 
             variant="contained" 
             onClick={handleCreateApiKey}
             disabled={!newApiKeyName.trim()}
           >
-            Create Key
+            {t('settings.apiKeys.createDialog.createButton')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1069,32 +1097,32 @@ export default function SettingsPage() {
         open={deleteKeyId !== null}
         onClose={() => setDeleteKeyId(null)}
       >
-        <DialogTitle>Delete API Key?</DialogTitle>
+        <DialogTitle>{t('settings.apiKeys.deleteDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Are you sure you want to delete this API key? Any applications using this key will lose access.
+            {t('settings.apiKeys.deleteDialog.description')}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteKeyId(null)}>Cancel</Button>
+          <Button onClick={() => setDeleteKeyId(null)}>{t('common.cancel')}</Button>
           <Button 
             variant="contained" 
             color="error"
             onClick={() => deleteKeyId && handleDeleteApiKey(deleteKeyId)}
           >
-            Delete
+            {t('common.delete')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Quick Sync Settings */}
-      <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 2 }}>
+      <Card sx={{ bgcolor: 'background.paper', mb: 2 }}>
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <SpeedIcon sx={{ mr: 1, color: 'primary.main' }} />
               <Typography variant="h6">
-                Quick Sync - Adaptive Streaming
+                {t('settings.quickSync.title')}
               </Typography>
             </Box>
           </AccordionSummary>
@@ -1109,16 +1137,16 @@ export default function SettingsPage() {
 
       {/* Admin User Management */}
       {isAdmin && (
-        <Card sx={{ maxWidth: 600, bgcolor: 'background.paper', mb: 2 }}>
+        <Card sx={{ bgcolor: 'background.paper', mb: 2 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <GroupIcon sx={{ mr: 1, color: 'primary.main' }} />
               <Typography variant="h6">
-                User Management
+                {t('adminUsers.title')}
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Manage all users in the system. Create, edit, or delete user accounts and monitor system statistics.
+              {t('settings.userManagement.description')}
             </Typography>
             <Button
               variant="contained"
@@ -1129,7 +1157,7 @@ export default function SettingsPage() {
                 minHeight: { xs: '44px', sm: '48px' },
               }}
             >
-              Open User Management
+              {t('settings.userManagement.openButton')}
             </Button>
           </CardContent>
         </Card>

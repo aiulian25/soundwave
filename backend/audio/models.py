@@ -1,12 +1,14 @@
 """Audio models"""
 
 import os
+import logging
 from pathlib import Path
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.conf import settings
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class Audio(models.Model):
@@ -78,18 +80,16 @@ class Audio(models.Model):
     
     def delete(self, *args, **kwargs):
         """Override delete to remove audio file from filesystem"""
-        if self.file_path:
-            # Construct full path to the audio file
-            full_path = Path(settings.MEDIA_ROOT) / self.file_path
-            try:
-                if full_path.exists():
-                    full_path.unlink()  # Delete the file
-            except (OSError, IOError) as e:
-                # Log error but continue with database deletion
-                print(f"Warning: Could not delete audio file {full_path}: {e}")
-        
-        # Delete from database
+        file_to_delete = Path(settings.MEDIA_ROOT) / self.file_path if self.file_path else None
+
+        # Delete from database first so we don't orphan records if DB deletion fails.
         super().delete(*args, **kwargs)
+
+        if file_to_delete:
+            try:
+                file_to_delete.unlink(missing_ok=True)
+            except OSError as e:
+                logger.warning("Could not delete audio file %s: %s", file_to_delete, e)
 
 
 class AudioProgress(models.Model):

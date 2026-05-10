@@ -28,9 +28,11 @@ import {
   Warning as WarningIcon,
   Error as ErrorIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { useQuickSync } from '../context/QuickSyncContext';
 
 const QuickSyncSettings = () => {
+  const { t } = useTranslation();
   const { status, preferences, loading, updatePreferences, runSpeedTest, refreshStatus } = useQuickSync();
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -38,20 +40,20 @@ const QuickSyncSettings = () => {
   const handleModeChange = async (mode: string) => {
     try {
       await updatePreferences({ mode: mode as any });
-      setMessage({ type: 'success', text: 'Quality mode updated successfully' });
+      setMessage({ type: 'success', text: t('quickSync.messages.qualityModeUpdated') });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update quality mode' });
+      setMessage({ type: 'error', text: t('quickSync.errors.updateQualityModeFailed') });
     }
   };
 
   const handlePreferenceChange = async (key: string, value: boolean) => {
     try {
       await updatePreferences({ [key]: value });
-      setMessage({ type: 'success', text: 'Preferences updated successfully' });
+      setMessage({ type: 'success', text: t('quickSync.messages.preferencesUpdated') });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update preferences' });
+      setMessage({ type: 'error', text: t('quickSync.errors.updatePreferencesFailed') });
     }
   };
 
@@ -59,10 +61,10 @@ const QuickSyncSettings = () => {
     setTesting(true);
     try {
       await runSpeedTest();
-      setMessage({ type: 'success', text: 'Speed test completed' });
+      setMessage({ type: 'success', text: t('quickSync.messages.speedTestCompleted') });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Speed test failed' });
+      setMessage({ type: 'error', text: t('quickSync.errors.speedTestFailed') });
     } finally {
       setTesting(false);
     }
@@ -107,7 +109,7 @@ const QuickSyncSettings = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="subtitle1" fontWeight={600}>Quick Sync - Adaptive Streaming</Typography>
+        <Typography variant="subtitle1" fontWeight={600}>{t('quickSync.title')}</Typography>
         <IconButton size="small" onClick={refreshStatus} disabled={loading}>
           <RefreshIcon />
         </IconButton>
@@ -122,7 +124,7 @@ const QuickSyncSettings = () => {
       {/* Current Status */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Typography variant="body2" gutterBottom fontWeight="bold" mb={1.5}>
-          Current Status
+          {t('quickSync.currentStatus')}
         </Typography>
 
         {status && (
@@ -132,7 +134,7 @@ const QuickSyncSettings = () => {
               <Box display="flex" alignItems="center" mb={1}>
                 <SpeedIcon sx={{ mr: 0.5, fontSize: '1.1rem' }} />
                 <Typography variant="caption" fontWeight="bold">
-                  Network Speed
+                  {t('quickSync.networkSpeed')}
                 </Typography>
                 <Box ml="auto">
                   {getNetworkStatusIcon(status.network.status)}
@@ -159,12 +161,12 @@ const QuickSyncSettings = () => {
               <Box display="flex" alignItems="center" mb={1}>
                 <MemoryIcon sx={{ mr: 0.5, fontSize: '1.1rem' }} />
                 <Typography variant="caption" fontWeight="bold">
-                  System Resources
+                  {t('quickSync.systemResources')}
                 </Typography>
               </Box>
               <Box mb={1.5}>
                 <Box display="flex" justifyContent="space-between" mb={0.5}>
-                  <Typography variant="caption">CPU Usage</Typography>
+                  <Typography variant="caption">{t('quickSync.cpuUsage')}</Typography>
                   <Typography variant="caption">{status.system.cpu_percent.toFixed(0)}%</Typography>
                 </Box>
                 <LinearProgress
@@ -175,7 +177,7 @@ const QuickSyncSettings = () => {
               </Box>
               <Box>
                 <Box display="flex" justifyContent="space-between" mb={0.5}>
-                  <Typography variant="caption">Memory Usage</Typography>
+                  <Typography variant="caption">{t('quickSync.memoryUsage')}</Typography>
                   <Typography variant="caption">{status.system.memory_percent.toFixed(0)}%</Typography>
                 </Box>
                 <LinearProgress
@@ -191,7 +193,7 @@ const QuickSyncSettings = () => {
               <Box display="flex" alignItems="center" mb={1}>
                 <StorageIcon sx={{ mr: 0.5, fontSize: '1.1rem' }} />
                 <Typography variant="caption" fontWeight="bold">
-                  Active Quality
+                  {t('quickSync.activeQuality')}
                 </Typography>
               </Box>
               <Typography variant="h6" color="primary" mb={0.75}>
@@ -201,7 +203,7 @@ const QuickSyncSettings = () => {
                 {status.quality.bitrate} kbps
               </Typography>
               {status.quality.auto_selected && (
-                <Chip label="Auto-Selected" size="small" color="info" />
+                <Chip label={t('quickSync.autoSelected')} size="small" color="info" />
               )}
             </Grid>
           </Grid>
@@ -215,7 +217,7 @@ const QuickSyncSettings = () => {
             disabled={testing}
             fullWidth
           >
-            {testing ? 'Testing Connection...' : 'Run Speed Test'}
+            {testing ? t('quickSync.actions.testingConnection') : t('quickSync.actions.runSpeedTest')}
           </Button>
         </Box>
       </Paper>
@@ -223,53 +225,53 @@ const QuickSyncSettings = () => {
       {/* Quality Settings */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-          Quality Settings
+          {t('quickSync.qualitySettings')}
         </Typography>
 
         <FormControl fullWidth sx={{ mb: 3 }}>
-          <InputLabel>Quality Mode</InputLabel>
+          <InputLabel>{t('quickSync.qualityMode')}</InputLabel>
           <Select
             value={preferences?.mode || 'auto'}
             onChange={(e) => handleModeChange(e.target.value)}
-            label="Quality Mode"
+            label={t('quickSync.qualityMode')}
           >
             <MenuItem value="auto">
               <Box>
-                <Typography>Auto (Recommended)</Typography>
+                <Typography>{t('quickSync.modes.auto')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Adapts to your connection and system
+                  {t('quickSync.modes.autoDescription')}
                 </Typography>
               </Box>
             </MenuItem>
             <MenuItem value="ultra">
               <Box>
-                <Typography>Ultra (320 kbps)</Typography>
+                <Typography>{t('quickSync.modes.ultra')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Maximum fidelity - requires 5+ Mbps
+                  {t('quickSync.modes.ultraDescription')}
                 </Typography>
               </Box>
             </MenuItem>
             <MenuItem value="high">
               <Box>
-                <Typography>High (256 kbps)</Typography>
+                <Typography>{t('quickSync.modes.high')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Best experience - requires 2+ Mbps
+                  {t('quickSync.modes.highDescription')}
                 </Typography>
               </Box>
             </MenuItem>
             <MenuItem value="medium">
               <Box>
-                <Typography>Medium (128 kbps)</Typography>
+                <Typography>{t('quickSync.modes.medium')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Balanced - requires 1+ Mbps
+                  {t('quickSync.modes.mediumDescription')}
                 </Typography>
               </Box>
             </MenuItem>
             <MenuItem value="low">
               <Box>
-                <Typography>Low (64 kbps)</Typography>
+                <Typography>{t('quickSync.modes.low')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Saves bandwidth - requires 0.5+ Mbps
+                  {t('quickSync.modes.lowDescription')}
                 </Typography>
               </Box>
             </MenuItem>
@@ -286,7 +288,7 @@ const QuickSyncSettings = () => {
           label={
             <Box display="flex" alignItems="center">
               <Typography>Prefer Higher Quality</Typography>
-              <Tooltip title="When system resources allow, automatically upgrade to higher quality">
+              <Tooltip title={t('quickSync.tooltips.preferHigherQuality')}>
                 <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
               </Tooltip>
             </Box>
@@ -303,7 +305,7 @@ const QuickSyncSettings = () => {
           label={
             <Box display="flex" alignItems="center">
               <Typography>Adapt to System Load</Typography>
-              <Tooltip title="Automatically adjust quality based on CPU and memory usage">
+              <Tooltip title={t('quickSync.tooltips.adaptToSystemLoad')}>
                 <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
               </Tooltip>
             </Box>
@@ -320,7 +322,7 @@ const QuickSyncSettings = () => {
           label={
             <Box display="flex" alignItems="center">
               <Typography>Apply to Downloads</Typography>
-              <Tooltip title="Use Quick Sync quality settings when downloading audio">
+              <Tooltip title={t('quickSync.tooltips.applyToDownloads')}>
                 <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
               </Tooltip>
             </Box>
@@ -332,30 +334,30 @@ const QuickSyncSettings = () => {
       {status && (
         <Paper sx={{ p: 3 }}>
           <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-            Buffer Settings
+            {t('quickSync.bufferSettings')}
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={6}>
               <Typography variant="body2" color="text.secondary">
-                Buffer Size
+                {t('quickSync.bufferSize')}
               </Typography>
               <Typography variant="h6">{status.buffer.buffer_size}s</Typography>
             </Grid>
             <Grid item xs={6}>
               <Typography variant="body2" color="text.secondary">
-                Max Buffer
+                {t('quickSync.maxBuffer')}
               </Typography>
               <Typography variant="h6">{status.buffer.max_buffer_size}s</Typography>
             </Grid>
             <Grid item xs={6}>
               <Typography variant="body2" color="text.secondary">
-                Preload
+                {t('quickSync.preload')}
               </Typography>
               <Typography variant="h6">{status.buffer.preload}</Typography>
             </Grid>
             <Grid item xs={6}>
               <Typography variant="body2" color="text.secondary">
-                Rebuffer Threshold
+                {t('quickSync.rebufferThreshold')}
               </Typography>
               <Typography variant="h6">{status.buffer.rebuffer_threshold.toFixed(1)}s</Typography>
             </Grid>

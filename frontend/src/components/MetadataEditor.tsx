@@ -31,6 +31,7 @@ import {
   MusicNote as MusicIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { audioAPI } from '../api/client';
 import type { Audio } from '../types';
 
@@ -55,6 +56,7 @@ interface MetadataEditorProps {
 }
 
 export default function MetadataEditor({ audio, open, onClose, onUpdate }: MetadataEditorProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<MetadataResult[]>([]);
@@ -101,10 +103,10 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
       });
       setResults(response.data.results || []);
       if (response.data.results.length === 0) {
-        setError('No matches found. Try adjusting the search terms.');
+        setError(t('metadataEditor.errors.noMatches'));
       }
     } catch (err) {
-      setError('Failed to search metadata');
+      setError(t('metadataEditor.errors.searchFailed'));
       console.error('Metadata search error:', err);
     } finally {
       setSearching(false);
@@ -123,7 +125,11 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
       console.log('[MetadataEditor] Auto-fetch response:', response.data);
       if (response.data.audio) {
         const updated = response.data.audio;
-        setSuccess(`✓ Found: ${updated.artist || 'Unknown'} - ${updated.album || 'Unknown'} (${updated.year || '?'})`);
+        setSuccess(t('metadataEditor.messages.foundMatch', {
+          artist: updated.artist || t('metadataEditor.unknown.artist'),
+          album: updated.album || t('metadataEditor.unknown.album'),
+          year: updated.year || '?',
+        }));
         onUpdate?.(updated);
         // Update local state
         setArtist(updated.artist || '');
@@ -131,10 +137,10 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
         setYear(updated.year?.toString() || '');
         setGenre(updated.genre || '');
       } else {
-        setError(response.data.message || 'No metadata found');
+        setError(response.data.message || t('metadataEditor.errors.noMetadataFound'));
       }
     } catch (err) {
-      setError('Failed to auto-fetch metadata');
+      setError(t('metadataEditor.errors.autoFetchFailed'));
       console.error('Auto-fetch error:', err);
     } finally {
       setLoading(false);
@@ -156,7 +162,11 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
       console.log('[MetadataEditor] Apply response:', response.data);
       if (response.data.audio) {
         const updated = response.data.audio;
-        setSuccess(`✓ Applied: ${updated.artist || 'Unknown'} - ${updated.album || 'Unknown'} (${updated.year || '?'})`);
+        setSuccess(t('metadataEditor.messages.applied', {
+          artist: updated.artist || t('metadataEditor.unknown.artist'),
+          album: updated.album || t('metadataEditor.unknown.album'),
+          year: updated.year || '?',
+        }));
         onUpdate?.(updated);
         setArtist(updated.artist || '');
         setAlbum(updated.album || '');
@@ -164,7 +174,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
         setGenre(updated.genre || '');
       }
     } catch (err) {
-      setError('Failed to apply metadata');
+      setError(t('metadataEditor.errors.applyFailed'));
       console.error('Apply metadata error:', err);
     } finally {
       setLoading(false);
@@ -187,12 +197,12 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
         source: 'manual',
       });
       if (response.data.audio) {
-        setSuccess('Metadata saved');
+        setSuccess(t('metadataEditor.messages.saved'));
         onUpdate?.(response.data.audio);
         setEditMode(false);
       }
     } catch (err) {
-      setError('Failed to save metadata');
+      setError(t('metadataEditor.errors.saveFailed'));
       console.error('Save metadata error:', err);
     } finally {
       setLoading(false);
@@ -204,7 +214,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <MusicIcon color="primary" />
-          <Typography variant="h6">Edit Metadata</Typography>
+          <Typography variant="h6">{t('metadataEditor.title')}</Typography>
         </Box>
         <IconButton onClick={onClose} size="small">
           <CloseIcon />
@@ -230,6 +240,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             Track
+            {t('metadataEditor.sections.track')}
           </Typography>
           <Typography variant="body1" fontWeight={500} noWrap>
             {audio.title}
@@ -244,27 +255,28 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Typography variant="subtitle2" color="text.secondary">
               Current Metadata
+              {t('metadataEditor.sections.currentMetadata')}
             </Typography>
             <Button
               size="small"
               startIcon={<EditIcon />}
               onClick={() => setEditMode(!editMode)}
             >
-              {editMode ? 'Cancel Edit' : 'Edit Manually'}
+              {editMode ? t('metadataEditor.actions.cancelEdit') : t('metadataEditor.actions.editManually')}
             </Button>
           </Box>
           
           {editMode ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
               <TextField
-                label="Artist"
+                label={t('metadataEditor.fields.artist')}
                 value={artist}
                 onChange={(e) => setArtist(e.target.value)}
                 size="small"
                 fullWidth
               />
               <TextField
-                label="Album"
+                label={t('metadataEditor.fields.album')}
                 value={album}
                 onChange={(e) => setAlbum(e.target.value)}
                 size="small"
@@ -272,7 +284,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
               />
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField
-                  label="Year"
+                  label={t('metadataEditor.fields.year')}
                   value={year}
                   onChange={(e) => setYear(e.target.value)}
                   size="small"
@@ -280,7 +292,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
                   sx={{ width: 120 }}
                 />
                 <TextField
-                  label="Genre"
+                  label={t('metadataEditor.fields.genre')}
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
                   size="small"
@@ -292,7 +304,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
                 onClick={handleSaveManual}
                 disabled={loading}
               >
-                Save Changes
+                {t('metadataEditor.actions.saveChanges')}
               </Button>
             </Box>
           ) : (
@@ -311,12 +323,12 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
               )}
               {!audio.artist && !audio.album && !audio.year && !audio.genre && (
                 <Typography variant="body2" color="text.secondary">
-                  No metadata available
+                  {t('metadataEditor.empty.noMetadata')}
                 </Typography>
               )}
               {audio.metadata_source && (
                 <Typography variant="caption" color="text.secondary" sx={{ width: '100%', mt: 1 }}>
-                  Source: {audio.metadata_source}
+                  {t('metadataEditor.sourceLabel')}: {audio.metadata_source}
                 </Typography>
               )}
             </Box>
@@ -335,10 +347,10 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
             disabled={loading || !audio.youtube_id}
             fullWidth
           >
-            Auto-Fetch Best Match
+            {t('metadataEditor.actions.autoFetchBestMatch')}
           </Button>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
-            Automatically finds and applies the best matching metadata from MusicBrainz
+            {t('metadataEditor.helpers.autoFetchDescription')}
           </Typography>
         </Box>
         
@@ -347,18 +359,18 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
         {/* Search Section */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Search MusicBrainz
+            {t('metadataEditor.sections.searchMusicBrainz')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
             <TextField
-              label="Title"
+              label={t('metadataEditor.fields.title')}
               value={searchTitle}
               onChange={(e) => setSearchTitle(e.target.value)}
               size="small"
               fullWidth
             />
             <TextField
-              label="Artist"
+              label={t('metadataEditor.fields.artist')}
               value={searchArtist}
               onChange={(e) => setSearchArtist(e.target.value)}
               size="small"
@@ -372,7 +384,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
             disabled={searching || !audio.youtube_id}
             fullWidth
           >
-            {searching ? 'Searching...' : 'Search'}
+            {searching ? t('metadataEditor.actions.searching') : t('metadataEditor.actions.search')}
           </Button>
         </Box>
         
@@ -392,7 +404,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Typography variant="body2" fontWeight={500}>
-                        {result.title || 'Unknown Title'}
+                        {result.title || t('metadataEditor.unknown.title')}
                       </Typography>
                       <Chip
                         label={`${Math.round(result.confidence * 100)}%`}
@@ -406,19 +418,19 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
                       {result.artist && (
                         <Typography variant="caption" color="text.secondary">
-                          Artist: {result.artist}
+                          {t('metadataEditor.labels.artist')}: {result.artist}
                         </Typography>
                       )}
                       {result.album && (
                         <Typography variant="caption" color="text.secondary">
-                          Album: {result.album} {result.year && `(${result.year})`}
+                          {t('metadataEditor.labels.album')}: {result.album} {result.year && `(${result.year})`}
                         </Typography>
                       )}
                     </Box>
                   }
                 />
                 <ListItemSecondaryAction>
-                  <Tooltip title="Apply this metadata">
+                  <Tooltip title={t('metadataEditor.actions.applyThisMetadata')}>
                     <IconButton
                       edge="end"
                       onClick={() => handleApplyResult(result)}
@@ -436,7 +448,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
       </DialogContent>
       
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t('common.close')}</Button>
       </DialogActions>
     </Dialog>
   );

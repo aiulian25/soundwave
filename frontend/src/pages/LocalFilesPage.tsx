@@ -46,6 +46,7 @@ import {
   QueueMusic as PlaylistIcon,
   CloudDownload as DownloadIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import api from '../api/client';
 import ScrollToTop from '../components/ScrollToTop';
 
@@ -86,6 +87,7 @@ interface LocalFilesPageProps {
 }
 
 const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, isPlaying }) => {
+  const { t } = useTranslation();
   const [tab, setTab] = useState(0);
   const [audioFiles, setAudioFiles] = useState<LocalAudio[]>([]);
   const [playlists, setPlaylists] = useState<LocalPlaylist[]>([]);
@@ -139,7 +141,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
     } catch (error) {
       console.error('Error loading audio files:', error);
       setAudioFiles([]);
-      setAlert({ message: 'Failed to load audio files', severity: 'error' });
+      setAlert({ message: t('localFiles.errors.loadAudioFilesFailed'), severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -210,7 +212,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
         },
       });
 
-      setAlert({ message: 'File uploaded! Metadata extracted from ID3 tags.', severity: 'success' });
+      setAlert({ message: t('localFiles.messages.uploadedWithMetadata'), severity: 'success' });
       setUploadDialogOpen(false);
       setSelectedFile(null);
       loadAudioFiles();
@@ -218,7 +220,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
     } catch (error: any) {
       console.error('Upload error:', error);
       setAlert({
-        message: error.response?.data?.error || error.response?.data?.detail || 'Failed to upload file',
+        message: error.response?.data?.error || error.response?.data?.detail || t('localFiles.errors.uploadFailed'),
         severity: 'error',
       });
     } finally {
@@ -240,7 +242,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
     const audioForPlayer = {
       youtube_id: `local-${audio.id}`,
       title: audio.title,
-      artist: audio.artist || 'Unknown Artist',
+      artist: audio.artist || t('player.unknownArtist'),
       album: audio.album,
       duration: audio.duration,
       file_url: audio.file_url,
@@ -260,16 +262,16 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
   };
 
   const handleDelete = async (audio: LocalAudio) => {
-    if (!confirm(`Delete "${audio.title}"?`)) return;
+    if (!confirm(t('localFiles.confirm.deleteFile', { title: audio.title }))) return;
 
     try {
       await api.delete(`/audio/local-audio/${audio.id}/`);
-      setAlert({ message: 'File deleted successfully', severity: 'success' });
+      setAlert({ message: t('localFiles.messages.fileDeleted'), severity: 'success' });
       loadAudioFiles();
       loadStats();
     } catch (error) {
       console.error('Error deleting file:', error);
-      setAlert({ message: 'Failed to delete file', severity: 'error' });
+      setAlert({ message: t('localFiles.errors.deleteFailed'), severity: 'error' });
     }
     setAnchorEl(null);
   };
@@ -297,14 +299,14 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          My Local Files
+          {t('localFiles.title')}
         </Typography>
         <Button
           variant="contained"
           startIcon={<UploadIcon />}
           onClick={() => setUploadDialogOpen(true)}
         >
-          Upload Audio
+          {t('localFiles.actions.uploadAudio')}
         </Button>
       </Box>
 
@@ -321,7 +323,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Total Files
+                {t('localFiles.stats.totalFiles')}
               </Typography>
               <Typography variant="h4">{stats.total_files || 0}</Typography>
             </CardContent>
@@ -331,7 +333,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Artists
+                {t('localFiles.stats.artists')}
               </Typography>
               <Typography variant="h4">{stats.total_artists || 0}</Typography>
             </CardContent>
@@ -341,7 +343,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Total Size
+                {t('localFiles.stats.totalSize')}
               </Typography>
               <Typography variant="h4">{(stats.total_size_mb || 0).toFixed(0)} MB</Typography>
             </CardContent>
@@ -351,7 +353,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Favorites
+                {t('localFiles.stats.favorites')}
               </Typography>
               <Typography variant="h4">{stats.favorites || 0}</Typography>
             </CardContent>
@@ -361,8 +363,8 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
 
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, newValue) => setTab(newValue)} sx={{ mb: 2 }}>
-        <Tab label="Audio Files" />
-        <Tab label="Playlists" />
+        <Tab label={t('localFiles.tabs.audioFiles')} />
+        <Tab label={t('localFiles.tabs.playlists')} />
       </Tabs>
 
       {/* Tab Content */}
@@ -371,7 +373,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
           {/* Filters */}
           <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
             <TextField
-              placeholder="Search..."
+              placeholder={t('localFiles.filters.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               InputProps={{
@@ -384,13 +386,13 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
               sx={{ minWidth: 250 }}
             />
             <FormControl sx={{ minWidth: 150 }}>
-              <InputLabel>Artist</InputLabel>
+              <InputLabel>{t('localFiles.filters.artist')}</InputLabel>
               <Select
                 value={filterArtist}
                 onChange={(e) => setFilterArtist(e.target.value)}
-                label="Artist"
+                label={t('localFiles.filters.artist')}
               >
-                <MenuItem value="">All Artists</MenuItem>
+                <MenuItem value="">{t('localFiles.filters.allArtists')}</MenuItem>
                 {artists.map((artist) => (
                   <MenuItem key={artist} value={artist}>
                     {artist}
@@ -399,13 +401,13 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
               </Select>
             </FormControl>
             <FormControl sx={{ minWidth: 150 }}>
-              <InputLabel>Album</InputLabel>
+              <InputLabel>{t('localFiles.filters.album')}</InputLabel>
               <Select
                 value={filterAlbum}
                 onChange={(e) => setFilterAlbum(e.target.value)}
-                label="Album"
+                label={t('localFiles.filters.album')}
               >
-                <MenuItem value="">All Albums</MenuItem>
+                <MenuItem value="">{t('localFiles.filters.allAlbums')}</MenuItem>
                 {albums.map((album) => (
                   <MenuItem key={album.album} value={album.album}>
                     {album.album}
@@ -414,13 +416,13 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
               </Select>
             </FormControl>
             <FormControl sx={{ minWidth: 150 }}>
-              <InputLabel>Genre</InputLabel>
+              <InputLabel>{t('localFiles.filters.genre')}</InputLabel>
               <Select
                 value={filterGenre}
                 onChange={(e) => setFilterGenre(e.target.value)}
-                label="Genre"
+                label={t('localFiles.filters.genre')}
               >
-                <MenuItem value="">All Genres</MenuItem>
+                <MenuItem value="">{t('localFiles.filters.allGenres')}</MenuItem>
                 {genres.map((genre) => (
                   <MenuItem key={genre} value={genre}>
                     {genre}
@@ -433,9 +435,9 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
               startIcon={<FavoriteIcon />}
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
             >
-              Favorites
+              {t('localFiles.filters.favorites')}
             </Button>
-            <Button onClick={clearFilters}>Clear Filters</Button>
+            <Button onClick={clearFilters}>{t('localFiles.filters.clearFilters')}</Button>
           </Box>
 
           {/* Audio Grid */}
@@ -445,17 +447,17 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
             <Box sx={{ textAlign: 'center', py: 8 }}>
               <MusicIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" color="textSecondary" gutterBottom>
-                No audio files yet
+                {t('localFiles.empty.title')}
               </Typography>
               <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                Upload your local audio files to start listening
+                {t('localFiles.empty.description')}
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<UploadIcon />}
                 onClick={() => setUploadDialogOpen(true)}
               >
-                Upload Your First File
+                {t('localFiles.empty.uploadFirst')}
               </Button>
             </Box>
           ) : (
@@ -491,7 +493,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
                           {audio.title}
                         </Typography>
                         <Typography variant="body2" color="textSecondary" noWrap>
-                          {audio.artist || 'Unknown Artist'}
+                          {audio.artist || t('player.unknownArtist')}
                         </Typography>
                         {audio.album && (
                           <Typography variant="caption" color="textSecondary" noWrap>
@@ -546,6 +548,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
         <Box>
           <Typography variant="body1" color="textSecondary">
             Playlists feature coming soon...
+            {t('localFiles.playlistsComingSoon')}
           </Typography>
         </Box>
       )}
@@ -563,14 +566,14 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
             handleMenuClose();
           }}
         >
-          <DownloadIcon sx={{ mr: 1 }} /> Download
+          <DownloadIcon sx={{ mr: 1 }} /> {t('localFiles.actions.download')}
         </MenuItem>
         <MenuItem
           onClick={() => {
             if (selectedAudio) handleDelete(selectedAudio);
           }}
         >
-          <DeleteIcon sx={{ mr: 1 }} /> Delete
+          <DeleteIcon sx={{ mr: 1 }} /> {t('localFiles.actions.delete')}
         </MenuItem>
       </Menu>
 
@@ -581,7 +584,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Upload Audio File</DialogTitle>
+        <DialogTitle>{t('localFiles.uploadDialog.title')}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <input
@@ -599,7 +602,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
                 fullWidth
                 sx={{ mb: 2 }}
               >
-                Choose File
+                {t('localFiles.uploadDialog.chooseFile')}
               </Button>
             </label>
             {selectedFile && (
@@ -609,6 +612,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Metadata will be read from ID3 tags
+                  {t('localFiles.uploadDialog.fileInfo', { size: (selectedFile.size / (1024 * 1024)).toFixed(2) })}
                 </Typography>
               </Box>
             )}
@@ -616,7 +620,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
               <Box sx={{ mt: 2 }}>
                 <LinearProgress variant="determinate" value={uploadProgress} />
                 <Typography variant="body2" color="textSecondary" sx={{ mt: 1, textAlign: 'center' }}>
-                  Uploading... {uploadProgress}%
+                  {t('localFiles.uploadDialog.uploading', { progress: uploadProgress })}
                 </Typography>
               </Box>
             )}
@@ -624,14 +628,14 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={handleUpload}
             variant="contained"
             disabled={!selectedFile || uploading}
           >
-            Upload
+            {t('localFiles.actions.upload')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -46,19 +46,20 @@ import {
   Tune as TuneIcon,
   Remove as RemoveIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { smartPlaylistAPI } from '../api/client';
 import type { SmartPlaylist, SmartPlaylistChoices, Audio } from '../types';
 import ScrollToTop from '../components/ScrollToTop';
 
 // Rule preset templates for quick creation
 const RULE_PRESETS = [
-  { label: 'Most Played (Top 50)', rules: [{ field: 'play_count', operator: 'greater_than', value: '0' }], order_by: '-play_count', limit: 50 },
-  { label: 'Recently Added (Last 30 days)', rules: [{ field: 'downloaded_date', operator: 'in_last_days', value: '30' }], order_by: '-downloaded_date', limit: null },
-  { label: 'Favorites', rules: [{ field: 'is_favorite', operator: 'is_true', value: '' }], order_by: '-downloaded_date', limit: null },
-  { label: 'By Genre...', rules: [{ field: 'genre', operator: 'contains', value: '' }], order_by: 'title', limit: null },
-  { label: 'By Artist...', rules: [{ field: 'artist', operator: 'contains', value: '' }], order_by: 'title', limit: null },
-  { label: 'Short Tracks (Under 3 min)', rules: [{ field: 'duration', operator: 'less_than', value: '180' }], order_by: 'duration', limit: null },
-  { label: 'Custom Rules...', rules: [], order_by: '-downloaded_date', limit: null },
+  { key: 'mostPlayedTop50', rules: [{ field: 'play_count', operator: 'greater_than', value: '0' }], order_by: '-play_count', limit: 50 },
+  { key: 'recentlyAdded30Days', rules: [{ field: 'downloaded_date', operator: 'in_last_days', value: '30' }], order_by: '-downloaded_date', limit: null },
+  { key: 'favorites', rules: [{ field: 'is_favorite', operator: 'is_true', value: '' }], order_by: '-downloaded_date', limit: null },
+  { key: 'byGenre', rules: [{ field: 'genre', operator: 'contains', value: '' }], order_by: 'title', limit: null },
+  { key: 'byArtist', rules: [{ field: 'artist', operator: 'contains', value: '' }], order_by: 'title', limit: null },
+  { key: 'shortTracks', rules: [{ field: 'duration', operator: 'less_than', value: '180' }], order_by: 'duration', limit: null },
+  { key: 'customRules', rules: [], order_by: '-downloaded_date', limit: null },
 ];
 
 // Icon mapping for smart playlists
@@ -78,6 +79,7 @@ interface SmartPlaylistsPageProps {
 }
 
 export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPageProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<SmartPlaylist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +103,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       setPlaylists(response.data.data || []);
     } catch (err) {
       console.error('Failed to load smart playlists:', err);
-      setSnackbar({ open: true, message: 'Failed to load smart playlists', severity: 'error' });
+      setSnackbar({ open: true, message: t('smartPlaylists.errors.loadFailed'), severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
 
   const handleCreatePlaylist = async () => {
     if (!newPlaylistName.trim()) {
-      setSnackbar({ open: true, message: 'Please enter a name', severity: 'error' });
+      setSnackbar({ open: true, message: t('smartPlaylists.errors.enterName'), severity: 'error' });
       return;
     }
 
@@ -144,7 +146,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
     let rules = [...preset.rules];
     
     // For presets that need a value (genre, artist)
-    if (preset.label.includes('...') && customRuleValue.trim()) {
+    if (['byGenre', 'byArtist'].includes(preset.key) && customRuleValue.trim()) {
       rules = rules.map(r => ({ ...r, value: customRuleValue.trim() }));
     }
     
@@ -157,7 +159,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
     if (rules.length === 0) {
       setSnackbar({ 
         open: true, 
-        message: 'No rules set - playlist will include all tracks. Add rules after creation to filter.', 
+        message: t('smartPlaylists.messages.noRulesWarning'), 
         severity: 'info' 
       });
     }
@@ -172,7 +174,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       });
       resetCreateDialog();
       setCreateDialogOpen(false);
-      setSnackbar({ open: true, message: 'Smart playlist created!', severity: 'success' });
+      setSnackbar({ open: true, message: t('smartPlaylists.messages.created'), severity: 'success' });
       loadPlaylists();
       
       // Navigate to the new playlist to let user refine rules
@@ -183,7 +185,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       console.error('Failed to create smart playlist:', err);
       setSnackbar({
         open: true,
-        message: err.response?.data?.name?.[0] || 'Failed to create smart playlist',
+        message: err.response?.data?.name?.[0] || t('smartPlaylists.errors.createFailed'),
         severity: 'error',
       });
     }
@@ -193,19 +195,19 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
     event.stopPropagation();
     
     if (playlist.is_system) {
-      setSnackbar({ open: true, message: 'Cannot delete system playlists', severity: 'error' });
+      setSnackbar({ open: true, message: t('smartPlaylists.errors.cannotDeleteSystem'), severity: 'error' });
       return;
     }
 
-    if (!confirm(`Delete "${playlist.name}"?`)) return;
+    if (!confirm(t('smartPlaylists.confirm.delete', { name: playlist.name }))) return;
 
     try {
       await smartPlaylistAPI.delete(playlist.id);
-      setSnackbar({ open: true, message: 'Smart playlist deleted', severity: 'success' });
+      setSnackbar({ open: true, message: t('smartPlaylists.messages.deleted'), severity: 'success' });
       loadPlaylists();
     } catch (err) {
       console.error('Failed to delete smart playlist:', err);
-      setSnackbar({ open: true, message: 'Failed to delete smart playlist', severity: 'error' });
+      setSnackbar({ open: true, message: t('smartPlaylists.errors.deleteFailed'), severity: 'error' });
     }
   };
 
@@ -217,7 +219,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       const tracks = response.data.data as Audio[];
       
       if (tracks.length === 0) {
-        setSnackbar({ open: true, message: 'No tracks in this playlist', severity: 'info' });
+        setSnackbar({ open: true, message: t('smartPlaylists.messages.noTracks'), severity: 'info' });
         return;
       }
 
@@ -233,12 +235,12 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       setCurrentAudio(queue[0], queue);
       setSnackbar({
         open: true,
-        message: `Playing ${tracks.length} tracks${shuffle ? ' (shuffled)' : ''}`,
+        message: t(shuffle ? 'smartPlaylists.messages.playingShuffled' : 'smartPlaylists.messages.playing', { count: tracks.length }),
         severity: 'success',
       });
     } catch (err) {
       console.error('Failed to play playlist:', err);
-      setSnackbar({ open: true, message: 'Failed to load tracks', severity: 'error' });
+      setSnackbar({ open: true, message: t('smartPlaylists.errors.loadTracksFailed'), severity: 'error' });
     }
   };
 
@@ -267,7 +269,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <AutoAwesomeIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           <Typography variant="h4" fontWeight="bold">
-            Smart Playlists
+            {t('smartPlaylists.title')}
           </Typography>
         </Box>
         <Button
@@ -275,12 +277,12 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
           startIcon={<AddIcon />}
           onClick={handleOpenCreateDialog}
         >
-          Create
+          {t('smartPlaylists.actions.create')}
         </Button>
       </Box>
 
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Dynamic playlists that automatically update based on rules. Your library changes, they update instantly.
+        {t('smartPlaylists.description')}
       </Typography>
 
       {/* System Playlists */}
@@ -288,7 +290,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
         <>
           <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
             <BoltIcon sx={{ color: 'warning.main' }} />
-            Auto Playlists
+            {t('smartPlaylists.sections.autoPlaylists')}
           </Typography>
           <Grid container spacing={2} sx={{ mb: 4 }}>
             {systemPlaylists.map((playlist) => (
@@ -313,20 +315,24 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                             {getIcon(playlist.icon)}
                           </Box>
                           <Typography variant="h6" noWrap sx={{ flex: 1 }}>
-                            {playlist.name}
+                            {playlist.preset_type
+                              ? t(`smartPlaylists.system.${playlist.preset_type}.name`, { defaultValue: playlist.name })
+                              : playlist.name}
                           </Typography>
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: 40 }}>
-                          {playlist.description}
+                          {playlist.preset_type
+                            ? t(`smartPlaylists.system.${playlist.preset_type}.description`, { defaultValue: playlist.description })
+                            : playlist.description}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Chip
-                            label={`${playlist.track_count} tracks`}
+                            label={t('smartPlaylists.trackCount', { count: playlist.track_count })}
                             size="small"
                             sx={{ bgcolor: `${playlist.color}22`, color: playlist.color }}
                           />
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
-                            <Tooltip title="Play">
+                            <Tooltip title={t('smartPlaylists.actions.play')}>
                               <IconButton
                                 size="small"
                                 onClick={(e) => handlePlayPlaylist(playlist, false, e)}
@@ -335,7 +341,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                                 <PlayIcon />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Shuffle">
+                            <Tooltip title={t('smartPlaylists.actions.shuffle')}>
                               <IconButton
                                 size="small"
                                 onClick={(e) => handlePlayPlaylist(playlist, true, e)}
@@ -359,24 +365,24 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       {/* Custom Playlists */}
       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <TuneIcon sx={{ color: 'primary.main' }} />
-        Custom Smart Playlists
+        {t('smartPlaylists.sections.customSmartPlaylists')}
       </Typography>
       
       {customPlaylists.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'background.default' }}>
           <AutoAwesomeIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5, mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
-            No custom smart playlists yet
+            {t('smartPlaylists.empty.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Create your own rules-based playlists
+            {t('smartPlaylists.empty.description')}
           </Typography>
           <Button
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={handleOpenCreateDialog}
           >
-            Create Smart Playlist
+            {t('smartPlaylists.actions.createSmartPlaylist')}
           </Button>
         </Paper>
       ) : (
@@ -407,16 +413,16 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                         </Typography>
                       </Box>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: 40 }}>
-                        {playlist.description || 'No description'}
+                        {playlist.description || t('smartPlaylists.empty.noDescription')}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Chip
-                          label={`${playlist.track_count} tracks`}
+                          label={t('smartPlaylists.trackCount', { count: playlist.track_count })}
                           size="small"
                           sx={{ bgcolor: `${playlist.color}22`, color: playlist.color }}
                         />
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="Play">
+                          <Tooltip title={t('smartPlaylists.actions.play')}>
                             <IconButton
                               size="small"
                               onClick={(e) => handlePlayPlaylist(playlist, false, e)}
@@ -425,7 +431,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                               <PlayIcon />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Shuffle">
+                          <Tooltip title={t('smartPlaylists.actions.shuffle')}>
                             <IconButton
                               size="small"
                               onClick={(e) => handlePlayPlaylist(playlist, true, e)}
@@ -434,7 +440,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                               <ShuffleIcon />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete">
+                          <Tooltip title={t('smartPlaylists.actions.delete')}>
                             <IconButton
                               size="small"
                               onClick={(e) => handleDeletePlaylist(playlist, e)}
@@ -459,14 +465,14 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <AutoAwesomeIcon color="primary" />
-            Create Smart Playlist
+            {t('smartPlaylists.createDialog.title')}
           </Box>
         </DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Name"
+            label={t('smartPlaylists.createDialog.name')}
             fullWidth
             value={newPlaylistName}
             onChange={(e) => setNewPlaylistName(e.target.value)}
@@ -474,7 +480,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
           />
           <TextField
             margin="dense"
-            label="Description (optional)"
+            label={t('smartPlaylists.createDialog.descriptionOptional')}
             fullWidth
             multiline
             rows={2}
@@ -487,7 +493,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
           
           <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <TuneIcon fontSize="small" />
-            Choose what tracks to include:
+            {t('smartPlaylists.createDialog.chooseTracks')}
           </Typography>
           
           <RadioGroup
@@ -502,14 +508,14 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                 <FormControlLabel
                   value={index}
                   control={<Radio size="small" />}
-                  label={preset.label}
+                  label={t(`smartPlaylists.presets.${preset.key}`)}
                   sx={{ ml: 0 }}
                 />
                 {/* Show value input for presets that need it */}
-                {selectedPreset === index && preset.label.includes('...') && (
+                {selectedPreset === index && ['byGenre', 'byArtist'].includes(preset.key) && (
                   <TextField
                     size="small"
-                    placeholder={preset.label.includes('Genre') ? 'e.g., Rock, Pop, Jazz' : 'e.g., Artist name'}
+                    placeholder={preset.key === 'byGenre' ? t('smartPlaylists.placeholders.genre') : t('smartPlaylists.placeholders.artist')}
                     value={customRuleValue}
                     onChange={(e) => setCustomRuleValue(e.target.value)}
                     sx={{ ml: 4, mb: 1, width: 'calc(100% - 32px)' }}
@@ -525,10 +531,10 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
               {customRules.map((rule, index) => (
                 <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
                   <FormControl size="small" sx={{ minWidth: 120 }}>
-                    <InputLabel>Field</InputLabel>
+                      <InputLabel>{t('smartPlaylists.customRules.field')}</InputLabel>
                     <Select
                       value={rule.field}
-                      label="Field"
+                      label={t('smartPlaylists.customRules.field')}
                       onChange={(e) => {
                         const updated = [...customRules];
                         updated[index].field = e.target.value;
@@ -541,10 +547,10 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                     </Select>
                   </FormControl>
                   <FormControl size="small" sx={{ minWidth: 130 }}>
-                    <InputLabel>Operator</InputLabel>
+                    <InputLabel>{t('smartPlaylists.customRules.operator')}</InputLabel>
                     <Select
                       value={rule.operator}
-                      label="Operator"
+                      label={t('smartPlaylists.customRules.operator')}
                       onChange={(e) => {
                         const updated = [...customRules];
                         updated[index].operator = e.target.value;
@@ -559,7 +565,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                   {!['is_true', 'is_false', 'is_set', 'is_not_set'].includes(rule.operator) && (
                     <TextField
                       size="small"
-                      placeholder="Value"
+                      placeholder={t('smartPlaylists.customRules.value')}
                       value={rule.value}
                       onChange={(e) => {
                         const updated = [...customRules];
@@ -586,19 +592,19 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                 startIcon={<AddIcon />}
                 onClick={() => setCustomRules([...customRules, { field: 'genre', operator: 'contains', value: '' }])}
               >
-                Add Rule
+                {t('smartPlaylists.actions.addRule')}
               </Button>
             </Box>
           )}
           
           <Alert severity="info" sx={{ mt: 2 }}>
-            Smart playlists automatically update when your library changes. You can refine rules after creation.
+            {t('smartPlaylists.createDialog.info')}
           </Alert>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setCreateDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleCreatePlaylist} variant="contained">
-            Create
+            {t('smartPlaylists.actions.create')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -36,6 +36,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ClearIcon from '@mui/icons-material/Clear';
 import PersonIcon from '@mui/icons-material/Person';
 import AlbumIcon from '@mui/icons-material/Album';
+import { useTranslation } from 'react-i18next';
 import { audioAPI, playlistAPI, channelAPI } from '../api/client';
 import { fetchAllAudio, fetchAllPlaylists, fetchAllChannels } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
@@ -73,6 +74,7 @@ interface QuickSuggestion {
 
 export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -80,9 +82,10 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [allAudio, setAllAudio] = useState<Audio[]>([]);
-  const [popularSearches] = useState<string[]>([
-    'hip hop', 'rock music', 'jazz', 'classical', 'electronic', 'blues'
-  ]);
+  const popularSearches = useMemo(
+    () => t('search.popularSearches', { returnObjects: true }) as string[],
+    [t]
+  );
   
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -377,7 +380,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, letterSpacing: '-0.02em' }}>
-        Search
+        {t('search.title')}
       </Typography>
 
       {/* Search Input with Auto-complete */}
@@ -391,7 +394,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={handleInputFocus}
             onKeyDown={handleKeyDown}
-            placeholder="Search for songs, artists, playlists, or channels..."
+            placeholder={t('search.placeholder')}
             variant="outlined"
             InputProps={{
               startAdornment: (
@@ -449,7 +452,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                     <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <HistoryIcon fontSize="small" />
-                        Recent searches
+                        {t('search.suggestions.recentSearches')}
                       </Typography>
                       <Typography
                         variant="caption"
@@ -460,7 +463,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                           clearRecentSearches();
                         }}
                       >
-                        Clear all
+                        {t('search.actions.clearAll')}
                       </Typography>
                     </Box>
                   )}
@@ -470,7 +473,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                     <Box sx={{ px: 2, py: 0.5 }}>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <PersonIcon fontSize="small" />
-                        Artists
+                        {t('search.suggestions.artists')}
                       </Typography>
                     </Box>
                   )}
@@ -490,7 +493,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             <Box sx={{ px: 2, py: 0.5 }}>
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <MusicNoteIcon fontSize="small" />
-                                Songs
+                                {t('search.suggestions.songs')}
                               </Typography>
                             </Box>
                           </>
@@ -501,7 +504,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             <Box sx={{ px: 2, py: 0.5 }}>
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <HistoryIcon fontSize="small" />
-                                Recent
+                                {t('search.suggestions.recent')}
                               </Typography>
                             </Box>
                           </>
@@ -512,7 +515,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             <Box sx={{ px: 2, py: 0.5 }}>
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <TrendingUpIcon fontSize="small" />
-                                Popular
+                                {t('search.suggestions.popular')}
                               </Typography>
                             </Box>
                           </>
@@ -553,7 +556,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                   {suggestions.length === 0 && !query.trim() && (
                     <Box sx={{ p: 2, textAlign: 'center' }}>
                       <Typography variant="body2" color="text.secondary">
-                        Start typing to search
+                        {t('search.suggestions.startTyping')}
                       </Typography>
                     </Box>
                   )}
@@ -570,19 +573,19 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
             <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val)}>
               <Tab
-                label={`All (${totalResults})`}
+                label={t('search.tabs.all', { count: totalResults })}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
               <Tab
-                label={`Songs (${audioResults.length})`}
+                label={t('search.tabs.songs', { count: audioResults.length })}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
               <Tab
-                label={`Playlists (${playlistResults.length})`}
+                label={t('search.tabs.playlists', { count: playlistResults.length })}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
               <Tab
-                label={`Channels (${channelResults.length})`}
+                label={t('search.tabs.channels', { count: channelResults.length })}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
             </Tabs>
@@ -596,10 +599,10 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
             <Box sx={{ textAlign: 'center', py: 8 }}>
               <SearchIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.3, mb: 2 }} />
               <Typography variant="h6" color="text.secondary">
-                No results found
+                {t('search.noResults.title')}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Try searching with different keywords
+                {t('search.noResults.description')}
               </Typography>
             </Box>
           ) : (
@@ -610,7 +613,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                   {audioResults.length > 0 && (
                     <Box sx={{ mb: 4 }}>
                       <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <MusicNoteIcon /> Songs
+                        <MusicNoteIcon /> {t('search.sections.songs')}
                       </Typography>
                       <List>
                         {audioResults.slice(0, 5).map((audio) => (
@@ -656,7 +659,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                                 primaryTypographyProps={{ fontWeight: 500 }}
                               />
                               {!audio.file_path && (
-                                <Chip label="Not Downloaded" size="small" color="warning" sx={{ mr: 2 }} />
+                                <Chip label={t('search.status.notDownloaded')} size="small" color="warning" sx={{ mr: 2 }} />
                               )}
                             </ListItemButton>
                           </ListItem>
@@ -668,7 +671,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                   {playlistResults.length > 0 && (
                     <Box sx={{ mb: 4 }}>
                       <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PlaylistPlayIcon /> Playlists
+                        <PlaylistPlayIcon /> {t('search.sections.playlists')}
                       </Typography>
                       <Grid container spacing={2}>
                         {playlistResults.slice(0, 4).map((playlist) => (
@@ -692,7 +695,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                                   {playlist.title}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" noWrap>
-                                  {playlist.downloaded_count}/{playlist.item_count} tracks
+                                  {t('search.libraryTrackCount', { downloaded: playlist.downloaded_count, total: playlist.item_count })}
                                 </Typography>
                               </CardContent>
                             </Card>
@@ -705,7 +708,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                   {channelResults.length > 0 && (
                     <Box sx={{ mb: 4 }}>
                       <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <YouTubeIcon /> Channels
+                        <YouTubeIcon /> {t('search.sections.channels')}
                       </Typography>
                       <List>
                         {channelResults.slice(0, 5).map((channel) => (
@@ -718,7 +721,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                               </ListItemAvatar>
                               <ListItemText
                                 primary={channel.channel_name}
-                                secondary={channel.subscribed ? 'Subscribed' : 'Not subscribed'}
+                                secondary={channel.subscribed ? t('search.status.subscribed') : t('search.status.notSubscribed')}
                                 primaryTypographyProps={{ fontWeight: 500 }}
                               />
                             </ListItemButton>
@@ -776,7 +779,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                           primaryTypographyProps={{ fontWeight: 500 }}
                         />
                         {!audio.file_path && (
-                          <Chip label="Not Downloaded" size="small" color="warning" sx={{ mr: 2 }} />
+                          <Chip label={t('search.status.notDownloaded')} size="small" color="warning" sx={{ mr: 2 }} />
                         )}
                       </ListItemButton>
                     </ListItem>
@@ -811,7 +814,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             {playlist.channel_name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary" display="block">
-                            {playlist.downloaded_count}/{playlist.item_count} tracks
+                            {t('search.libraryTrackCount', { downloaded: playlist.downloaded_count, total: playlist.item_count })}
                           </Typography>
                         </CardContent>
                       </Card>
@@ -833,11 +836,11 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                         </ListItemAvatar>
                         <ListItemText
                           primary={channel.channel_name}
-                          secondary={channel.subscribed ? 'Subscribed' : 'Not subscribed'}
+                          secondary={channel.subscribed ? t('search.status.subscribed') : t('search.status.notSubscribed')}
                           primaryTypographyProps={{ fontWeight: 500, fontSize: '1rem' }}
                         />
                         {channel.subscribed && (
-                          <Chip label="Subscribed" size="small" color="success" />
+                          <Chip label={t('search.status.subscribed')} size="small" color="success" />
                         )}
                       </ListItemButton>
                     </ListItem>
@@ -854,10 +857,10 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <SearchIcon sx={{ fontSize: 80, color: 'text.secondary', opacity: 0.3, mb: 2 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            Search Your Library
+            {t('search.empty.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Find songs, playlists, and channels in your collection
+            {t('search.empty.description')}
           </Typography>
         </Box>
       )}

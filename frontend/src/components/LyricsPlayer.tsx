@@ -39,6 +39,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import { useTranslation } from 'react-i18next';
 import api, { audioAPI } from '../api/client';
 import { offlineStorage } from '../utils/offlineStorage';
 import { getLyricsColors, LyricsThemeColors, DEFAULT_VISUALIZER_THEME } from '../config/visualizerThemes';
@@ -92,6 +93,7 @@ interface LyricsPlayerProps {
 }
 
 export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek, visualizerTheme, isLightMode }: LyricsPlayerProps) {
+  const { t } = useTranslation();
   // Get settings and theme for automatic detection
   const { settings } = useSettings();
   const muiTheme = useTheme();
@@ -206,7 +208,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       
       // No cache - fetch from API (requires online)
       if (!navigator.onLine) {
-        setError('Lyrics not available offline');
+        setError(t('lyrics.errors.notAvailableOffline'));
         setLoading(false);
         return;
       }
@@ -222,7 +224,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       // Cache for offline use (fire and forget)
       offlineStorage.saveLyrics(youtubeId, response.data).catch(() => {});
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load lyrics');
+      setError(err.response?.data?.error || t('lyrics.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -247,7 +249,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         loadSuggestions();
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch lyrics');
+      setError(err.response?.data?.error || t('lyrics.errors.fetchFailed'));
     } finally {
       setLoading(false);
     }
@@ -289,7 +291,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       setSuggestions([]);
       setEditMode(false);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to apply lyrics');
+      setError(err.response?.data?.error || t('lyrics.errors.applyFailed'));
     } finally {
       setApplyingId(null);
     }
@@ -320,7 +322,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       // Auto-load suggestions after delete
       loadSuggestions();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to delete lyrics');
+      setError(err.response?.data?.error || t('lyrics.errors.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -371,7 +373,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
       console.error('Download failed:', err);
-      setError(err.response?.data?.error || 'Failed to download lyrics');
+      setError(err.response?.data?.error || t('lyrics.errors.downloadFailed'));
     }
   };
 
@@ -385,13 +387,13 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
 
     // Validate file extension
     if (!file.name.toLowerCase().endsWith('.lrc')) {
-      setError('Please select a valid .lrc file');
+      setError(t('lyrics.errors.invalidLrcFile'));
       return;
     }
 
     // Validate file size (max 1MB)
     if (file.size > 1024 * 1024) {
-      setError('LRC file must be smaller than 1MB');
+      setError(t('lyrics.errors.lrcTooLarge'));
       return;
     }
 
@@ -416,7 +418,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       
     } catch (err: any) {
       console.error('Upload failed:', err);
-      setError(err.response?.data?.error || 'Failed to upload LRC file');
+      setError(err.response?.data?.error || t('lyrics.errors.uploadFailed'));
     } finally {
       setUploading(false);
       // Reset file input
@@ -520,7 +522,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             {error}
           </Alert>
           <Button variant="contained" onClick={fetchLyrics} startIcon={<RefreshIcon />}>
-            Try Fetch Lyrics
+            {t('lyrics.actions.tryFetchLyrics')}
           </Button>
         </Box>
       </Box>
@@ -544,10 +546,10 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
           <MusicNoteIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            Instrumental Track
+            {t('lyrics.instrumental.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-            This track was marked as instrumental. If it has lyrics, you can search for them or upload an LRC file.
+            {t('lyrics.instrumental.description')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
             <Button
@@ -557,7 +559,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               onClick={deleteLyrics}
               disabled={deleting}
             >
-              {deleting ? 'Clearing...' : 'Search for Lyrics'}
+              {deleting ? t('lyrics.actions.clearing') : t('lyrics.actions.searchForLyrics')}
             </Button>
             <Button
               variant="outlined"
@@ -567,7 +569,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               disabled={uploading}
               color="secondary"
             >
-              {uploading ? 'Uploading...' : 'Upload .LRC'}
+              {uploading ? t('lyrics.actions.uploading') : t('lyrics.actions.uploadLrc')}
             </Button>
           </Box>
           {/* Hidden file input for upload */}
@@ -583,7 +585,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             open={uploadSuccess}
             autoHideDuration={3000}
             onClose={() => setUploadSuccess(false)}
-            message="LRC file uploaded successfully!"
+            message={t('lyrics.messages.uploadSuccess')}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           />
         </Box>
@@ -603,13 +605,13 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         )}
         <Box sx={{ flex: 1, p: 2, overflow: 'auto' }}>
           <Alert severity="info" sx={{ mb: 2 }}>
-            No lyrics found for this track
-            {lyrics.fetch_attempted && ` (Attempted ${lyrics.fetch_attempts} times)`}
+            {t('lyrics.empty.noLyrics')}
+            {lyrics.fetch_attempted && ` (${t('lyrics.empty.attemptedTimes', { count: lyrics.fetch_attempts })})`}
           </Alert>
           
           <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
             <Button variant="contained" onClick={fetchLyrics} startIcon={<RefreshIcon />} size="small">
-              Retry Fetch
+              {t('lyrics.actions.retryFetch')}
             </Button>
             <Button 
               variant="outlined" 
@@ -618,7 +620,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               size="small"
               disabled={suggestionsLoading}
             >
-              {suggestionsLoading ? 'Searching...' : 'Find Suggestions'}
+              {suggestionsLoading ? t('lyrics.actions.searching') : t('lyrics.actions.findSuggestions')}
             </Button>
             <Button
               variant="outlined"
@@ -628,7 +630,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               disabled={uploading}
               color="secondary"
             >
-              {uploading ? 'Uploading...' : 'Upload .LRC'}
+              {uploading ? t('lyrics.actions.uploading') : t('lyrics.actions.uploadLrc')}
             </Button>
           </Box>
           
@@ -646,7 +648,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             open={uploadSuccess}
             autoHideDuration={3000}
             onClose={() => setUploadSuccess(false)}
-            message="LRC file uploaded successfully!"
+            message={t('lyrics.messages.uploadSuccess')}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           />
 
@@ -655,7 +657,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             <TextField
               fullWidth
               size="small"
-              placeholder="Search by song title or artist..."
+              placeholder={t('lyrics.search.placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               InputProps={{
@@ -667,7 +669,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                 endAdornment: searchQuery && (
                   <InputAdornment position="end">
                     <Button type="submit" size="small" disabled={suggestionsLoading}>
-                      Search
+                      {t('lyrics.actions.search')}
                     </Button>
                   </InputAdornment>
                 ),
@@ -679,7 +681,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           {suggestions.length > 0 && (
             <Box sx={{ maxHeight: 300, overflow: 'auto', position: 'relative' }}>
               <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-                Found {suggestions.length} suggestions:
+                {t('lyrics.search.foundSuggestions', { count: suggestions.length })}
               </Typography>
               <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
                 {suggestions.map((suggestion) => (
@@ -703,7 +705,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                         startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
                         sx={{ minWidth: 70 }}
                       >
-                        {applyingId === suggestion.id ? '...' : 'Use'}
+                        {applyingId === suggestion.id ? t('lyrics.actions.applying') : t('lyrics.actions.use')}
                       </Button>
                     }
                   >
@@ -715,20 +717,20 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                             "{suggestion.track_name}"
                           </Typography>
                           <Typography variant="body2" color="text.secondary" noWrap>
-                            by {suggestion.artist_name}
+                            {t('lyrics.search.byArtist', { artist: suggestion.artist_name })}
                           </Typography>
                         </Box>
                       }
                       secondary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                           {suggestion.has_synced && (
-                            <Chip label="Synced" size="small" color="success" sx={{ height: 20 }} />
+                            <Chip label={t('lyrics.tags.synced')} size="small" color="success" sx={{ height: 20 }} />
                           )}
                           {suggestion.has_plain && !suggestion.has_synced && (
-                            <Chip label="Plain" size="small" sx={{ height: 20 }} />
+                            <Chip label={t('lyrics.tags.plain')} size="small" sx={{ height: 20 }} />
                           )}
                           {suggestion.instrumental && (
-                            <Chip label="Instrumental" size="small" color="info" sx={{ height: 20 }} />
+                            <Chip label={t('lyrics.tags.instrumental')} size="small" color="info" sx={{ height: 20 }} />
                           )}
                           <Typography variant="caption" color="text.secondary">
                             {formatDuration(suggestion.duration)}
@@ -761,7 +763,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 2, pt: 1 }}>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          Lyrics
+          {t('lyrics.title')}
         </Typography>
         
         {/* Find Different Lyrics button */}
@@ -774,7 +776,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             }
           }}
           sx={{ mr: 1 }}
-          title="Find different lyrics"
+          title={t('lyrics.actions.findDifferentLyrics')}
           color={editMode ? 'primary' : 'default'}
         >
           <SwapHorizIcon />
@@ -785,7 +787,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           size="small" 
           onClick={(e) => setDownloadMenuAnchor(e.currentTarget)}
           sx={{ mr: 1 }}
-          title="Download lyrics"
+          title={t('lyrics.actions.downloadLyrics')}
         >
           <DownloadIcon />
         </IconButton>
@@ -799,19 +801,19 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               <ListItemIcon>
                 <MusicNoteIcon fontSize="small" />
               </ListItemIcon>
-              Download .LRC (synced)
+              {t('lyrics.actions.downloadLrcSynced')}
             </MenuItem>
           )}
           <MenuItem onClick={() => handleDownload('txt')}>
             <ListItemIcon>
               <TextSnippetIcon fontSize="small" />
             </ListItemIcon>
-            Download .TXT (plain)
+            {t('lyrics.actions.downloadTxtPlain')}
           </MenuItem>
         </Menu>
         
         {/* Upload LRC button */}
-        <Tooltip title="Upload .LRC file">
+        <Tooltip title={t('lyrics.actions.uploadLrcFile')}>
           <IconButton 
             size="small" 
             onClick={handleUploadClick}
@@ -829,7 +831,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           onChange={handleLrcUpload}
         />
         
-        <IconButton size="small" onClick={fetchLyrics} sx={{ mr: 1 }} title="Refresh lyrics">
+        <IconButton size="small" onClick={fetchLyrics} sx={{ mr: 1 }} title={t('lyrics.actions.refreshLyrics')}>
           <RefreshIcon />
         </IconButton>
         
@@ -845,7 +847,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         open={uploadSuccess}
         autoHideDuration={3000}
         onClose={() => setUploadSuccess(false)}
-        message="LRC file uploaded successfully!"
+        message={t('lyrics.messages.uploadSuccess')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
       
@@ -854,7 +856,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         <Box sx={{ p: 2, bgcolor: 'action.hover', borderBottom: 1, borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="subtitle2" color="primary">
-              Find Different Lyrics
+              {t('lyrics.actions.findDifferentLyrics')}
             </Typography>
             <Button
               size="small"
@@ -864,7 +866,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               onClick={deleteLyrics}
               disabled={deleting}
             >
-              {deleting ? 'Clearing...' : 'Clear & Search'}
+              {deleting ? t('lyrics.actions.clearing') : t('lyrics.actions.clearAndSearch')}
             </Button>
           </Box>
           
@@ -873,7 +875,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             <TextField
               fullWidth
               size="small"
-              placeholder="Search by song title or artist..."
+              placeholder={t('lyrics.search.placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               InputProps={{
@@ -885,7 +887,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                 endAdornment: (
                   <InputAdornment position="end">
                     <Button type="submit" size="small" disabled={suggestionsLoading}>
-                      {suggestionsLoading ? 'Searching...' : 'Search'}
+                      {suggestionsLoading ? t('lyrics.actions.searching') : t('lyrics.actions.search')}
                     </Button>
                   </InputAdornment>
                 ),
@@ -903,7 +905,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           {!suggestionsLoading && suggestions.length > 0 && (
             <Box sx={{ maxHeight: 250, overflow: 'auto', position: 'relative', zIndex: 1 }}>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                {suggestions.length} suggestions found - select one to replace current lyrics:
+                {t('lyrics.search.suggestionsFoundReplace', { count: suggestions.length })}
               </Typography>
               <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
                 {suggestions.map((suggestion) => (
@@ -927,7 +929,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                         startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
                         sx={{ minWidth: 70 }}
                       >
-                        {applyingId === suggestion.id ? '...' : 'Use'}
+                        {applyingId === suggestion.id ? t('lyrics.actions.applying') : t('lyrics.actions.use')}
                       </Button>
                     }
                   >
@@ -939,20 +941,20 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                             "{suggestion.track_name}"
                           </Typography>
                           <Typography variant="body2" color="text.secondary" noWrap>
-                            by {suggestion.artist_name}
+                            {t('lyrics.search.byArtist', { artist: suggestion.artist_name })}
                           </Typography>
                         </Box>
                       }
                       secondary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                           {suggestion.has_synced && (
-                            <Chip label="Synced" size="small" color="success" sx={{ height: 20 }} />
+                            <Chip label={t('lyrics.tags.synced')} size="small" color="success" sx={{ height: 20 }} />
                           )}
                           {suggestion.has_plain && !suggestion.has_synced && (
-                            <Chip label="Plain" size="small" sx={{ height: 20 }} />
+                            <Chip label={t('lyrics.tags.plain')} size="small" sx={{ height: 20 }} />
                           )}
                           {suggestion.instrumental && (
-                            <Chip label="Instrumental" size="small" color="info" sx={{ height: 20 }} />
+                            <Chip label={t('lyrics.tags.instrumental')} size="small" color="info" sx={{ height: 20 }} />
                           )}
                           <Typography variant="caption" color="text.secondary">
                             {formatDuration(suggestion.duration)}
@@ -968,7 +970,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
           
           {!suggestionsLoading && suggestions.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-              No suggestions loaded yet. Enter a search term or click Search to find lyrics.
+              {t('lyrics.search.noSuggestionsLoaded')}
             </Typography>
           )}
         </Box>
@@ -977,7 +979,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       {lyrics.is_synced && (
         <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="caption" color="text.secondary">
-            Source: {lyrics.source === 'upload' && lyrics.uploaded_filename 
+            {t('lyrics.source')}: {lyrics.source === 'upload' && lyrics.uploaded_filename 
               ? `📤 ${lyrics.uploaded_filename}` 
               : lyrics.source} {lyrics.language && `• ${lyrics.language}`}
           </Typography>
@@ -989,15 +991,15 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                 onChange={(e) => setAutoScroll(e.target.checked)}
               />
             }
-            label={<Typography variant="caption">Auto-scroll</Typography>}
+            label={<Typography variant="caption">{t('lyrics.autoScroll')}</Typography>}
           />
         </Box>
       )}
 
       {lyrics.is_synced && lyrics.plain_lyrics && (
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ px: 2, minHeight: 40 }}>
-          <Tab label="Synced" sx={{ minHeight: 40, py: 0.5 }} />
-          <Tab label="Plain Text" sx={{ minHeight: 40, py: 0.5 }} />
+          <Tab label={t('lyrics.tabs.synced')} sx={{ minHeight: 40, py: 0.5 }} />
+          <Tab label={t('lyrics.tabs.plainText')} sx={{ minHeight: 40, py: 0.5 }} />
         </Tabs>
       )}
 
@@ -1152,7 +1154,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
 
       {lyrics.last_error && (
         <Alert severity="warning" sx={{ m: 2, mt: 0 }}>
-          Last fetch error: {lyrics.last_error}
+          {t('lyrics.lastFetchError', { error: lyrics.last_error })}
         </Alert>
       )}
     </Card>

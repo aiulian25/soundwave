@@ -15,6 +15,8 @@ build/
 db.sqlite3
 media/
 staticfiles/
+celerybeat-schedule
+celerybeat.pid
 
 # Node
 node_modules/
@@ -37,6 +39,8 @@ node_modules/
 *.swp
 *.swo
 *~
+*.backup
+*.bak
 
 # OS
 .DS_Store

@@ -32,7 +32,6 @@ export interface DownloadProgress {
 class BackgroundDownloadService {
   private swRegistration: ServiceWorkerRegistration | null = null;
   private isSupported: boolean = false;
-  private authToken: string | null = null;
   private statusPollingInterval: number | null = null;
   private statusListeners: Set<(downloads: DownloadProgress[]) => void> = new Set();
 
@@ -97,12 +96,6 @@ class BackgroundDownloadService {
   private handleServiceWorkerMessage(event: MessageEvent) {
     const { type, ...data } = event.data || {};
     
-    if (type === 'GET_AUTH_TOKEN') {
-      // Service worker requesting auth token
-      const token = this.authToken || localStorage.getItem('token');
-      event.ports?.[0]?.postMessage({ token });
-    }
-    
     if (type === 'DOWNLOAD_STATUS_UPDATE') {
       // Status update from service worker
       this.notifyStatusListeners(data.downloads);
@@ -115,30 +108,19 @@ class BackgroundDownloadService {
   }
 
   /**
-   * Set the authentication token for API requests
+   * Legacy no-op kept for backward compatibility with existing callers.
    */
-  setAuthToken(token: string | null) {
-    this.authToken = token;
-    
-    // Update token in service worker for pending downloads
-    if (token && this.swRegistration) {
-      this.sendMessage('UPDATE_AUTH_TOKEN', { authToken: token });
-    }
+  setAuthToken(_token: string | null) {
+    return;
   }
 
   /**
    * Queue a download for background processing
    */
   async queueDownload(url: string, title?: string): Promise<{ success: boolean; id?: number; error?: string }> {
-    const token = this.authToken || localStorage.getItem('token');
-    
-    if (!token) {
-      return { success: false, error: 'Not authenticated' };
-    }
-
     // If online and basic mode, try direct API call first
     if (navigator.onLine && !this.isSupported) {
-      return this.directDownload(url, token);
+      return this.directDownload(url);
     }
 
     // Use service worker for background download
@@ -146,7 +128,6 @@ class BackgroundDownloadService {
       const result = await this.sendMessage('QUEUE_DOWNLOAD', {
         url,
         title,
-        authToken: token,
       });
       
       return result;
@@ -155,7 +136,7 @@ class BackgroundDownloadService {
       
       // Fallback to direct API if service worker fails
       if (navigator.onLine) {
-        return this.directDownload(url, token);
+        return this.directDownload(url);
       }
       
       return { success: false, error: 'Failed to queue download' };
@@ -166,21 +147,14 @@ class BackgroundDownloadService {
    * Queue multiple downloads for background processing
    */
   async queueDownloads(downloads: { url: string; title?: string }[]): Promise<{ success: boolean; ids?: number[]; error?: string }> {
-    const token = this.authToken || localStorage.getItem('token');
-    
-    if (!token) {
-      return { success: false, error: 'Not authenticated' };
-    }
-
     // If online and basic mode, try direct API call
     if (navigator.onLine && !this.isSupported) {
-      return this.directDownloadBatch(downloads.map(d => d.url), token);
+      return this.directDownloadBatch(downloads.map(d => d.url));
     }
 
     try {
       const result = await this.sendMessage('QUEUE_DOWNLOADS_BATCH', {
         downloads,
-        authToken: token,
       });
       
       return result;
@@ -188,7 +162,7 @@ class BackgroundDownloadService {
       console.error('[BackgroundDownload] Batch queue error:', error);
       
       if (navigator.onLine) {
-        return this.directDownloadBatch(downloads.map(d => d.url), token);
+        return this.directDownloadBatch(downloads.map(d => d.url));
       }
       
       return { success: false, error: 'Failed to queue downloads' };
@@ -261,16 +235,13 @@ class BackgroundDownloadService {
       }
       
       try {
-        const token = this.authToken || localStorage.getItem('token');
-        if (!token) return;
-
         // Fetch active downloads
         const pendingResponse = await fetch('/api/download/?filter=pending', {
-          headers: { 'Authorization': `Token ${token}` },
+          credentials: 'include',
         });
         
         const downloadingResponse = await fetch('/api/download/?filter=downloading', {
-          headers: { 'Authorization': `Token ${token}` },
+          credentials: 'include',
         });
 
         if (pendingResponse.ok && downloadingResponse.ok) {
@@ -339,14 +310,14 @@ class BackgroundDownloadService {
   /**
    * Direct API call fallback when service worker not available
    */
-  private async directDownload(url: string, token: string): Promise<{ success: boolean; id?: number; error?: string }> {
+  private async directDownload(url: string): Promise<{ success: boolean; id?: number; error?: string }> {
     try {
       const response = await fetch('/api/download/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({
           urls: [url],
           auto_start: true,
@@ -365,14 +336,14 @@ class BackgroundDownloadService {
     }
   }
 
-  private async directDownloadBatch(urls: string[], token: string): Promise<{ success: boolean; ids?: number[]; error?: string }> {
+  private async directDownloadBatch(urls: string[]): Promise<{ success: boolean; ids?: number[]; error?: string }> {
     try {
       const response = await fetch('/api/download/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({
           urls,
           auto_start: true,
@@ -396,7 +367,7 @@ class BackgroundDownloadService {
    */
   private sendMessage(type: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
-      if (!navigator.serviceWorker.controller) {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker || !navigator.serviceWorker.controller) {
         // No controller yet - this is normal during SW update, just resolve with empty
         console.log('[BackgroundDownload] No service worker controller, returning empty');
         resolve({ downloads: [], success: true });

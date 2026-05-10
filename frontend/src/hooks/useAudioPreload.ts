@@ -44,9 +44,7 @@ export function useAudioPreload({ enabled, youtubeId, mediaUrl }: UseAudioPreloa
       if (youtubeId && preloadedUrlRef.current !== youtubeId) {
         try {
           const response = await fetch(`/api/audio/${youtubeId}/player/`, {
-            headers: {
-              'Authorization': `Token ${localStorage.getItem('token')}`,
-            },
+            credentials: 'include',
           });
           const data = await response.json();
           

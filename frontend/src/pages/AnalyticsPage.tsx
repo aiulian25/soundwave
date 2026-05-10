@@ -22,6 +22,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import {
   AccessTime as AccessTimeIcon,
   MusicNote as MusicNoteIcon,
@@ -107,18 +108,20 @@ interface InsightsData {
   recent_history: RecentTrack[];
 }
 
-const formatDuration = (seconds: number): string => {
+const formatDuration = (seconds: number, t: (key: string, options?: Record<string, unknown>) => string): string => {
   if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 3600) return t('analytics.duration.minutesShort', { count: Math.floor(seconds / 60) });
   const hours = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  return mins > 0
+    ? t('analytics.duration.hoursMinutesShort', { hours, minutes: mins })
+    : t('analytics.duration.hoursShort', { count: hours });
 };
 
-const formatHour = (hour: number): string => {
-  if (hour === 0) return '12 AM';
-  if (hour === 12) return '12 PM';
-  return hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
+const formatHour = (hour: number, t: (key: string, options?: Record<string, unknown>) => string): string => {
+  if (hour === 0) return t('analytics.hours.midnight');
+  if (hour === 12) return t('analytics.hours.noon');
+  return hour > 12 ? t('analytics.hours.pm', { hour: hour - 12 }) : t('analytics.hours.am', { hour });
 };
 
 interface StatCardProps {
@@ -174,9 +177,10 @@ const StatCard = ({ title, value, subtitle, icon, color = 'primary.main' }: Stat
 
 interface HourlyChartProps {
   data: HourlyData[];
+  t: (key: string, options?: Record<string, unknown>) => string;
 }
 
-const HourlyChart = ({ data }: HourlyChartProps) => {
+const HourlyChart = ({ data, t }: HourlyChartProps) => {
   const theme = useTheme();
   const maxPlayCount = Math.max(...data.map(d => d.play_count), 1);
 
@@ -186,7 +190,11 @@ const HourlyChart = ({ data }: HourlyChartProps) => {
         {data.map((item) => (
           <Tooltip
             key={item.hour}
-            title={`${formatHour(item.hour)}: ${item.play_count} plays (${formatDuration(item.total_duration)})`}
+            title={t('analytics.hourlyChart.tooltip', {
+              hour: formatHour(item.hour, t),
+              count: item.play_count,
+              duration: formatDuration(item.total_duration, t),
+            })}
           >
             <Box
               sx={{
@@ -207,17 +215,18 @@ const HourlyChart = ({ data }: HourlyChartProps) => {
         ))}
       </Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-        <Typography variant="caption" color="text.secondary">12 AM</Typography>
-        <Typography variant="caption" color="text.secondary">6 AM</Typography>
-        <Typography variant="caption" color="text.secondary">12 PM</Typography>
-        <Typography variant="caption" color="text.secondary">6 PM</Typography>
-        <Typography variant="caption" color="text.secondary">12 AM</Typography>
+        <Typography variant="caption" color="text.secondary">{t('analytics.hours.midnight')}</Typography>
+        <Typography variant="caption" color="text.secondary">{t('analytics.hours.am', { hour: 6 })}</Typography>
+        <Typography variant="caption" color="text.secondary">{t('analytics.hours.noon')}</Typography>
+        <Typography variant="caption" color="text.secondary">{t('analytics.hours.pm', { hour: 6 })}</Typography>
+        <Typography variant="caption" color="text.secondary">{t('analytics.hours.midnight')}</Typography>
       </Box>
     </Box>
   );
 };
 
 export default function AnalyticsPage() {
+  const { t, i18n } = useTranslation();
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
@@ -251,7 +260,7 @@ export default function AnalyticsPage() {
     return (
       <Box sx={{ textAlign: 'center', py: 8 }}>
         <Typography variant="h6" color="text.secondary">
-          Unable to load analytics data
+          {t('analytics.errors.unableToLoad')}
         </Typography>
       </Box>
     );
@@ -266,23 +275,23 @@ export default function AnalyticsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Listening Insights
+            {t('analytics.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Your personal listening statistics and habits
+            {t('analytics.description')}
           </Typography>
         </Box>
         <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Time Range</InputLabel>
+          <InputLabel>{t('analytics.timeRange.label')}</InputLabel>
           <Select
             value={timeRange}
-            label="Time Range"
+            label={t('analytics.timeRange.label')}
             onChange={(e) => setTimeRange(Number(e.target.value))}
           >
-            <MenuItem value={7}>Last 7 days</MenuItem>
-            <MenuItem value={30}>Last 30 days</MenuItem>
-            <MenuItem value={90}>Last 3 months</MenuItem>
-            <MenuItem value={365}>Last year</MenuItem>
+            <MenuItem value={7}>{t('analytics.timeRange.last7Days')}</MenuItem>
+            <MenuItem value={30}>{t('analytics.timeRange.last30Days')}</MenuItem>
+            <MenuItem value={90}>{t('analytics.timeRange.last3Months')}</MenuItem>
+            <MenuItem value={365}>{t('analytics.timeRange.lastYear')}</MenuItem>
           </Select>
         </FormControl>
       </Box>
@@ -291,24 +300,24 @@ export default function AnalyticsPage() {
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Total Listening Time"
-            value={formatDuration(insights.total_listening_time)}
+            title={t('analytics.cards.totalListeningTime')}
+            value={formatDuration(insights.total_listening_time, t)}
             icon={<AccessTimeIcon />}
             color="primary.main"
           />
         </Grid>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Tracks Played"
+            title={t('analytics.cards.tracksPlayed')}
             value={insights.total_tracks_played.toLocaleString()}
-            subtitle={`${insights.total_unique_tracks} unique`}
+            subtitle={t('analytics.cards.uniqueTracks', { count: insights.total_unique_tracks })}
             icon={<MusicNoteIcon />}
             color="secondary.main"
           />
         </Grid>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Unique Artists"
+            title={t('analytics.cards.uniqueArtists')}
             value={insights.total_unique_artists}
             icon={<PersonIcon />}
             color="warning.main"
@@ -316,40 +325,40 @@ export default function AnalyticsPage() {
         </Grid>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Daily Average"
-            value={formatDuration(insights.avg_daily_listening)}
+            title={t('analytics.cards.dailyAverage')}
+            value={formatDuration(insights.avg_daily_listening, t)}
             icon={<TrendingUpIcon />}
             color="info.main"
           />
         </Grid>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Current Streak"
-            value={`${insights.current_streak} days`}
+            title={t('analytics.cards.currentStreak')}
+            value={t('analytics.days', { count: insights.current_streak })}
             icon={<FireIcon />}
             color={insights.current_streak > 0 ? 'error.main' : 'text.disabled'}
           />
         </Grid>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Longest Streak"
-            value={`${insights.longest_streak} days`}
+            title={t('analytics.cards.longestStreak')}
+            value={t('analytics.days', { count: insights.longest_streak })}
             icon={<CalendarIcon />}
             color="success.main"
           />
         </Grid>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Peak Hour"
-            value={insights.favorite_hour !== null ? formatHour(insights.favorite_hour) : 'N/A'}
+            title={t('analytics.cards.peakHour')}
+            value={insights.favorite_hour !== null ? formatHour(insights.favorite_hour, t) : t('analytics.notAvailable')}
             icon={<ScheduleIcon />}
             color="primary.main"
           />
         </Grid>
         <Grid item xs={6} sm={4} md={3}>
           <StatCard
-            title="Favorite Day"
-            value={insights.favorite_day || 'N/A'}
+            title={t('analytics.cards.favoriteDay')}
+            value={insights.favorite_day || t('analytics.notAvailable')}
             icon={<CalendarIcon />}
             color="secondary.main"
           />
@@ -362,12 +371,12 @@ export default function AnalyticsPage() {
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                Listening Activity by Hour
+                {t('analytics.sections.activityByHour.title')}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                When you listen to music throughout the day
+                {t('analytics.sections.activityByHour.description')}
               </Typography>
-              <HourlyChart data={insights.listening_by_hour} />
+              <HourlyChart data={insights.listening_by_hour} t={t} />
             </CardContent>
           </Card>
         </Grid>
@@ -377,11 +386,11 @@ export default function AnalyticsPage() {
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Top Artists
+                {t('analytics.sections.topArtists')}
               </Typography>
               {insights.top_artists.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                  No listening data yet
+                  {t('analytics.empty.noListeningData')}
                 </Typography>
               ) : (
                 <List dense disablePadding>
@@ -400,7 +409,7 @@ export default function AnalyticsPage() {
                       </ListItemAvatar>
                       <ListItemText
                         primary={artist.artist}
-                        secondary={`${artist.play_count} plays • ${formatDuration(artist.total_duration)}`}
+                        secondary={t('analytics.listItem.playsDuration', { count: artist.play_count, duration: formatDuration(artist.total_duration, t) })}
                         primaryTypographyProps={{ fontWeight: 500 }}
                       />
                       <Box sx={{ width: 80 }}>
@@ -423,11 +432,11 @@ export default function AnalyticsPage() {
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Top Channels
+                {t('analytics.sections.topChannels')}
               </Typography>
               {insights.top_channels.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                  No listening data yet
+                  {t('analytics.empty.noListeningData')}
                 </Typography>
               ) : (
                 <List dense disablePadding>
@@ -445,7 +454,7 @@ export default function AnalyticsPage() {
                       </ListItemAvatar>
                       <ListItemText
                         primary={channel.channel_name}
-                        secondary={`${channel.play_count} plays • ${formatDuration(channel.total_duration)}`}
+                        secondary={t('analytics.listItem.playsDuration', { count: channel.play_count, duration: formatDuration(channel.total_duration, t) })}
                         primaryTypographyProps={{ 
                           fontWeight: 500,
                           sx: { 
@@ -476,11 +485,11 @@ export default function AnalyticsPage() {
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Most Played Tracks
+                {t('analytics.sections.mostPlayedTracks')}
               </Typography>
               {insights.top_tracks.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                  No listening data yet
+                  {t('analytics.empty.noListeningData')}
                 </Typography>
               ) : (
                 <List dense disablePadding>
@@ -533,11 +542,11 @@ export default function AnalyticsPage() {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Recent Listening History
+                {t('analytics.sections.recentListeningHistory')}
               </Typography>
               {insights.recent_history.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                  No recent listening history
+                  {t('analytics.empty.noRecentHistory')}
                 </Typography>
               ) : (
                 <List disablePadding>
@@ -567,9 +576,9 @@ export default function AnalyticsPage() {
                           <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <span>{track.artist || track.channel_name}</span>
                             <span>•</span>
-                            <span>{formatDuration(track.duration_listened)}</span>
+                            <span>{formatDuration(track.duration_listened, t)}</span>
                             {track.completed && (
-                              <Chip label="Completed" size="small" color="success" sx={{ height: 18, fontSize: '0.65rem' }} />
+                              <Chip label={t('analytics.status.completed')} size="small" color="success" sx={{ height: 18, fontSize: '0.65rem' }} />
                             )}
                           </Box>
                         }
@@ -583,7 +592,7 @@ export default function AnalyticsPage() {
                         }}
                       />
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(track.listened_at).toLocaleString()}
+                        {new Date(track.listened_at).toLocaleString(i18n.language === 'ro' ? 'ro-RO' : 'en-US')}
                       </Typography>
                     </ListItem>
                   ))}
@@ -599,7 +608,7 @@ export default function AnalyticsPage() {
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Genre Distribution
+                  {t('analytics.sections.genreDistribution')}
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                   {insights.genre_distribution.map((genre) => (

@@ -46,6 +46,7 @@ import {
   Remove as RemoveIcon,
   Preview as PreviewIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { smartPlaylistAPI, audioAPI } from '../api/client';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
@@ -56,6 +57,7 @@ interface SmartPlaylistDetailPageProps {
 }
 
 export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlaylistDetailPageProps) {
+  const { t } = useTranslation();
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
@@ -92,7 +94,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
       setError('');
     } catch (err: any) {
       console.error('Failed to load smart playlist:', err);
-      setError(err.response?.data?.detail || 'Failed to load playlist');
+      setError(err.response?.data?.detail || t('smartPlaylistDetail.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -205,12 +207,12 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
         limit: editingLimit ? parseInt(editingLimit.toString()) : null,
       });
       setEditDialogOpen(false);
-      setSnackbarMessage('Rules updated!');
+      setSnackbarMessage(t('smartPlaylistDetail.messages.rulesUpdated'));
       setSnackbarOpen(true);
       loadPlaylist(); // Reload to get updated tracks
     } catch (err: any) {
       console.error('Failed to save rules:', err);
-      setSnackbarMessage(err.response?.data?.error || 'Failed to save rules');
+      setSnackbarMessage(err.response?.data?.error || t('smartPlaylistDetail.errors.saveRulesFailed'));
       setSnackbarOpen(true);
     }
   };
@@ -234,7 +236,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
       <Box sx={{ p: 3 }}>
         <Alert severity="error">{error}</Alert>
         <Button startIcon={<BackIcon />} onClick={() => navigate('/smart-playlists')} sx={{ mt: 2 }}>
-          Back to Smart Playlists
+          {t('smartPlaylistDetail.actions.backToSmartPlaylists')}
         </Button>
       </Box>
     );
@@ -250,8 +252,8 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
           startIcon={<BackIcon />}
           onClick={() => navigate('/smart-playlists')}
           sx={{ mb: 2 }}
-        >
-          Back to Smart Playlists
+>
+          {t('smartPlaylistDetail.actions.backToSmartPlaylists')}
         </Button>
 
         <Card
@@ -269,7 +271,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                     {playlist.name}
                   </Typography>
                   {playlist.is_system && (
-                    <Chip label="Auto" size="small" color="warning" />
+                    <Chip label={t('smartPlaylistDetail.badges.auto')} size="small" color="warning" />
                   )}
                 </Box>
                 <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
@@ -277,7 +279,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   <Chip
-                    label={`${tracks.length} tracks`}
+                    label={t('smartPlaylistDetail.trackCount', { count: tracks.length })}
                     sx={{ bgcolor: `${playlist.color}22`, color: playlist.color }}
                   />
                 </Box>
@@ -290,8 +292,8 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                   onClick={() => handlePlay(0, false)}
                   disabled={tracks.length === 0}
                   sx={{ bgcolor: playlist.color, '&:hover': { bgcolor: playlist.color, filter: 'brightness(0.9)' } }}
-                >
-                  Play All
+>
+                  {t('smartPlaylistDetail.actions.playAll')}
                 </Button>
                 <Button
                   variant="outlined"
@@ -299,16 +301,16 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                   onClick={() => handlePlay(0, true)}
                   disabled={tracks.length === 0}
                   sx={{ borderColor: playlist.color, color: playlist.color }}
-                >
-                  Shuffle
+>
+                  {t('smartPlaylistDetail.actions.shuffle')}
                 </Button>
                 {!playlist.is_system && (
                   <Button
                     variant="outlined"
                     startIcon={<TuneIcon />}
                     onClick={openEditDialog}
-                  >
-                    Edit Rules
+>
+                    {t('smartPlaylistDetail.actions.editRules')}
                   </Button>
                 )}
               </Box>
@@ -322,7 +324,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <AutoAwesomeIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5, mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
-            No tracks match the rules
+            {t('smartPlaylistDetail.empty.noTracksMatchRules')}
           </Typography>
           {!playlist.is_system && (
             <Button
@@ -330,8 +332,8 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
               startIcon={<TuneIcon />}
               onClick={openEditDialog}
               sx={{ mt: 2 }}
-            >
-              Edit Rules
+>
+              {t('smartPlaylistDetail.actions.editRules')}
             </Button>
           )}
         </Paper>
@@ -341,11 +343,11 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
             <TableHead>
               <TableRow>
                 <TableCell width={50}>#</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Artist</TableCell>
-                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Channel</TableCell>
-                <TableCell align="right" sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Plays</TableCell>
-                <TableCell align="right" width={100}>Actions</TableCell>
+                <TableCell>{t('library.columns.title')}</TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('search.suggestions.artists')}</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('library.columns.channel')}</TableCell>
+                <TableCell align="right" sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('library.columns.plays')}</TableCell>
+                <TableCell align="right" width={100}>{t('library.columns.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -414,41 +416,41 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <TuneIcon />
-            Edit Smart Playlist Rules
+            {t('smartPlaylistDetail.dialog.editRulesTitle')}
           </Box>
         </DialogTitle>
         <DialogContent dividers>
           {/* Match Mode */}
           <Box sx={{ mb: 3 }}>
             <FormControl fullWidth size="small">
-              <InputLabel>Match Mode</InputLabel>
+              <InputLabel>{t('smartPlaylistDetail.dialog.matchMode')}</InputLabel>
               <Select
                 value={editingMatchMode}
                 onChange={(e) => setEditingMatchMode(e.target.value as 'all' | 'any')}
-                label="Match Mode"
+                label={t('smartPlaylistDetail.dialog.matchMode')}
               >
-                <MenuItem value="all">Match ALL rules (AND)</MenuItem>
-                <MenuItem value="any">Match ANY rule (OR)</MenuItem>
+                <MenuItem value="all">{t('smartPlaylistDetail.dialog.matchAllRules')}</MenuItem>
+                <MenuItem value="any">{t('smartPlaylistDetail.dialog.matchAnyRules')}</MenuItem>
               </Select>
             </FormControl>
           </Box>
 
           {/* Rules */}
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Rules</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('smartPlaylistDetail.dialog.rules')}</Typography>
           {editingRules.length === 0 ? (
             <Alert severity="info" sx={{ mb: 2 }}>
-              No rules defined. All tracks will be included.
+              {t('smartPlaylistDetail.dialog.noRulesDefined')}
             </Alert>
           ) : (
             <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
               {editingRules.map((rule, index) => (
                 <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                   <FormControl size="small" sx={{ minWidth: 140 }}>
-                    <InputLabel>Field</InputLabel>
+                    <InputLabel>{t('smartPlaylistDetail.dialog.field')}</InputLabel>
                     <Select
                       value={rule.field}
                       onChange={(e) => handleRuleChange(index, 'field', e.target.value)}
-                      label="Field"
+                      label={t('smartPlaylistDetail.dialog.field')}
                     >
                       {choices?.fields.map((f) => (
                         <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>
@@ -457,11 +459,11 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                   </FormControl>
 
                   <FormControl size="small" sx={{ minWidth: 160 }}>
-                    <InputLabel>Operator</InputLabel>
+                    <InputLabel>{t('smartPlaylistDetail.dialog.operator')}</InputLabel>
                     <Select
                       value={rule.operator}
                       onChange={(e) => handleRuleChange(index, 'operator', e.target.value)}
-                      label="Operator"
+                      label={t('smartPlaylistDetail.dialog.operator')}
                     >
                       {choices?.operators
                         .filter((op) => getApplicableOperators(rule.field).includes(op.value))
@@ -474,7 +476,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                   {!['is_true', 'is_false', 'is_set', 'is_not_set'].includes(rule.operator) && (
                     <TextField
                       size="small"
-                      label="Value"
+                      label={t('smartPlaylistDetail.dialog.value')}
                       value={rule.value}
                       onChange={(e) => handleRuleChange(index, 'value', e.target.value)}
                       sx={{ minWidth: 120 }}
@@ -484,7 +486,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                   {rule.operator === 'between' && (
                     <TextField
                       size="small"
-                      label="To"
+                      label={t('smartPlaylistDetail.dialog.to')}
                       value={rule.value_2 || ''}
                       onChange={(e) => handleRuleChange(index, 'value_2', e.target.value)}
                       sx={{ width: 80 }}
@@ -500,7 +502,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
           )}
 
           <Button startIcon={<AddIcon />} onClick={handleAddRule} size="small">
-            Add Rule
+            {t('smartPlaylistDetail.dialog.addRule')}
           </Button>
 
           <Divider sx={{ my: 3 }} />
@@ -509,11 +511,11 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small">
-                <InputLabel>Order By</InputLabel>
+                <InputLabel>{t('smartPlaylistDetail.dialog.orderBy')}</InputLabel>
                 <Select
                   value={editingOrderBy}
                   onChange={(e) => setEditingOrderBy(e.target.value)}
-                  label="Order By"
+                  label={t('smartPlaylistDetail.dialog.orderBy')}
                 >
                   {choices?.order_by_options.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
@@ -525,7 +527,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
               <TextField
                 fullWidth
                 size="small"
-                label="Limit (empty = unlimited)"
+                label={t('smartPlaylistDetail.dialog.limit')}
                 type="number"
                 value={editingLimit}
                 onChange={(e) => setEditingLimit(e.target.value ? parseInt(e.target.value) : '')}
@@ -542,19 +544,19 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
               onClick={handlePreview}
               disabled={previewLoading}
             >
-              Preview
+              {t('smartPlaylistDetail.dialog.preview')}
             </Button>
             {previewCount !== null && (
               <Typography variant="body2" color="text.secondary">
-                {previewCount} tracks would match
+                {t('smartPlaylistDetail.dialog.previewMatchCount', { count: previewCount })}
               </Typography>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setEditDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleSaveRules} variant="contained">
-            Save Rules
+            {t('smartPlaylistDetail.actions.saveRules')}
           </Button>
         </DialogActions>
       </Dialog>

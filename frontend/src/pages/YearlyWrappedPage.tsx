@@ -16,6 +16,7 @@ import {
   Divider,
   Avatar,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import {
   MusicNote as MusicIcon,
   AccessTime as TimeIcon,
@@ -31,6 +32,7 @@ import { statsAPI } from '../api/client';
 import type { YearlyWrapped } from '../types';
 
 export default function YearlyWrappedPage() {
+  const { t, i18n } = useTranslation();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [wrapped, setWrapped] = useState<YearlyWrapped | null>(null);
@@ -53,9 +55,9 @@ export default function YearlyWrappedPage() {
     } catch (err: any) {
       console.error('Failed to load yearly wrapped:', err);
       if (err.response?.status === 404) {
-        setError(`No listening data found for ${year}`);
+        setError(t('yearlyWrapped.errors.noDataForYear', { year }));
       } else {
-        setError('Failed to load yearly wrapped');
+        setError(t('yearlyWrapped.errors.loadFailed'));
       }
       setWrapped(null);
     } finally {
@@ -64,18 +66,44 @@ export default function YearlyWrappedPage() {
   };
 
   const formatMinutes = (minutes: number) => {
-    if (minutes < 60) return `${minutes} minutes`;
+    if (minutes < 60) return t('yearlyWrapped.time.minutes', { count: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} hours`;
+    if (hours < 24) return t('yearlyWrapped.time.hours', { count: hours });
     const days = Math.floor(hours / 24);
-    return `${days} days, ${hours % 24} hours`;
+    return t('yearlyWrapped.time.daysHours', { days, hours: hours % 24 });
   };
 
   const formatHour = (hour: number | null) => {
-    if (hour === null) return 'N/A';
-    if (hour === 0) return '12 AM';
-    if (hour === 12) return '12 PM';
-    return hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
+    if (hour === null) return t('yearlyWrapped.notAvailable');
+    if (hour === 0) return t('yearlyWrapped.hours.midnight');
+    if (hour === 12) return t('yearlyWrapped.hours.noon');
+    return hour > 12 ? t('yearlyWrapped.hours.pm', { hour: hour - 12 }) : t('yearlyWrapped.hours.am', { hour });
+  };
+
+  const formatMonthShort = (monthNumber: number) => (
+    new Date(2000, monthNumber - 1, 1).toLocaleString(i18n.language === 'ro' ? 'ro-RO' : 'en-US', { month: 'short' })
+  );
+
+  const translatePersonality = (personality: string) => {
+    if (personality.startsWith('🔥')) return t('yearlyWrapped.personality.streakMaster');
+    if (personality.startsWith('🦉')) return t('yearlyWrapped.personality.nightOwl');
+    if (personality.startsWith('🐦')) return t('yearlyWrapped.personality.earlyBird');
+    if (personality.startsWith('🌍')) return t('yearlyWrapped.personality.musicalExplorer');
+    if (personality.startsWith('💖')) return t('yearlyWrapped.personality.devotedFan');
+    if (personality.startsWith('🎵')) return t('yearlyWrapped.personality.audioAddict');
+    if (personality.startsWith('🎧')) return t('yearlyWrapped.personality.dedicatedListener');
+    if (personality.startsWith('🌱')) return t('yearlyWrapped.personality.risingStar');
+    return personality;
+  };
+
+  const translateDayName = (day: string) => {
+    const key = day.toLowerCase();
+    return t(`common.days.${key}`, { defaultValue: day });
+  };
+
+  const translateMonthName = (month: string) => {
+    const key = month.toLowerCase();
+    return t(`common.months.${key}`, { defaultValue: month });
   };
 
   if (loading) {
@@ -92,17 +120,17 @@ export default function YearlyWrappedPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            🎁 Your {year} Wrapped
+            {t('yearlyWrapped.title', { year })}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            A look back at your listening journey
+            {t('yearlyWrapped.description')}
           </Typography>
         </Box>
         <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Year</InputLabel>
+          <InputLabel>{t('yearlyWrapped.year')}</InputLabel>
           <Select
             value={year}
-            label="Year"
+            label={t('yearlyWrapped.year')}
             onChange={(e) => setYear(Number(e.target.value))}
           >
             {yearOptions.map((y) => (
@@ -114,7 +142,7 @@ export default function YearlyWrappedPage() {
 
       {error ? (
         <Alert severity="info" sx={{ mb: 3 }}>
-          {error}. Start listening to build your wrapped!
+          {t('yearlyWrapped.errors.withHint', { error })}
         </Alert>
       ) : wrapped && (
         <>
@@ -129,10 +157,10 @@ export default function YearlyWrappedPage() {
           >
             <CardContent sx={{ textAlign: 'center', py: 4 }}>
               <Typography variant="h5" sx={{ mb: 1 }}>
-                Your Listening Personality
+                {t('yearlyWrapped.personality.title')}
               </Typography>
               <Typography variant="h3" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                {wrapped.listening_personality}
+                {translatePersonality(wrapped.listening_personality)}
               </Typography>
             </CardContent>
           </Card>
@@ -142,7 +170,7 @@ export default function YearlyWrappedPage() {
             <Grid item xs={6} md={3}>
               <StatCard
                 icon={<TimeIcon sx={{ fontSize: 32 }} />}
-                label="Minutes Listened"
+                label={t('yearlyWrapped.stats.minutesListened')}
                 value={wrapped.total_minutes_listened.toLocaleString()}
                 subtitle={formatMinutes(wrapped.total_minutes_listened)}
                 color="primary.main"
@@ -151,16 +179,16 @@ export default function YearlyWrappedPage() {
             <Grid item xs={6} md={3}>
               <StatCard
                 icon={<MusicIcon sx={{ fontSize: 32 }} />}
-                label="Tracks Played"
+                label={t('yearlyWrapped.stats.tracksPlayed')}
                 value={wrapped.total_tracks_played.toLocaleString()}
-                subtitle={`${wrapped.total_unique_tracks} unique`}
+                subtitle={t('yearlyWrapped.stats.uniqueTracks', { count: wrapped.total_unique_tracks })}
                 color="secondary.main"
               />
             </Grid>
             <Grid item xs={6} md={3}>
               <StatCard
                 icon={<ArtistIcon sx={{ fontSize: 32 }} />}
-                label="Artists Discovered"
+                label={t('yearlyWrapped.stats.artistsDiscovered')}
                 value={wrapped.total_unique_artists.toString()}
                 color="warning.main"
               />
@@ -168,9 +196,9 @@ export default function YearlyWrappedPage() {
             <Grid item xs={6} md={3}>
               <StatCard
                 icon={<FireIcon sx={{ fontSize: 32 }} />}
-                label="Longest Streak"
-                value={`${wrapped.longest_streak} days`}
-                subtitle={`${wrapped.total_listening_days} days active`}
+                label={t('yearlyWrapped.stats.longestStreak')}
+                value={t('yearlyWrapped.stats.days', { count: wrapped.longest_streak })}
+                subtitle={t('yearlyWrapped.stats.daysActive', { count: wrapped.total_listening_days })}
                 color="error.main"
               />
             </Grid>
@@ -183,7 +211,7 @@ export default function YearlyWrappedPage() {
                 <Card sx={{ height: '100%' }}>
                   <CardContent>
                     <Typography variant="overline" color="text.secondary">
-                      #1 Artist
+                      {t('yearlyWrapped.sections.numberOneArtist')}
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
                       <Avatar sx={{ width: 64, height: 64, bgcolor: 'warning.main' }}>
@@ -194,7 +222,7 @@ export default function YearlyWrappedPage() {
                           {wrapped.top_artist.artist}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {wrapped.top_artist.play_count} plays • {wrapped.top_artist.total_minutes} minutes
+                          {t('yearlyWrapped.artistSummary', { count: wrapped.top_artist.play_count, minutes: wrapped.top_artist.total_minutes })}
                         </Typography>
                       </Box>
                     </Box>
@@ -207,7 +235,7 @@ export default function YearlyWrappedPage() {
                 <Card sx={{ height: '100%' }}>
                   <CardContent>
                     <Typography variant="overline" color="text.secondary">
-                      #1 Track
+                      {t('yearlyWrapped.sections.numberOneTrack')}
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
                       {wrapped.top_track.thumbnail_url ? (
@@ -229,7 +257,7 @@ export default function YearlyWrappedPage() {
                           {wrapped.top_track.artist}
                         </Typography>
                         <Typography variant="caption" color="primary.main">
-                          {wrapped.top_track.play_count} plays
+                          {t('yearlyWrapped.playCount', { count: wrapped.top_track.play_count })}
                         </Typography>
                       </Box>
                     </Box>
@@ -246,7 +274,7 @@ export default function YearlyWrappedPage() {
               <Card sx={{ height: '100%' }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                    🎤 Top 5 Artists
+                    {t('yearlyWrapped.sections.top5Artists')}
                   </Typography>
                   {wrapped.top_5_artists.map((artist, index) => (
                     <Box key={artist.artist} sx={{ mb: 1.5 }}>
@@ -266,7 +294,7 @@ export default function YearlyWrappedPage() {
                             {artist.artist}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {artist.play_count} plays
+                            {t('yearlyWrapped.playCount', { count: artist.play_count })}
                           </Typography>
                         </Box>
                       </Box>
@@ -281,7 +309,7 @@ export default function YearlyWrappedPage() {
               <Card sx={{ height: '100%' }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                    🎵 Top 5 Tracks
+                    {t('yearlyWrapped.sections.top5Tracks')}
                   </Typography>
                   {wrapped.top_5_tracks.map((track, index) => (
                     <Box key={track.youtube_id} sx={{ mb: 1.5 }}>
@@ -308,7 +336,7 @@ export default function YearlyWrappedPage() {
                             {track.title}
                           </Typography>
                           <Typography variant="caption" color="text.secondary" noWrap>
-                            {track.artist} • {track.play_count} plays
+                            {t('yearlyWrapped.trackSummary', { artist: track.artist, count: track.play_count })}
                           </Typography>
                         </Box>
                       </Box>
@@ -323,7 +351,7 @@ export default function YearlyWrappedPage() {
           <Card sx={{ mb: 4 }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                📅 Monthly Listening
+                {t('yearlyWrapped.sections.monthlyListening')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end', height: 150 }}>
                 {wrapped.monthly_minutes.map((month) => {
@@ -361,7 +389,7 @@ export default function YearlyWrappedPage() {
                           fontWeight: month.month === wrapped.peak_month ? 600 : 400,
                         }}
                       >
-                        {month.month.substring(0, 3)}
+                        {formatMonthShort(month.month_num)}
                       </Typography>
                     </Box>
                   );
@@ -370,17 +398,17 @@ export default function YearlyWrappedPage() {
               <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <Chip 
                   icon={<CalendarIcon />}
-                  label={`Peak Month: ${wrapped.peak_month}`}
+                  label={t('yearlyWrapped.highlights.peakMonth', { month: translateMonthName(wrapped.peak_month) })}
                   color="primary"
                   variant="outlined"
                 />
                 <Chip 
                   icon={wrapped.peak_hour !== null && wrapped.peak_hour >= 18 ? <MoonIcon /> : <SunIcon />}
-                  label={`Peak Time: ${formatHour(wrapped.peak_hour)}`}
+                  label={t('yearlyWrapped.highlights.peakTime', { time: formatHour(wrapped.peak_hour) })}
                   variant="outlined"
                 />
                 <Chip 
-                  label={`Favorite Day: ${wrapped.peak_day_of_week}`}
+                  label={t('yearlyWrapped.highlights.favoriteDay', { day: translateDayName(wrapped.peak_day_of_week) })}
                   variant="outlined"
                 />
               </Box>
@@ -392,10 +420,10 @@ export default function YearlyWrappedPage() {
             <CardContent sx={{ textAlign: 'center' }}>
               <TrophyIcon sx={{ fontSize: 48, color: 'warning.main', mb: 1 }} />
               <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                {wrapped.achievements_unlocked} Achievements Unlocked
+                {t('yearlyWrapped.achievements.unlocked', { count: wrapped.achievements_unlocked })}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                in {year}
+                {t('yearlyWrapped.achievements.inYear', { year })}
               </Typography>
             </CardContent>
           </Card>

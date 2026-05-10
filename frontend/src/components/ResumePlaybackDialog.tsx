@@ -22,6 +22,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import DevicesIcon from '@mui/icons-material/Devices';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import { useTranslation } from 'react-i18next';
 import type { PlaybackSession } from '../hooks/usePlaybackSync';
 
 interface ResumePlaybackDialogProps {
@@ -39,11 +40,11 @@ const formatTime = (seconds: number): string => {
 };
 
 // Format relative time
-const formatRelativeTime = (seconds: number): string => {
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-  return `${Math.floor(seconds / 86400)} days ago`;
+const formatRelativeTime = (seconds: number, t: (key: string, options?: Record<string, unknown>) => string): string => {
+  if (seconds < 60) return t('resumePlayback.relative.justNow');
+  if (seconds < 3600) return t('resumePlayback.relative.minutesAgo', { count: Math.floor(seconds / 60) });
+  if (seconds < 86400) return t('resumePlayback.relative.hoursAgo', { count: Math.floor(seconds / 3600) });
+  return t('resumePlayback.relative.daysAgo', { count: Math.floor(seconds / 86400) });
 };
 
 export default function ResumePlaybackDialog({
@@ -52,6 +53,7 @@ export default function ResumePlaybackDialog({
   onResume,
   onDismiss,
 }: ResumePlaybackDialogProps) {
+  const { t } = useTranslation();
   if (!session?.audio_details) return null;
 
   const { audio_details, position, device_name, seconds_since_update } = session;
@@ -78,7 +80,7 @@ export default function ResumePlaybackDialog({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <DevicesIcon color="primary" />
           <Typography variant="h6" component="span">
-            Continue Listening?
+            {t('resumePlayback.title')}
           </Typography>
         </Box>
         <IconButton size="small" onClick={onDismiss} sx={{ color: 'text.secondary' }}>
@@ -144,8 +146,8 @@ export default function ResumePlaybackDialog({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
           <AccessTimeIcon fontSize="small" />
           <Typography variant="body2">
-            Last played {formatRelativeTime(seconds_since_update)}
-            {device_name && ` on ${device_name}`}
+            {t('resumePlayback.lastPlayed', { time: formatRelativeTime(seconds_since_update, t) })}
+            {device_name && ` ${t('resumePlayback.onDevice', { device: device_name })}`}
           </Typography>
         </Box>
       </DialogContent>
@@ -156,7 +158,7 @@ export default function ResumePlaybackDialog({
           color="inherit"
           sx={{ color: 'text.secondary' }}
         >
-          Not Now
+          {t('resumePlayback.actions.notNow')}
         </Button>
         <Button
           onClick={onResume}
@@ -164,7 +166,7 @@ export default function ResumePlaybackDialog({
           startIcon={<PlayArrowIcon />}
           sx={{ px: 3 }}
         >
-          Resume at {formatTime(resumePosition)}
+          {t('resumePlayback.actions.resumeAt', { time: formatTime(resumePosition) })}
         </Button>
       </DialogActions>
     </Dialog>

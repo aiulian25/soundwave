@@ -11,7 +11,8 @@ import {
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LockIcon from '@mui/icons-material/Lock';
-import axios from 'axios';
+import { useTranslation } from 'react-i18next';
+import api, { ensureCsrfCookie } from '../api/client';
 
 interface UserData {
   id: number;
@@ -27,6 +28,7 @@ interface UserData {
 }
 
 export default function UserProfileCard() {
+  const { t, i18n } = useTranslation();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,29 +44,19 @@ export default function UserProfileCard() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      loadUserData();
-    }
+    loadUserData();
   }, []);
 
   const loadUserData = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    
     try {
-      const response = await axios.get('/api/user/account/', {
-        headers: {
-          'Authorization': `Token ${token}`,
-        },
-      });
+      const response = await api.get('/user/account/');
       setUserData(response.data);
       setUsername(response.data.username);
       setFirstName(response.data.first_name || '');
       setLastName(response.data.last_name || '');
       setEmail(response.data.email);
     } catch (err: any) {
-      setError('Failed to load user data');
+      setError(t('userProfile.errors.loadFailed'));
     }
   };
 
@@ -76,24 +68,24 @@ export default function UserProfileCard() {
     const emailChanged = email !== userData?.email;
     
     if (!usernameChanged && !firstNameChanged && !lastNameChanged && !emailChanged) {
-      setError('No changes detected');
+      setError(t('userProfile.errors.noChanges'));
       return;
     }
 
     // Password required for username or email change
     if ((usernameChanged || emailChanged) && !currentPassword) {
-      setError('Current password required to change username or email');
+      setError(t('userProfile.errors.passwordRequiredForIdentity'));
       return;
     }
 
     // Validate username
     if (usernameChanged) {
       if (username.length < 3) {
-        setError('Username must be at least 3 characters long');
+        setError(t('userProfile.errors.usernameMinLength'));
         return;
       }
       if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        setError('Username can only contain letters, numbers, and underscores');
+        setError(t('userProfile.errors.usernamePattern'));
         return;
       }
     }
@@ -103,6 +95,7 @@ export default function UserProfileCard() {
     setSuccess('');
 
     try {
+      await ensureCsrfCookie();
       const payload: any = {};
       if (usernameChanged) payload.username = username;
       if (firstNameChanged) payload.first_name = firstName;
@@ -114,15 +107,7 @@ export default function UserProfileCard() {
         payload.current_password = currentPassword;
       }
 
-      const response = await axios.patch('/api/user/profile/', 
-        payload,
-        {
-          headers: {
-            'Authorization': `Token ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await api.patch('/user/profile/', payload);
       
       // Update local state with response data instead of reloading
       if (response.data.user) {
@@ -133,11 +118,11 @@ export default function UserProfileCard() {
         setEmail(response.data.user.email);
       }
       
-      setSuccess('Profile updated successfully!');
+      setSuccess(t('userProfile.success.profileUpdated'));
       setCurrentPassword('');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update profile');
+      setError(err.response?.data?.error || t('userProfile.errors.updateFailed'));
     } finally {
       setLoading(false);
     }
@@ -145,17 +130,17 @@ export default function UserProfileCard() {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setError('Please fill in all password fields');
+      setError(t('userProfile.errors.fillAllPasswordFields'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match');
+      setError(t('userProfile.errors.passwordsDoNotMatch'));
       return;
     }
 
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError(t('userProfile.errors.passwordMinLength'));
       return;
     }
 
@@ -164,25 +149,18 @@ export default function UserProfileCard() {
     setSuccess('');
 
     try {
-      await axios.post('/api/user/change-password/', 
-        { 
-          current_password: currentPassword,
-          new_password: newPassword 
-        },
-        {
-          headers: {
-            'Authorization': `Token ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      setSuccess('Password changed successfully!');
+      await ensureCsrfCookie();
+      await api.post('/user/change-password/', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setSuccess(t('userProfile.success.passwordChanged'));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to change password');
+      setError(err.response?.data?.error || t('userProfile.errors.changePasswordFailed'));
     } finally {
       setLoading(false);
     }
@@ -192,7 +170,7 @@ export default function UserProfileCard() {
     <Paper sx={{ p: 3 }}>
       <Box display="flex" alignItems="center" mb={3}>
         <AccountCircleIcon sx={{ mr: 1, fontSize: 32, color: 'primary.main' }} />
-        <Typography variant="h6">Profile Information</Typography>
+        <Typography variant="h6">{t('userProfile.title')}</Typography>
       </Box>
 
       {error && (
@@ -211,23 +189,23 @@ export default function UserProfileCard() {
         <>
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Username</Typography>
+              <Typography variant="subtitle2" color="text.secondary">{t('userProfile.info.username')}</Typography>
               <Typography variant="body1" fontWeight={600}>{userData.username}</Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Member Since</Typography>
-              <Typography variant="body1">{new Date(userData.date_joined).toLocaleDateString()}</Typography>
+              <Typography variant="subtitle2" color="text.secondary">{t('userProfile.info.memberSince')}</Typography>
+              <Typography variant="body1">{new Date(userData.date_joined).toLocaleDateString(i18n.language === 'ro' ? 'ro-RO' : 'en-US')}</Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Storage</Typography>
+              <Typography variant="subtitle2" color="text.secondary">{t('userProfile.info.storage')}</Typography>
               <Typography variant="body1">
-                {(userData.storage_used_gb || 0).toFixed(2)} / {userData.storage_quota_gb || 0} GB
+                {t('userProfile.info.storageUsage', { used: (userData.storage_used_gb || 0).toFixed(2), quota: userData.storage_quota_gb || 0 })}
               </Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Limits</Typography>
+              <Typography variant="subtitle2" color="text.secondary">{t('userProfile.info.limits')}</Typography>
               <Typography variant="body1">
-                {userData.max_channels || 0} channels, {userData.max_playlists || 0} playlists
+                {t('userProfile.info.limitsValue', { channels: userData.max_channels || 0, playlists: userData.max_playlists || 0 })}
               </Typography>
             </Grid>
           </Grid>
@@ -238,21 +216,21 @@ export default function UserProfileCard() {
           <Box mb={3}>
             <Box display="flex" alignItems="center" mb={2}>
               <AccountCircleIcon sx={{ mr: 1, color: 'primary.main' }} />
-              <Typography variant="h6">Update Profile</Typography>
+              <Typography variant="h6">{t('userProfile.sections.updateProfile')}</Typography>
             </Box>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
-                  label="Username (Login ID)"
+                  label={t('userProfile.fields.username')}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   fullWidth
-                  helperText="Used for login - requires password to change"
+                  helperText={t('userProfile.helpers.username')}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="First Name"
+                  label={t('userProfile.fields.firstName')}
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   fullWidth
@@ -260,7 +238,7 @@ export default function UserProfileCard() {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Last Name"
+                  label={t('userProfile.fields.lastName')}
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   fullWidth
@@ -268,7 +246,7 @@ export default function UserProfileCard() {
               </Grid>
               <Grid item xs={12}>
                 <TextField
-                  label="Email Address"
+                  label={t('userProfile.fields.email')}
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -277,12 +255,12 @@ export default function UserProfileCard() {
               </Grid>
               <Grid item xs={12}>
                 <TextField
-                  label="Current Password"
+                  label={t('userProfile.fields.currentPassword')}
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   fullWidth
-                  helperText="Required for username or email changes"
+                  helperText={t('userProfile.helpers.currentPasswordForIdentity')}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -292,7 +270,7 @@ export default function UserProfileCard() {
                   disabled={loading}
                   fullWidth
                 >
-                  Update Profile
+                  {t('userProfile.actions.updateProfile')}
                 </Button>
               </Grid>
             </Grid>
@@ -304,12 +282,12 @@ export default function UserProfileCard() {
           <Box>
             <Box display="flex" alignItems="center" mb={2}>
               <LockIcon sx={{ mr: 1, color: 'primary.main' }} />
-              <Typography variant="h6">Change Password</Typography>
+              <Typography variant="h6">{t('userProfile.sections.changePassword')}</Typography>
             </Box>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
-                  label="Current Password"
+                  label={t('userProfile.fields.currentPassword')}
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
@@ -318,17 +296,17 @@ export default function UserProfileCard() {
               </Grid>
               <Grid item xs={12}>
                 <TextField
-                  label="New Password"
+                  label={t('userProfile.fields.newPassword')}
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   fullWidth
-                  helperText="Minimum 8 characters"
+                  helperText={t('userProfile.helpers.newPassword')}
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
-                  label="Confirm New Password"
+                  label={t('userProfile.fields.confirmNewPassword')}
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -342,7 +320,7 @@ export default function UserProfileCard() {
                   disabled={loading}
                   fullWidth
                 >
-                  Change Password
+                  {t('userProfile.actions.changePassword')}
                 </Button>
               </Grid>
             </Grid>

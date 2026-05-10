@@ -29,17 +29,46 @@ services:
       - SW_USERNAME=admin
       - SW_PASSWORD=soundwave
       - ELASTIC_PASSWORD=soundwave
+      - POSTGRES_DB=soundwave
+      - POSTGRES_USER=soundwave
+      - POSTGRES_PASSWORD=soundwave
+      - POSTGRES_HOST=soundwave-pg
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=postgresql://soundwave:soundwave@soundwave-pg:5432/soundwave
       - REDIS_HOST=soundwave-redis
       - TZ=UTC
       - ES_URL=http://soundwave-es:9200
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8889}
-      - DJANGO_DEBUG=True
+      - SECURE_COOKIES=${SECURE_COOKIES:-False}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,192.168.1.80}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in environment}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
     depends_on:
       soundwave-es:
+        condition: service_healthy
+      soundwave-pg:
         condition: service_healthy
       soundwave-redis:
         condition: service_healthy
     restart: unless-stopped
+
+  soundwave-pg:
+    image: postgres:16-alpine
+    container_name: soundwave-pg
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=soundwave
+      - POSTGRES_USER=soundwave
+      - POSTGRES_PASSWORD=soundwave
+    expose:
+      - "5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soundwave -d soundwave"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   soundwave-es:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
@@ -86,4 +115,5 @@ services:
 
 volumes:
   es_data:
+  pg_data:
   redis_data:

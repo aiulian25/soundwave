@@ -230,15 +230,13 @@ export function usePlaybackSync({
           device_name: getDeviceName(),
         });
         
-        const token = localStorage.getItem('token');
-        
         // Use fetch with keepalive for reliable sync on page close
         fetch('/api/playback-sync/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
           },
+          credentials: 'include',
           body: data,
           keepalive: true,  // Allow request to outlive the page
         }).catch(() => {});

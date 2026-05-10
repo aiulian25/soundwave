@@ -6,6 +6,8 @@ import mimetypes
 from pathlib import Path
 from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponse, FileResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
@@ -37,6 +39,16 @@ from user.two_factor import (
 from datetime import datetime
 
 audit_log = logging.getLogger('security.audit')
+
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class CsrfTokenView(APIView):
+    """Issue a CSRF cookie for SPA clients before unsafe requests."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        return Response({'detail': 'CSRF cookie set'})
 
 
 class UserAccountView(ApiBaseView):
@@ -385,11 +397,19 @@ class LoginView(APIView):
         )
         
         login(request, user)
-        token, _ = Token.objects.get_or_create(user=user)
-        return Response({
-            'token': token.key,
-            'user': AccountSerializer(user).data
-        })
+
+        response_data = {
+            'session_authenticated': True,
+            'user': AccountSerializer(user).data,
+        }
+
+        # Compatibility path for non-browser/programmatic clients that still
+        # require token auth. Browser clients should rely on HttpOnly session cookie.
+        if request.data.get('return_token'):
+            token, _ = Token.objects.get_or_create(user=user)
+            response_data['token'] = token.key
+
+        return Response(response_data)
 
 
 class LogoutView(ApiBaseView):

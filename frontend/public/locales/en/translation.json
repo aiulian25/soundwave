@@ -1,0 +1,1856 @@
+{
+  "login": {
+    "logoAlt": "SoundWave logo",
+    "tagline": "Your Personal Music Hub",
+    "welcomeBack": "Welcome Back",
+    "username": "Username",
+    "password": "Password",
+    "twoFactorCode": "Two-Factor Code",
+    "rememberPassword": "Remember Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "loginButton": "Login",
+    "lockedCountdown": "Locked ({{time}})",
+    "accountTemporarilyLocked": "Account Temporarily Locked",
+    "lockoutWait": "Too many failed login attempts. Please wait {{time}} before trying again.",
+    "lastAttempt": "Last Attempt!",
+    "invalidCredentials": "Invalid Credentials",
+    "accountWillLockNext": "Account will be locked on next failed attempt.",
+    "attemptsRemainingOne": "1 attempt remaining before your account is locked for 60 minutes.",
+    "attemptsRemainingOther": "{{count}} attempts remaining before your account is locked for 60 minutes.",
+    "errors": {
+      "enter2fa": "Please enter your two-factor authentication code",
+      "accountLocked": "Account temporarily locked",
+      "invalidCredentials": "Invalid credentials",
+      "invalidCredentialsOrCode": "Invalid credentials or verification code"
+    }
+  },
+  "topbar": {
+    "greeting": {
+      "morning": "Good Morning",
+      "afternoon": "Good Afternoon",
+      "evening": "Good Evening"
+    },
+    "musicLover": "Music Lover",
+    "logout": "Logout",
+    "openDrawer": "Open navigation menu"
+  },
+  "player": {
+    "unknownArtist": "Unknown Artist",
+    "toggleLyrics": "Click to toggle lyrics",
+    "lyricsNotAvailableLocal": "Lyrics not available for local files",
+    "playingFromCache": "Playing from cache",
+    "trackOptions": "Track options",
+    "addToPlaylist": "Add to Playlist",
+    "removeFromFavorites": "Remove from Favorites",
+    "addToFavorites": "Add to Favorites",
+    "exportTrack": "Export Track",
+    "editMetadata": "Edit Metadata",
+    "relatedTracks": "Related Tracks",
+    "startRadio": "Start Radio",
+    "stopRadio": "Click to stop radio",
+    "radio": "RADIO",
+    "sleepTimer": "Sleep timer",
+    "sleepTimerActive": "Sleep timer active",
+    "queueCount": "Queue ({{count}} tracks)",
+    "equalizer": "Equalizer",
+    "equalizerOn": "Equalizer (on)",
+    "classicBars": "Classic Bars",
+    "visualizerThemeHint": "Click to change visualizer theme (Current: {{themeName}})"
+  },
+  "home": {
+    "sections": {
+      "continueListening": "Continue Listening",
+      "madeForYou": "Made For You",
+      "recentlyPlayed": "Recently Played",
+      "recentlyAdded": "Recently Added"
+    },
+    "actions": {
+      "clear": "Clear",
+      "seeAll": "See All",
+      "refreshRecommendations": "Refresh recommendations"
+    },
+    "tags": {
+      "FOR_YOU": "FOR YOU",
+      "DISCOVER": "DISCOVER",
+      "OTHER": "OTHER",
+      "THROWBACK": "THROWBACK"
+    },
+    "reasons": {
+      "forYou": "Because you like {{artist}}",
+      "discover": "Hidden gem in your library",
+      "other": "More music you might like",
+      "throwback": "From your collection"
+    },
+    "timeLeft": "{{minutes}}m {{seconds}}s left",
+    "empty": {
+      "title": "Welcome to SoundWave!",
+      "description": "Start by downloading some music or exploring your library."
+    }
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search for songs, artists, playlists, or channels...",
+    "popularSearches": [
+      "hip hop",
+      "rock music",
+      "jazz",
+      "classical",
+      "electronic",
+      "blues"
+    ],
+    "actions": {
+      "clearAll": "Clear all"
+    },
+    "suggestions": {
+      "recentSearches": "Recent searches",
+      "artists": "Artists",
+      "songs": "Songs",
+      "recent": "Recent",
+      "popular": "Popular",
+      "startTyping": "Start typing to search"
+    },
+    "tabs": {
+      "all": "All ({{count}})",
+      "songs": "Songs ({{count}})",
+      "playlists": "Playlists ({{count}})",
+      "channels": "Channels ({{count}})"
+    },
+    "sections": {
+      "songs": "Songs",
+      "playlists": "Playlists",
+      "channels": "Channels"
+    },
+    "status": {
+      "notDownloaded": "Not Downloaded",
+      "subscribed": "Subscribed",
+      "notSubscribed": "Not subscribed"
+    },
+    "noResults": {
+      "title": "No results found",
+      "description": "Try searching with different keywords"
+    },
+    "libraryTrackCount": "{{downloaded}}/{{total}} tracks",
+    "empty": {
+      "title": "Search Your Library",
+      "description": "Find songs, playlists, and channels in your collection"
+    }
+  },
+  "library": {
+    "title": "Library",
+    "actions": {
+      "playAll": "Play All",
+      "shuffle": "Shuffle",
+      "refresh": "Refresh library"
+    },
+    "columns": {
+      "title": "Title",
+      "channel": "Channel",
+      "duration": "Duration",
+      "size": "Size",
+      "plays": "Plays",
+      "actions": "Actions"
+    },
+    "trackCount": "{{count}} tracks in your library",
+    "messages": {
+      "playingTracks": "Playing {{count}} tracks",
+      "shuffledTracks": "Shuffled {{count}} tracks"
+    },
+    "errors": {
+      "noTracks": "No tracks in library",
+      "noTracksToShuffle": "No tracks to shuffle"
+    }
+  },
+  "favorites": {
+    "title": "Favorites",
+    "loading": "Loading favorites...",
+    "actions": {
+      "playAll": "Play All",
+      "shuffle": "Shuffle"
+    },
+    "columns": {
+      "title": "Title",
+      "channel": "Channel",
+      "duration": "Duration",
+      "size": "Size",
+      "plays": "Plays",
+      "actions": "Actions"
+    },
+    "empty": {
+      "title": "No favorites yet",
+      "description": "Start adding songs to your favorites"
+    },
+    "messages": {
+      "removed": "Removed from favorites",
+      "playingTracks": "Playing {{count}} favorite tracks",
+      "shuffledTracks": "Shuffled {{count}} favorite tracks"
+    },
+    "errors": {
+      "noFavoritesToPlay": "No favorites to play",
+      "noFavoritesToShuffle": "No favorites to shuffle"
+    }
+  },
+  "channels": {
+    "title": "YouTube Channels",
+    "genericChannelName": "channel",
+    "actions": {
+      "resetOrder": "Reset to default order",
+      "cancel": "Cancel",
+      "select": "Select",
+      "subscribeToChannel": "Subscribe to Channel",
+      "deselectAll": "Deselect All",
+      "selectAll": "Select All",
+      "deleteSelected": "Delete Selected",
+      "subscribe": "Subscribe",
+      "subscribing": "Subscribing..."
+    },
+    "pending": {
+      "processing": "Processing {{count}} channel subscription...",
+      "processing_other": "Processing {{count}} channel subscriptions...",
+      "description": "Server is downloading in background - will auto-refresh"
+    },
+    "selection": {
+      "selectedCount": "{{selected}} of {{total}} selected"
+    },
+    "empty": {
+      "title": "No channels subscribed",
+      "description": "Subscribe to YouTube channels to automatically download their content"
+    },
+    "dialog": {
+      "title": "Subscribe to YouTube Channel",
+      "channelUrlLabel": "Channel URL",
+      "channelUrlPlaceholder": "https://www.youtube.com/@channelname or channel ID",
+      "channelUrlHelp": "Enter a YouTube channel URL or channel ID"
+    },
+    "confirm": {
+      "unsubscribeOne": "Are you sure you want to unsubscribe from this channel?",
+      "unsubscribeMany": "Are you sure you want to unsubscribe from {{count}} channel(s)?"
+    },
+    "messages": {
+      "subscriptionStarted": "Channel subscription started",
+      "subscribingToChannel": "✓ Subscribing to {{channelName}}... Downloading channel info and videos in background."
+    },
+    "errors": {
+      "subscribeFailed": "Failed to subscribe to channel"
+    }
+  },
+  "playlists": {
+    "title": "YouTube Playlists",
+    "offlineChannelName": "Offline",
+    "actions": {
+      "resetOrder": "Reset to default order",
+      "addPlaylist": "Add Playlist"
+    },
+    "status": {
+      "offline": "Offline"
+    },
+    "empty": {
+      "title": "No playlists added",
+      "description": "Add YouTube playlists to automatically download all their videos"
+    },
+    "dialog": {
+      "title": "Add YouTube Playlist",
+      "urlLabel": "Playlist URL",
+      "urlPlaceholder": "https://www.youtube.com/playlist?list=...",
+      "urlHelp": "Enter a YouTube playlist URL"
+    },
+    "confirm": {
+      "delete": "Are you sure you want to remove this playlist?"
+    },
+    "messages": {
+      "subscriptionStarted": "✅ Playlist subscription started! Fetching metadata and downloading audio...",
+      "syncStarted": "🔄 Sync started! Server processing in background...",
+      "syncComplete": "✅ Sync complete! {{downloaded}}/{{total}} tracks available",
+      "syncFailed": "❌ Sync failed: {{error}}",
+      "syncStartFailed": "❌ Failed to start sync: {{error}}",
+      "forceRecheckStarted": "🔍 Force recheck started — re-downloading missing files...",
+      "forceRecheckFailed": "❌ Failed to start recheck: {{error}}"
+    },
+    "errors": {
+      "subscribeFailed": "Failed to subscribe to playlist",
+      "unknownError": "Unknown error"
+    }
+  },
+  "playlistDetail": {
+    "status": {
+      "offline": "Offline",
+      "cached": "Cached",
+      "availableOffline": "Available offline",
+      "notDownloaded": "Not Downloaded"
+    },
+    "actions": {
+      "playAll": "Play All",
+      "shuffle": "Shuffle",
+      "saveAll": "Save All",
+      "downloadAllTitle": "Download all tracks to your device",
+      "forceRecheck": "Force Recheck",
+      "forceRecheckTitle": "Re-check all tracks and re-download missing files",
+      "caching": "Caching...",
+      "makeAvailableOffline": "Make Available Offline",
+      "removeOffline": "Remove Offline",
+      "removeOfflineTitle": "Remove offline cache to free up storage space",
+      "play": "Play",
+      "downloadToDevice": "Download to device"
+    },
+    "offlineMode": {
+      "title": "Offline Mode",
+      "available": "This playlist is available offline",
+      "unavailableHint": "You are offline. Cache playlists when online for offline access."
+    },
+    "cacheCard": {
+      "readyTitle": "📱 Offline Ready",
+      "cacheTitle": "💾 Cache for Offline",
+      "readyDescription": "{{count}} tracks cached and available without internet",
+      "cacheDescription": "Download this playlist to listen without an internet connection",
+      "storageUsed": "Storage Used"
+    },
+    "progress": {
+      "title": "Download Progress",
+      "count": "{{downloaded}} / {{total}} tracks",
+      "cachingForOffline": "Caching for Offline"
+    },
+    "stats": {
+      "totalTracks": "Total Tracks",
+      "downloaded": "Downloaded",
+      "lastUpdated": "Last Updated"
+    },
+    "columns": {
+      "title": "Title",
+      "channel": "Channel",
+      "duration": "Duration",
+      "actions": "Actions"
+    },
+    "empty": {
+      "noTracks": "No tracks found in this playlist"
+    },
+    "messages": {
+      "downloadingTracks": "Downloading {{count}} tracks to your device",
+      "forceRecheckStarted": "Force recheck started — checking all tracks and re-downloading missing files...",
+      "forceRecheckFailed": "Failed to start recheck: {{error}}",
+      "starting": "Starting...",
+      "cachePartial": "✅ {{cached}} tracks cached, {{failed}} failed",
+      "cacheSuccess": "✅ {{count}} tracks available offline!",
+      "offlineDataRemoved": "Offline data removed",
+      "downloadingTrack": "Downloading \"{{title}}\" to your device",
+      "playingTracks": "Playing {{count}} tracks",
+      "shuffledTracks": "Shuffled {{count}} tracks"
+    },
+    "errors": {
+      "notAvailableOffline": "Playlist not available offline",
+      "loadFailed": "Failed to load playlist",
+      "notFound": "Playlist not found",
+      "noDownloadedTracksToSave": "No downloaded tracks to save",
+      "noTracksToCache": "No tracks to cache",
+      "mustBeOnline": "Must be online to download for offline use",
+      "noTracksDownloadedYet": "No tracks downloaded yet. Download tracks first.",
+      "cacheFailed": "Failed to cache playlist",
+      "offlineCachingFailed": "Offline caching failed",
+      "removeOfflineFailed": "Failed to remove offline data",
+      "downloadFailed": "Download failed",
+      "noDownloadedTracksToPlay": "No downloaded tracks to play",
+      "noDownloadedTracksToShuffle": "No downloaded tracks to shuffle"
+    }
+  },
+  "analytics": {
+    "title": "Listening Insights",
+    "description": "Your personal listening statistics and habits",
+    "notAvailable": "N/A",
+    "days": "{{count}} days",
+    "duration": {
+      "minutesShort": "{{count}}m",
+      "hoursShort": "{{count}}h",
+      "hoursMinutesShort": "{{hours}}h {{minutes}}m"
+    },
+    "hours": {
+      "midnight": "12 AM",
+      "noon": "12 PM",
+      "am": "{{hour}} AM",
+      "pm": "{{hour}} PM"
+    },
+    "timeRange": {
+      "label": "Time Range",
+      "last7Days": "Last 7 days",
+      "last30Days": "Last 30 days",
+      "last3Months": "Last 3 months",
+      "lastYear": "Last year"
+    },
+    "cards": {
+      "totalListeningTime": "Total Listening Time",
+      "tracksPlayed": "Tracks Played",
+      "uniqueTracks": "{{count}} unique",
+      "uniqueArtists": "Unique Artists",
+      "dailyAverage": "Daily Average",
+      "currentStreak": "Current Streak",
+      "longestStreak": "Longest Streak",
+      "peakHour": "Peak Hour",
+      "favoriteDay": "Favorite Day"
+    },
+    "sections": {
+      "activityByHour": {
+        "title": "Listening Activity by Hour",
+        "description": "When you listen to music throughout the day"
+      },
+      "topArtists": "Top Artists",
+      "topChannels": "Top Channels",
+      "mostPlayedTracks": "Most Played Tracks",
+      "recentListeningHistory": "Recent Listening History",
+      "genreDistribution": "Genre Distribution"
+    },
+    "hourlyChart": {
+      "tooltip": "{{hour}}: {{count}} plays ({{duration}})"
+    },
+    "listItem": {
+      "playsDuration": "{{count}} plays • {{duration}}"
+    },
+    "status": {
+      "completed": "Completed"
+    },
+    "empty": {
+      "noListeningData": "No listening data yet",
+      "noRecentHistory": "No recent listening history"
+    },
+    "errors": {
+      "unableToLoad": "Unable to load analytics data"
+    }
+  },
+  "yearlyWrapped": {
+    "title": "🎁 Your {{year}} Wrapped",
+    "description": "A look back at your listening journey",
+    "year": "Year",
+    "notAvailable": "N/A",
+    "time": {
+      "minutes": "{{count}} minutes",
+      "hours": "{{count}} hours",
+      "daysHours": "{{days}} days, {{hours}} hours"
+    },
+    "hours": {
+      "midnight": "12 AM",
+      "noon": "12 PM",
+      "am": "{{hour}} AM",
+      "pm": "{{hour}} PM"
+    },
+    "personality": {
+      "title": "Your Listening Personality",
+      "streakMaster": "🔥 Streak Master - Your consistency is legendary!",
+      "nightOwl": "🦉 Night Owl - The night is your symphony",
+      "earlyBird": "🐦 Early Bird - Music starts your day right",
+      "musicalExplorer": "🌍 Musical Explorer - You love discovering new sounds",
+      "devotedFan": "💖 Devoted Fan - Loyalty is your middle name",
+      "audioAddict": "🎵 Audio Addict - Music is your constant companion",
+      "dedicatedListener": "🎧 Dedicated Listener - Music is a big part of your life",
+      "risingStar": "🌱 Rising Star - Your musical journey is just beginning"
+    },
+    "stats": {
+      "minutesListened": "Minutes Listened",
+      "tracksPlayed": "Tracks Played",
+      "uniqueTracks": "{{count}} unique",
+      "artistsDiscovered": "Artists Discovered",
+      "longestStreak": "Longest Streak",
+      "days": "{{count}} days",
+      "daysActive": "{{count}} days active"
+    },
+    "sections": {
+      "numberOneArtist": "#1 Artist",
+      "numberOneTrack": "#1 Track",
+      "top5Artists": "🎤 Top 5 Artists",
+      "top5Tracks": "🎵 Top 5 Tracks",
+      "monthlyListening": "📅 Monthly Listening"
+    },
+    "artistSummary": "{{count}} plays • {{minutes}} minutes",
+    "playCount": "{{count}} plays",
+    "trackSummary": "{{artist}} • {{count}} plays",
+    "highlights": {
+      "peakMonth": "Peak Month: {{month}}",
+      "peakTime": "Peak Time: {{time}}",
+      "favoriteDay": "Favorite Day: {{day}}"
+    },
+    "achievements": {
+      "unlocked": "{{count}} Achievements Unlocked",
+      "inYear": "in {{year}}"
+    },
+    "errors": {
+      "loadFailed": "Failed to load yearly wrapped",
+      "noDataForYear": "No listening data found for {{year}}",
+      "withHint": "{{error}}. Start listening to build your wrapped!"
+    }
+  },
+  "achievements": {
+    "title": "🏆 Achievements",
+    "description": "Track your listening milestones and earn badges",
+    "actions": {
+      "checkForNew": "Check for New"
+    },
+    "messages": {
+      "newUnlocked": "🎉 {{count}} new achievement(s) unlocked!",
+      "noneYet": "No new achievements yet. Keep listening!"
+    },
+    "errors": {
+      "loadFailed": "Failed to load achievements data",
+      "checkFailed": "Failed to check achievements"
+    },
+    "streak": {
+      "currentStreak": "{{count}} Day Streak",
+      "atRisk": "⚠️ At Risk!",
+      "onFire": "🔥 On Fire!",
+      "listenedToday": "Great job! You've listened today. Keep it up!",
+      "listenToday": "Listen to a track today to maintain your streak!",
+      "bestStreak": "Best Streak",
+      "days": "days",
+      "thisWeek": "This Week",
+      "dayTooltip": "{{day}}: {{count}} tracks played",
+      "nextMilestone": "Next milestone: {{count}}-day streak",
+      "daysToGo": "{{count}} days to go"
+    },
+    "progress": {
+      "unlockedOfTotal": "{{unlocked}} of {{total}} Achievements Unlocked"
+    },
+    "tabs": {
+      "all": "All ({{unlocked}}/{{total}})",
+      "tracks": "Tracks ({{count}})",
+      "time": "Time ({{count}})",
+      "streaks": "Streaks ({{count}})",
+      "variety": "Variety ({{count}})",
+      "special": "Special ({{count}})"
+    },
+    "empty": {
+      "noAchievementsInCategory": "No achievements in this category"
+    },
+    "card": {
+      "completed": "Completed!",
+      "progress": "Progress"
+    },
+    "items": {
+      "tracks_10": { "name": "First Steps", "description": "Listen to 10 tracks" },
+      "tracks_50": { "name": "Music Explorer", "description": "Listen to 50 tracks" },
+      "tracks_100": { "name": "Dedicated Listener", "description": "Listen to 100 tracks" },
+      "tracks_500": { "name": "Music Enthusiast", "description": "Listen to 500 tracks" },
+      "tracks_1000": { "name": "Audiophile", "description": "Listen to 1,000 tracks" },
+      "tracks_5000": { "name": "Music Legend", "description": "Listen to 5,000 tracks" },
+      "tracks_10000": { "name": "Sound Master", "description": "Listen to 10,000 tracks" },
+      "hours_1": { "name": "First Hour", "description": "Listen for 1 hour" },
+      "hours_10": { "name": "Getting Started", "description": "Listen for 10 hours" },
+      "hours_24": { "name": "Full Day", "description": "Listen for 24 hours" },
+      "hours_100": { "name": "Dedicated Fan", "description": "Listen for 100 hours" },
+      "hours_500": { "name": "Time Traveler", "description": "Listen for 500 hours" },
+      "hours_1000": { "name": "Marathon Listener", "description": "Listen for 1,000 hours" },
+      "streak_3": { "name": "3-Day Streak", "description": "Listen 3 days in a row" },
+      "streak_7": { "name": "Week Warrior", "description": "Listen 7 days in a row" },
+      "streak_14": { "name": "Two Week Champion", "description": "Listen 14 days in a row" },
+      "streak_30": { "name": "Monthly Master", "description": "Listen 30 days in a row" },
+      "streak_60": { "name": "Two Month Hero", "description": "Listen 60 days in a row" },
+      "streak_90": { "name": "Quarter King", "description": "Listen 90 days in a row" },
+      "streak_180": { "name": "Half Year Legend", "description": "Listen 180 days in a row" },
+      "streak_365": { "name": "Year-Long Dedication", "description": "Listen 365 days in a row" },
+      "artists_10": { "name": "Artist Explorer", "description": "Listen to 10 different artists" },
+      "artists_50": { "name": "Genre Hopper", "description": "Listen to 50 different artists" },
+      "artists_100": { "name": "Music Wanderer", "description": "Listen to 100 different artists" },
+      "artists_500": { "name": "Eclectic Taste", "description": "Listen to 500 different artists" },
+      "channels_5": { "name": "Channel Surfer", "description": "Listen from 5 different channels" },
+      "channels_25": { "name": "Content Explorer", "description": "Listen from 25 different channels" },
+      "channels_50": { "name": "Curator", "description": "Listen from 50 different channels" },
+      "channels_100": { "name": "Library Builder", "description": "Listen from 100 different channels" },
+      "night_owl": { "name": "Night Owl", "description": "Listen to music after midnight" },
+      "early_bird": { "name": "Early Bird", "description": "Listen to music before 6 AM" },
+      "weekend_warrior": { "name": "Weekend Warrior", "description": "Listen to 50+ tracks on a weekend" },
+      "genre_master": { "name": "Genre Master", "description": "Listen to 10+ different genres" },
+      "completionist": { "name": "Completionist", "description": "Complete 100 tracks fully" },
+      "collector": { "name": "Collector", "description": "Have 500+ tracks in your library" },
+      "superfan": { "name": "Superfan", "description": "Listen to 50+ plays of a single artist" }
+    }
+  },
+  "channelDetail": {
+    "title": "Channel Details",
+    "notAvailable": "N/A",
+    "actions": {
+      "playAll": "Play All",
+      "shuffle": "Shuffle",
+      "downloadAll": "Download All",
+      "download": "Download"
+    },
+    "columns": {
+      "title": "Title",
+      "duration": "Duration",
+      "published": "Published",
+      "plays": "Plays",
+      "actions": "Actions"
+    },
+    "stats": {
+      "subscribers": "{{count}} subscribers",
+      "tracks": "{{count}} tracks",
+      "downloaded": "{{count}} downloaded",
+      "views": "{{count}} views"
+    },
+    "messages": {
+      "playingAll": "Playing all {{count}} tracks from {{channel}}",
+      "shuffling": "Shuffling {{count}} tracks from {{channel}}",
+      "downloadingTracks": "Downloading {{count}} tracks to your device"
+    },
+    "errors": {
+      "loadFailed": "Failed to load channel",
+      "notFound": "Channel not found",
+      "noDownloadedTracks": "No downloaded tracks to save"
+    },
+    "empty": {
+      "noAudioTitle": "No audio files found",
+      "noAudioDescription": "Audio files will appear here once they are downloaded from this channel."
+    },
+    "fallback": {
+      "audioFilename": "audio"
+    }
+  },
+  "downloadDialog": {
+    "title": "Export Track",
+    "format": {
+      "mp3": "MP3 (Compressed, smaller file)",
+      "flac": "FLAC (Lossless, larger file)",
+      "mp3Description": "Compressed, universal compatibility, embedded synced lyrics (SYLT)",
+      "flacDescription": "Lossless quality, larger file, embedded LRC in metadata"
+    },
+    "quality": {
+      "high": "High (320 kbps)",
+      "medium": "Medium (192 kbps)",
+      "low": "Low (128 kbps)"
+    },
+    "sections": {
+      "outputFormat": "Output Format",
+      "quality": "Quality",
+      "lyrics": "Lyrics",
+      "artwork": "Album Artwork"
+    },
+    "lyrics": {
+      "embed": "Embed lyrics in file",
+      "syncedEmbedded": "Synced lyrics will be embedded ({{tag}})",
+      "plainEmbedded": "Plain lyrics will be embedded",
+      "none": "No lyrics to embed"
+    },
+    "artwork": {
+      "embed": "Embed album artwork",
+      "source": "Artwork Source"
+    },
+    "actions": {
+      "exporting": "Exporting...",
+      "exportAs": "Export as {{format}}"
+    },
+    "errors": {
+      "loadOptionsFailed": "Failed to load export options",
+      "exportFailed": "Export failed. Please try again."
+    },
+    "fallback": {
+      "audioFilename": "audio"
+    }
+  },
+  "equalizer": {
+    "title": "Equalizer",
+    "on": "On",
+    "off": "Off",
+    "preset": "Preset",
+    "custom": "Custom",
+    "builtIn": "Built-in",
+    "customSection": "Custom",
+    "actions": {
+      "resetToFlat": "Reset to Flat",
+      "saveCustomPreset": "Save as Custom Preset",
+      "deleteCustomPreset": "Delete Custom Preset"
+    },
+    "saveDialog": {
+      "title": "Save Custom Preset",
+      "presetName": "Preset Name"
+    }
+  },
+  "lyrics": {
+    "title": "Lyrics",
+    "source": "Source",
+    "autoScroll": "Auto-scroll",
+    "lastFetchError": "Last fetch error: {{error}}",
+    "instrumental": {
+      "title": "Instrumental Track",
+      "description": "This track was marked as instrumental. If it has lyrics, you can search for them or upload an LRC file."
+    },
+    "empty": {
+      "noLyrics": "No lyrics found for this track",
+      "attemptedTimes": "Attempted {{count}} times"
+    },
+    "tabs": {
+      "synced": "Synced",
+      "plainText": "Plain Text"
+    },
+    "search": {
+      "placeholder": "Search by song title or artist...",
+      "foundSuggestions": "Found {{count}} suggestions:",
+      "byArtist": "by {{artist}}",
+      "suggestionsFoundReplace": "{{count}} suggestions found - select one to replace current lyrics:",
+      "noSuggestionsLoaded": "No suggestions loaded yet. Enter a search term or click Search to find lyrics."
+    },
+    "tags": {
+      "synced": "Synced",
+      "plain": "Plain",
+      "instrumental": "Instrumental"
+    },
+    "messages": {
+      "uploadSuccess": "LRC file uploaded successfully!"
+    },
+    "actions": {
+      "tryFetchLyrics": "Try Fetch Lyrics",
+      "retryFetch": "Retry Fetch",
+      "searchForLyrics": "Search for Lyrics",
+      "findSuggestions": "Find Suggestions",
+      "findDifferentLyrics": "Find Different Lyrics",
+      "downloadLyrics": "Download lyrics",
+      "downloadLrcSynced": "Download .LRC (synced)",
+      "downloadTxtPlain": "Download .TXT (plain)",
+      "uploadLrc": "Upload .LRC",
+      "uploadLrcFile": "Upload .LRC file",
+      "refreshLyrics": "Refresh lyrics",
+      "clearAndSearch": "Clear & Search",
+      "search": "Search",
+      "searching": "Searching...",
+      "use": "Use",
+      "applying": "Applying...",
+      "clearing": "Clearing...",
+      "uploading": "Uploading..."
+    },
+    "errors": {
+      "notAvailableOffline": "Lyrics not available offline",
+      "loadFailed": "Failed to load lyrics",
+      "fetchFailed": "Failed to fetch lyrics",
+      "applyFailed": "Failed to apply lyrics",
+      "deleteFailed": "Failed to delete lyrics",
+      "downloadFailed": "Failed to download lyrics",
+      "invalidLrcFile": "Please select a valid .lrc file",
+      "lrcTooLarge": "LRC file must be smaller than 1MB",
+      "uploadFailed": "Failed to upload LRC file"
+    }
+  },
+  "pwaSettings": {
+    "title": "Progressive Web App (PWA)",
+    "connectionStatus": "Connection Status",
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "installation": "Installation",
+    "installedReady": "App is installed and ready to use",
+    "installFor": "Install SoundWave for:",
+    "installBenefits": {
+      "fasterStartup": "Faster startup and better performance",
+      "offlineAccess": "Offline access to cached content",
+      "nativeExperience": "Native app-like experience",
+      "desktopShortcut": "Desktop shortcut access"
+    },
+    "installHelp": {
+      "status": "Status",
+      "secureContext": "Secure context",
+      "notHttps": "Not HTTPS",
+      "swSupported": "SW supported",
+      "noSwSupport": "No SW support",
+      "ios": {
+        "title": "Install on iPhone/iPad:",
+        "step1": "1. Tap the Share button at the bottom of Safari",
+        "step2": "2. Scroll down and tap Add to Home Screen",
+        "step3": "3. Tap Add in the top right corner",
+        "hint": "On iOS 26+, any website can be installed as a full PWA!"
+      },
+      "generic": {
+        "title": "To install SoundWave:",
+        "chromeEdge": "Chrome/Edge: Click the install icon in the address bar, or Menu > Install SoundWave",
+        "safariMac": "Safari (Mac): File > Add to Dock...",
+        "firefox": "Firefox: Menu > Install (if available)"
+      }
+    },
+    "requirements": "Requirements: HTTPS connection, valid manifest, service worker",
+    "cacheStorage": "Cache Storage",
+    "cacheDescription": "Cached data allows offline access to previously viewed content and improves loading times.",
+    "actions": {
+      "clearCache": "Clear Cache",
+      "clearingCache": "Clearing Cache..."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "enable": "Enable push notifications",
+      "description": "Get notified about downloads, updates, and more"
+    },
+    "features": {
+      "title": "PWA Features",
+      "offlineMode": "Access cached content without internet",
+      "backgroundSyncTitle": "Background Sync",
+      "backgroundSync": "Sync data when connection is restored",
+      "audioCachingTitle": "Audio Caching",
+      "audioCaching": "Cache audio files for offline playback",
+      "active": "Active"
+    },
+    "alerts": {
+      "installed": "App installed successfully!",
+      "installCancelled": "Installation cancelled or not available",
+      "cacheCleared": "Cache cleared successfully",
+      "cacheClearFailed": "Failed to clear cache",
+      "cacheClearError": "Error clearing cache",
+      "notificationsEnabled": "Notifications enabled",
+      "notificationsDenied": "Notifications permission denied"
+    }
+  },
+  "userProfile": {
+    "title": "Profile Information",
+    "sections": {
+      "updateProfile": "Update Profile",
+      "changePassword": "Change Password"
+    },
+    "fields": {
+      "username": "Username (Login ID)",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmNewPassword": "Confirm New Password"
+    },
+    "helpers": {
+      "username": "Used for login - requires password to change",
+      "currentPasswordForIdentity": "Required for username or email changes",
+      "newPassword": "Minimum 8 characters"
+    },
+    "actions": {
+      "updateProfile": "Update Profile",
+      "changePassword": "Change Password"
+    },
+    "info": {
+      "username": "Username",
+      "memberSince": "Member Since",
+      "storage": "Storage",
+      "storageUsage": "{{used}} / {{quota}} GB",
+      "limits": "Limits",
+      "limitsValue": "{{channels}} channels, {{playlists}} playlists"
+    },
+    "success": {
+      "profileUpdated": "Profile updated successfully!",
+      "passwordChanged": "Password changed successfully!"
+    },
+    "errors": {
+      "loadFailed": "Failed to load user data",
+      "noChanges": "No changes detected",
+      "passwordRequiredForIdentity": "Current password required to change username or email",
+      "usernameMinLength": "Username must be at least 3 characters long",
+      "usernamePattern": "Username can only contain letters, numbers, and underscores",
+      "updateFailed": "Failed to update profile",
+      "fillAllPasswordFields": "Please fill in all password fields",
+      "passwordsDoNotMatch": "New passwords do not match",
+      "passwordMinLength": "Password must be at least 8 characters long",
+      "changePasswordFailed": "Failed to change password"
+    }
+  },
+  "quickSync": {
+    "title": "Quick Sync - Adaptive Streaming",
+    "currentStatus": "Current Status",
+    "networkSpeed": "Network Speed",
+    "systemResources": "System Resources",
+    "cpuUsage": "CPU Usage",
+    "memoryUsage": "Memory Usage",
+    "activeQuality": "Active Quality",
+    "autoSelected": "Auto-Selected",
+    "qualitySettings": "Quality Settings",
+    "qualityMode": "Quality Mode",
+    "bufferSettings": "Buffer Settings",
+    "bufferSize": "Buffer Size",
+    "maxBuffer": "Max Buffer",
+    "preload": "Preload",
+    "rebufferThreshold": "Rebuffer Threshold",
+    "modes": {
+      "auto": "Auto (Recommended)",
+      "autoDescription": "Adapts to your connection and system",
+      "ultra": "Ultra (320 kbps)",
+      "ultraDescription": "Maximum fidelity - requires 5+ Mbps",
+      "high": "High (256 kbps)",
+      "highDescription": "Best experience - requires 2+ Mbps",
+      "medium": "Medium (128 kbps)",
+      "mediumDescription": "Balanced - requires 1+ Mbps",
+      "low": "Low (64 kbps)",
+      "lowDescription": "Saves bandwidth - requires 0.5+ Mbps"
+    },
+    "tooltips": {
+      "preferHigherQuality": "When system resources allow, automatically upgrade to higher quality",
+      "adaptToSystemLoad": "Automatically adjust quality based on CPU and memory usage",
+      "applyToDownloads": "Use Quick Sync quality settings when downloading audio"
+    },
+    "actions": {
+      "runSpeedTest": "Run Speed Test",
+      "testingConnection": "Testing Connection..."
+    },
+    "messages": {
+      "qualityModeUpdated": "Quality mode updated successfully",
+      "preferencesUpdated": "Preferences updated successfully",
+      "speedTestCompleted": "Speed test completed"
+    },
+    "errors": {
+      "updateQualityModeFailed": "Failed to update quality mode",
+      "updatePreferencesFailed": "Failed to update preferences",
+      "speedTestFailed": "Speed test failed"
+    }
+  },
+  "avatarDialog": {
+    "title": "Choose Your Avatar",
+    "sections": {
+      "presets": "Preset Avatars",
+      "custom": "Custom Avatar"
+    },
+    "actions": {
+      "uploadImage": "Upload Image",
+      "removeAvatar": "Remove Avatar"
+    },
+    "helpers": {
+      "fileTypes": "Max 20MB - JPEG, PNG, GIF, WebP"
+    },
+    "success": {
+      "updated": "Avatar updated successfully!",
+      "uploaded": "Avatar uploaded successfully!",
+      "removed": "Avatar removed successfully!"
+    },
+    "errors": {
+      "setPresetFailed": "Failed to set preset avatar",
+      "fileTooLarge": "File too large. Maximum size is 20MB",
+      "invalidFileType": "Invalid file type. Please upload JPEG, PNG, GIF, or WebP",
+      "uploadFailed": "Failed to upload avatar",
+      "removeFailed": "Failed to remove avatar"
+    }
+  },
+  "resumePlayback": {
+    "title": "Continue Listening?",
+    "lastPlayed": "Last played {{time}}",
+    "onDevice": "on {{device}}",
+    "actions": {
+      "notNow": "Not Now",
+      "resumeAt": "Resume at {{time}}"
+    },
+    "relative": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}} minutes ago",
+      "hoursAgo": "{{count}} hours ago",
+      "daysAgo": "{{count}} days ago"
+    }
+  },
+  "sleepTimer": {
+    "title": "Sleep Timer",
+    "timerActive": "Timer Active",
+    "fadingOut": "Fading out...",
+    "stopPlaybackAfter": "Stop playback after",
+    "modes": {
+      "time": "Time",
+      "songs": "Songs",
+      "thisTrack": "This Track"
+    },
+    "minutesShort": "{{count}} min",
+    "hoursShort": "{{count}} hr",
+    "hoursMinutesShort": "{{hours}} hr {{minutes}} min",
+    "songsCount": "{{count}} songs",
+    "endOfTrackDescription": "Playback will stop when the current track ends.",
+    "fadeOutBeforeStopping": "Fade out before stopping",
+    "fadeOutDescription": "Gradually reduce volume for a smoother ending",
+    "fadeDuration": "Fade duration: {{count}} seconds",
+    "remaining": {
+      "seconds": "{{count}} seconds remaining",
+      "time": "{{time}} remaining",
+      "songs": "{{count}} songs remaining",
+      "afterThisTrack": "Stopping after this track"
+    },
+    "actions": {
+      "cancelTimer": "Cancel Timer",
+      "updateTimer": "Update Timer",
+      "startSleepTimer": "Start Sleep Timer"
+    }
+  },
+  "addToPlaylist": {
+    "title": "Add to Playlist",
+    "fields": {
+      "playlistName": "Playlist Name"
+    },
+    "actions": {
+      "creating": "Creating...",
+      "createAndAdd": "Create & Add",
+      "createNewPlaylist": "Create New Playlist"
+    },
+    "messages": {
+      "addedTo": "Added to \"{{playlist}}\"",
+      "createdAndAdded": "Created \"{{playlist}}\" and added track"
+    },
+    "errors": {
+      "addFailed": "Failed to add to playlist",
+      "createFailed": "Failed to create playlist"
+    },
+    "empty": {
+      "noCustomPlaylists": "No custom playlists yet. Create one!"
+    },
+    "trackCount": "{{count}} tracks"
+  },
+  "playlistCard": {
+    "status": {
+      "offline": "Offline",
+      "unavailable": "Unavailable"
+    },
+    "lastRefresh": {
+      "never": "Never synced",
+      "justNow": "Just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "actions": {
+      "syncing": "Syncing...",
+      "syncPlaylist": "Sync playlist",
+      "rechecking": "Rechecking...",
+      "forceRecheck": "Force recheck missing files",
+      "removePlaylist": "Remove playlist"
+    }
+  },
+  "channelCard": {
+    "updatedPrefix": "Updated",
+    "stats": {
+      "subs": "Subs",
+      "videos": "Videos",
+      "downloaded": "Downloaded"
+    },
+    "downloadProgress": "Download progress",
+    "actions": {
+      "syncChannel": "Sync channel",
+      "removeChannel": "Remove channel"
+    },
+    "status": {
+      "inactive": "Inactive"
+    },
+    "lastRefresh": {
+      "never": "Never synced",
+      "justNow": "Just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    }
+  },
+  "radioIndicator": {
+    "modes": {
+      "track": "Track Radio",
+      "artist": "Artist Radio",
+      "favorites": "Favorites Mix",
+      "discovery": "Discovery Mode",
+      "recent": "New Additions"
+    },
+    "sessionStats": "{{played}} played • {{skipped}} skipped",
+    "actions": {
+      "settings": "Radio Settings",
+      "stop": "Stop Radio"
+    },
+    "settings": {
+      "varietyLevel": "Variety Level",
+      "varietyHelp": "Lower = stick to similar tracks, Higher = more variety",
+      "resetLearningData": "Reset Learning Data",
+      "marks": {
+        "similar": "Similar",
+        "balanced": "Balanced",
+        "varied": "Varied"
+      }
+    }
+  },
+  "downloadStatus": {
+    "title": "Downloads",
+    "offline": "Offline",
+    "tooltip": {
+      "online": "Download Status",
+      "offline": "Offline - Downloads will sync when online"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "syncWhenOnline": "Sync when online"
+    },
+    "backgroundEnabled": "✓ Background downloads enabled - Downloads continue when app is closed",
+    "sections": {
+      "activeDownloads": "Active Downloads ({{count}})",
+      "queuedForSync": "Queued for Sync ({{count}})"
+    },
+    "empty": {
+      "title": "No active downloads",
+      "online": "Downloads you start will appear here",
+      "offline": "Queue downloads offline and they will sync when online"
+    },
+    "syncWhenOnlinePending": "Will sync when online ({{count}} pending)"
+  },
+  "relatedTracks": {
+    "title": "Related Tracks",
+    "trackCount": "{{count}} tracks",
+    "moreTracks": "+{{count}} more tracks",
+    "algorithmHint": "Based on your listening patterns, favorites, and popular tracks",
+    "sections": {
+      "recommendedForYou": "Recommended for You",
+      "moreFrom": "More from {{channel}}"
+    },
+    "actions": {
+      "removeFromFavorites": "Remove from favorites",
+      "addToFavorites": "Add to favorites"
+    },
+    "errors": {
+      "notAvailableForLocalFiles": "Recommendations not available for local files",
+      "loadFailed": "Failed to load recommendations"
+    },
+    "empty": {
+      "description": "No related tracks found. Start listening to more music to get personalized recommendations!"
+    }
+  },
+  "metadataEditor": {
+    "title": "Edit Metadata",
+    "sourceLabel": "Source",
+    "sections": {
+      "track": "Track",
+      "currentMetadata": "Current Metadata",
+      "searchMusicBrainz": "Search MusicBrainz"
+    },
+    "fields": {
+      "title": "Title",
+      "artist": "Artist",
+      "album": "Album",
+      "year": "Year",
+      "genre": "Genre"
+    },
+    "labels": {
+      "artist": "Artist",
+      "album": "Album"
+    },
+    "actions": {
+      "cancelEdit": "Cancel Edit",
+      "editManually": "Edit Manually",
+      "saveChanges": "Save Changes",
+      "autoFetchBestMatch": "Auto-Fetch Best Match",
+      "searching": "Searching...",
+      "search": "Search",
+      "applyThisMetadata": "Apply this metadata"
+    },
+    "helpers": {
+      "autoFetchDescription": "Automatically finds and applies the best matching metadata from MusicBrainz"
+    },
+    "messages": {
+      "saved": "Metadata saved",
+      "foundMatch": "✓ Found: {{artist}} - {{album}} ({{year}})",
+      "applied": "✓ Applied: {{artist}} - {{album}} ({{year}})"
+    },
+    "errors": {
+      "noMatches": "No matches found. Try adjusting the search terms.",
+      "searchFailed": "Failed to search metadata",
+      "noMetadataFound": "No metadata found",
+      "autoFetchFailed": "Failed to auto-fetch metadata",
+      "applyFailed": "Failed to apply metadata",
+      "saveFailed": "Failed to save metadata"
+    },
+    "empty": {
+      "noMetadata": "No metadata available"
+    },
+    "unknown": {
+      "artist": "Unknown",
+      "album": "Unknown",
+      "title": "Unknown Title"
+    }
+  },
+  "trackActionsMenu": {
+    "actions": {
+      "playNext": "Play Next",
+      "addToQueue": "Add to Queue",
+      "startRadio": "Start Radio",
+      "removeFromFavorites": "Remove from Favorites",
+      "addToFavorites": "Add to Favorites",
+      "addToPlaylist": "Add to Playlist",
+      "download": "Download",
+      "goToChannel": "Go to Channel",
+      "findInPlaylists": "Find in Playlists"
+    },
+    "findInPlaylists": {
+      "title": "Playlists containing this track",
+      "empty": "This track is not in any playlist yet.",
+      "secondary": "{{count}} tracks • Position #{{position}}"
+    }
+  },
+  "achievementNotification": {
+    "counter": "Achievement {{current}} of {{total}}",
+    "unlocked": "Achievement Unlocked!",
+    "contextArtist": "Artist: {{artist}}",
+    "actions": {
+      "viewAll": "View All Achievements",
+      "next": "Next",
+      "awesome": "Awesome!"
+    }
+  },
+  "localFiles": {
+    "title": "My Local Files",
+    "tabs": {
+      "audioFiles": "Audio Files",
+      "playlists": "Playlists"
+    },
+    "stats": {
+      "totalFiles": "Total Files",
+      "artists": "Artists",
+      "totalSize": "Total Size",
+      "favorites": "Favorites"
+    },
+    "filters": {
+      "searchPlaceholder": "Search...",
+      "artist": "Artist",
+      "album": "Album",
+      "genre": "Genre",
+      "allArtists": "All Artists",
+      "allAlbums": "All Albums",
+      "allGenres": "All Genres",
+      "favorites": "Favorites",
+      "clearFilters": "Clear Filters"
+    },
+    "actions": {
+      "uploadAudio": "Upload Audio",
+      "upload": "Upload",
+      "download": "Download",
+      "delete": "Delete"
+    },
+    "messages": {
+      "uploadedWithMetadata": "File uploaded! Metadata extracted from ID3 tags.",
+      "fileDeleted": "File deleted successfully"
+    },
+    "errors": {
+      "loadAudioFilesFailed": "Failed to load audio files",
+      "uploadFailed": "Failed to upload file",
+      "deleteFailed": "Failed to delete file"
+    },
+    "empty": {
+      "title": "No audio files yet",
+      "description": "Upload your local audio files to start listening",
+      "uploadFirst": "Upload Your First File"
+    },
+    "playlistsComingSoon": "Playlists feature coming soon...",
+    "confirm": {
+      "deleteFile": "Delete \"{{title}}\"?"
+    },
+    "uploadDialog": {
+      "title": "Upload Audio File",
+      "chooseFile": "Choose File",
+      "fileInfo": "{{size}} MB • Metadata will be read from ID3 tags",
+      "uploading": "Uploading... {{progress}}%"
+    }
+  },
+  "listeningHistory": {
+    "title": "Listening History",
+    "trackCount": "{{count}} tracks in your history",
+    "groups": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This Week",
+      "lastWeek": "Last Week",
+      "thisMonth": "This Month",
+      "lastMonth": "Last Month"
+    },
+    "timeAgo": {
+      "justNow": "Just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "onThisDay": {
+      "title": "On This Day",
+      "memoriesCount": "{{count}} memories"
+    },
+    "moreTracks": "+{{count}} more tracks",
+    "showingFirst50": "Showing first 50 of {{count}} tracks",
+    "actions": {
+      "refresh": "Refresh",
+      "clear": "Clear",
+      "retry": "Retry",
+      "loading": "Loading...",
+      "loadMore": "Load More",
+      "scrollToTop": "scroll to top"
+    },
+    "clearDialog": {
+      "title": "Clear Listening History",
+      "chooseAmount": "Choose how much history to clear:",
+      "olderThan1Week": "Clear older than 1 week",
+      "olderThan1Month": "Clear older than 1 month",
+      "olderThan3Months": "Clear older than 3 months",
+      "clearAll": "Clear All History"
+    },
+    "errors": {
+      "loadFailed": "Failed to load history"
+    },
+    "empty": {
+      "title": "No listening history yet",
+      "description": "Start playing some music to build your history!"
+    }
+  },
+  "offlineManager": {
+    "title": "Offline Storage",
+    "subtitle": "Manage playlists cached for offline playback",
+    "offlineWarning": "You are currently offline. You can only play cached content.",
+    "sections": {
+      "offlinePlaylists": "Offline Playlists"
+    },
+    "storage": {
+      "used": "Storage Used",
+      "available": "Available",
+      "usageOfQuota": "{{percent}}% of {{quota}} used"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "clearAll": "Clear All",
+      "browsePlaylists": "Browse Playlists",
+      "remove": "Remove"
+    },
+    "trackCount": "{{count}} tracks",
+    "cachedAt": "Cached {{date}}",
+    "removeDialog": {
+      "title": "Remove Offline Playlist?",
+      "description": "Are you sure you want to remove \"{{title}}\" from offline storage? You'll need to re-download it to play offline."
+    },
+    "clearAllDialog": {
+      "title": "Clear All Offline Data?",
+      "description": "This will remove all cached playlists and free up storage space. You'll need to re-download playlists to use them offline.",
+      "warning": "This action cannot be undone."
+    },
+    "errors": {
+      "removeOfflineDataFailed": "Failed to remove offline data",
+      "clearAllFailed": "Failed to clear all offline data"
+    },
+    "empty": {
+      "title": "No playlists cached for offline use"
+    }
+  },
+  "adminUsers": {
+    "title": "User Management",
+    "actions": {
+      "createUser": "Create User",
+      "userDetails": "User Details",
+      "editUser": "Edit User",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "deleteUser": "Delete User",
+      "resetStorage": "Reset Storage",
+      "reset2fa": "Reset 2FA",
+      "saveChanges": "Save Changes",
+      "deletePermanently": "Delete Permanently"
+    },
+    "table": {
+      "username": "Username",
+      "email": "Email",
+      "status": "Status",
+      "storage": "Storage",
+      "content": "Content",
+      "joined": "Joined",
+      "actions": "Actions"
+    },
+    "stats": {
+      "users": "Users",
+      "usersSummary": "{{active}} active, {{admins}} admins",
+      "content": "Content",
+      "contentSummary": "{{playlists}} playlists, {{audio}} audio",
+      "storage": "Storage",
+      "storageAllocated": "/ {{quota}} GB allocated"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "role": {
+      "admin": "Admin",
+      "user": "User"
+    },
+    "fields": {
+      "username": "Username",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "storageQuotaGb": "Storage Quota (GB)",
+      "maxChannels": "Max Channels",
+      "maxPlaylists": "Max Playlists",
+      "notes": "Notes",
+      "adminUser": "Admin User",
+      "active": "Active",
+      "status": "Status",
+      "role": "Role",
+      "storageUsage": "Storage Usage",
+      "channels": "Channels",
+      "playlists": "Playlists",
+      "audioFiles": "Audio Files",
+      "dateJoined": "Date Joined",
+      "lastLogin": "Last Login"
+    },
+    "values": {
+      "never": "Never"
+    },
+    "content": {
+      "channelsCount": "{{count}} channels",
+      "summary": "{{playlists}} playlists, {{audio}} audio"
+    },
+    "empty": {
+      "noUsers": "No users found"
+    },
+    "dialogs": {
+      "create": {
+        "title": "Create New User"
+      },
+      "edit": {
+        "title": "Edit User: {{username}}"
+      },
+      "details": {
+        "title": "User Details: {{username}}"
+      },
+      "delete": {
+        "title": "Delete User?",
+        "warning": "This action is permanent and cannot be undone! The following will be deleted:",
+        "bullets": {
+          "audio": "• All audio files",
+          "playlists": "• All playlists",
+          "channels": "• All channels",
+          "downloads": "• All downloads",
+          "history": "• Listening history",
+          "account": "• User account"
+        },
+        "confirmPrompt": "Type \"{{username}}\" to confirm deletion:"
+      }
+    },
+    "messages": {
+      "userCreated": "User created successfully",
+      "userUpdated": "User updated successfully",
+      "userActivated": "User activated",
+      "userDeactivated": "User deactivated",
+      "storageReset": "Storage reset successfully",
+      "twoFaReset": "2FA reset successfully",
+      "userDeleted": "User deleted successfully"
+    },
+    "errors": {
+      "loadUsersFailed": "Failed to load users",
+      "createUserFailed": "Failed to create user",
+      "updateUserFailed": "Failed to update user",
+      "toggleStatusFailed": "Failed to toggle user status",
+      "resetStorageFailed": "Failed to reset storage",
+      "resetTwoFaFailed": "Failed to reset 2FA",
+      "deleteUserFailed": "Failed to delete user"
+    }
+  },
+  "smartPlaylists": {
+    "title": "Smart Playlists",
+    "description": "Dynamic playlists that automatically update based on rules. Your library changes, they update instantly.",
+    "trackCount": "{{count}} tracks",
+    "sections": {
+      "autoPlaylists": "Auto Playlists",
+      "customSmartPlaylists": "Custom Smart Playlists"
+    },
+    "actions": {
+      "create": "Create",
+      "createSmartPlaylist": "Create Smart Playlist",
+      "play": "Play",
+      "shuffle": "Shuffle",
+      "delete": "Delete",
+      "addRule": "Add Rule"
+    },
+    "presets": {
+      "mostPlayedTop50": "Most Played (Top 50)",
+      "recentlyAdded30Days": "Recently Added (Last 30 days)",
+      "favorites": "Favorites",
+      "byGenre": "By Genre...",
+      "byArtist": "By Artist...",
+      "shortTracks": "Short Tracks (Under 3 min)",
+      "customRules": "Custom Rules..."
+    },
+    "placeholders": {
+      "genre": "e.g., Rock, Pop, Jazz",
+      "artist": "e.g., Artist name"
+    },
+    "customRules": {
+      "field": "Field",
+      "operator": "Operator",
+      "value": "Value"
+    },
+    "createDialog": {
+      "title": "Create Smart Playlist",
+      "name": "Name",
+      "descriptionOptional": "Description (optional)",
+      "chooseTracks": "Choose what tracks to include:",
+      "info": "Smart playlists automatically update when your library changes. You can refine rules after creation."
+    },
+    "confirm": {
+      "delete": "Delete \"{{name}}\"?"
+    },
+    "messages": {
+      "created": "Smart playlist created!",
+      "deleted": "Smart playlist deleted",
+      "noTracks": "No tracks in this playlist",
+      "playing": "Playing {{count}} tracks",
+      "playingShuffled": "Playing {{count}} tracks (shuffled)",
+      "noRulesWarning": "No rules set - playlist will include all tracks. Add rules after creation to filter."
+    },
+    "errors": {
+      "loadFailed": "Failed to load smart playlists",
+      "enterName": "Please enter a name",
+      "createFailed": "Failed to create smart playlist",
+      "cannotDeleteSystem": "Cannot delete system playlists",
+      "deleteFailed": "Failed to delete smart playlist",
+      "loadTracksFailed": "Failed to load tracks"
+    },
+    "system": {
+      "most_played": {
+        "name": "🔥 Most Played",
+        "description": "Your top 50 most played tracks"
+      },
+      "recently_added": {
+        "name": "✨ Recently Added",
+        "description": "Tracks added in the last 30 days"
+      },
+      "not_played_recently": {
+        "name": "🕰️ Rediscover",
+        "description": "Tracks you haven't played in over 60 days"
+      },
+      "never_played": {
+        "name": "🆕 Never Played",
+        "description": "Tracks you haven't listened to yet"
+      },
+      "short_tracks": {
+        "name": "⚡ Quick Hits",
+        "description": "Tracks under 3 minutes"
+      },
+      "long_tracks": {
+        "name": "🎸 Epic Tracks",
+        "description": "Tracks over 6 minutes"
+      }
+    },
+    "empty": {
+      "title": "No custom smart playlists yet",
+      "description": "Create your own rules-based playlists",
+      "noDescription": "No description"
+    }
+  },
+  "smartPlaylistDetail": {
+    "trackCount": "{{count}} tracks",
+    "badges": {
+      "auto": "Auto"
+    },
+    "actions": {
+      "backToSmartPlaylists": "Back to Smart Playlists",
+      "playAll": "Play All",
+      "shuffle": "Shuffle",
+      "editRules": "Edit Rules",
+      "saveRules": "Save Rules"
+    },
+    "dialog": {
+      "editRulesTitle": "Edit Rules",
+      "matchMode": "Match Mode",
+      "matchAllRules": "Match ALL rules (AND)",
+      "matchAnyRules": "Match ANY rule (OR)",
+      "rules": "Rules",
+      "noRulesDefined": "No rules defined. All tracks will be included.",
+      "field": "Field",
+      "operator": "Operator",
+      "value": "Value",
+      "to": "To",
+      "addRule": "Add Rule",
+      "orderBy": "Order By",
+      "limit": "Limit (empty = unlimited)",
+      "preview": "Preview",
+      "previewMatchCount": "{{count}} tracks match"
+    },
+    "messages": {
+      "rulesUpdated": "Rules updated!"
+    },
+    "errors": {
+      "loadFailed": "Failed to load playlist",
+      "saveRulesFailed": "Failed to save rules"
+    },
+    "empty": {
+      "noTracksMatchRules": "No tracks match the rules"
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "back": "Back",
+    "delete": "Delete",
+    "unknownError": "Unknown error",
+    "days": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "months": {
+      "january": "January",
+      "february": "February",
+      "march": "March",
+      "april": "April",
+      "may": "May",
+      "june": "June",
+      "july": "July",
+      "august": "August",
+      "september": "September",
+      "october": "October",
+      "november": "November",
+      "december": "December"
+    }
+  },
+  "sidebar": {
+    "home": "Home",
+    "search": "Search",
+    "library": "Library",
+    "favorites": "Favorites",
+    "history": "History",
+    "channels": "Channels",
+    "playlists": "Playlists",
+    "smartPlaylists": "Smart Playlists",
+    "analytics": "Analytics",
+    "achievements": "Achievements",
+    "yearlyWrapped": "Yearly Wrapped",
+    "localFiles": "Local Files",
+    "offline": "Offline",
+    "settings": "Settings",
+    "pwaBadge": "PWA"
+  },
+  "queueDrawer": {
+    "title": "Queue",
+    "tooltips": {
+      "play": "Play",
+      "removeFromQueue": "Remove from queue",
+      "clearQueueExceptCurrent": "Clear queue (except current)"
+    },
+    "empty": {
+      "title": "Queue is empty",
+      "description": "Add songs to start a queue"
+    },
+    "sections": {
+      "nowPlaying": "Now Playing",
+      "upNext": "Up Next ({{count}})",
+      "previouslyPlayed": "Previously Played ({{count}})"
+    },
+    "footer": {
+      "remainingTracks": "{{count}} remaining",
+      "unknownDuration": "Unknown duration",
+      "durationHoursMinutes": "{{hours}}h {{minutes}}m",
+      "durationMinutes": "{{minutes}} min"
+    }
+  },
+  "startRadioMenu": {
+    "title": "Start Radio",
+    "orStartMix": "Or Start a Mix",
+    "modes": {
+      "track": {
+        "label": "Track Radio",
+        "description": "Similar to this song"
+      },
+      "artist": {
+        "label": "Artist Radio",
+        "description": "More from this artist"
+      },
+      "favorites": {
+        "label": "Favorites Mix",
+        "description": "Your most played tracks"
+      },
+      "discovery": {
+        "label": "Discovery Mode",
+        "description": "Explore your unplayed tracks"
+      },
+      "recent": {
+        "label": "New Additions",
+        "description": "Recently added tracks"
+      }
+    }
+  },
+  "pwa": {
+    "offlineTitle": "You're offline",
+    "offlineDescription": "Cached content is still available",
+    "onlineBack": "You're back online!",
+    "installAction": "Install",
+    "installTitle": "Install SoundWave",
+    "installDescription": "Install the app for faster access and offline playback",
+    "updateAction": "Update",
+    "updateTitle": "Update Available",
+    "updateDescription": "A new version of SoundWave is ready to install",
+    "offlineModeBadge": "Offline Mode"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize the look and feel of SoundWave with different color themes.",
+      "themeLabel": "Theme"
+    },
+    "visualizer": {
+      "title": "Audio Visualizer",
+      "description": "Choose a visualization style for the audio player. Different themes offer unique animations and color schemes.",
+      "enableLabel": "Enable visualizer",
+      "glowLabel": "Enable glow effect",
+      "themeSection": "Visualizer Theme"
+    },
+    "twoFactor": {
+      "title": "Two-Factor Authentication",
+      "description": "Add an extra layer of security to your account. You'll need to enter a code from your authenticator app when you sign in.",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "backupCodesRemaining": "{{count}} backup codes remaining",
+      "enableButton": "Enable Two-Factor Authentication",
+      "disableButton": "Disable Two-Factor Authentication",
+      "backupCodesTitle": "Backup Codes",
+      "downloadCodesButton": "Download Backup Codes",
+      "regenerateCodesButton": "Regenerate Codes",
+      "setupDialog": {
+        "title": "Enable Two-Factor Authentication",
+        "scanQrCode": "Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)",
+        "orEnterManually": "Or enter this code manually:",
+        "enterCodeToVerify": "Enter the 6-digit code from your app to verify:",
+        "viewBackupCodes": "View Backup Codes",
+        "saveBackupCodesWarning": "Save these backup codes in a safe place. Each code can only be used once.",
+        "backToSetup": "Back to Setup",
+        "verifyAndEnable": "Verify and Enable"
+      },
+      "disableDialog": {
+        "title": "Disable Two-Factor Authentication",
+        "warning": "Disabling two-factor authentication will make your account less secure.",
+        "enterCode": "Enter a verification code from your authenticator app or use a backup code:",
+        "disableButton": "Disable 2FA"
+      }
+    },
+    "apiKeys": {
+      "title": "API Keys",
+      "createKeyButton": "Create Key",
+      "description": "Create API keys for external dashboard widgets (like Homepage). Keys are compatible with TubeArchivist widget format.",
+      "saveKeyWarning": "Save your API key now!",
+      "saveKeyCaption": "This key will only be shown once. Copy it now!",
+      "noKeysYet": "No API keys created yet",
+      "deleteKeyTooltip": "Delete key",
+      "widgetConfig": "Homepage Widget Configuration",
+      "table": {
+        "name": "Name",
+        "key": "Key",
+        "lastUsed": "Last Used",
+        "actions": "Actions"
+      },
+      "createDialog": {
+        "title": "Create API Key",
+        "description": "Create an API key for external dashboard widgets. This key will allow read-only access to your statistics.",
+        "keyNameLabel": "Key Name",
+        "keyNamePlaceholder": "e.g., Homepage Widget",
+        "copyWarning": "The API key will only be shown once after creation. Make sure to copy it!",
+        "createButton": "Create Key"
+      },
+      "deleteDialog": {
+        "title": "Delete API Key?",
+        "description": "Are you sure you want to delete this API key? Any applications using this key will lose access."
+      }
+    },
+    "playback": {
+      "title": "Playback",
+      "autoplayLabel": "Autoplay",
+      "normalizeLabel": "Normalize audio",
+      "smartShuffle": {
+        "title": "Smart Shuffle",
+        "description": "When enabled, shuffle mode will avoid playing recently heard songs, creating a more varied listening experience.",
+        "enableLabel": "Enable smart shuffle",
+        "historySize": "History size: {{count}} tracks",
+        "historySizeHelp": "Number of recently played songs to avoid when shuffling"
+      },
+      "seekDuration": {
+        "title": "Seek Duration",
+        "description": "Choose how many seconds to skip forward or backward when using seek controls (media keys, headphones, etc.).",
+        "seconds": "{{count}} seconds"
+      },
+      "prefetch": {
+        "title": "Intelligent Prefetch & Caching",
+        "description": "Automatically download upcoming tracks for instant playback. Cached tracks play without network delay.",
+        "enableLabel": "Enable intelligent prefetching"
+      },
+      "sync": {
+        "title": "Cross-Device Playback Sync",
+        "description": "Sync playback position across devices. Disable to reduce battery and data usage on mobile.",
+        "enableLabel": "Enable playback sync"
+      },
+      "cacheStats": {
+        "title": "Cache Statistics",
+        "cachedTracks": "Cached tracks",
+        "cacheSize": "Cache size",
+        "maxSize": "Max size",
+        "clearing": "Clearing...",
+        "clearButton": "Clear Cache"
+      }
+    },
+    "downloadQuality": {
+      "title": "Download Quality",
+      "bestQualityLabel": "Download in best quality"
+    },
+    "lyrics": {
+      "title": "Lyrics",
+      "description": "Automatically fetch and cache synchronized lyrics for your audio files using LRCLIB API.",
+      "autoFetchLabel": "Auto-fetch lyrics for new downloads",
+      "showInPlayerLabel": "Show synchronized lyrics in player"
+    },
+    "quickSync": {
+      "title": "Quick Sync - Adaptive Streaming"
+    },
+    "userManagement": {
+      "description": "Manage all users in the system. Create, edit, or delete user accounts and monitor system statistics.",
+      "openButton": "Open User Management"
+    },
+    "alerts": {
+      "apiKeyCreated": "API key created! Copy it now - it will only be shown once.",
+      "apiKeyCreateFailed": "Failed to create API key",
+      "apiKeyDeleted": "API key deleted",
+      "apiKeyDeleteFailed": "Failed to delete API key",
+      "copiedToClipboard": "Copied to clipboard!",
+      "audioCacheCleared": "Audio cache cleared successfully",
+      "audioCacheClearFailed": "Failed to clear cache",
+      "setup2faFailed": "Failed to setup 2FA",
+      "twoFactorEnabled": "Two-factor authentication enabled successfully!",
+      "invalidVerificationCode": "Invalid verification code",
+      "twoFactorDisabled": "Two-factor authentication disabled",
+      "backupCodesRegenerated": "Backup codes regenerated successfully!",
+      "regenerateBackupCodesFailed": "Failed to regenerate backup codes",
+      "downloadBackupCodesFailed": "Failed to download backup codes"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Choose your app language. New features are translated and your choice is remembered on this device.",
+      "label": "App language",
+      "options": {
+        "en": "English",
+        "ro": "Romanian"
+      }
+    }
+  },
+  "localFilesNew": {
+    "title": "My Local Files",
+    "buttons": {
+      "refresh": "Refresh",
+      "clearAll": "Clear All",
+      "selectFiles": "Select Files",
+      "selectFolder": "Select Folder"
+    },
+    "tooltips": {
+      "selectFilesHint": "Select individual audio files from your device",
+      "selectFolderHttps": "Folder selection requires HTTPS or localhost. Currently viewing over HTTP. Use \"Select Files\" instead, or access via HTTPS.",
+      "selectFolderHint": "Select a folder to scan recursively including all subfolders"
+    },
+    "alerts": {
+      "noFilesTitle": "No local files yet",
+      "noFilesDescription": "Click \"Select Files\" to choose individual audio files (works everywhere), or \"Select Folder\" to scan an entire folder including subfolders (requires HTTPS or localhost). Files are stored in your browser and play locally without uploading.",
+      "processingFiles": "Processing {{count}} files...",
+      "addedFiles": "Added {{count}} files successfully!",
+      "failedSelectFiles": "Failed to select files",
+      "folderNotSupported": "Folder selection not supported in this browser. Use Chrome, Edge, or Opera.",
+      "folderRequiresHttps": "Folder selection requires HTTPS or localhost. For local network access, use \"Select Files\" instead or access via HTTPS.",
+      "scanningFolder": "Scanning folder and subfolders...",
+      "noAudioFiles": "No audio files found in the selected folder",
+      "processingAudioFiles": "Processing {{count}} audio files...",
+      "successfullyAdded": "Successfully added {{count}} files from folder!",
+      "failedReadFolder": "Failed to read folder",
+      "folderCancelled": "Folder selection cancelled",
+      "failedPlayFile": "Failed to play file",
+      "fileRemoved": "File removed",
+      "failedRemoveFile": "Failed to remove file",
+      "allFilesRemoved": "All files removed",
+      "failedClearLibrary": "Failed to clear library"
+    },
+    "confirmations": {
+      "removeFile": "Remove this file from your library?",
+      "removeAllFiles": "Remove ALL files from your library? This cannot be undone."
+    },
+    "table": {
+      "columnNumber": "#",
+      "columnArtist": "Artist",
+      "columnAlbum": "Album"
+    }
+  }
+}

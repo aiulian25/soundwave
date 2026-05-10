@@ -28,6 +28,7 @@ import {
   YouTube as YouTubeIcon,
   PlaylistPlay as PlayAllIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { channelAPI, audioAPI } from '../api/client';
 import TrackActionsMenu from '../components/TrackActionsMenu';
@@ -58,6 +59,7 @@ interface ChannelDetailPageProps {
 }
 
 export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPageProps) {
+  const { t, i18n } = useTranslation();
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
@@ -81,7 +83,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
       setError('');
     } catch (err: any) {
       console.error('Failed to load channel:', err);
-      setError(err.response?.data?.detail || 'Failed to load channel');
+      setError(err.response?.data?.detail || t('channelDetail.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -99,7 +101,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
   const handlePlayAll = () => {
     if (channel?.audio_files && channel.audio_files.length > 0) {
       setCurrentAudio(channel.audio_files[0], channel.audio_files);
-      setSnackbarMessage(`Playing all ${channel.audio_files.length} tracks from ${channel.channel_name}`);
+      setSnackbarMessage(t('channelDetail.messages.playingAll', { count: channel.audio_files.length, channel: channel.channel_name }));
       setSnackbarOpen(true);
     }
   };
@@ -109,7 +111,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
       // Create shuffled copy of the audio files
       const shuffled = [...channel.audio_files].sort(() => Math.random() - 0.5);
       setCurrentAudio(shuffled[0], shuffled);
-      setSnackbarMessage(`Shuffling ${channel.audio_files.length} tracks from ${channel.channel_name}`);
+      setSnackbarMessage(t('channelDetail.messages.shuffling', { count: channel.audio_files.length, channel: channel.channel_name }));
       setSnackbarOpen(true);
     }
   };
@@ -119,12 +121,12 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
     const downloadableTracks = channel.audio_files.filter(audio => audio.file_path && audio.youtube_id);
     
     if (downloadableTracks.length === 0) {
-      setSnackbarMessage('No downloaded tracks to save');
+      setSnackbarMessage(t('channelDetail.errors.noDownloadedTracks'));
       setSnackbarOpen(true);
       return;
     }
     
-    setSnackbarMessage(`Downloading ${downloadableTracks.length} tracks to your device`);
+    setSnackbarMessage(t('channelDetail.messages.downloadingTracks', { count: downloadableTracks.length }));
     setSnackbarOpen(true);
     
     // Download each track with authentication
@@ -134,7 +136,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = audio.title || 'audio';
+        link.download = audio.title || t('channelDetail.fallback.audioFilename');
         link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
@@ -204,9 +206,9 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
           <IconButton onClick={() => navigate('/channels')}>
             <BackIcon />
           </IconButton>
-          <Typography variant="h5">Channel Details</Typography>
+          <Typography variant="h5">{t('channelDetail.title')}</Typography>
         </Box>
-        <Alert severity="error">{error || 'Channel not found'}</Alert>
+        <Alert severity="error">{error || t('channelDetail.errors.notFound')}</Alert>
       </Box>
     );
   }
@@ -219,7 +221,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
           <BackIcon />
         </IconButton>
         <Typography variant="h4" fontWeight="bold">
-          Channel Details
+          {t('channelDetail.title')}
         </Typography>
       </Box>
 
@@ -245,17 +247,17 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                 size="small"
               />
               <Chip 
-                label={`${formatNumber(channel.subscriber_count)} subscribers`} 
+                label={t('channelDetail.stats.subscribers', { count: formatNumber(channel.subscriber_count) })} 
                 variant="outlined" 
                 size="small" 
               />
               <Chip 
-                label={`${channel.audio_count || 0} tracks`} 
+                label={t('channelDetail.stats.tracks', { count: channel.audio_count || 0 })} 
                 variant="outlined" 
                 size="small" 
               />
               <Chip 
-                label={`${channel.downloaded_count} downloaded`} 
+                label={t('channelDetail.stats.downloaded', { count: channel.downloaded_count })} 
                 variant="outlined" 
                 size="small" 
               />
@@ -270,21 +272,21 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                     startIcon={<PlayAllIcon />}
                     onClick={handlePlayAll}
                   >
-                    Play All
+                    {t('channelDetail.actions.playAll')}
                   </Button>
                   <Button
                     variant="outlined"
                     startIcon={<ShuffleIcon />}
                     onClick={handlePlayShuffled}
                   >
-                    Shuffle
+                    {t('channelDetail.actions.shuffle')}
                   </Button>
                   <Button
                     variant="outlined"
                     startIcon={<DownloadIcon />}
                     onClick={handleDownloadAll}
                   >
-                    Download All
+                    {t('channelDetail.actions.downloadAll')}
                   </Button>
                 </>
               )}
@@ -300,11 +302,11 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
             <TableHead>
               <TableRow>
                 <TableCell width={60}>#</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell width={120}>Duration</TableCell>
-                <TableCell width={120}>Published</TableCell>
-                <TableCell width={100}>Plays</TableCell>
-                <TableCell width={100}>Actions</TableCell>
+                <TableCell>{t('channelDetail.columns.title')}</TableCell>
+                <TableCell width={120}>{t('channelDetail.columns.duration')}</TableCell>
+                <TableCell width={120}>{t('channelDetail.columns.published')}</TableCell>
+                <TableCell width={100}>{t('channelDetail.columns.plays')}</TableCell>
+                <TableCell width={100}>{t('channelDetail.columns.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -360,7 +362,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                           {audio.title}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {formatNumber(audio.view_count || 0)} views
+                          {t('channelDetail.stats.views', { count: formatNumber(audio.view_count || 0) })}
                         </Typography>
                       </Box>
                     </Box>
@@ -374,7 +376,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                   
                   <TableCell>
                     <Typography variant="body2" color="text.secondary">
-                      {audio.published_date ? new Date(audio.published_date).toLocaleDateString() : 'N/A'}
+                      {audio.published_date ? new Date(audio.published_date).toLocaleDateString(i18n.language === 'ro' ? 'ro-RO' : 'en-US') : t('channelDetail.notAvailable')}
                     </Typography>
                   </TableCell>
                   
@@ -386,7 +388,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                   
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="Download">
+                      <Tooltip title={t('channelDetail.actions.download')}>
                         <IconButton 
                           size="small"
                           onClick={async (e) => {
@@ -396,7 +398,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                               const url = window.URL.createObjectURL(blob);
                               const link = document.createElement('a');
                               link.href = url;
-                              link.download = audio.title || 'audio';
+                              link.download = audio.title || t('channelDetail.fallback.audioFilename');
                               link.click();
                               window.URL.revokeObjectURL(url);
                             } catch (err) {
@@ -422,10 +424,10 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <YouTubeIcon sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            No audio files found
+            {t('channelDetail.empty.noAudioTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Audio files will appear here once they are downloaded from this channel.
+            {t('channelDetail.empty.noAudioDescription')}
           </Typography>
         </Paper>
       )}

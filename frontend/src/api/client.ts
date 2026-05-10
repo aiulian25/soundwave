@@ -8,6 +8,10 @@ function getCookie(name: string): string | null {
   return null;
 }
 
+export function getCsrfToken(): string | null {
+  return getCookie('csrftoken');
+}
+
 const api = axios.create({
   baseURL: '/api',
   headers: {
@@ -16,13 +20,28 @@ const api = axios.create({
   withCredentials: true, // Send cookies with requests
 });
 
-// Add auth token and CSRF token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Token ${token}`;
+let csrfBootstrapped = false;
+let authEventsEnabled = false;
+
+export function setAuthEventsEnabled(enabled: boolean): void {
+  authEventsEnabled = enabled;
+}
+
+export async function ensureCsrfCookie(): Promise<void> {
+  if (csrfBootstrapped) {
+    return;
   }
-  
+
+  try {
+    await api.get('/user/csrf/');
+    csrfBootstrapped = true;
+  } catch {
+    // Best-effort; requests may still succeed if cookie already exists.
+  }
+}
+
+// Add CSRF token to unsafe requests
+api.interceptors.request.use((config) => {
   // Add CSRF token for unsafe methods
   if (config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
     const csrfToken = getCookie('csrftoken');
@@ -34,21 +53,28 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle token expiry/invalid - redirect to login when token is expired or invalid
+// Handle authentication expiry/invalid for cookie-session and token clients
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
     const errorMessage = error.response?.data?.detail || error.response?.data?.error || '';
+    const requestUrl = error.config?.url || '';
     
-    // Check for invalid/expired token on both 401 and 403
-    if (status === 401 || status === 403) {
-      if (errorMessage.includes('expired') || errorMessage.includes('Invalid token')) {
-        // Clear invalid token and redirect to login
-        localStorage.removeItem('token');
-        
+    // Don't emit global auth events for login endpoint failures
+    if (requestUrl.includes('/user/login/')) {
+      return Promise.reject(error);
+    }
+
+    // Only emit global auth-required events once we know this browser session
+    // has been authenticated at least once in the current app lifecycle.
+    if (authEventsEnabled && (status === 401 || status === 403)) {
+      if (
+        errorMessage.includes('expired') ||
+        errorMessage.includes('Invalid token')
+      ) {
         // Dispatch custom event for app to handle logout
-        window.dispatchEvent(new CustomEvent('token-expired', { 
+        window.dispatchEvent(new CustomEvent('auth-required', {
           detail: { message: 'Your session has expired. Please log in again.' }
         }));
       }
@@ -67,11 +93,9 @@ export const audioAPI = {
   download: (youtubeId: string) => api.post(`/audio/${youtubeId}/`, { action: 'download' }),
   toggleFavorite: (youtubeId: string) => api.post(`/audio/${youtubeId}/`, { action: 'toggle_favorite' }),
   downloadFile: async (youtubeId: string) => {
-    const token = localStorage.getItem('token');
+    await ensureCsrfCookie();
     const response = await fetch(`/api/audio/${youtubeId}/download/`, {
-      headers: {
-        'Authorization': `Token ${token}`,
-      },
+      credentials: 'include',
     });
     if (!response.ok) throw new Error('Download failed');
     const blob = await response.blob();

@@ -19,6 +19,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import ExploreIcon from '@mui/icons-material/Explore';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import { useRadio, type RadioMode } from '../context/RadioContext';
+import { useTranslation } from 'react-i18next';
 import type { Audio } from '../types';
 
 interface StartRadioMenuProps {
@@ -30,49 +31,50 @@ interface StartRadioMenuProps {
 
 const radioModes: Array<{
   mode: RadioMode;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   icon: React.ReactNode;
   requiresTrack: boolean;
 }> = [
   {
     mode: 'track',
-    label: 'Track Radio',
-    description: 'Similar to this song',
+    labelKey: 'startRadioMenu.modes.track.label',
+    descriptionKey: 'startRadioMenu.modes.track.description',
     icon: <RadioIcon />,
     requiresTrack: true,
   },
   {
     mode: 'artist',
-    label: 'Artist Radio',
-    description: 'More from this artist',
+    labelKey: 'startRadioMenu.modes.artist.label',
+    descriptionKey: 'startRadioMenu.modes.artist.description',
     icon: <PersonIcon />,
     requiresTrack: true,
   },
   {
     mode: 'favorites',
-    label: 'Favorites Mix',
-    description: 'Your most played tracks',
+    labelKey: 'startRadioMenu.modes.favorites.label',
+    descriptionKey: 'startRadioMenu.modes.favorites.description',
     icon: <FavoriteIcon />,
     requiresTrack: false,
   },
   {
     mode: 'discovery',
-    label: 'Discovery Mode',
-    description: 'Explore your unplayed tracks',
+    labelKey: 'startRadioMenu.modes.discovery.label',
+    descriptionKey: 'startRadioMenu.modes.discovery.description',
     icon: <ExploreIcon />,
     requiresTrack: false,
   },
   {
     mode: 'recent',
-    label: 'New Additions',
-    description: 'Recently added tracks',
+    labelKey: 'startRadioMenu.modes.recent.label',
+    descriptionKey: 'startRadioMenu.modes.recent.description',
     icon: <NewReleasesIcon />,
     requiresTrack: false,
   },
 ];
 
 export default function StartRadioMenu({ anchorEl, open, onClose, track }: StartRadioMenuProps) {
+  const { t } = useTranslation();
   const { startRadio, isLoading } = useRadio();
   
   const handleStartRadio = async (mode: RadioMode) => {
@@ -98,7 +100,7 @@ export default function StartRadioMenu({ anchorEl, open, onClose, track }: Start
       }}
     >
       <Typography variant="overline" sx={{ px: 2, color: 'text.secondary' }}>
-        Start Radio
+        {t('startRadioMenu.title')}
       </Typography>
       
       {track && (
@@ -115,8 +117,8 @@ export default function StartRadioMenu({ anchorEl, open, onClose, track }: Start
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText
-                  primary={item.label}
-                  secondary={`${item.description}: ${track.title}`}
+                  primary={t(item.labelKey)}
+                  secondary={`${t(item.descriptionKey)}: ${track.title}`}
                   secondaryTypographyProps={{ noWrap: true, sx: { maxWidth: 180 } }}
                 />
               </MenuItem>
@@ -124,7 +126,7 @@ export default function StartRadioMenu({ anchorEl, open, onClose, track }: Start
           
           <Divider sx={{ my: 0.5 }} />
           <Typography variant="overline" sx={{ px: 2, color: 'text.secondary' }}>
-            Or start a mix
+            {t('startRadioMenu.orStartMix')}
           </Typography>
         </>
       )}
@@ -141,8 +143,8 @@ export default function StartRadioMenu({ anchorEl, open, onClose, track }: Start
               {item.icon}
             </ListItemIcon>
             <ListItemText
-              primary={item.label}
-              secondary={item.description}
+              primary={t(item.labelKey)}
+              secondary={t(item.descriptionKey)}
             />
           </MenuItem>
         ))}

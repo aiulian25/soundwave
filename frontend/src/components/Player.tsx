@@ -43,6 +43,7 @@ import SleepTimerDialog from './SleepTimerDialog';
 import QueueDrawer from './QueueDrawer';
 import EqualizerDialog from './EqualizerDialog';
 import AddToPlaylistDialog from './AddToPlaylistDialog';
+import { useTranslation } from 'react-i18next';
 
 // Import LyricsPlayer directly instead of lazy to avoid offline loading issues
 import LyricsPlayer from './LyricsPlayer';
@@ -81,6 +82,7 @@ interface PlayerProps {
 }
 
 export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect, onTimeUpdate, initialSeek, isRadioMode = false, queue = [], currentQueueIndex = 0, onQueueReorder, onRemoveFromQueue, onPlayQueueTrack, onClearQueue }: PlayerProps) {
+  const { t } = useTranslation();
   const { settings, updateSetting } = useSettings();
   const { isRadioMode: radioActive, stopRadio } = useRadio();
   const { timerState: sleepTimerState, getFadeVolume, shouldStop: shouldSleepStop, onSongEnded } = useSleepTimer();
@@ -360,18 +362,15 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       if (currentTime > 10 && audio.youtube_id) {
         // Use synchronous approach for unmount
         const position = Math.floor(currentTime);
-        const token = localStorage.getItem('token');
-        if (token) {
-          fetch(`/api/audio/${audio.youtube_id}/progress/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Token ${token}`,
-            },
-            body: JSON.stringify({ position, completed: false }),
-            keepalive: true,
-          }).catch(() => {});
-        }
+        fetch(`/api/audio/${audio.youtube_id}/progress/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ position, completed: false }),
+          keepalive: true,
+        }).catch(() => {});
       }
     };
   }, [audio.youtube_id, currentTime]);
@@ -413,9 +412,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           // This reduces latency and prevents buffering on track change
           if (audio.file_path) {
             const encodedPath = audio.file_path.split('/').map(part => encodeURIComponent(part)).join('/');
-            // Include auth token for media authentication
-            const token = localStorage.getItem('token');
-            const directUrl = `/media/${encodedPath}${token ? `?token=${token}` : ''}`;
+            const directUrl = `/media/${encodedPath}`;
             console.log('[Player] → Streaming directly (no API call):', audio.title);
             setStreamUrl(directUrl);
             setLoadingStream(false);
@@ -431,9 +428,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           // Fallback: fetch stream URL from API (for tracks without file_path)
           console.log('[Player] → Fetching stream URL from API:', audio.title);
           const response = await fetch(`/api/audio/${audio.youtube_id}/player/`, {
-            headers: {
-              'Authorization': `Token ${localStorage.getItem('token')}`,
-            },
+            credentials: 'include',
           });
           const data = await response.json();
           setStreamUrl(data.stream_url);
@@ -474,7 +469,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     const updateMediaSession = (artworkArray?: Array<{src: string; sizes: string; type: string}>) => {
       setMediaMetadata({
         title: audio.title,
-        artist: audio.artist || audio.channel_name || 'Unknown Artist',
+        artist: audio.artist || audio.channel_name || t('player.unknownArtist'),
         album: audio.album,
         artwork: artworkArray,
       });
@@ -933,7 +928,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           },
           transition: 'opacity 0.2s ease',
         }}
-        title={`Click to change visualizer theme (Current: ${visualizerThemes.find(t => t.id === settings.visualizer_theme)?.name || 'Classic Bars'})`}
+        title={t('player.visualizerThemeHint', {
+          themeName: visualizerThemes.find((theme) => theme.id === settings.visualizer_theme)?.name || t('player.classicBars'),
+        })}
       >
         <AudioVisualizer
           data={visualizerData}
@@ -1140,7 +1137,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                   },
                 },
               }}
-              title={audio.youtube_id ? 'Click to toggle lyrics' : 'Lyrics not available for local files'}
+              title={audio.youtube_id ? t('player.toggleLyrics') : t('player.lyricsNotAvailableLocal')}
             >
               {/* Hidden img to detect load errors */}
               <img 
@@ -1195,7 +1192,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                   },
                 },
               }}
-              title={audio.youtube_id ? 'Click to toggle lyrics' : 'Lyrics not available for local files'}
+              title={audio.youtube_id ? t('player.toggleLyrics') : t('player.lyricsNotAvailableLocal')}
             >
               <MusicNoteIcon sx={{ fontSize: 80, color: 'primary.main', opacity: 0.7 }} />
             </Box>
@@ -1213,14 +1210,14 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </Typography>
             )}
             {isCachedPlayback && (
-              <Tooltip title="Playing from cache">
+              <Tooltip title={t('player.playingFromCache')}>
                 <CachedIcon sx={{ fontSize: 16, color: 'success.main' }} />
               </Tooltip>
             )}
           </Box>
           {/* Track Actions & Related Tracks & Metadata Buttons */}
           <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-            <Tooltip title="Track options">
+            <Tooltip title={t('player.trackOptions')}>
               <IconButton
                 onClick={(e) => setTrackActionsMenuAnchor(e.currentTarget)}
                 sx={{
@@ -1245,13 +1242,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                 <ListItemIcon>
                   <PlaylistAddIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Add to Playlist</ListItemText>
+                <ListItemText>{t('player.addToPlaylist')}</ListItemText>
               </MenuItem>
               <MenuItem onClick={() => { handleFavoriteToggle(); setTrackActionsMenuAnchor(null); }}>
                 <ListItemIcon>
                   {isFavorite ? <FavoriteIcon fontSize="small" sx={{ color: 'error.main' }} /> : <FavoriteBorderIcon fontSize="small" />}
                 </ListItemIcon>
-                <ListItemText>{isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}</ListItemText>
+                <ListItemText>{isFavorite ? t('player.removeFromFavorites') : t('player.addToFavorites')}</ListItemText>
               </MenuItem>
               {audio.youtube_id && (
                 <>
@@ -1260,19 +1257,19 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                     <ListItemIcon>
                       <DownloadIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>Export Track</ListItemText>
+                    <ListItemText>{t('player.exportTrack')}</ListItemText>
                   </MenuItem>
                   <MenuItem onClick={() => { setShowMetadataEditor(true); setTrackActionsMenuAnchor(null); }}>
                     <ListItemIcon>
                       <EditIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>Edit Metadata</ListItemText>
+                    <ListItemText>{t('player.editMetadata')}</ListItemText>
                   </MenuItem>
                 </>
               )}
             </Menu>
             {audio.youtube_id && onTrackSelect && (
-              <Tooltip title="Related tracks">
+              <Tooltip title={t('player.relatedTracks')}>
                 <IconButton
                   onClick={() => setShowRelatedTracks(!showRelatedTracks)}
                   sx={{
@@ -1289,7 +1286,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </Tooltip>
             )}
             {audio.youtube_id && !radioActive && (
-              <Tooltip title="Start Radio">
+              <Tooltip title={t('player.startRadio')}>
                 <IconButton
                   onClick={(e) => setRadioMenuAnchor(e.currentTarget)}
                   sx={{
@@ -1306,10 +1303,10 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </Tooltip>
             )}
             {radioActive && (
-              <Tooltip title="Click to stop radio">
+              <Tooltip title={t('player.stopRadio')}>
                 <Chip
                   icon={<RadioIcon sx={{ fontSize: 16 }} />}
-                  label="RADIO"
+                  label={t('player.radio')}
                   size="small"
                   color="secondary"
                   onClick={() => stopRadio()}
@@ -1328,7 +1325,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </Tooltip>
             )}
             {/* Sleep Timer Button */}
-            <Tooltip title={sleepTimerState.isActive ? 'Sleep timer active' : 'Sleep timer'}>
+            <Tooltip title={sleepTimerState.isActive ? t('player.sleepTimerActive') : t('player.sleepTimer')}>
               <IconButton
                 onClick={() => setShowSleepTimerDialog(true)}
                 sx={{
@@ -1359,7 +1356,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </IconButton>
             </Tooltip>
             {/* Queue Button */}
-            <Tooltip title={`Queue (${queue.length} tracks)`}>
+            <Tooltip title={t('player.queueCount', { count: queue.length })}>
               <IconButton
                 onClick={() => setShowQueueDrawer(true)}
                 sx={{
@@ -1397,7 +1394,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </IconButton>
             </Tooltip>
             {/* Equalizer Button */}
-            <Tooltip title={eqEnabled ? 'Equalizer (on)' : 'Equalizer'}>
+            <Tooltip title={eqEnabled ? t('player.equalizerOn') : t('player.equalizer')}>
               <IconButton
                 onClick={() => setShowEqualizerDialog(true)}
                 sx={{
@@ -1652,7 +1649,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: 1, borderColor: 'divider' }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <AutoAwesomeIcon sx={{ color: 'primary.main' }} />
-                  Related Tracks
+                  {t('player.relatedTracks')}
                 </Typography>
                 <IconButton onClick={() => setShowRelatedTracks(false)} size="small">
                   <CloseIcon />

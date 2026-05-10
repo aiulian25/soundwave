@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v12';
+const CACHE_NAME = 'soundwave-v14';
 const API_CACHE_NAME = 'soundwave-api-v3';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
 const IMAGE_CACHE_NAME = 'soundwave-images-v2';
@@ -8,6 +8,7 @@ const IMAGE_CACHE_NAME = 'soundwave-images-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/offline.html',
   '/manifest.json',
   '/favicon.ico',
 ];
@@ -155,12 +156,18 @@ async function networkFirstStrategy(request, cacheName) {
       return cachedResponse;
     }
     
-    // Return offline page for navigation requests
-    if (request.mode === 'navigate') {
+    // Return offline page for navigation requests.
+    if (request.mode === 'navigate' || request.destination === 'document') {
       const cache = await caches.open(CACHE_NAME);
-      const offlinePage = await cache.match('/index.html');
+      const offlinePage = await cache.match('/offline.html');
       if (offlinePage) {
         return offlinePage;
+      }
+
+      // Last-resort fallback to index for compatibility.
+      const appShell = await cache.match('/index.html');
+      if (appShell) {
+        return appShell;
       }
     }
     
@@ -416,17 +423,11 @@ self.addEventListener('message', (event) => {
   
   // Cache playlist for offline access with authentication
   if (event.data && event.data.type === 'CACHE_PLAYLIST') {
-    const { playlistId, audioUrls, authToken } = event.data;
+    const { playlistId, audioUrls } = event.data;
     event.waitUntil(
       (async () => {
         try {
           console.log('[Service Worker] Caching playlist:', playlistId, 'with', audioUrls.length, 'tracks');
-          
-          if (!authToken) {
-            console.error('[Service Worker] No auth token provided for playlist caching');
-            event.ports[0].postMessage({ success: false, error: 'No auth token' });
-            return;
-          }
           
           const results = {
             metadata: false,
@@ -456,9 +457,9 @@ self.addEventListener('message', (event) => {
             const metadataUrl = `/api/playlist/${playlistId}/?include_items=true`;
             const metadataResponse = await fetch(metadataUrl, {
               headers: {
-                'Authorization': `Token ${authToken}`,
                 'Accept': 'application/json',
-              }
+              },
+              credentials: 'include',
             });
             if (metadataResponse.ok) {
               await apiCache.put(metadataUrl, metadataResponse.clone());
@@ -482,12 +483,11 @@ self.addEventListener('message', (event) => {
             sendProgress(trackName, 'downloading');
             
             try {
-              // Create authenticated request with Token auth
               const response = await fetch(url, {
                 headers: {
-                  'Authorization': `Token ${authToken}`,
                   'Accept': 'audio/*',
-                }
+                },
+                credentials: 'include',
               });
               
               if (response.ok) {

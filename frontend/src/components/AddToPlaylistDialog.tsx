@@ -33,6 +33,7 @@ import {
   QueueMusic as QueueMusicIcon,
   Check as CheckIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { playlistAPI } from '../api/client';
 import type { Audio } from '../types';
 
@@ -57,6 +58,7 @@ export default function AddToPlaylistDialog({
   track,
   onSuccess,
 }: AddToPlaylistDialogProps) {
+  const { t } = useTranslation();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export default function AddToPlaylistDialog({
       await playlistAPI.addItem(playlist.playlist_id, track.youtube_id);
       setSnackbar({
         open: true,
-        message: `Added to "${playlist.title}"`,
+        message: t('addToPlaylist.messages.addedTo', { playlist: playlist.title }),
         severity: 'success',
       });
       if (onSuccess) {
@@ -109,7 +111,7 @@ export default function AddToPlaylistDialog({
       }
       onClose();
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || 'Failed to add to playlist';
+      const errorMsg = err.response?.data?.error || t('addToPlaylist.errors.addFailed');
       setSnackbar({
         open: true,
         message: errorMsg,
@@ -138,7 +140,7 @@ export default function AddToPlaylistDialog({
       
       setSnackbar({
         open: true,
-        message: `Created "${newPlaylistName}" and added track`,
+        message: t('addToPlaylist.messages.createdAndAdded', { playlist: newPlaylistName }),
         severity: 'success',
       });
       
@@ -147,7 +149,7 @@ export default function AddToPlaylistDialog({
       }
       onClose();
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || 'Failed to create playlist';
+      const errorMsg = err.response?.data?.error || t('addToPlaylist.errors.createFailed');
       setSnackbar({
         open: true,
         message: errorMsg,
@@ -169,7 +171,7 @@ export default function AddToPlaylistDialog({
       <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <PlaylistAddIcon color="primary" />
-          Add to Playlist
+          {t('addToPlaylist.title')}
         </DialogTitle>
         <DialogContent dividers>
           {track && (
@@ -192,7 +194,7 @@ export default function AddToPlaylistDialog({
               <TextField
                 autoFocus
                 fullWidth
-                label="Playlist Name"
+                label={t('addToPlaylist.fields.playlistName')}
                 value={newPlaylistName}
                 onChange={(e) => setNewPlaylistName(e.target.value)}
                 onKeyDown={(e) => {
@@ -209,7 +211,7 @@ export default function AddToPlaylistDialog({
                   onClick={() => setShowCreateForm(false)}
                   disabled={creating}
                 >
-                  Back
+                  {t('common.back')}
                 </Button>
                 <Button
                   variant="contained"
@@ -217,7 +219,7 @@ export default function AddToPlaylistDialog({
                   disabled={!newPlaylistName.trim() || creating}
                   startIcon={creating ? <CircularProgress size={16} /> : <CheckIcon />}
                 >
-                  {creating ? 'Creating...' : 'Create & Add'}
+                  {creating ? t('addToPlaylist.actions.creating') : t('addToPlaylist.actions.createAndAdd')}
                 </Button>
               </Box>
             </Box>
@@ -230,7 +232,7 @@ export default function AddToPlaylistDialog({
                     <AddIcon color="primary" />
                   </ListItemIcon>
                   <ListItemText 
-                    primary="Create New Playlist" 
+                    primary={t('addToPlaylist.actions.createNewPlaylist')} 
                     primaryTypographyProps={{ color: 'primary', fontWeight: 'medium' }}
                   />
                 </ListItemButton>
@@ -241,7 +243,7 @@ export default function AddToPlaylistDialog({
               {/* Existing playlists */}
               {playlists.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                  No custom playlists yet. Create one!
+                  {t('addToPlaylist.empty.noCustomPlaylists')}
                 </Typography>
               ) : (
                 <List disablePadding>
@@ -260,7 +262,7 @@ export default function AddToPlaylistDialog({
                         </ListItemIcon>
                         <ListItemText 
                           primary={playlist.title}
-                          secondary={`${playlist.item_count} tracks`}
+                          secondary={t('addToPlaylist.trackCount', { count: playlist.item_count })}
                         />
                       </ListItemButton>
                     </ListItem>
@@ -271,7 +273,7 @@ export default function AddToPlaylistDialog({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleClose}>{t('common.cancel')}</Button>
         </DialogActions>
       </Dialog>
       

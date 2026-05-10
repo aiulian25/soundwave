@@ -20,6 +20,7 @@
 - 📝 **Playlists** - Create custom playlists or sync YouTube playlists
 - 🔄 **Force Recheck** - Per-playlist force recheck to verify and re-download missing files
 - ✨ **Smart Playlists** - Dynamic auto-updating playlists based on rules (Most Played, Recently Added, Genre filters, and more)
+- 🌐 **Multi-Language UI** - Full English and Romanian translations across all pages
 
 ### Analytics & Achievements
 - 🏆 **Achievements System** - 37 unlockable achievements across 6 categories (Tracks, Hours, Streaks, Artists, Channels, Special)
@@ -68,6 +69,7 @@
 
 - **Backend**: Django REST Framework (Python)
 - **Frontend**: React + TypeScript + Material-UI
+- **Database**: PostgreSQL (SQLite fallback for local development)
 - **Search Engine**: ElasticSearch
 - **Task Queue**: Celery + Redis
 - **Audio Extraction**: yt-dlp + FFmpeg
@@ -425,6 +427,35 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.11.0 - Full Audit Implementation & i18n (May 2026)
+
+#### Internationalisation (i18n) — All Pages
+- ✅ **Fully translated UI** — Every page, label, and error message supports English and Romanian
+- ✅ **Smart Playlists** — System preset names and descriptions translated by `preset_type`
+- ✅ **Achievements** — All 36 achievement names/descriptions translated in both locales
+- ✅ **Listening streak day names** — Backend abbreviated day names (Mon/Tue/…) correctly translated
+- ✅ **Year Wrapped** — Listening personality types, peak month, and favorite day translated
+- ✅ **Settings page** — Full-width single-column layout on desktop (no artificial 600 px cap)
+
+#### Security Hardening (Audit fixes)
+- ✅ **SSRF allowlist fix (#14)** — Artwork URL validation parses hostname, not string prefix; bypasses like `i.ytimg.com.evil.com` now rejected
+- ✅ **MD5 → SHA-256 (#4)** — Rate-limiter cache keys now use SHA-256 instead of MD5
+- ✅ **`DJANGO_DEBUG` defaults to `False` (#17)** — Debug mode must be explicitly enabled via env var
+- ✅ **`AuthDebugMiddleware` conditional (#11)** — Middleware only loaded when `AUTH_DEBUG=true`
+- ✅ **Celery result expiry (#13)** — Task results auto-expire after 1 hour (env-overridable) to prevent Redis bloat
+- ✅ **Atomic `play_count` increment (#9)** — Uses `F('play_count') + 1` to eliminate race condition
+- ✅ **File-delete order fix (#15)** — `Audio.delete()` removes DB row first, then cleans up disk file
+- ✅ **Bare `except:` replaced (#16)** — Swallowed exceptions now emit structured `logger.warning/exception` calls
+- ✅ **Backup file removed (#10)** — `LoginPage.tsx.backup` removed; `*.backup`/`*.bak` added to `.gitignore`
+- ✅ **`/media/` rate limiting (#12)** — Cache-backed concurrent stream limiter per user/IP
+- ✅ **API versioning (#18)** — All routes available under `/api/v1/` with `/api/` as backward-compatible alias
+- ✅ **Dynamic sitemap/robots.txt (#19)** — Served by Django using `SW_HOST` so self-hosted domains are correct
+- ✅ **PWA offline fallback page (#20)** — Custom `offline.html` precached in service worker; returned on navigation miss
+
+#### Database Migration
+- ✅ **PostgreSQL as production database (#8)** — Replaces SQLite for multi-process safety; SQLite retained for local dev fallback
+- ✅ **Migration script** — One-time SQLite → PostgreSQL data migration for existing deployments
 
 ### v1.10.1 - Security Hardening (March 2026)
 

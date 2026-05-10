@@ -46,6 +46,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import StartRadioMenu from './StartRadioMenu';
 import AddToPlaylistDialog from './AddToPlaylistDialog';
 import { audioAPI, playlistAPI } from '../api/client';
+import { useTranslation } from 'react-i18next';
 import type { Audio } from '../types';
 
 interface ContainingPlaylist {
@@ -77,6 +78,7 @@ export default function TrackActionsMenu({
   size = 'small',
   showQueueActions = true,
 }: TrackActionsMenuProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [radioMenuAnchor, setRadioMenuAnchor] = useState<HTMLElement | null>(null);
@@ -214,7 +216,7 @@ export default function TrackActionsMenu({
             <ListItemIcon>
               <PlaylistPlayIcon fontSize="small" sx={{ color: 'primary.main' }} />
             </ListItemIcon>
-            <ListItemText>Play Next</ListItemText>
+            <ListItemText>{t('trackActionsMenu.actions.playNext')}</ListItemText>
           </MenuItem>
         )}
         
@@ -224,7 +226,7 @@ export default function TrackActionsMenu({
             <ListItemIcon>
               <QueueMusicIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Add to Queue</ListItemText>
+            <ListItemText>{t('trackActionsMenu.actions.addToQueue')}</ListItemText>
           </MenuItem>
         )}
         
@@ -235,7 +237,7 @@ export default function TrackActionsMenu({
           <ListItemIcon>
             <RadioIcon fontSize="small" sx={{ color: 'primary.main' }} />
           </ListItemIcon>
-          <ListItemText>Start Radio</ListItemText>
+          <ListItemText>{t('trackActionsMenu.actions.startRadio')}</ListItemText>
         </MenuItem>
         
         <Divider sx={{ my: 0.5 }} />
@@ -250,7 +252,7 @@ export default function TrackActionsMenu({
             )}
           </ListItemIcon>
           <ListItemText>
-            {isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+            {isFavorite ? t('trackActionsMenu.actions.removeFromFavorites') : t('trackActionsMenu.actions.addToFavorites')}
           </ListItemText>
         </MenuItem>
         
@@ -259,7 +261,7 @@ export default function TrackActionsMenu({
           <ListItemIcon>
             <PlaylistAddIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Add to Playlist</ListItemText>
+          <ListItemText>{t('trackActionsMenu.actions.addToPlaylist')}</ListItemText>
         </MenuItem>
         
         {/* Download */}
@@ -268,7 +270,7 @@ export default function TrackActionsMenu({
             <ListItemIcon>
               <DownloadIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Download</ListItemText>
+            <ListItemText>{t('trackActionsMenu.actions.download')}</ListItemText>
           </MenuItem>
         )}
         
@@ -280,7 +282,7 @@ export default function TrackActionsMenu({
               <ListItemIcon>
                 <YouTubeIcon fontSize="small" sx={{ color: 'error.main' }} />
               </ListItemIcon>
-              <ListItemText>Go to Channel</ListItemText>
+              <ListItemText>{t('trackActionsMenu.actions.goToChannel')}</ListItemText>
             </MenuItem>
           </>
         )}
@@ -291,7 +293,7 @@ export default function TrackActionsMenu({
             <ListItemIcon>
               <FolderIcon fontSize="small" sx={{ color: 'info.main' }} />
             </ListItemIcon>
-            <ListItemText>Find in Playlists</ListItemText>
+            <ListItemText>{t('trackActionsMenu.actions.findInPlaylists')}</ListItemText>
           </MenuItem>
         )}
       </Menu>
@@ -319,7 +321,7 @@ export default function TrackActionsMenu({
         fullWidth
       >
         <DialogTitle>
-          Playlists containing this track
+          {t('trackActionsMenu.findInPlaylists.title')}
         </DialogTitle>
         <DialogContent>
           {loadingPlaylists ? (
@@ -328,7 +330,7 @@ export default function TrackActionsMenu({
             </Box>
           ) : containingPlaylists.length === 0 ? (
             <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-              This track is not in any playlist yet.
+              {t('trackActionsMenu.findInPlaylists.empty')}
             </Typography>
           ) : (
             <List>
@@ -346,7 +348,10 @@ export default function TrackActionsMenu({
                     </ListItemAvatar>
                     <ListItemText
                       primary={playlist.title}
-                      secondary={`${playlist.item_count} tracks • Position #${playlist.position}`}
+                      secondary={t('trackActionsMenu.findInPlaylists.secondary', {
+                        count: playlist.item_count,
+                        position: playlist.position,
+                      })}
                     />
                   </ListItemButton>
                 </ListItem>

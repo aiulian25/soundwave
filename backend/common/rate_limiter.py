@@ -30,7 +30,7 @@ def get_login_attempt_key(ip_address, username=None):
     identifier = f"{ip_address}"
     if username:
         identifier = f"{ip_address}:{username}"
-    key_hash = hashlib.md5(identifier.encode()).hexdigest()
+    key_hash = hashlib.sha256(identifier.encode()).hexdigest()
     return f"login_attempts:{key_hash}"
 
 
@@ -39,7 +39,7 @@ def get_lockout_key(ip_address, username=None):
     identifier = f"{ip_address}"
     if username:
         identifier = f"{ip_address}:{username}"
-    key_hash = hashlib.md5(identifier.encode()).hexdigest()
+    key_hash = hashlib.sha256(identifier.encode()).hexdigest()
     return f"login_lockout:{key_hash}"
 
 

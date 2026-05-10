@@ -39,6 +39,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TuneIcon from '@mui/icons-material/Tune';
+import { useTranslation } from 'react-i18next';
 import {
   useEqualizer,
   EQ_LABELS,
@@ -53,6 +54,7 @@ interface EqualizerDialogProps {
 }
 
 export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const {
@@ -216,7 +218,7 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <EqualizerIcon color="primary" />
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Equalizer
+            {t('equalizer.title')}
           </Typography>
           <FormControlLabel
             control={
@@ -226,7 +228,7 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
                 color="primary"
               />
             }
-            label={enabled ? 'On' : 'Off'}
+            label={enabled ? t('equalizer.on') : t('equalizer.off')}
           />
         </DialogTitle>
         
@@ -237,20 +239,20 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
           {/* Preset Selection */}
           <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
             <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Preset</InputLabel>
+              <InputLabel>{t('equalizer.preset')}</InputLabel>
               <Select
                 value={activePresetId === 'custom' ? '' : activePresetId}
                 onChange={handlePresetChange}
-                label="Preset"
+                label={t('equalizer.preset')}
                 displayEmpty
               >
                 {activePresetId === 'custom' && (
                   <MenuItem value="" disabled>
-                    <em>Custom</em>
+                    <em>{t('equalizer.custom')}</em>
                   </MenuItem>
                 )}
                 <MenuItem disabled sx={{ opacity: 0.7, fontSize: '0.75rem' }}>
-                  — Built-in —
+                  {t('equalizer.builtIn')}
                 </MenuItem>
                 {BUILTIN_PRESETS.map((preset) => (
                   <MenuItem key={preset.id} value={preset.id}>
@@ -259,7 +261,7 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
                 ))}
                 {customPresets.length > 0 && (
                   <MenuItem disabled sx={{ opacity: 0.7, fontSize: '0.75rem' }}>
-                    — Custom —
+                    {t('equalizer.customSection')}
                   </MenuItem>
                 )}
                 {customPresets.map((preset) => (
@@ -270,13 +272,13 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
               </Select>
             </FormControl>
             
-            <Tooltip title="Reset to Flat">
+            <Tooltip title={t('equalizer.actions.resetToFlat')}>
               <IconButton onClick={resetToFlat} size="small">
                 <RestartAltIcon />
               </IconButton>
             </Tooltip>
             
-            <Tooltip title="Save as Custom Preset">
+            <Tooltip title={t('equalizer.actions.saveCustomPreset')}>
               <IconButton 
                 onClick={() => setSaveDialogOpen(true)} 
                 size="small"
@@ -287,7 +289,7 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
             </Tooltip>
             
             {activePreset?.isCustom && (
-              <Tooltip title="Delete Custom Preset">
+              <Tooltip title={t('equalizer.actions.deleteCustomPreset')}>
                 <IconButton
                   onClick={() => deleteCustomPreset(activePresetId)}
                   size="small"
@@ -301,7 +303,7 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
             {isCustom && (
               <Chip
                 icon={<TuneIcon sx={{ fontSize: 16 }} />}
-                label="Custom"
+                  label={t('equalizer.custom')}
                 size="small"
                 color="secondary"
                 variant="outlined"
@@ -437,7 +439,7 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
         </DialogContent>
         
         <DialogActions>
-          <Button onClick={onClose}>Close</Button>
+          <Button onClick={onClose}>{t('common.close')}</Button>
         </DialogActions>
       </Dialog>
       
@@ -448,12 +450,12 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Save Custom Preset</DialogTitle>
+        <DialogTitle>{t('equalizer.saveDialog.title')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Preset Name"
+            label={t('equalizer.saveDialog.presetName')}
             fullWidth
             variant="outlined"
             value={newPresetName}
@@ -466,13 +468,13 @@ export default function EqualizerDialog({ open, onClose }: EqualizerDialogProps)
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setSaveDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button
             onClick={handleSavePreset}
             variant="contained"
             disabled={!newPresetName.trim()}
           >
-            Save
+            {t('common.save')}
           </Button>
         </DialogActions>
       </Dialog>

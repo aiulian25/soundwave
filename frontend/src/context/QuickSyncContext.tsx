@@ -111,16 +111,11 @@ export const QuickSyncProvider = ({ children }: QuickSyncProviderProps) => {
   };
 
   useEffect(() => {
-    // Only fetch if user is authenticated
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    
     // Fetch once on mount - no background polling to save mobile battery
     // Users can manually refresh via refreshStatus()
-    fetchStatus();
+    fetchStatus().catch(() => {
+      setLoading(false);
+    });
   }, []);
 
   return (

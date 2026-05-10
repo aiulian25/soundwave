@@ -13,12 +13,14 @@ Security Features:
 import os
 import re
 import logging
+from django.conf import settings
+from django.core.cache import cache
 from django.http import StreamingHttpResponse, HttpResponse, Http404, HttpResponseForbidden
 from django.utils.http import http_date
 from pathlib import Path
-from wsgiref.util import FileWrapper
 from rest_framework.authtoken.models import Token
 from common.expiring_token import is_token_expired
+from common.rate_limiter import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +94,75 @@ def range_file_iterator(file_obj, offset=0, chunk_size=8192, length=None):
         yield data
 
 
+def stream_file_iterator(file_obj, offset=0, chunk_size=8192, length=None, on_close=None):
+    """Iterate file chunks and always run cleanup callback when streaming ends."""
+    try:
+        yield from range_file_iterator(file_obj, offset=offset, chunk_size=chunk_size, length=length)
+    finally:
+        try:
+            file_obj.close()
+        except Exception:
+            pass
+        if on_close:
+            try:
+                on_close()
+            except Exception:
+                pass
+
+
+def _acquire_media_stream_slot(request, user):
+    """Acquire a concurrent media stream slot for the request scope."""
+    if not getattr(settings, 'MEDIA_RATE_LIMIT_ENABLED', True):
+        return None, None
+
+    if user and getattr(user, 'is_authenticated', False):
+        limit = max(1, int(getattr(settings, 'MEDIA_MAX_CONCURRENT_STREAMS_USER', 20)))
+        counter_key = f"media_stream_active:user:{user.pk}"
+    else:
+        client_ip = get_client_ip(request) or 'unknown'
+        limit = max(1, int(getattr(settings, 'MEDIA_MAX_CONCURRENT_STREAMS_IP', 30)))
+        counter_key = f"media_stream_active:ip:{client_ip}"
+
+    ttl = max(30, int(getattr(settings, 'MEDIA_STREAM_SLOT_TTL', 300)))
+
+    try:
+        cache.add(counter_key, 0, timeout=ttl)
+        try:
+            active = cache.incr(counter_key)
+        except ValueError:
+            cache.set(counter_key, 1, timeout=ttl)
+            active = 1
+
+        if hasattr(cache, 'touch'):
+            cache.touch(counter_key, ttl)
+
+        if active > limit:
+            try:
+                cache.decr(counter_key)
+            except ValueError:
+                cache.set(counter_key, 0, timeout=ttl)
+            return None, f"Too many concurrent media streams (limit: {limit})"
+
+        return counter_key, None
+    except Exception as exc:
+        # Fail open if cache is unavailable so playback remains usable.
+        logger.warning("Media rate-limit backend unavailable; allowing request: %s", exc)
+        return None, None
+
+
+def _release_media_stream_slot(counter_key):
+    """Release a previously acquired concurrent media stream slot."""
+    if not counter_key:
+        return
+
+    try:
+        cache.decr(counter_key)
+    except ValueError:
+        cache.set(counter_key, 0, timeout=max(30, int(getattr(settings, 'MEDIA_STREAM_SLOT_TTL', 300))))
+    except Exception:
+        pass
+
+
 def serve_media_with_range(request, path, document_root):
     """
     Serve static media files with HTTP Range request support
@@ -119,12 +190,12 @@ def serve_media_with_range(request, path, document_root):
         404: File not found or access denied
     """
     # SECURITY: Require authentication for all media file access
-    # Supports session auth, Authorization header, or query param token
+    # Supports session auth or Authorization header token
     user, error = authenticate_media_request(request)
     if not user:
         logger.warning(f"Unauthenticated media access attempt: {path} - {error}")
         return HttpResponseForbidden(error or "Authentication required")
-    
+
     # Security: Normalize path and prevent directory traversal attacks
     # Remove any path components that try to navigate up the directory tree
     path = Path(path).as_posix()
@@ -152,6 +223,14 @@ def serve_media_with_range(request, path, document_root):
     
     # Get file size
     file_size = full_path.stat().st_size
+
+    # Limit concurrent media streaming requests per user/IP to reduce abuse.
+    stream_counter_key, stream_limit_error = _acquire_media_stream_slot(request, user)
+    if stream_limit_error:
+        logger.warning("Blocked media request for %s: %s", path, stream_limit_error)
+        response = HttpResponse(stream_limit_error, status=429)
+        response['Retry-After'] = '5'
+        return response
     
     # Get Range header
     range_header = request.META.get('HTTP_RANGE', '').strip()
@@ -174,7 +253,11 @@ def serve_media_with_range(request, path, document_root):
     content_type = content_types.get(ext, content_type)
     
     # Open file
-    file_obj = open(full_path, 'rb')
+    try:
+        file_obj = open(full_path, 'rb')
+    except OSError:
+        _release_media_stream_slot(stream_counter_key)
+        raise Http404(f"Media file not found: {path}")
     
     # Handle Range request (for seeking)
     if range_match:
@@ -185,6 +268,7 @@ def serve_media_with_range(request, path, document_root):
         # Validate range
         if start >= file_size or end >= file_size or start > end:
             file_obj.close()
+            _release_media_stream_slot(stream_counter_key)
             response = HttpResponse(status=416)  # Range Not Satisfiable
             response['Content-Range'] = f'bytes */{file_size}'
             return response
@@ -194,7 +278,12 @@ def serve_media_with_range(request, path, document_root):
         
         # Create streaming response with partial content
         response = StreamingHttpResponse(
-            range_file_iterator(file_obj, offset=start, length=length),
+            stream_file_iterator(
+                file_obj,
+                offset=start,
+                length=length,
+                on_close=lambda: _release_media_stream_slot(stream_counter_key),
+            ),
             status=206,  # Partial Content
             content_type=content_type,
         )
@@ -205,7 +294,10 @@ def serve_media_with_range(request, path, document_root):
     else:
         # Serve entire file
         response = StreamingHttpResponse(
-            FileWrapper(file_obj),
+            stream_file_iterator(
+                file_obj,
+                on_close=lambda: _release_media_stream_slot(stream_counter_key),
+            ),
             content_type=content_type,
         )
         response['Content-Length'] = str(file_size)

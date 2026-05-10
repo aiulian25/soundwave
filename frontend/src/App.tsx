@@ -36,7 +36,7 @@ import { useRadio } from './context/RadioContext';
 import { checkPlaybackSession, type PlaybackSession } from './hooks/usePlaybackSync';
 import { offlineStorage } from './utils/offlineStorage';
 import { pwaManager } from './utils/pwa';
-import { audioAPI, playbackSyncAPI } from './api/client';
+import { audioAPI, playbackSyncAPI, userAPI, ensureCsrfCookie, setAuthEventsEnabled } from './api/client';
 import type { Audio } from './types';
 
 function App() {
@@ -94,17 +94,18 @@ function App() {
   });
 
   useEffect(() => {
-    // Check if user is already logged in
-    const token = localStorage.getItem('token');
-    if (token) {
-      setIsAuthenticated(true);
-      // Load user settings on app load if already authenticated
-      if (settingsContext?.loadSettings) {
-        settingsContext.loadSettings();
-      }
-      
-      // Check for existing playback session from another device (only on page load, not when already playing)
-      const checkSession = async () => {
+    const bootstrapAuth = async () => {
+      try {
+        await ensureCsrfCookie();
+        await userAPI.account();
+        setIsAuthenticated(true);
+        setAuthEventsEnabled(true);
+
+        if (settingsContext?.loadSettings) {
+          settingsContext.loadSettings();
+        }
+
+        // Check for existing playback session from another device (only on page load)
         try {
           const session = await checkPlaybackSession();
           if (session && session.audio_details) {
@@ -112,24 +113,28 @@ function App() {
             setResumeSession(session);
             setShowResumeDialog(true);
           }
-        } catch (error) {
+        } catch {
           console.debug('[App] No playback session to resume');
         }
-      };
-      checkSession();
-    }
+      } catch {
+        setIsAuthenticated(false);
+        setAuthEventsEnabled(false);
+      }
+    };
+
+    bootstrapAuth();
     
     // Listen for token expiry events from API client
-    const handleTokenExpired = (event: CustomEvent) => {
-      console.log('[App] Token expired:', event.detail?.message);
+    const handleAuthRequired = (event: CustomEvent) => {
+      console.log('[App] Auth required:', event.detail?.message);
       // Trigger logout to clean up state
       handleLogout();
     };
     
-    window.addEventListener('token-expired', handleTokenExpired as EventListener);
+    window.addEventListener('auth-required', handleAuthRequired as EventListener);
     
     return () => {
-      window.removeEventListener('token-expired', handleTokenExpired as EventListener);
+      window.removeEventListener('auth-required', handleAuthRequired as EventListener);
     };
   }, []);
 
@@ -301,6 +306,7 @@ function App() {
 
   const handleLoginSuccess = async () => {
     setIsAuthenticated(true);
+    setAuthEventsEnabled(true);
     // Load user settings after login
     if (settingsContext?.loadSettings) {
       settingsContext.loadSettings();
@@ -377,20 +383,15 @@ function App() {
   };
 
   const handleLogout = async () => {
-    // Clear local storage first to prevent any API calls with old token
-    localStorage.removeItem('token');
-    
     try {
-      // Call logout endpoint to delete token on server
-      await fetch('/api/user/logout/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      await ensureCsrfCookie();
+      // Call logout endpoint via API client so CSRF header is included.
+      await userAPI.logout();
     } catch (error) {
       console.error('Logout error:', error);
     }
+
+    setAuthEventsEnabled(false);
     
     // Clear offline data (IndexedDB playlists, favorites, etc.)
     try {

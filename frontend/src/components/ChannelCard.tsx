@@ -13,6 +13,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import SubscriptionsIcon from '@mui/icons-material/Subscriptions';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import DownloadDoneIcon from '@mui/icons-material/DownloadDone';
+import { useTranslation } from 'react-i18next';
 
 interface ChannelCardProps {
   channel: {
@@ -58,6 +59,7 @@ export default function ChannelCard({
   onClick,
   onToggleSelect,
 }: ChannelCardProps) {
+  const { t } = useTranslation();
   const getStatusColor = (status: string): 'default' | 'primary' | 'success' | 'error' | 'warning' => {
     switch (status) {
       case 'syncing': return 'primary';
@@ -69,7 +71,7 @@ export default function ChannelCard({
   };
 
   const getLastRefreshText = (lastRefresh: string) => {
-    if (!lastRefresh) return 'Never synced';
+    if (!lastRefresh) return t('channelCard.lastRefresh.never');
     const date = new Date(lastRefresh);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -77,10 +79,10 @@ export default function ChannelCard({
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
     
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    if (diffMins < 1) return t('channelCard.lastRefresh.justNow');
+    if (diffMins < 60) return t('channelCard.lastRefresh.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('channelCard.lastRefresh.hoursAgo', { count: diffHours });
+    return t('channelCard.lastRefresh.daysAgo', { count: diffDays });
   };
 
   return (
@@ -254,7 +256,7 @@ export default function ChannelCard({
           display="block"
           sx={{ mb: 2 }}
         >
-          Updated {getLastRefreshText(channel.last_refreshed)}
+          {t('channelCard.updatedPrefix')} {getLastRefreshText(channel.last_refreshed)}
         </Typography>
 
         {/* Error Message */}
@@ -282,7 +284,7 @@ export default function ChannelCard({
               {formatNumber(channel.subscriber_count)}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-              Subs
+              {t('channelCard.stats.subs')}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
@@ -291,7 +293,7 @@ export default function ChannelCard({
               {formatNumber(channel.video_count)}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-              Videos
+              {t('channelCard.stats.videos')}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
@@ -300,7 +302,7 @@ export default function ChannelCard({
               {channel.downloaded_count}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-              Downloaded
+              {t('channelCard.stats.downloaded')}
             </Typography>
           </Box>
         </Box>
@@ -309,7 +311,7 @@ export default function ChannelCard({
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
             <Typography variant="caption" color="text.secondary">
-              Download progress
+              {t('channelCard.downloadProgress')}
             </Typography>
             <Typography variant="caption" color="primary.main" fontWeight={600}>
               {channel.progress_percent}%
@@ -334,7 +336,7 @@ export default function ChannelCard({
 
         {/* Actions */}
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-          <Tooltip title="Sync channel">
+          <Tooltip title={t('channelCard.actions.syncChannel')}>
             <IconButton
               size="small"
               color="primary"
@@ -349,7 +351,7 @@ export default function ChannelCard({
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Remove channel">
+          <Tooltip title={t('channelCard.actions.removeChannel')}>
             <IconButton
               size="small"
               color="error"
@@ -368,7 +370,7 @@ export default function ChannelCard({
         {!channel.active && (
           <Box sx={{ mt: 1.5, textAlign: 'center' }}>
             <Chip 
-              label="Inactive" 
+              label={t('channelCard.status.inactive')} 
               color="error" 
               size="small" 
               variant="outlined"

@@ -13,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import Confetti from 'react-confetti';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { Achievement } from '../types';
 
 interface AchievementNotificationProps {
@@ -21,6 +22,7 @@ interface AchievementNotificationProps {
 }
 
 export default function AchievementNotification({ achievements, onClose }: AchievementNotificationProps) {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showConfetti, setShowConfetti] = useState(true);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -101,7 +103,10 @@ export default function AchievementNotification({ achievements, onClose }: Achie
           {/* Achievement Counter */}
           {achievements.length > 1 && (
             <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-              Achievement {currentIndex + 1} of {achievements.length}
+              {t('achievementNotification.counter', {
+                current: currentIndex + 1,
+                total: achievements.length,
+              })}
             </Typography>
           )}
 
@@ -136,7 +141,7 @@ export default function AchievementNotification({ achievements, onClose }: Achie
           >
             <TrophyIcon sx={{ fontSize: 18 }} />
             <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
-              Achievement Unlocked!
+              {t('achievementNotification.unlocked')}
             </Typography>
           </Box>
 
@@ -154,16 +159,17 @@ export default function AchievementNotification({ achievements, onClose }: Achie
           {currentAchievement.context && Object.keys(currentAchievement.context).length > 0 && (
             <Typography variant="body2" color="primary.main" sx={{ mb: 3 }}>
               {currentAchievement.context.artist && `Artist: ${currentAchievement.context.artist}`}
+              {currentAchievement.context.artist && t('achievementNotification.contextArtist', { artist: currentAchievement.context.artist })}
             </Typography>
           )}
 
           {/* Action Buttons */}
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
             <Button variant="outlined" onClick={handleViewAll}>
-              View All Achievements
+              {t('achievementNotification.actions.viewAll')}
             </Button>
             <Button variant="contained" onClick={handleNext}>
-              {currentIndex < achievements.length - 1 ? 'Next' : 'Awesome!'}
+              {currentIndex < achievements.length - 1 ? t('achievementNotification.actions.next') : t('achievementNotification.actions.awesome')}
             </Button>
           </Box>
         </DialogContent>

@@ -339,9 +339,7 @@ class AudioCacheManager {
     try {
       // Get stream URL
       const response = await fetch(`/api/audio/${youtubeId}/player/`, {
-        headers: {
-          'Authorization': `Token ${localStorage.getItem('token')}`,
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {

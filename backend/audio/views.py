@@ -1,5 +1,9 @@
 """Audio API views"""
 
+import logging
+from urllib.parse import urlparse
+
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
@@ -13,25 +17,39 @@ from audio.serializers import (
 )
 from common.views import ApiBaseView, AdminWriteOnly
 
-# Allowed URL prefixes for artwork fetching (SSRF protection)
-# Only trusted external services are allowed
-ALLOWED_ARTWORK_URL_PREFIXES = (
-    'https://i.ytimg.com/',           # YouTube thumbnails
-    'https://i3.ytimg.com/',          # YouTube thumbnails alt
-    'https://i9.ytimg.com/',          # YouTube thumbnails alt
-    'https://img.youtube.com/',       # YouTube thumbnails
-    'https://coverartarchive.org/',   # MusicBrainz Cover Art Archive
-    'http://coverartarchive.org/',    # MusicBrainz Cover Art Archive (HTTP)
-    'https://assets.fanart.tv/',      # Fanart.tv
-    'https://lastfm.freetls.fastly.net/',  # Last.fm images
-)
+
+logger = logging.getLogger(__name__)
+
+# Allowed artwork hosts and schemes for SSRF protection.
+ALLOWED_ARTWORK_HOST_SCHEMES = {
+    'i.ytimg.com': {'https'},
+    'i3.ytimg.com': {'https'},
+    'i9.ytimg.com': {'https'},
+    'img.youtube.com': {'https'},
+    'coverartarchive.org': {'https', 'http'},
+    'assets.fanart.tv': {'https'},
+    'lastfm.freetls.fastly.net': {'https'},
+}
 
 
 def is_safe_artwork_url(url: str) -> bool:
     """Validate URL is from a trusted source to prevent SSRF attacks"""
     if not url:
         return False
-    return any(url.startswith(prefix) for prefix in ALLOWED_ARTWORK_URL_PREFIXES)
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+
+    if not parsed.scheme or not parsed.hostname:
+        return False
+
+    allowed_schemes = ALLOWED_ARTWORK_HOST_SCHEMES.get(parsed.hostname.lower())
+    if not allowed_schemes:
+        return False
+
+    return parsed.scheme.lower() in allowed_schemes
 
 
 class AudioListView(ApiBaseView):
@@ -168,8 +186,8 @@ class AudioPlayerView(ApiBaseView):
             if not hasattr(audio, 'lyrics') or not audio.lyrics.fetch_attempted:
                 from audio.tasks_lyrics import fetch_lyrics_for_audio
                 fetch_lyrics_for_audio.delay(youtube_id)
-        except Exception:
-            pass  # Don't block playback if lyrics fetch fails
+        except Exception as e:
+            logger.warning("[Player GET] Lyrics fetch task trigger failed for %s: %s", youtube_id, e)
 
         # Get user progress
         progress = None
@@ -178,19 +196,14 @@ class AudioPlayerView(ApiBaseView):
         except AudioProgress.DoesNotExist:
             pass
 
-        # Build stream URL with proper encoding for special characters
+        # Build stream URL with proper encoding for special characters.
+        # Browser playback uses the authenticated session cookie on same-origin requests,
+        # so there is no need to embed the DRF token in the URL.
         from urllib.parse import quote
         # Encode the file path, preserving forward slashes
         encoded_path = '/'.join(quote(part, safe='') for part in audio.file_path.split('/'))
-        
-        # Include auth token in stream URL for browser media elements
-        # Browser audio/video elements can't send Authorization headers
-        from rest_framework.authtoken.models import Token
-        try:
-            token = Token.objects.get(user=request.user)
-            stream_url = f"/media/{encoded_path}?token={token.key}"
-        except Token.DoesNotExist:
-            stream_url = f"/media/{encoded_path}"
+
+        stream_url = f"/media/{encoded_path}"
 
         data = {
             'audio': AudioSerializer(audio).data,
@@ -233,8 +246,7 @@ class AudioProgressView(ApiBaseView):
 
         # Update audio play count
         if created or serializer.validated_data.get('completed'):
-            audio.play_count += 1
-            audio.save()
+            Audio.objects.filter(pk=audio.pk).update(play_count=F('play_count') + 1)
 
         return Response({
             'position': progress.position,
@@ -355,11 +367,17 @@ class AudioExportView(ApiBaseView):
             lyrics = Lyrics.objects.get(audio=audio)
             has_lyrics = bool(lyrics.plain_lyrics or lyrics.synced_lyrics)
             has_synced_lyrics = bool(lyrics.synced_lyrics)
-            print(f"[Export GET] Found lyrics for {youtube_id}: has_lyrics={has_lyrics}, has_synced={has_synced_lyrics}, source={lyrics.source}")
+            logger.info(
+                "[Export GET] Found lyrics for %s: has_lyrics=%s, has_synced=%s, source=%s",
+                youtube_id,
+                has_lyrics,
+                has_synced_lyrics,
+                lyrics.source,
+            )
         except Lyrics.DoesNotExist:
-            print(f"[Export GET] No lyrics found for {youtube_id}")
+            logger.info("[Export GET] No lyrics found for %s", youtube_id)
         except Exception as e:
-            print(f"[Export GET] Error checking lyrics for {youtube_id}: {e}")
+            logger.warning("[Export GET] Error checking lyrics for %s: %s", youtube_id, e)
         
         # Check for artwork
         has_artwork = bool(audio.cover_art_url or audio.thumbnail_url)
@@ -380,8 +398,8 @@ class AudioExportView(ApiBaseView):
                     'label': f'{art.get_artwork_type_display()} ({art.source})',
                     'priority': art.priority,
                 })
-        except:
-            pass
+        except Exception as e:
+            logger.warning("[Export GET] Error loading uploaded artwork for %s: %s", youtube_id, e)
         
         return Response({
             'youtube_id': youtube_id,
@@ -451,8 +469,10 @@ class AudioExportView(ApiBaseView):
                 lyrics_obj = Lyrics.objects.get(audio=audio)
                 plain_lyrics = lyrics_obj.plain_lyrics
                 synced_lyrics = lyrics_obj.synced_lyrics
-            except:
-                pass
+            except Lyrics.DoesNotExist:
+                logger.info("[Export POST] No lyrics found for %s", youtube_id)
+            except Exception as e:
+                logger.warning("[Export POST] Error loading lyrics for %s: %s", youtube_id, e)
         
         # Get artwork
         cover_art_data = None
@@ -468,8 +488,8 @@ class AudioExportView(ApiBaseView):
                     resp = http_requests.get(art_url, timeout=10)
                     if resp.status_code == 200:
                         cover_art_data = resp.content
-                except Exception:
-                    pass  # Silently fail - don't expose error details
+                except Exception as e:
+                    logger.warning("[Export POST] Failed to fetch artwork for %s: %s", youtube_id, e)
         
         # Create temporary file for conversion
         temp_dir = tempfile.mkdtemp()
@@ -507,7 +527,7 @@ class AudioExportView(ApiBaseView):
                 
                 result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
                 if result.returncode != 0:
-                    print(f"FFmpeg error: {result.stderr}")
+                    logger.warning("FFmpeg error: %s", result.stderr)
                     return Response(
                         {'error': 'Audio conversion failed'},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -551,8 +571,8 @@ class AudioExportView(ApiBaseView):
             # Clean up temp directory
             try:
                 shutil.rmtree(temp_dir)
-            except:
-                pass
+            except Exception as e:
+                logger.warning("[Export POST] Failed to clean temp dir %s: %s", temp_dir, e)
 
 
 class MetadataSearchView(ApiBaseView):
@@ -820,6 +840,7 @@ class ArtworkProxyView(APIView):
                 )
         except Exception:
             # Don't expose exception details in response
+            logger.warning("[Artwork Proxy] Error fetching artwork for %s", youtube_id, exc_info=True)
             return Response(
                 {'error': 'Error fetching artwork'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

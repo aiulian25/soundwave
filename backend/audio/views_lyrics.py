@@ -1,4 +1,5 @@
 """Views for lyrics management"""
+import logging
 import re
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -20,6 +21,9 @@ from audio.serializers_lyrics import (
 from audio.lyrics_service import LyricsService, LRCLIBClient, clean_title_for_lyrics
 from audio.tasks_lyrics import fetch_lyrics_for_audio, fetch_lyrics_batch
 from common.views import ApiBaseView
+
+
+logger = logging.getLogger(__name__)
 
 
 def parse_lrc_content(lrc_content: str) -> tuple[str, str, str]:
@@ -111,7 +115,12 @@ class LyricsUploadView(ApiBaseView):
             lyrics.last_error = ''
             lyrics.save()
             
-            print(f"[LRC Upload] Saved lyrics for {audio.title} - file: {lrc_file.name}, lines: {len(synced_lyrics.splitlines())}")
+            logger.info(
+                "[LRC Upload] Saved lyrics for %s - file: %s, lines: %d",
+                audio.title,
+                lrc_file.name,
+                len(synced_lyrics.splitlines()),
+            )
             
             # Return updated lyrics
             response_serializer = LyricsSerializer(lyrics)

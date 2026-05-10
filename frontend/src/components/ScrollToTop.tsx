@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Fab, Zoom } from '@mui/material';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import { useTranslation } from 'react-i18next';
 
 interface ScrollToTopProps {
   threshold?: number;
 }
 
 export default function ScrollToTop({ threshold = 300 }: ScrollToTopProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function ScrollToTop({ threshold = 300 }: ScrollToTopProps) {
           right: 24,
           zIndex: 1000,
         }}
-        aria-label="scroll to top"
+        aria-label={t('listeningHistory.actions.scrollToTop')}
       >
         <KeyboardArrowUpIcon />
       </Fab>
