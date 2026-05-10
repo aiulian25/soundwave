@@ -12,6 +12,7 @@ import FindReplaceIcon from '@mui/icons-material/FindReplace';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface PlaylistCardProps {
@@ -48,6 +49,7 @@ export default function PlaylistCard({
   onClick,
 }: PlaylistCardProps) {
   const { t } = useTranslation();
+  const [imgError, setImgError] = useState(false);
   const progress = playlist.item_count > 0 
     ? Math.round((playlist.downloaded_count / playlist.item_count) * 100) 
     : 0;
@@ -100,14 +102,26 @@ export default function PlaylistCard({
           paddingBottom: '100%', // 1:1 aspect ratio
           width: '100%',
           position: 'relative',
-          backgroundImage: playlist.thumbnail_url ? `url(${playlist.thumbnail_url})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
           bgcolor: 'grey.900',
         }}
       >
+        {/* Thumbnail image with error fallback */}
+        {playlist.thumbnail_url && !imgError && (
+          <img
+            src={playlist.thumbnail_url}
+            alt=""
+            onError={() => setImgError(true)}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        )}
         {/* Fallback Icon */}
-        {!playlist.thumbnail_url && (
+        {(!playlist.thumbnail_url || imgError) && (
           <Box sx={{ 
             position: 'absolute', 
             inset: 0, 

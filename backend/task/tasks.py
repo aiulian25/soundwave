@@ -586,6 +586,18 @@ def download_playlist_task(playlist_id, force=False):
                           playlist.title, playlist.playlist_id)
             return f"Failed to fetch playlist items"
 
+        # Refresh playlist thumbnail from latest yt-dlp metadata
+        # (handles case where thumbnail_url was empty at subscribe time
+        #  or never populated during migration)
+        new_thumbnail = ''
+        if info.get('thumbnails'):
+            new_thumbnail = info['thumbnails'][-1].get('url') or ''
+        if not new_thumbnail and info.get('thumbnail'):
+            new_thumbnail = info.get('thumbnail') or ''
+        if new_thumbnail and new_thumbnail != playlist.thumbnail_url:
+            playlist.thumbnail_url = new_thumbnail
+            logger.info('[PlaylistSync] Refreshed thumbnail for "%s"', playlist.title)
+
         # Update item count
         total_items = len([e for e in info['entries'] if e])
         playlist.item_count = total_items
