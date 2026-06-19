@@ -49,7 +49,7 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
 
       - name: Trivy config (IaC / Dockerfile misconfig) → SARIF
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: config
           scan-ref: .
@@ -58,7 +58,7 @@ jobs:
           severity: HIGH,CRITICAL
 
       - name: Trivy filesystem (vuln + secret) → SARIF
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: .
@@ -94,7 +94,7 @@ jobs:
       # tab + as job annotations) so existing dependency debt doesn't block every
       # PR; enforce as a hard gate on main pushes, the weekly schedule, and manual runs.
       - name: Trivy filesystem gate (fixable CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: .
@@ -144,7 +144,7 @@ jobs:
           platforms: linux/amd64
 
       - name: Trivy image scan → SARIF (report all)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: soundwave:scan
@@ -167,7 +167,7 @@ jobs:
           artifact-name: sbom-image.cdx.json
 
       - name: Trivy image gate (fixable CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: soundwave:scan
