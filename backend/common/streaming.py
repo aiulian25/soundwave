@@ -14,6 +14,8 @@ import os
 import re
 import logging
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core import signing
 from django.core.cache import cache
 from django.http import StreamingHttpResponse, HttpResponse, Http404, HttpResponseForbidden
 from django.utils.http import http_date
@@ -24,14 +26,65 @@ from common.rate_limiter import get_client_ip
 
 logger = logging.getLogger(__name__)
 
+# APP-05: short-lived, path-bound signed media ticket. Replaces accepting a
+# long-lived auth token in the URL (which leaked into proxy/access logs and
+# browser history). The ticket is an HMAC-signed, timestamped token (Django
+# signing uses SECRET_KEY) bound to a specific user + media path.
+MEDIA_TICKET_SALT = 'soundwave.media-ticket.v1'
 
-def authenticate_media_request(request):
+
+def media_ticket_ttl():
+    """Ticket lifetime in seconds (default 300s / 5 min)."""
+    try:
+        return int(getattr(settings, 'MEDIA_TICKET_TTL', 300))
+    except (TypeError, ValueError):
+        return 300
+
+
+def make_media_ticket(user, path):
+    """Create a signed, expiring ticket authorizing `user` to stream `path`."""
+    return signing.dumps(
+        {'uid': user.pk, 'p': path},
+        salt=MEDIA_TICKET_SALT,
+        compress=True,
+    )
+
+
+def resolve_media_ticket(path, ticket):
+    """Validate a media ticket for `path`.
+
+    Returns (user, None) when valid, or (None, reason) otherwise. Fails closed on
+    expiry, tampering, or a path mismatch (so a ticket for one file cannot be
+    replayed against another).
+    """
+    if not ticket:
+        return None, 'Authentication required'
+    try:
+        data = signing.loads(ticket, salt=MEDIA_TICKET_SALT, max_age=media_ticket_ttl())
+    except signing.SignatureExpired:
+        return None, 'Media link expired'
+    except signing.BadSignature:
+        return None, 'Invalid media link'
+
+    if not isinstance(data, dict) or data.get('p') != path:
+        return None, 'Media link does not match this file'
+
+    try:
+        user = get_user_model().objects.get(pk=data.get('uid'), is_active=True)
+    except get_user_model().DoesNotExist:
+        return None, 'Invalid media link'
+    return user, None
+
+
+def authenticate_media_request(request, path=None):
     """
     Authenticate a media request using multiple methods:
-    1. Django session (cookies - already authenticated via session middleware)
-    2. Authorization header (Token xxx)
-    3. Query parameter (?token=xxx) - for browser audio/video elements
-    
+    1. Django session (cookies — primary path for same-origin browser playback)
+    2. Authorization header (Token xxx) — for API clients
+    3. Query parameter (?t=<signed ticket>) — short-lived, path-bound ticket for
+       browser <audio>/<video> elements that cannot send headers and clients that
+       cannot use cookies. Replaces the previous ?token=<long-lived token> (APP-05).
+
     Returns:
         (user, None) if authenticated
         (None, error_message) if not authenticated
@@ -39,7 +92,7 @@ def authenticate_media_request(request):
     # Method 1: Session authentication (already handled by SessionMiddleware)
     if request.user.is_authenticated:
         return (request.user, None)
-    
+
     # Method 2: Authorization header
     auth_header = request.META.get('HTTP_AUTHORIZATION', '')
     if auth_header.startswith('Token '):
@@ -52,20 +105,36 @@ def authenticate_media_request(request):
                 return (None, "Token expired")
         except Token.DoesNotExist:
             return (None, "Invalid token")
-    
-    # Method 3: Query parameter (for browser audio/video elements)
-    token_key = request.GET.get('token', '')
-    if token_key:
-        try:
-            token = Token.objects.select_related('user').get(key=token_key)
-            if not is_token_expired(token):
-                return (token.user, None)
-            else:
-                return (None, "Token expired")
-        except Token.DoesNotExist:
-            return (None, "Invalid token")
-    
+
+    # Method 3: Short-lived signed media ticket (?t=...), bound to this exact path.
+    ticket = request.GET.get('t', '')
+    if ticket:
+        return resolve_media_ticket(path, ticket)
+
     return (None, "Authentication required")
+
+
+def user_can_access_media(user, path):
+    """Authorize a user for a specific media `path` (APP-05 media-IDOR hardening).
+
+    `/media/` only ever serves files owned via one of the media models. A user may
+    stream a path if they own a record pointing to it (downloaded audio, an uploaded
+    local file, or a local cover image). Admins may access anything. Shared downloaded
+    files still work because each owner has their own Audio row for the same file_path.
+    """
+    if getattr(user, 'is_admin', False) or getattr(user, 'is_superuser', False):
+        return True
+    from audio.models import Audio
+    from audio.models_local import LocalAudio, LocalAudioPlaylist
+    if Audio.objects.filter(file_path=path, owner=user).exists():
+        return True
+    if LocalAudio.objects.filter(file=path, owner=user).exists():
+        return True
+    if LocalAudio.objects.filter(cover_art=path, owner=user).exists():
+        return True
+    if LocalAudioPlaylist.objects.filter(cover_image=path, owner=user).exists():
+        return True
+    return False
 
 
 def range_file_iterator(file_obj, offset=0, chunk_size=8192, length=None):
@@ -189,9 +258,10 @@ def serve_media_with_range(request, path, document_root):
         416: Range Not Satisfiable
         404: File not found or access denied
     """
-    # SECURITY: Require authentication for all media file access
-    # Supports session auth or Authorization header token
-    user, error = authenticate_media_request(request)
+    # SECURITY: Require authentication for all media file access.
+    # Supports session cookie, Authorization header token, or a short-lived signed
+    # ticket bound to this exact `path` (APP-05).
+    user, error = authenticate_media_request(request, path=path)
     if not user:
         logger.warning(f"Unauthenticated media access attempt: {path} - {error}")
         return HttpResponseForbidden(error or "Authentication required")
@@ -202,7 +272,14 @@ def serve_media_with_range(request, path, document_root):
     if '..' in path or path.startswith('/') or '\\' in path:
         logger.warning(f"Blocked directory traversal attempt: {path}")
         raise Http404("Invalid path")
-    
+
+    # APP-05: enforce per-user ownership of the requested media path so one tenant
+    # cannot stream another tenant's files by guessing the path. (404, not 403, to
+    # avoid confirming the file exists.)
+    if not user_can_access_media(user, path):
+        logger.warning("Blocked cross-tenant media access: user=%s path=%s", getattr(user, 'pk', None), path)
+        raise Http404("Media file not found")
+
     # Build full file path
     full_path = Path(document_root) / path
     
@@ -312,11 +389,8 @@ def serve_media_with_range(request, path, document_root):
     
     # iOS Safari specific headers for better audio streaming
     response['X-Content-Type-Options'] = 'nosniff'
-    
-    # Allow cross-origin requests for audio (needed for PWA/Service Worker)
-    response['Access-Control-Allow-Origin'] = '*'
-    response['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
-    response['Access-Control-Allow-Headers'] = 'Range, Content-Type'
-    response['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges'
-    
+
+    # APP-11: no wildcard CORS here. Same-origin playback (the SPA + Service Worker)
+    # needs no CORS headers. Any legitimate cross-origin use is handled centrally by
+    # corsheaders, which reflects only CORS_ALLOWED_ORIGINS (never "*" with creds).
     return response

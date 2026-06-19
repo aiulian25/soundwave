@@ -42,6 +42,8 @@ class AccountManager(BaseUserManager):
 class Account(AbstractUser):
     """Custom user model"""
     email = models.EmailField(verbose_name="email", max_length=60, unique=True)
+    # Address awaiting email confirmation before it replaces `email` (APP-10).
+    pending_email = models.EmailField(max_length=60, blank=True, null=True)
     username = models.CharField(max_length=30, unique=True)
     date_joined = models.DateTimeField(verbose_name='date joined', auto_now_add=True)
     last_login = models.DateTimeField(verbose_name='last login', auto_now=True)
@@ -52,8 +54,17 @@ class Account(AbstractUser):
     
     # 2FA fields
     two_factor_enabled = models.BooleanField(default=False)
-    two_factor_secret = models.CharField(max_length=32, blank=True, null=True)
+    # Stores the Fernet-encrypted TOTP secret (APP-03); wider than the raw base32
+    # secret to hold the ciphertext. Backup codes are stored hashed (one-way).
+    two_factor_secret = models.CharField(max_length=255, blank=True, null=True)
     backup_codes = models.JSONField(default=list, blank=True)
+
+    # Force a password change on next login (set for the bootstrap admin so the
+    # weak default password from SW_PASSWORD cannot remain in use). See APP-01.
+    password_change_required = models.BooleanField(
+        default=False,
+        help_text="Require the user to set a new password before using the app",
+    )
     
     # User isolation and resource limits
     storage_quota_gb = models.IntegerField(default=50, help_text="Storage quota in GB")

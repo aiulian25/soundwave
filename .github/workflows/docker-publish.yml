@@ -6,6 +6,10 @@ on:
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ main, master ]
+  # Weekly rebuild so OS security patches in the base image land without a code
+  # change (CNT-01). The security-scan workflow flags drift between rebuilds.
+  schedule:
+    - cron: '0 5 * * 1'   # Mondays 05:00 UTC
   workflow_dispatch:
 
 env:
@@ -80,6 +84,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+          # Always re-pull the base image so a fresh layer is used (CNT-01).
+          pull: true
+          # On the weekly/manual rebuild, skip the layer cache so `apt-get upgrade`
+          # actually re-runs and pulls the latest OS security patches.
+          no-cache: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
 
       # Output image digest
       - name: Output image details

@@ -34,9 +34,17 @@ from user.two_factor import (
     generate_qr_code,
     verify_totp,
     generate_backup_codes,
-    generate_backup_codes_pdf,
+    encrypt_secret,
+    decrypt_secret,
+    hash_backup_codes,
+    verify_and_consume_backup_code,
 )
 from datetime import datetime
+from django.conf import settings
+
+# Avatar storage location. Derives from DATA_DIR so it is writable in every
+# environment (prod default DATA_DIR=/app/data → /app/data/avatars, unchanged).
+AVATAR_DIR = Path(getattr(settings, 'DATA_DIR', '/app/data')) / 'avatars'
 
 audit_log = logging.getLogger('security.audit')
 
@@ -161,12 +169,19 @@ class UserProfileView(ApiBaseView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # APP-10: when email verification is enabled, a new email goes "pending" and
+        # only takes effect after the confirmation link is followed.
+        email_verification = getattr(settings, 'EMAIL_VERIFICATION_REQUIRED', False)
+        email_pending_for = None
+        email_change_requested = bool(email) and email != user.email
+
         # Update fields
         updated_fields = []
         if username:
             user.username = username
             updated_fields.append('username')
-        if email:
+        if email_change_requested and not email_verification:
+            # Legacy immediate change (password already verified above).
             user.email = email
             updated_fields.append('email')
         if first_name is not None:
@@ -176,17 +191,93 @@ class UserProfileView(ApiBaseView):
             user.last_name = last_name
             if 'name' not in updated_fields:
                 updated_fields.append('name')
-        
+
         # Clear failed attempts on successful password verification
         if current_password:
             clear_sensitive_action_attempts(user.id, action_type)
-        
+
+        # Handle the verified email-change path: store pending + send confirmation.
+        if email_change_requested and email_verification:
+            from user.email_verification import send_email_change_confirmation
+            language = (request.data.get('language') or 'en').split('-')[0].lower()
+            user.pending_email = email
+            user.save()
+            try:
+                send_email_change_confirmation(user, email, language=language)
+            except Exception as exc:
+                # Revert the pending state so we don't claim a change that wasn't sent.
+                user.pending_email = None
+                user.save(update_fields=['pending_email'])
+                audit_log.warning("Email-change confirmation send failed for user=%s: %s", user.username, exc)
+                return Response(
+                    {'error': 'Could not send the confirmation email. Please try again later.',
+                     'code': 'email_send_failed'},
+                    status=status.HTTP_502_BAD_GATEWAY
+                )
+            return Response({
+                'message': 'Confirmation email sent',
+                'code': 'email_confirmation_sent',
+                'pending_email': email,
+                'user': AccountSerializer(user).data,
+            })
+
         user.save()
-        
+
         return Response({
-            'message': f'{" and ".join(updated_fields).capitalize()} updated successfully',
+            'message': f'{" and ".join(updated_fields).capitalize()} updated successfully' if updated_fields else 'No changes',
             'user': AccountSerializer(user).data
         })
+
+
+class EmailConfirmView(APIView):
+    """Confirm a pending email change via a signed link (APP-10).
+
+    Public + session-less on purpose: the unforgeable, short-lived token is the
+    proof that the requester controls the new mailbox.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        from django.core import signing
+        from user.email_verification import load_email_change_token
+
+        token = request.data.get('token', '')
+        if not token:
+            return Response({'error': 'Missing token', 'code': 'invalid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            data = load_email_change_token(token)
+        except signing.SignatureExpired:
+            return Response({'error': 'This confirmation link has expired.', 'code': 'expired'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        except signing.BadSignature:
+            return Response({'error': 'This confirmation link is invalid.', 'code': 'invalid'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        new_email = data.get('email')
+        try:
+            user = Account.objects.get(pk=data.get('uid'))
+        except Account.DoesNotExist:
+            return Response({'error': 'This confirmation link is invalid.', 'code': 'invalid'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Single-use: the address must still be the one currently pending.
+        if not new_email or user.pending_email != new_email:
+            return Response({'error': 'This confirmation link is no longer valid.', 'code': 'invalid'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if Account.objects.exclude(pk=user.pk).filter(email=new_email).exists():
+            user.pending_email = None
+            user.save(update_fields=['pending_email'])
+            return Response({'error': 'That email address is already in use.', 'code': 'email_taken'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        user.email = new_email
+        user.pending_email = None
+        user.save(update_fields=['email', 'pending_email'])
+        audit_log.info("Email change confirmed for user=%s", user.username)
+        return Response({'message': 'Email confirmed', 'code': 'confirmed', 'email': new_email})
 
 
 class ChangePasswordView(ApiBaseView):
@@ -248,18 +339,32 @@ class ChangePasswordView(ApiBaseView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
-        # Validate new password length
-        if len(new_password) < 8:
+        # New password must differ from the current one. This is essential for the
+        # forced first-run change (APP-01): a weak bootstrap password must not be
+        # "changed" back to itself.
+        if new_password == current_password:
             return Response(
-                {'error': 'Password must be at least 8 characters long'},
+                {'error': 'New password must be different from the current password',
+                 'password_codes': ['password_same_as_current']},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # Enforce Django's configured password validators (length/common/numeric/
+        # similarity). `password_codes` lets the SPA show a localized message (APP-07).
+        from user.password_policy import check_password_strength
+        messages, codes = check_password_strength(new_password, user=user)
+        if codes:
+            return Response(
+                {'error': ' '.join(messages), 'password_codes': codes},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Clear failed attempts on success
         clear_sensitive_action_attempts(user.id, action_type)
-        
-        # Set new password
+
+        # Set new password and clear any forced-change requirement
         user.set_password(new_password)
+        user.password_change_required = False
         user.save()
         
         # Delete old token and create new one for security
@@ -361,13 +466,11 @@ class LoginView(APIView):
                     'message': 'Two-factor authentication required'
                 }, status=status.HTTP_200_OK)
             
-            # Verify TOTP code
-            if user.two_factor_secret and verify_totp(user.two_factor_secret, two_factor_code):
+            # Verify TOTP code (secret is encrypted at rest — decrypt to verify)
+            if user.two_factor_secret and verify_totp(decrypt_secret(user.two_factor_secret), two_factor_code):
                 pass  # Code is valid, continue login
-            # Check backup codes
-            elif two_factor_code in user.backup_codes:
-                # Remove used backup code
-                user.backup_codes.remove(two_factor_code)
+            # Check backup codes (stored hashed; consumed on use)
+            elif verify_and_consume_backup_code(user, two_factor_code):
                 user.save()
             else:
                 # Record failed 2FA attempt too
@@ -517,12 +620,13 @@ class TwoFactorSetupView(ApiBaseView):
         
         # Generate backup codes
         backup_codes = generate_backup_codes()
-        
-        # Store secret temporarily (not enabled yet)
-        user.two_factor_secret = secret
-        user.backup_codes = backup_codes
+
+        # Store secret encrypted and codes hashed (not enabled yet). The raw
+        # secret/codes are returned ONCE in this response for the user to save.
+        user.two_factor_secret = encrypt_secret(secret)
+        user.backup_codes = hash_backup_codes(backup_codes)
         user.save()
-        
+
         serializer = TwoFactorSetupSerializer({
             'secret': secret,
             'qr_code': qr_code,
@@ -569,7 +673,7 @@ class TwoFactorVerifyView(ApiBaseView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        if verify_totp(user.two_factor_secret, code):
+        if verify_totp(decrypt_secret(user.two_factor_secret), code):
             clear_sensitive_action_attempts(user.id, action_type)
             user.two_factor_enabled = True
             user.save()
@@ -639,8 +743,8 @@ class TwoFactorDisableView(ApiBaseView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Verify code before disabling
-        if verify_totp(user.two_factor_secret, code) or code in user.backup_codes:
+        # Verify code before disabling (TOTP secret encrypted; backup codes hashed)
+        if verify_totp(decrypt_secret(user.two_factor_secret), code) or verify_and_consume_backup_code(user, code):
             clear_sensitive_action_attempts(user.id, action_type)
             user.two_factor_enabled = False
             user.two_factor_secret = None
@@ -716,7 +820,7 @@ class TwoFactorRegenerateCodesView(ApiBaseView):
             )
         
         # Verify the 2FA code (but NOT a backup code - we're regenerating those!)
-        if not verify_totp(user.two_factor_secret, code):
+        if not verify_totp(decrypt_secret(user.two_factor_secret), code):
             attempts, is_now_locked, lockout_duration = record_sensitive_action_failure(user.id, action_type)
             
             if is_now_locked:
@@ -741,11 +845,11 @@ class TwoFactorRegenerateCodesView(ApiBaseView):
         # Clear failed attempts on success
         clear_sensitive_action_attempts(user.id, action_type)
         
-        # Generate new backup codes
+        # Generate new backup codes — store hashed, return raw ONCE in this response.
         backup_codes = generate_backup_codes()
-        user.backup_codes = backup_codes
+        user.backup_codes = hash_backup_codes(backup_codes)
         user.save()
-        
+
         return Response({
             'backup_codes': backup_codes,
             'message': 'Backup codes regenerated successfully'
@@ -753,96 +857,95 @@ class TwoFactorRegenerateCodesView(ApiBaseView):
 
 
 class TwoFactorDownloadCodesView(ApiBaseView):
-    """Download backup codes as PDF"""
+    """Backup-code download.
+
+    APP-03: backup codes are now stored hashed and cannot be reconstructed, so they
+    can only be saved at generation time (setup/regenerate). This endpoint therefore
+    no longer returns codes — clients must regenerate to obtain a fresh, downloadable
+    set. Kept for backward-compatibility with a clear, machine-readable response.
+    """
 
     def get(self, request):
-        """Generate and download backup codes PDF"""
-        user = request.user
-        
-        if not user.two_factor_enabled or not user.backup_codes:
-            return Response(
-                {'error': 'No backup codes available'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Generate PDF
-        pdf_buffer = generate_backup_codes_pdf(user.username, user.backup_codes)
-        
-        # Create filename: username_SoundWave_BackupCodes_YYYY-MM-DD.pdf
-        filename = f"{user.username}_SoundWave_BackupCodes_{datetime.now().strftime('%Y-%m-%d')}.pdf"
-        
-        response = HttpResponse(pdf_buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        return response
+        return Response(
+            {
+                'error': 'Backup codes can only be saved when generated. Regenerate your codes to download a new set.',
+                'code': 'codes_not_retrievable',
+            },
+            status=status.HTTP_410_GONE
+        )
 
 
 class AvatarUploadView(APIView):
     """Upload user avatar"""
     parser_classes = [MultiPartParser, FormParser]
-    
-    # Avatar directory - persistent storage
-    AVATAR_DIR = Path('/app/data/avatars')
+
+    # Avatar directory - persistent storage (module-level, derived from DATA_DIR)
+    AVATAR_DIR = AVATAR_DIR
     MAX_SIZE = 20 * 1024 * 1024  # 20MB
-    ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
-    
+
     def post(self, request):
-        """Upload custom avatar image"""
+        """Upload custom avatar image.
+
+        APP-09: the image is validated by its actual bytes (magic bytes) and
+        re-encoded through Pillow rather than trusting the client Content-Type.
+        This rejects renamed/polyglot/SVG files and strips metadata.
+        """
+        import re as _re
+        from user.avatar_utils import process_avatar_image, InvalidAvatarImage
+
         if 'avatar' not in request.FILES:
             return Response(
-                {'error': 'No avatar file provided'},
+                {'error': 'No avatar file provided', 'code': 'no_file'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         avatar_file = request.FILES['avatar']
-        
-        # Validate file size
-        if avatar_file.size > self.MAX_SIZE:
+
+        # Validate file size before reading it into memory.
+        if avatar_file.size and avatar_file.size > self.MAX_SIZE:
             return Response(
-                {'error': f'File too large. Maximum size is {self.MAX_SIZE // (1024*1024)}MB'},
+                {'error': f'File too large. Maximum size is {self.MAX_SIZE // (1024*1024)}MB',
+                 'code': 'file_too_large'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Validate content type
-        content_type = avatar_file.content_type
-        if content_type not in self.ALLOWED_TYPES:
+
+        raw = avatar_file.read()
+        if len(raw) > self.MAX_SIZE:
             return Response(
-                {'error': f'Invalid file type. Allowed types: {", ".join(self.ALLOWED_TYPES)}'},
+                {'error': f'File too large. Maximum size is {self.MAX_SIZE // (1024*1024)}MB',
+                 'code': 'file_too_large'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # Validate (magic bytes) + re-encode. The server decides the format/extension.
+        try:
+            data, ext = process_avatar_image(raw)
+        except InvalidAvatarImage as exc:
+            return Response({'error': exc.message, 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
+
         # Create avatars directory if it doesn't exist
         self.AVATAR_DIR.mkdir(parents=True, exist_ok=True)
-        
-        # Map content type to safe extension (don't trust client extension)
-        EXTENSION_MAP = {
-            'image/jpeg': '.jpg',
-            'image/png': '.png',
-            'image/gif': '.gif',
-            'image/webp': '.webp',
-        }
-        ext = EXTENSION_MAP.get(content_type, '.jpg')
-        
-        # Generate safe filename: username_timestamp.ext
+
+        # Generate safe filename: <sanitized-username>_timestamp.ext
+        safe_username = _re.sub(r'[^A-Za-z0-9_-]', '_', request.user.username) or 'user'
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{request.user.username}_{timestamp}{ext}"
+        filename = f"{safe_username}_{timestamp}{ext}"
         filepath = self.AVATAR_DIR / filename
-        
+
         # Remove old avatar file if it exists and is not a preset
         if request.user.avatar and not request.user.avatar.startswith('preset_'):
             old_path = self.AVATAR_DIR / request.user.avatar.split('/')[-1]
             if old_path.exists():
                 old_path.unlink()
-        
-        # Save file
-        with open(filepath, 'wb+') as destination:
-            for chunk in avatar_file.chunks():
-                destination.write(chunk)
-        
+
+        # Write the re-encoded bytes (never the original upload).
+        with open(filepath, 'wb') as destination:
+            destination.write(data)
+
         # Update user model
         request.user.avatar = f"avatars/{filename}"
         request.user.save()
-        
+
         return Response({
             'message': 'Avatar uploaded successfully',
             'avatar': request.user.avatar
@@ -889,7 +992,7 @@ class AvatarPresetView(ApiBaseView):
         # Remove old custom avatar file if exists
         user = request.user
         if user.avatar and not user.avatar.startswith('preset_'):
-            avatar_dir = Path('/app/data/avatars')
+            avatar_dir = AVATAR_DIR
             filepath = avatar_dir / user.avatar.split('/')[-1]
             if filepath.exists():
                 filepath.unlink()
@@ -909,7 +1012,7 @@ class AvatarFileView(APIView):
     
     def get(self, request, filename):
         """Serve avatar file"""
-        avatar_dir = Path('/app/data/avatars')
+        avatar_dir = AVATAR_DIR
         filepath = avatar_dir / filename
         
         # Security: validate path

@@ -20,7 +20,7 @@ import { userAPI, ensureCsrfCookie } from '../api/client';
 import { useTranslation } from 'react-i18next';
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (passwordChangeRequired?: boolean) => void;
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
@@ -76,8 +76,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         setError(t('login.errors.enter2fa'));
         return;
       }
-      
-      onLoginSuccess();
+
+      onLoginSuccess(response.data.user?.password_change_required === true);
     } catch (err: any) {
       const data = err.response?.data;
       

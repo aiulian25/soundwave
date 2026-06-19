@@ -8,6 +8,7 @@ class ArtworkSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Artwork
+        # Artwork's timestamp field is `fetched_date` (there is no created_at).
         fields = [
             'id',
             'audio',
@@ -20,9 +21,9 @@ class ArtworkSerializer(serializers.ModelSerializer):
             'height',
             'priority',
             'is_primary',
-            'created_at',
+            'fetched_date',
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'fetched_date']
 
 
 class MusicMetadataSerializer(serializers.ModelSerializer):
@@ -30,8 +31,9 @@ class MusicMetadataSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = MusicMetadata
+        # MusicMetadata's primary key is `audio` (OneToOneField, primary_key=True) —
+        # it has no `id`, and its timestamp field is `last_updated`.
         fields = [
-            'id',
             'audio',
             'album_name',
             'album_artist',
@@ -46,10 +48,10 @@ class MusicMetadataSerializer(serializers.ModelSerializer):
             'listeners',
             'fanart_artist_id',
             'fanart_album_id',
-            'created_at',
-            'updated_at',
+            'metadata_fetched',
+            'last_updated',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['audio', 'last_updated']
 
 
 class ArtistInfoSerializer(serializers.ModelSerializer):
@@ -57,8 +59,11 @@ class ArtistInfoSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ArtistInfo
+        # NOTE: ArtistInfo's primary key is `channel` (OneToOneField, primary_key=True)
+        # — it has no `id`, and its timestamp field is `last_updated`. Referencing
+        # non-existent fields here previously crashed schema generation (APP-12) and
+        # any serialization of this model.
         fields = [
-            'id',
             'channel',
             'bio',
             'bio_summary',
@@ -69,10 +74,10 @@ class ArtistInfoSerializer(serializers.ModelSerializer):
             'tags',
             'fanart_id',
             'similar_artists',
-            'created_at',
-            'updated_at',
+            'metadata_fetched',
+            'last_updated',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['channel', 'last_updated']
 
 
 class AudioWithArtworkSerializer(serializers.Serializer):

@@ -1,0 +1,204 @@
+name: Security Scan
+
+# Operationalizes SECURITY_ASSESSMENT.md §8 in CI.
+#  - code/dependency/config/secret scans on every push & PR (fast, no image build)
+#  - full image vuln scan on main + a weekly schedule (rebuild-and-rescan cadence)
+# Results are uploaded as SARIF (GitHub Security tab) and SBOM artifacts.
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC — catch newly-disclosed CVEs in a static image
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Fast checks on every push / PR: Dockerfile lint, secrets, IaC misconfig,
+  # filesystem CVEs (covers Python deps), Python pip-audit, and a source SBOM.
+  code-and-deps:
+    name: Code, deps & config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history so gitleaks can scan commits
+
+      - name: Hadolint (Dockerfile lint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          no-fail: true   # report, do not block PRs on style warnings
+
+      - name: Gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+      - name: Trivy config (IaC / Dockerfile misconfig) → SARIF
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          severity: HIGH,CRITICAL
+
+      - name: Trivy filesystem (vuln + secret) → SARIF
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          format: sarif
+          output: trivy-fs.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: '.venv,frontend/node_modules,frontend/dist,staticfiles,backend/staticfiles,audio,cache,data'
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .
+          category: trivy
+
+      - name: pip-audit (Python dependency CVEs)
+        continue-on-error: true   # cross-check only; trivy fs is the authoritative gate
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pip-audit \
+            || python3 -m pip install --quiet --user pip-audit || true
+          python3 -m pip_audit -r backend/requirements.txt || true
+
+      - name: Generate source SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: sbom-source.cdx.json
+
+      # Ratchet rollout: report-only on PRs (results still visible in the Security
+      # tab + as job annotations) so existing dependency debt doesn't block every
+      # PR; enforce as a hard gate on main pushes, the weekly schedule, and manual runs.
+      - name: Trivy filesystem gate (fixable CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: '.venv,frontend/node_modules,frontend/dist,staticfiles,backend/staticfiles,audio,cache,data'
+          exit-code: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+
+  # --------------------------------------------------------------------------
+  # Heavier image scan — only on main pushes, the weekly schedule, or manual run.
+  image-scan:
+    name: Container image scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image (load locally, amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: soundwave:scan
+          cache-from: type=gha
+          platforms: linux/amd64
+
+      - name: Trivy image scan → SARIF (report all)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: soundwave:scan
+          format: sarif
+          output: trivy-image.sarif
+          scanners: vuln,secret,misconfig
+
+      - name: Upload image SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      - name: Generate image SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: soundwave:scan
+          format: cyclonedx-json
+          artifact-name: sbom-image.cdx.json
+
+      - name: Trivy image gate (fixable CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: soundwave:scan
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+  # --------------------------------------------------------------------------
+  # Authorization / multi-tenant isolation (BOLA) regression tests (APP-04).
+  # Fails the build if any endpoint leaks another tenant's data.
+  backend-tests:
+    name: Backend authz / BOLA tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run BOLA / isolation tests
+        working-directory: ./backend
+        env:
+          DJANGO_DEBUG: 'True'
+          DJANGO_SECRET_KEY: 'ci-test-secret-not-for-production'
+        run: python manage.py test common.tests --settings=config.settings_test -v 2

@@ -101,8 +101,15 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || t('avatarDialog.errors.uploadFailed'));
+        const data = await response.json().catch(() => ({}));
+        // Map backend validation codes (APP-09) to localized messages.
+        const codeKeys: Record<string, string> = {
+          file_too_large: 'avatarDialog.errors.fileTooLarge',
+          unsupported_format: 'avatarDialog.errors.invalidFileType',
+          invalid_image: 'avatarDialog.errors.invalidImage',
+        };
+        const key = data?.code ? codeKeys[data.code] : undefined;
+        throw new Error(key ? t(key) : (data?.error || t('avatarDialog.errors.uploadFailed')));
       }
 
       const data = await response.json();

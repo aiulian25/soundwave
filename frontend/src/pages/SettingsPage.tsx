@@ -271,30 +271,25 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDownloadCodes = async () => {
-    try {
-      const response = await userAPI.twoFactorDownloadCodes();
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Get filename from Content-Disposition header or create default
-      const contentDisposition = response.headers['content-disposition'];
-      let filename = 'backup_codes.pdf';
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?(.+)"?/);
-        if (match) filename = match[1];
-      }
-      
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(t('settings.alerts.downloadBackupCodesFailed'));
+  const handleDownloadCodes = () => {
+    // Backup codes are stored hashed server-side (APP-03) and cannot be re-fetched.
+    // Download the freshly generated codes if they are still in memory; otherwise
+    // guide the user to regenerate (which produces a new, downloadable set).
+    const codes = setupData?.backup_codes;
+    if (!codes || codes.length === 0) {
+      setError(t('settings.alerts.backupCodesUnavailable'));
+      setTimeout(() => setError(''), 6000);
+      return;
     }
+    const blob = new Blob([codes.join('\n')], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'soundwave_backup_codes.txt');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   };
 
   const handleLanguageChange = async (language: string) => {

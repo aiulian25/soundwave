@@ -85,6 +85,31 @@ class ApiBaseView(APIView):
     authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    def filter_owned(self, queryset, field=None, allow_admin_all=False):
+        """Scope a queryset to the requesting user's own objects (APP-04 / BOLA).
+
+        Centralizes multi-tenant isolation so every endpoint filters the same way.
+        By default scopes strictly by owner — including admins — which matches the
+        app's per-tenant resource model (each user has their own library). Pass
+        ``allow_admin_all=True`` for management endpoints that intentionally span
+        tenants.
+
+        ``field`` is auto-detected as ``owner`` or ``user`` when not given.
+        """
+        user = getattr(self.request, 'user', None)
+        if allow_admin_all and user is not None and (
+            getattr(user, 'is_admin', False) or getattr(user, 'is_superuser', False)
+        ):
+            return queryset
+
+        if field is None:
+            names = {f.name for f in queryset.model._meta.get_fields()}
+            field = 'owner' if 'owner' in names else ('user' if 'user' in names else None)
+        if field is None:
+            # Caller used this on a non-ownable model; fail closed to avoid leaking.
+            return queryset.none()
+        return queryset.filter(**{field: user})
+
 
 class AdminOnly(IsAdminUser):
     """Admin only permission"""

@@ -65,8 +65,8 @@ class AudioListView(ApiBaseView):
         status_filter = request.query_params.get('status')
         favorites = request.query_params.get('favorites')
 
-        # Base queryset - filter by user
-        queryset = Audio.objects.filter(owner=request.user)
+        # Base queryset - scoped to the requesting user (APP-04 centralized)
+        queryset = self.filter_owned(Audio.objects.all())
 
         # Apply filters
         if channel_id:
@@ -204,10 +204,15 @@ class AudioPlayerView(ApiBaseView):
         encoded_path = '/'.join(quote(part, safe='') for part in audio.file_path.split('/'))
 
         stream_url = f"/media/{encoded_path}"
+        # APP-05: also offer a short-lived signed URL for clients that cannot use the
+        # session cookie (cross-origin / non-browser). The SPA keeps using stream_url.
+        from common.streaming import make_media_ticket
+        stream_ticket_url = f"/media/{encoded_path}?t={make_media_ticket(request.user, audio.file_path)}"
 
         data = {
             'audio': AudioSerializer(audio).data,
-            'stream_url': stream_url
+            'stream_url': stream_url,
+            'stream_ticket_url': stream_ticket_url,
         }
         if progress:
             data['progress'] = {

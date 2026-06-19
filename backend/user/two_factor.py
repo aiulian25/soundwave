@@ -4,13 +4,77 @@ import pyotp
 import qrcode
 import io
 import base64
+import hashlib
 import secrets
+from cryptography.fernet import Fernet, InvalidToken
+from django.conf import settings
+from django.contrib.auth.hashers import make_password, check_password
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 from datetime import datetime
+
+
+def _fernet():
+    """Fernet built from a dedicated TOTP_ENC_KEY if set, else DJANGO_SECRET_KEY.
+
+    APP-03: rotating the underlying key makes existing encrypted TOTP secrets
+    undecryptable (affected users must re-enroll 2FA). Use a dedicated TOTP_ENC_KEY
+    to decouple 2FA from Django secret-key rotation.
+    """
+    key_material = (getattr(settings, 'TOTP_ENC_KEY', '') or settings.SECRET_KEY).encode()
+    fernet_key = base64.urlsafe_b64encode(hashlib.sha256(key_material).digest())
+    return Fernet(fernet_key)
+
+
+def encrypt_secret(plain):
+    """Encrypt a TOTP secret for storage. Returns the original on empty input."""
+    if not plain:
+        return plain
+    return _fernet().encrypt(plain.encode()).decode()
+
+
+def decrypt_secret(token):
+    """Decrypt a stored TOTP secret.
+
+    Falls back to returning the value unchanged if it is not a valid Fernet token
+    (e.g. a legacy plaintext secret not yet converted by the data migration), so
+    verification never hard-breaks mid-deploy.
+    """
+    if not token:
+        return token
+    try:
+        return _fernet().decrypt(token.encode()).decode()
+    except (InvalidToken, ValueError, TypeError):
+        return token
+
+
+def hash_backup_code(code):
+    """Hash a single backup code for storage (one-way)."""
+    return make_password(code)
+
+
+def hash_backup_codes(codes):
+    """Hash a list of raw backup codes for storage."""
+    return [hash_backup_code(code) for code in codes]
+
+
+def verify_and_consume_backup_code(user, code):
+    """Check a backup code against the user's stored hashes.
+
+    On a match, removes that hash (single-use) and returns True. The caller is
+    responsible for saving the user. Does not match plaintext, so unconverted
+    legacy codes simply fail closed (the data migration hashes existing codes).
+    """
+    if not code or not user.backup_codes:
+        return False
+    for stored in list(user.backup_codes):
+        if isinstance(stored, str) and '$' in stored and check_password(code, stored):
+            user.backup_codes.remove(stored)
+            return True
+    return False
 
 
 def generate_totp_secret():

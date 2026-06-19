@@ -907,6 +907,7 @@
       "setPresetFailed": "Failed to set preset avatar",
       "fileTooLarge": "File too large. Maximum size is 20MB",
       "invalidFileType": "Invalid file type. Please upload JPEG, PNG, GIF, or WebP",
+      "invalidImage": "That file isn't a valid image. Please upload a real JPEG, PNG, GIF, or WebP.",
       "uploadFailed": "Failed to upload avatar",
       "removeFailed": "Failed to remove avatar"
     }
@@ -1067,7 +1068,10 @@
       "online": "Downloads you start will appear here",
       "offline": "Queue downloads offline and they will sync when online"
     },
-    "syncWhenOnlinePending": "Will sync when online ({{count}} pending)"
+    "syncWhenOnlinePending": "Will sync when online ({{count}} pending)",
+    "errors": {
+      "blockedUrl": "This download link is invalid or points to a blocked address."
+    }
   },
   "relatedTracks": {
     "title": "Related Tracks",
@@ -1798,7 +1802,8 @@
       "twoFactorDisabled": "Two-factor authentication disabled",
       "backupCodesRegenerated": "Backup codes regenerated successfully!",
       "regenerateBackupCodesFailed": "Failed to regenerate backup codes",
-      "downloadBackupCodesFailed": "Failed to download backup codes"
+      "downloadBackupCodesFailed": "Failed to download backup codes",
+      "backupCodesUnavailable": "For your security, backup codes can only be saved when generated. Use \"Regenerate Codes\" to create and download a new set."
     },
     "language": {
       "title": "Language",
@@ -1851,6 +1856,48 @@
       "columnNumber": "#",
       "columnArtist": "Artist",
       "columnAlbum": "Album"
+    }
+  },
+  "forcePasswordChange": {
+    "title": "Set a new password",
+    "subtitle": "For your security, you must change the default password before continuing.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "hint": "Use at least {{count}} characters. Avoid common or reused passwords.",
+    "submit": "Change password",
+    "signOut": "Sign out instead",
+    "success": "Password changed successfully. Continuing…",
+    "errors": {
+      "fillAllFields": "Please fill in all password fields",
+      "tooShort": "Password must be at least {{count}} characters long",
+      "mismatch": "New passwords do not match",
+      "sameAsCurrent": "New password must be different from the current password",
+      "failed": "Failed to change password"
+    }
+  },
+  "passwordPolicy": {
+    "tooShort": "Password is too short. Use at least 8 characters.",
+    "tooCommon": "This password is too common. Choose a less predictable one.",
+    "entirelyNumeric": "Password can't be entirely numeric.",
+    "tooSimilar": "Password is too similar to your username or email.",
+    "sameAsCurrent": "New password must be different from your current password.",
+    "mismatch": "Passwords do not match.",
+    "invalid": "Password does not meet the security requirements."
+  },
+  "emailVerification": {
+    "confirmTitle": "Confirm your email",
+    "confirming": "Confirming your new email address…",
+    "success": "Your email address has been confirmed.",
+    "goToApp": "Go to SoundWave",
+    "pendingNotice": "We sent a confirmation link to {{email}}. Your address will change once you confirm it.",
+    "errors": {
+      "expired": "This confirmation link has expired. Please request the change again.",
+      "invalid": "This confirmation link is invalid or has already been used.",
+      "emailTaken": "That email address is already in use.",
+      "generic": "We couldn't confirm your email. Please try again."
     }
   }
 }

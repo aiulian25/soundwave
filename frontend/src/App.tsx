@@ -4,6 +4,8 @@ import { Box, IconButton, Typography, useMediaQuery, useTheme } from '@mui/mater
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import LoginPage from './pages/LoginPage';
+import ForcePasswordChangePage from './pages/ForcePasswordChangePage';
+import ConfirmEmailPage from './pages/ConfirmEmailPage';
 import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
 import SearchPage from './pages/SearchPage';
@@ -41,6 +43,7 @@ import type { Audio } from './types';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [currentAudio, setCurrentAudio] = useState<Audio | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -97,9 +100,16 @@ function App() {
     const bootstrapAuth = async () => {
       try {
         await ensureCsrfCookie();
-        await userAPI.account();
+        const accountRes = await userAPI.account();
         setIsAuthenticated(true);
         setAuthEventsEnabled(true);
+
+        // APP-01: if the account still requires a password change, gate the app
+        // and skip the rest of the post-auth bootstrap until it's resolved.
+        if (accountRes.data?.password_change_required) {
+          setMustChangePassword(true);
+          return;
+        }
 
         if (settingsContext?.loadSettings) {
           settingsContext.loadSettings();
@@ -304,14 +314,13 @@ function App() {
     setIsPlaying(true);
   };
 
-  const handleLoginSuccess = async () => {
-    setIsAuthenticated(true);
-    setAuthEventsEnabled(true);
+  // Post-auth bootstrap shared by fresh login and forced-password-change completion.
+  const runPostAuthBootstrap = async () => {
     // Load user settings after login
     if (settingsContext?.loadSettings) {
       settingsContext.loadSettings();
     }
-    
+
     // Check for existing playback session from another device
     try {
       const session = await checkPlaybackSession();
@@ -323,6 +332,25 @@ function App() {
     } catch (error) {
       console.debug('[App] No playback session to resume');
     }
+  };
+
+  const handleLoginSuccess = async (passwordChangeRequired = false) => {
+    setIsAuthenticated(true);
+    setAuthEventsEnabled(true);
+
+    // APP-01: a forced password change blocks the rest of the app until resolved.
+    if (passwordChangeRequired) {
+      setMustChangePassword(true);
+      return;
+    }
+
+    await runPostAuthBootstrap();
+  };
+
+  // Called when the forced password change completes successfully.
+  const handlePasswordChanged = async () => {
+    setMustChangePassword(false);
+    await runPostAuthBootstrap();
   };
 
   // Handle resume playback from another device
@@ -425,6 +453,7 @@ function App() {
     // Navigate to root and set authenticated to false
     navigate('/', { replace: true });
     setIsAuthenticated(false);
+    setMustChangePassword(false);
   };
 
   const toggleMobileDrawer = () => {
@@ -620,8 +649,19 @@ function App() {
     });
   }, []);
 
+  // Public route: email-change confirmation, reachable from the emailed link even
+  // when logged out / on another device (APP-10).
+  if (window.location.pathname === '/confirm-email') {
+    return <ConfirmEmailPage />;
+  }
+
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // APP-01: block the entire app behind a forced password change when required.
+  if (mustChangePassword) {
+    return <ForcePasswordChangePage onChanged={handlePasswordChanged} onLogout={handleLogout} />;
   }
 
   return (

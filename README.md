@@ -192,7 +192,7 @@ Docker will automatically create the `pg_data` volume for PostgreSQL data. No ma
 grep SW_PASSWORD .env
 ```
 
-> ⚠️ **First login:** Go to **Settings → Account** and change your admin password to something memorable.
+> ⚠️ **First login:** You'll be **required to set a new admin password** before you can use the app — the initial `SW_PASSWORD` cannot remain in use. Choose something strong and memorable.
 
 Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to initialize before SoundWave starts.
 
@@ -218,7 +218,15 @@ Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to
 | `DJANGO_DEBUG` | Enable Django debug mode | `False` |
 | `ALLOW_LOCAL_NETWORK` | Allow access from 192.168.x.x local network IPs | `false` |
 | `SECURE_COOKIES` | Cookie security: `auto`, `true`, or `false` | `auto` |
+| `SSL_REDIRECT` | Redirect HTTP→HTTPS (set behind an HTTPS proxy) | `False` |
+| `NUM_PROXIES` | Trusted reverse-proxy hop count for real client IP (login lockout / rate limiting) | — (direct) |
 | `TOKEN_EXPIRY_HOURS` | API token lifetime in hours | `168` (7 days) |
+| `EMAIL_HOST` | SMTP host; enables verified email-address changes | — (off) |
+| `EMAIL_PORT` | SMTP port | `587` |
+| `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` | SMTP credentials | — |
+| `EMAIL_USE_TLS` | Use STARTTLS for SMTP | `true` |
+| `DEFAULT_FROM_EMAIL` | From-address for confirmation emails | `SoundWave <no-reply@localhost>` |
+| `EMAIL_VERIFICATION_REQUIRED` | Force email-change verification even without SMTP | `false` |
 | `SW_AUTO_UPDATE_YTDLP` | Auto-update yt-dlp on startup | `false` |
 | `LASTFM_API_KEY` | Last.fm API key for artist/track metadata | — |
 | `LASTFM_API_SECRET` | Last.fm API secret | — |
@@ -525,6 +533,43 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.12.0 - Deep Security Assessment Remediation (June 2026)
+
+A full security assessment (`SECURITY_ASSESSMENT.md`) was completed and every actionable finding remediated. All new user-facing strings are localized (English + Romanian).
+
+#### Authentication & Account Security
+- ✅ **Forced admin password change (APP-01)** — The bootstrap admin must set a new password on first login; the initial `SW_PASSWORD` can no longer remain in use on an exposed instance.
+- ✅ **Password strength policy** — New/changed passwords are validated for length and complexity, with localized error messages.
+- ✅ **2FA secrets encrypted at rest** — TOTP secrets are Fernet-encrypted in the database, and backup codes are hashed instead of stored in plaintext.
+- ✅ **Verified email changes** — When SMTP is configured, changing an account email sends a confirmation link and only applies once confirmed (`pending_email`).
+- ✅ **Login lockout hardening** — Per-IP/username lockout derives the real client IP via `NUM_PROXIES`, preventing spoofing behind a reverse proxy.
+
+#### Access Control & Data Isolation
+- ✅ **Per-user media authorization (IDOR fix, APP-05)** — Streaming a file now checks ownership; users can only access their own audio (admins bypass).
+- ✅ **Signed, short-lived media tickets** — Long-lived `?token=` media auth replaced with expiring, HMAC-signed, path-bound tickets.
+- ✅ **Object-ownership filtering (BOLA)** — API list/detail views filter by owner so users can't read others' objects by ID.
+- ✅ **No wildcard CORS on media (APP-11)** — Media responses no longer send `Access-Control-Allow-Origin: *`.
+- ✅ **Restricted API docs/schema** — Swagger/OpenAPI schema is limited to users who can manage users.
+- ✅ **Complete account deletion** — Deleting a user removes all on-disk files (downloaded audio, **local uploads + cover art**, custom avatar) and cascades every DB relationship; no delete route can orphan files.
+
+#### Input & Request Hardening
+- ✅ **SSRF guard** — Outbound URL fetches (artwork, public links) validate the resolved host and block private/internal targets.
+- ✅ **Avatar upload validation** — Uploads are verified by image magic-bytes, not just extension or content-type.
+
+#### Container & Dependency Hardening
+- ✅ **Non-root container user (CNT-01)** — The image runs as an unprivileged `appuser`.
+- ✅ **Pinned `yt-dlp` (CNT-02)** — Installed and pinned in the image (`2026.6.9`); there is no runtime `pip` on the read-only rootfs.
+- ✅ **Leaner image (CNT-04)** — `--no-install-recommends`, pinned build tools, and pruned unused Mesa GPU drivers shrink the attack surface and CVE count.
+
+#### Secrets, Network & Supply-chain
+- ✅ **Strong unique service secrets (DEP-01)** — `setup.sh` generates them; `scripts/rotate-secrets.sh` rotates live Postgres/Redis/Elasticsearch credentials in place.
+- ✅ **Network isolation (DEP-04)** — Postgres/Redis/Elasticsearch live on an `internal` Docker network with no host reachability and no internet egress; only the app is externally reachable.
+- ✅ **Secure cookies / HSTS (DEP-05/06)** — `SECURE_COOKIES`/`SSL_REDIRECT` for HTTPS deployments, with startup warnings when misconfigured (e.g. an HTTPS `SW_HOST` without Secure cookies).
+- ✅ **Automated security scanning** — Weekly CI (Trivy, Grype, Syft, Hadolint, Gitleaks) plus no-cache image rebuilds.
+
+#### Reliability (read-only rootfs entrypoint)
+- ✅ **Entrypoint fixes** — `HOME=/tmp` (gunicorn control server), non-fatal `collectstatic`, and the Celery **beat** schedule/pidfile moved to `/tmp` so the periodic scheduler no longer crash-loops on the read-only production filesystem.
 
 ### v1.11.0 - Full Audit Implementation & i18n (May 2026)
 

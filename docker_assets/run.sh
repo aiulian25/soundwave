@@ -5,6 +5,10 @@ set +e
 
 echo "Starting SoundWave..."
 
+# On the read-only production rootfs, HOME (used by gunicorn's control server for
+# ~/.gunicorn and by some libs for caches) must point at a writable tmpfs.
+export HOME=/tmp
+
 # Determine if running in production mode
 IS_PRODUCTION="false"
 if [ "${DJANGO_DEBUG}" = "False" ] || [ "${DJANGO_DEBUG}" = "false" ] || [ -z "${DJANGO_DEBUG}" ]; then
@@ -166,14 +170,20 @@ echo "=== Migrations complete ==="
 python manage.py shell << END
 from user.models import Account
 if not Account.objects.filter(username='$SW_USERNAME').exists():
-    Account.objects.create_superuser('$SW_USERNAME', 'admin@soundwave.local', '$SW_PASSWORD')
-    print('Superuser created')
+    user = Account.objects.create_superuser('$SW_USERNAME', 'admin@soundwave.local', '$SW_PASSWORD')
+    # APP-01: force the bootstrap admin to set a new password on first login so the
+    # default SW_PASSWORD cannot remain in use on an internet-exposed instance.
+    user.password_change_required = True
+    user.save(update_fields=['password_change_required'])
+    print('Superuser created (password change required on first login)')
 else:
     print('Superuser already exists')
 END
 
-# Collect static files
-python manage.py collectstatic --noinput
+# Collect static files. These are already collected into the image at build time;
+# on the read-only production rootfs this re-run cannot write, so never fail on it.
+python manage.py collectstatic --noinput 2>/dev/null \
+    || echo "Static collection skipped (assets baked at build / read-only rootfs)"
 
 # Start Celery worker in background with proper error handling
 # Limit concurrency to avoid SQLite locks
@@ -193,6 +203,8 @@ echo "Celery worker started (PID: $WORKER_PID)"
 echo "Starting Celery beat scheduler..."
 celery -A config beat \
     --loglevel=info \
+    --schedule=/tmp/celerybeat-schedule \
+    --pidfile=/tmp/celerybeat.pid \
     --logfile=/tmp/celery-beat.log \
     >> /tmp/celery-beat.log 2>&1 &
 BEAT_PID=$!

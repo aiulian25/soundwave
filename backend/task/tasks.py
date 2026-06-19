@@ -147,6 +147,20 @@ def download_audio_task(queue_id):
     """Download audio from YouTube - AUDIO ONLY, no video"""
     try:
         queue_item = DownloadQueue.objects.get(id=queue_id)
+
+        # SSRF guard (APP-02), defence-in-depth: re-validate immediately before the
+        # fetch so auto-started/retried items, and anything queued before this check
+        # existed, cannot make yt-dlp reach an internal/non-routable address.
+        from common.url_security import check_public_http_url, message_for
+        ok, code = check_public_http_url(queue_item.url)
+        if not ok:
+            queue_item.status = 'failed'
+            # Stable '[blocked_url]' marker lets the SPA render a localized message.
+            queue_item.error_message = f'[blocked_url] {message_for(code)}'
+            queue_item.save()
+            logger.warning("Blocked SSRF download attempt for queue %s: %s", queue_id, queue_item.url)
+            return
+
         queue_item.status = 'downloading'
         queue_item.started_date = timezone.now()
         queue_item.save()

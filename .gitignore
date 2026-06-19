@@ -41,6 +41,10 @@ node_modules/
 *~
 *.backup
 *.bak
+# Timestamped local backups — may hold real secrets or user data, never commit
+*.bak.*
+.env.bak*
+*.sqlite3.bak*
 
 # OS
 .DS_Store
@@ -51,3 +55,11 @@ tubearchivist-develop/
 
 # Cookies
 cookies.txt
+
+# Security scan output (SBOMs, scanner JSON reports)
+security-reports/
+
+# Internal development notes — kept locally, not pushed to GitHub.
+# (README links docs/WIDGET_API.md, so that one stays tracked.)
+docs/*
+!docs/WIDGET_API.md

@@ -105,6 +105,7 @@ export interface User {
   email: string;
   date_joined: string;
   last_login: string;
+  password_change_required?: boolean;
 }
 
 export interface AudioProgress {

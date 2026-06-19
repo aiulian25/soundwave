@@ -1,0 +1,13 @@
+# Netscape HTTP Cookie File
+# https://curl.se/docs/http-cookies.html
+#
+# This file is mounted into the container (read-only) and passed to yt-dlp as a
+# cookies file. It is OPTIONAL — leave it as just this header to download public
+# content without authentication.
+#
+# To download age-restricted / members-only / private content, export your YouTube
+# cookies in Netscape format (e.g. a "Get cookies.txt" browser extension) and paste
+# the cookie lines below this header into `cookies.txt` (NOT this example file).
+#
+# ⚠️ Treat cookies.txt as a SECRET — it grants access to your Google session. It is
+#    gitignored on purpose; never commit real cookies.

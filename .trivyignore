@@ -1,0 +1,14 @@
+# Trivy ignore list — accepted / triaged vulnerabilities.
+#
+# Add a CVE ID on its own line ONLY after triage, with a comment explaining
+# why it is accepted (not exploitable in our context) and/or a review date.
+# Prefer fixing (rebuild image, bump dependency) over ignoring.
+#
+# The CI gate uses `--ignore-unfixed`, so vulnerabilities without an upstream
+# fix do not need to be listed here; this file is for *fixable* findings we are
+# consciously deferring.
+#
+# Format:
+#   CVE-2026-XXXXX   # reason — owner — review-by YYYY-MM-DD
+#
+# (intentionally empty — nothing accepted yet)

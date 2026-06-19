@@ -11,16 +11,17 @@ class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         fields = [
-            'id', 'username', 'email', 'date_joined', 'last_login', 
+            'id', 'username', 'email', 'date_joined', 'last_login',
             'two_factor_enabled', 'avatar', 'avatar_url',
             'is_admin', 'is_superuser', 'is_staff',
-            'storage_quota_gb', 'storage_used_gb', 
-            'max_channels', 'max_playlists'
+            'storage_quota_gb', 'storage_used_gb',
+            'max_channels', 'max_playlists',
+            'password_change_required'
         ]
         read_only_fields = [
             'id', 'date_joined', 'last_login', 'two_factor_enabled', 'avatar_url',
             'is_admin', 'is_superuser', 'is_staff',
-            'storage_used_gb'
+            'storage_used_gb', 'password_change_required'
         ]
     
     def get_avatar_url(self, obj):

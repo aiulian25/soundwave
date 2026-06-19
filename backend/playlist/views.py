@@ -20,7 +20,7 @@ class PlaylistListView(ApiBaseView):
 
     def get(self, request):
         """Get playlist list"""
-        playlists = Playlist.objects.filter(owner=request.user)
+        playlists = self.filter_owned(Playlist.objects.all())
         serializer = PlaylistSerializer(playlists, many=True)
         return Response({'data': serializer.data})
 

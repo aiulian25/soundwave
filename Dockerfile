@@ -2,7 +2,7 @@
 FROM python:3.11-slim AS builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -11,13 +11,13 @@ WORKDIR /app
 # Upgrade setuptools and wheel to address CVEs in vendored copies bundled with setuptools:
 # - CVE-2026-24049: wheel privilege escalation (fixed in wheel 0.46.2)
 # - CVE-2026-23949: jaraco.context path traversal (fixed in setuptools >=80.0.0 vendored deps)
-# Upgrade wheel separately too since setuptools vendors its own copy
-RUN pip install --no-cache-dir --upgrade setuptools "wheel>=0.46.2"
+# Pinned (CNT-03); both are build-only and removed from the runtime image below.
+RUN pip install --no-cache-dir --upgrade "setuptools==82.0.1" "wheel==0.47.0"
 
-# Install Python dependencies globally
+# Install Python dependencies globally. yt-dlp is pinned in requirements.txt
+# (CNT-02) — do NOT re-install it unpinned here, which would defeat the pin.
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir yt-dlp
 
 # Final stage - runtime only
 FROM python:3.11-slim
@@ -25,12 +25,20 @@ FROM python:3.11-slim
 # Create a non-root user and group
 RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -d /app -s /sbin/nologin -c "Docker image user" appuser
 
-# Install only runtime dependencies (no build-essential)
-# Use --no-install-recommends to skip unnecessary packages
-# apt-get upgrade applies latest security patches to base OS packages
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-    curl \
-    ffmpeg \
+# Install only runtime dependencies (no build-essential).
+# --no-install-recommends keeps the image minimal; apt-get upgrade applies the latest
+# OS security patches.
+# CNT-04: ffmpeg pulls the mesa/GL stack (libavdevice's OpenGL/KMS *output devices*),
+# which audio-only conversion never uses and which carries unfixable CRITICALs
+# (CVE-2026-40393). The mesa DRI/GLX/gallium drivers are dlopen'd only for actual GL
+# rendering, so we force-remove them. NB: libgbm1 (libgbm.so.1) is DT_NEEDED by
+# libavdevice — removing it breaks the ffmpeg binary — so it is intentionally kept.
+# The runtime never runs apt again, so the residual dep state is inert.
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends curl ffmpeg \
+    && for pkg in libgl1-mesa-dri libglx-mesa0 mesa-libgallium; do \
+         dpkg --purge --force-depends "$pkg" 2>/dev/null || true; \
+       done \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder

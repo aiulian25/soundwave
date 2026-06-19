@@ -13,6 +13,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LockIcon from '@mui/icons-material/Lock';
 import { useTranslation } from 'react-i18next';
 import api, { ensureCsrfCookie } from '../api/client';
+import { localizePasswordError } from '../utils/passwordErrors';
 
 interface UserData {
   id: number;
@@ -106,9 +107,13 @@ export default function UserProfileCard() {
       if ((usernameChanged || emailChanged) && currentPassword.trim()) {
         payload.current_password = currentPassword;
       }
+      // Language for the (possible) confirmation email (APP-10).
+      if (emailChanged) {
+        payload.language = i18n.language;
+      }
 
       const response = await api.patch('/user/profile/', payload);
-      
+
       // Update local state with response data instead of reloading
       if (response.data.user) {
         setUserData(response.data.user);
@@ -117,10 +122,15 @@ export default function UserProfileCard() {
         setLastName(response.data.user.last_name || '');
         setEmail(response.data.user.email);
       }
-      
-      setSuccess(t('userProfile.success.profileUpdated'));
+
       setCurrentPassword('');
-      setTimeout(() => setSuccess(''), 3000);
+      if (response.data.code === 'email_confirmation_sent') {
+        // Email is pending confirmation — show that instead of "updated".
+        setSuccess(t('emailVerification.pendingNotice', { email: response.data.pending_email }));
+      } else {
+        setSuccess(t('userProfile.success.profileUpdated'));
+        setTimeout(() => setSuccess(''), 3000);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || t('userProfile.errors.updateFailed'));
     } finally {
@@ -160,7 +170,7 @@ export default function UserProfileCard() {
       setConfirmPassword('');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.error || t('userProfile.errors.changePasswordFailed'));
+      setError(localizePasswordError(err, t, 'userProfile.errors.changePasswordFailed'));
     } finally {
       setLoading(false);
     }

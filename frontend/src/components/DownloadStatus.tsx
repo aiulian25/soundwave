@@ -249,7 +249,9 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
                         />
                         {download.error_message && (
                           <Typography variant="caption" color="error" sx={{ ml: 1 }}>
-                            {download.error_message}
+                            {download.error_message.startsWith('[blocked_url]')
+                              ? t('downloadStatus.errors.blockedUrl')
+                              : download.error_message}
                           </Typography>
                         )}
                       </Box>

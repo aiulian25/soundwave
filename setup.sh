@@ -19,14 +19,49 @@ echo ""
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-# Step 1: Create .env file
+# Step 1: Create .env file with freshly generated strong secrets (DEP-01)
 echo -e "${YELLOW}📝 Step 1/6: Creating environment file...${NC}"
+
+# Generate a URL-safe random secret (hex — no characters that break connection URLs)
+gen_secret() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex 24
+    else
+        head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'
+    fi
+}
+
+# Set KEY=value in .env only if the key is currently empty/placeholder.
+set_secret_if_empty() {
+    local key="$1" val="$2"
+    local current
+    current=$(grep -E "^${key}=" .env | head -1 | cut -d= -f2-)
+    if [ -z "$current" ]; then
+        if grep -qE "^${key}=" .env; then
+            sed -i.bak "s|^${key}=.*|${key}=${val}|" .env && rm -f .env.bak
+        else
+            echo "${key}=${val}" >> .env
+        fi
+    fi
+}
+
 if [ ! -f .env ]; then
     cp .env.example .env
-    echo -e "${GREEN}✅ Created .env file with default settings${NC}"
-    echo -e "${YELLOW}ℹ️  Default credentials: admin / soundwave${NC}"
+
+    # Generate strong, unique secrets for anything left blank in the template.
+    ADMIN_PW=$(gen_secret)
+    set_secret_if_empty SW_PASSWORD "$ADMIN_PW"
+    set_secret_if_empty POSTGRES_PASSWORD "$(gen_secret)"
+    set_secret_if_empty REDIS_PASSWORD "$(gen_secret)"
+    set_secret_if_empty ELASTIC_PASSWORD "$(gen_secret)"
+    set_secret_if_empty DJANGO_SECRET_KEY "$(gen_secret)$(gen_secret)"
+    chmod 600 .env 2>/dev/null || true
+
+    echo -e "${GREEN}✅ Created .env with freshly generated strong secrets${NC}"
+    echo -e "${YELLOW}ℹ️  Initial admin login: ${SW_USERNAME:-admin} / ${ADMIN_PW}${NC}"
+    echo -e "${YELLOW}   (You'll be required to change this password on first login.)${NC}"
 else
-    echo -e "${BLUE}ℹ️  .env file already exists${NC}"
+    echo -e "${BLUE}ℹ️  .env file already exists — leaving secrets untouched${NC}"
 fi
 echo ""
 

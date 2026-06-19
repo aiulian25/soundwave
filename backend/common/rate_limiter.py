@@ -15,13 +15,39 @@ LOGIN_LOCKOUT_DURATION = getattr(settings, 'LOGIN_LOCKOUT_DURATION', 60 * 60)  #
 
 
 def get_client_ip(request):
-    """Extract client IP from request, handling proxies."""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0].strip()
-    else:
-        ip = request.META.get('REMOTE_ADDR', '')
-    return ip
+    """Resolve the client IP for rate-limiting / lockout keys.
+
+    Security (APP-08): ``X-Forwarded-For`` is client-controlled and can be spoofed
+    to evade per-IP lockout/throttle. It is therefore only trusted when the
+    deployment declares how many trusted proxies sit in front of the app via the
+    ``NUM_PROXIES`` setting (same concept as DRF's NUM_PROXIES and Django's
+    SECURE_PROXY_SSL_HEADER):
+
+      - NUM_PROXIES unset (None): backward-compatible default — use the first XFF
+        entry if present, else REMOTE_ADDR.
+      - NUM_PROXIES = 0: ignore XFF entirely, use REMOTE_ADDR.
+      - NUM_PROXIES = N: take the Nth entry from the right of XFF — the address our
+        own trusted proxy observed, which the client cannot forge.
+
+    Behind a reverse proxy, set NUM_PROXIES to the number of proxies so real client
+    IPs are used and spoofing is prevented.
+    """
+    remote_addr = request.META.get('REMOTE_ADDR', '')
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    num_proxies = getattr(settings, 'NUM_PROXIES', None)
+
+    if num_proxies is not None:
+        if num_proxies == 0 or not xff:
+            return remote_addr
+        addrs = [addr.strip() for addr in xff.split(',') if addr.strip()]
+        if not addrs:
+            return remote_addr
+        return addrs[-min(num_proxies, len(addrs))]
+
+    # Default (no trusted-proxy configuration): preserve prior behavior.
+    if xff:
+        return xff.split(',')[0].strip()
+    return remote_addr
 
 
 def get_login_attempt_key(ip_address, username=None):

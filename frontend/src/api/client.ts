@@ -259,6 +259,9 @@ export const userAPI = {
   login: (data: any) => api.post('/user/login/', data),
   logout: () => api.post('/user/logout/'),
   account: () => api.get('/user/account/'),
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    api.post('/user/change-password/', data),
+  confirmEmail: (token: string) => api.post('/user/email/confirm/', { token }),
   config: () => api.get('/user/config/'),
   updateConfig: (data: any) => api.post('/user/config/', data),
   // Two-Factor Authentication

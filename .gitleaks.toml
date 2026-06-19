@@ -1,0 +1,31 @@
+# Gitleaks configuration for SoundWave.
+# Extends the upstream default ruleset, then narrowly allowlists the
+# false positives documented in SECURITY_ASSESSMENT.md §8.
+#
+# Keep this list tight: only proven non-secrets belong here. Never add a
+# real key/token — rotate it and remove it from history instead.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "SoundWave documented false positives and example/template placeholders"
+
+# Files that intentionally contain placeholder/example values, not real secrets.
+#  - .env.example / docs: template & documentation placeholders
+#  - SmartPlaylistsPage.tsx: a RULE_PRESETS array whose `key: '<presetName>'`
+#    literals trip the generic-api-key rule. These are UI identifiers, not secrets.
+paths = [
+  '''\.env\.example$''',
+  '''docs/.*\.md$''',
+  '''frontend/src/pages/SmartPlaylistsPage\.tsx$''',
+  # Backend test fixtures use dummy, non-functional passwords (e.g. 'Zephyr9-Quokka_42x')
+  # that trip the generic-api-key rule. They are test data, never real credentials.
+  '''backend/.*/tests/.*\.py$''',
+]
+
+# Generic placeholder strings used across templates/docs.
+regexes = [
+  '''your_.*_key_here''',
+  '''change_this_password''',
+]

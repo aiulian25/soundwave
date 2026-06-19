@@ -68,7 +68,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - backend
+      # App joins both: `frontend` for its published port + outbound (yt-dlp/APIs),
+      # `datastore` (internal) to reach ES/Postgres/Redis (DEP-04).
+      - frontend
+      - datastore
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8888/api/ping/ || exit 1"]
       interval: 30s
@@ -120,7 +123,7 @@ services:
       timeout: 10s
       retries: 5
     networks:
-      - backend
+      - datastore
 
   soundwave-pg:
     image: postgres:16-alpine
@@ -156,7 +159,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - backend
+      - datastore
 
   soundwave-redis:
     image: redis:alpine
@@ -190,12 +193,21 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - backend
+      - datastore
 
 networks:
-  backend:
+  # Only the app is on the external network (for its published port + outbound).
+  frontend:
     driver: bridge
-    internal: false  # Main app needs external access for port publishing
+    internal: false
+  # ES / Postgres / Redis live here only: no host reachability and NO internet egress
+  # (DEP-04 — stronger than expose-only). Elasticsearch HTTP stays plaintext, which is
+  # acceptable on this isolated bridge. To enable TLS for a hostile-co-tenant threat
+  # model, set xpack.security.http.ssl.enabled=true on soundwave-es with mounted certs
+  # and switch ES_URL to https:// (+ CA trust for the client and healthcheck).
+  datastore:
+    driver: bridge
+    internal: true
 
 volumes:
   es_data:

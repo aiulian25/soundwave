@@ -907,6 +907,7 @@
       "setPresetFailed": "Setarea avatarului presetat a esuat",
       "fileTooLarge": "Fisier prea mare. Dimensiunea maxima este 20MB",
       "invalidFileType": "Tip de fisier invalid. Incarca JPEG, PNG, GIF sau WebP",
+      "invalidImage": "Acest fisier nu este o imagine valida. Incarca un JPEG, PNG, GIF sau WebP real.",
       "uploadFailed": "Incarcarea avatarului a esuat",
       "removeFailed": "Eliminarea avatarului a esuat"
     }
@@ -1067,7 +1068,10 @@
       "online": "Descarcarile pornite vor aparea aici",
       "offline": "Pune descarcari in coada offline si se vor sincroniza cand revii online"
     },
-    "syncWhenOnlinePending": "Se va sincroniza cand esti online ({{count}} in asteptare)"
+    "syncWhenOnlinePending": "Se va sincroniza cand esti online ({{count}} in asteptare)",
+    "errors": {
+      "blockedUrl": "Acest link de descarcare este invalid sau indica o adresa blocata."
+    }
   },
   "relatedTracks": {
     "title": "Melodii similare",
@@ -1798,7 +1802,8 @@
       "twoFactorDisabled": "Autentificarea in doi pasi a fost dezactivata",
       "backupCodesRegenerated": "Codurile de rezerva au fost regenerate cu succes!",
       "regenerateBackupCodesFailed": "Regenerarea codurilor de rezerva a esuat",
-      "downloadBackupCodesFailed": "Descarcarea codurilor de rezerva a esuat"
+      "downloadBackupCodesFailed": "Descarcarea codurilor de rezerva a esuat",
+      "backupCodesUnavailable": "Pentru securitatea ta, codurile de rezerva pot fi salvate doar la generare. Foloseste \"Regenereaza codurile\" pentru a crea si descarca un set nou."
     },
     "language": {
       "title": "Limba",
@@ -1851,6 +1856,48 @@
       "columnNumber": "#",
       "columnArtist": "Artist",
       "columnAlbum": "Album"
+    }
+  },
+  "forcePasswordChange": {
+    "title": "Seteaza o parola noua",
+    "subtitle": "Pentru securitatea ta, trebuie sa schimbi parola implicita inainte de a continua.",
+    "currentPassword": "Parola actuala",
+    "newPassword": "Parola noua",
+    "confirmPassword": "Confirma parola noua",
+    "showPassword": "Arata parola",
+    "hidePassword": "Ascunde parola",
+    "hint": "Foloseste cel putin {{count}} caractere. Evita parolele comune sau refolosite.",
+    "submit": "Schimba parola",
+    "signOut": "Deconecteaza-te",
+    "success": "Parola a fost schimbata cu succes. Se continua…",
+    "errors": {
+      "fillAllFields": "Te rugam sa completezi toate campurile de parola",
+      "tooShort": "Parola trebuie sa aiba cel putin {{count}} caractere",
+      "mismatch": "Parolele noi nu coincid",
+      "sameAsCurrent": "Parola noua trebuie sa fie diferita de parola actuala",
+      "failed": "Schimbarea parolei a esuat"
+    }
+  },
+  "passwordPolicy": {
+    "tooShort": "Parola este prea scurta. Foloseste cel putin 8 caractere.",
+    "tooCommon": "Aceasta parola este prea comuna. Alege una mai putin previzibila.",
+    "entirelyNumeric": "Parola nu poate fi formata doar din cifre.",
+    "tooSimilar": "Parola este prea asemanatoare cu numele de utilizator sau emailul.",
+    "sameAsCurrent": "Parola noua trebuie sa fie diferita de parola actuala.",
+    "mismatch": "Parolele nu coincid.",
+    "invalid": "Parola nu indeplineste cerintele de securitate."
+  },
+  "emailVerification": {
+    "confirmTitle": "Confirma emailul",
+    "confirming": "Se confirma noua adresa de email…",
+    "success": "Adresa ta de email a fost confirmata.",
+    "goToApp": "Mergi la SoundWave",
+    "pendingNotice": "Am trimis un link de confirmare catre {{email}}. Adresa se va schimba dupa ce o confirmi.",
+    "errors": {
+      "expired": "Acest link de confirmare a expirat. Te rugam sa soliciti din nou schimbarea.",
+      "invalid": "Acest link de confirmare este invalid sau a fost deja folosit.",
+      "emailTaken": "Aceasta adresa de email este deja folosita.",
+      "generic": "Nu am putut confirma emailul. Te rugam sa incerci din nou."
     }
   }
 }

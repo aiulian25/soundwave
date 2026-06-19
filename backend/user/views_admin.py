@@ -24,6 +24,7 @@ from user.serializers_admin import (
 from channel.models import Channel
 from playlist.models import Playlist
 from audio.models import Audio
+from audio.models_local import LocalAudio
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -121,6 +122,11 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             'is_active': user.is_active
         })
 
+    def destroy(self, request, *args, **kwargs):
+        """Route the default DELETE through delete_user so on-disk file cleanup
+        always runs — never allow a plain cascade that orphans audio files."""
+        return self.delete_user(request, *args, **kwargs)
+
     @action(detail=True, methods=['delete'], url_path='delete_user')
     def delete_user(self, request, pk=None):
         """Permanently delete a user and ALL their data (audio files, playlists, channels, etc.)"""
@@ -174,6 +180,20 @@ class UserManagementViewSet(viewsets.ModelViewSet):
                     channel_dir.rmdir()
             except (OSError, IOError):
                 pass
+
+        # 2b. Delete user-uploaded local audio files + cover art (CASCADE won't
+        # call LocalAudio.delete(), so the files on disk must be removed here).
+        for local in LocalAudio.objects.filter(owner=user).iterator():
+            for field in (local.file, local.cover_art):
+                if not field:
+                    continue
+                try:
+                    path = Path(field.path)
+                    if path.is_file():
+                        path.unlink()
+                        files_deleted += 1
+                except (OSError, IOError, ValueError) as e:
+                    errors.append(f'Could not delete {getattr(field, "name", field)}: {e}')
 
         # 3. Delete avatar file if it's a custom upload (not a preset number)
         if user.avatar and not user.avatar.isdigit():

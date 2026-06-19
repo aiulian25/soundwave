@@ -95,9 +95,23 @@ class UserCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate(self, data):
-        """Validate password match"""
+        """Validate password match and strength (APP-07)."""
         if data['password'] != data['password_confirm']:
-            raise serializers.ValidationError({"password": "Passwords do not match"})
+            raise serializers.ValidationError({
+                "password": "Passwords do not match",
+                "password_codes": ["password_mismatch"],
+            })
+
+        # Enforce the configured password validators. Build a transient user so the
+        # UserAttributeSimilarityValidator can compare against the new username/email.
+        from user.password_policy import check_password_strength
+        transient = Account(username=data.get('username', ''), email=data.get('email', ''))
+        messages, codes = check_password_strength(data['password'], user=transient)
+        if codes:
+            raise serializers.ValidationError({
+                "password": messages,
+                "password_codes": codes,
+            })
         return data
     
     def create(self, validated_data):

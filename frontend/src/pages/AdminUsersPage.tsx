@@ -42,6 +42,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import api from '../api/client';
+import { localizePasswordError } from '../utils/passwordErrors';
 
 interface User {
   id: number;
@@ -146,7 +147,7 @@ const AdminUsersPage = () => {
       loadSystemStats();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || t('adminUsers.errors.createUserFailed'));
+      setError(localizePasswordError(err, t, 'adminUsers.errors.createUserFailed'));
     }
   };
 

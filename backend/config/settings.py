@@ -23,6 +23,26 @@ if SECRET_KEY == _SECRET_KEY_DEFAULT and not DEBUG:
         'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
     )
 
+# APP-01: discourage known-weak bootstrap admin passwords. The primary control is
+# the forced first-run password change (Account.password_change_required); this is
+# a secondary signal. It only WARNS by default — SW_PASSWORD becomes stale once the
+# admin changes their password, so a hard failure on every boot would break working
+# installs. Operators wanting strict enforcement can set SW_ENFORCE_STRONG_PASSWORD=true.
+_WEAK_PASSWORDS = {'soundwave', 'admin', 'password', 'changeme', 'change_this_password'}
+_sw_password = os.environ.get('SW_PASSWORD', '').strip().lower()
+if _sw_password and _sw_password in _WEAK_PASSWORDS and not DEBUG:
+    if os.environ.get('SW_ENFORCE_STRONG_PASSWORD', 'false').strip().lower() in {'1', 'true', 'yes', 'on'}:
+        raise ValueError(
+            'SW_PASSWORD is a known-weak default. Set a strong SW_PASSWORD '
+            '(or unset SW_ENFORCE_STRONG_PASSWORD to downgrade this to a warning).'
+        )
+    logger.warning(
+        '[Security] SW_PASSWORD is a known-weak default (%s). The bootstrap admin '
+        'will be forced to change it on first login; set a strong SW_PASSWORD and '
+        'rotate the admin password. Set SW_ENFORCE_STRONG_PASSWORD=true to hard-fail.',
+        _sw_password,
+    )
+
 # ALLOWED_HOSTS configuration
 # Can be set via DJANGO_ALLOWED_HOSTS env var (comma-separated).
 # Falls back to SW_HOST / CORS origins and safe localhost defaults.
@@ -292,6 +312,22 @@ CACHES = {
 MAX_LOGIN_ATTEMPTS = 3  # Number of failed attempts before lockout
 LOGIN_LOCKOUT_DURATION = 60 * 60  # 60 minutes in seconds
 
+# Number of trusted reverse proxies in front of the app (APP-08). Controls how the
+# client IP is derived from X-Forwarded-For for BOTH the custom login lockout and
+# the DRF throttles. Leave unset for direct exposure; set to the proxy hop count
+# (usually 1) behind nginx/Cloudflare/etc. so client IPs cannot be spoofed.
+def _env_int_or_none(name):
+    raw = os.environ.get(name, '').strip()
+    if raw == '':
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+NUM_PROXIES = _env_int_or_none('NUM_PROXIES')
+
 # Token expiry settings
 TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY_HOURS', 24 * 7))  # Default: 7 days
 TOKEN_EXPIRY_HOURS_EXTENDED = int(os.environ.get('TOKEN_EXPIRY_HOURS_EXTENDED', 24 * 30))  # Default: 30 days (for "remember me")
@@ -318,6 +354,8 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # APP-08: trust X-Forwarded-For only when proxies are declared (anti-spoofing).
+    'NUM_PROXIES': NUM_PROXIES,
 }
 
 # CORS settings
@@ -367,6 +405,22 @@ elif _USE_SECURE_COOKIES in ('true', '1', 'yes'):
 else:
     USE_SECURE_COOKIES = False
 
+# DEP-05/06: warn loudly if the deployment looks like HTTPS (a public https origin is
+# configured) but Secure cookies / HSTS are OFF — the exact silent misconfiguration
+# found live. The fix is SECURE_COOKIES=true (+ SW_HOST=https://..., SSL_REDIRECT=True).
+_has_https_origin = any(
+    o.startswith('https://') and 'localhost' not in o and '127.0.0.1' not in o
+    for o in CSRF_TRUSTED_ORIGINS
+)
+if _has_https_origin and not USE_SECURE_COOKIES and not DEBUG:
+    logger.warning(
+        '[Security] An HTTPS origin is configured but Secure cookies and HSTS are '
+        'DISABLED (SECURE_COOKIES=%s, SW_HOST=%s). Session/CSRF cookies are being sent '
+        'without the Secure flag. Set SECURE_COOKIES=true (and SW_HOST=https://..., '
+        'SSL_REDIRECT=True) so cookies are Secure and HSTS is emitted.',
+        _USE_SECURE_COOKIES, os.environ.get('SW_HOST', '') or '(unset)',
+    )
+
 # Cookie security settings
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = USE_SECURE_COOKIES
@@ -402,7 +456,33 @@ SPECTACULAR_SETTINGS = {
     'TITLE': 'SoundWave API',
     'DESCRIPTION': 'Audio archiving and streaming platform',
     'VERSION': '1.0.0',
+    # APP-06: the OpenAPI schema and Swagger UI expose the full API surface, so they
+    # must not be public. Restrict both /api/schema/ and /api/docs/ to admins.
+    'SERVE_PERMISSIONS': ['common.permissions.CanManageUsers'],
 }
+
+# Email settings (APP-10: email-change verification)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '').strip()
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = _env_bool('EMAIL_USE_TLS', True)
+EMAIL_USE_SSL = _env_bool('EMAIL_USE_SSL', False)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SoundWave <no-reply@localhost>')
+
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+elif DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    # No mail server configured: a no-op backend so nothing silently hangs on :25.
+    EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
+
+# Require confirming a new email address before it takes effect. Defaults ON only
+# when SMTP is configured, so mail-less deployments keep the existing password-gated
+# change rather than being blocked. Set EMAIL_VERIFICATION_REQUIRED=true to enforce.
+EMAIL_VERIFICATION_REQUIRED = _env_bool('EMAIL_VERIFICATION_REQUIRED', bool(EMAIL_HOST))
+EMAIL_CHANGE_TOKEN_TTL = int(os.environ.get('EMAIL_CHANGE_TOKEN_TTL', str(30 * 60)))  # 30 minutes
 
 # Celery settings
 CELERY_BROKER_URL = f"redis://{_REDIS_AUTH}{os.environ.get('REDIS_HOST', 'localhost')}:6379/0"

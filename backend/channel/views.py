@@ -18,7 +18,7 @@ class ChannelListView(ApiBaseView):
         logger = logging.getLogger(__name__)
         logger.info(f"GET channel list - User: {request.user}, Auth: {request.user.is_authenticated}")
         
-        channels = Channel.objects.filter(owner=request.user, subscribed=True)
+        channels = self.filter_owned(Channel.objects.filter(subscribed=True))
         serializer = ChannelSerializer(channels, many=True)
         return Response({'data': serializer.data, 'paginate': True})
 

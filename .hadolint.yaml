@@ -1,0 +1,9 @@
+# Hadolint configuration for SoundWave.
+#
+# DL3008 (pin apt package versions, e.g. `apt-get install pkg=version`) is disabled
+# intentionally (CNT-03). The Dockerfile runs `apt-get upgrade -y` to apply the latest
+# OS security patches (CNT-01); pinning apt versions would freeze packages to
+# soon-vulnerable versions and break builds when a pinned version ages out of the
+# Debian repo. Reproducibility comes from the pinned base image + the weekly rebuild.
+ignored:
+  - DL3008
