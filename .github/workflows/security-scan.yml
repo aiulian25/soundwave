@@ -69,12 +69,22 @@ jobs:
           ignore-unfixed: true
           skip-dirs: '.venv,frontend/node_modules,frontend/dist,staticfiles,backend/staticfiles,audio,cache,data'
 
-      - name: Upload SARIF to GitHub Security
+      # Each SARIF must upload under a distinct category — GitHub no longer allows
+      # combining multiple SARIF runs in one category (and `sarif_file: .` globbed
+      # all of them together).
+      - name: Upload Trivy config SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: .
-          category: trivy
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      - name: Upload Trivy filesystem SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
 
       - name: pip-audit (Python dependency CVEs)
         continue-on-error: true   # cross-check only; trivy fs is the authoritative gate
