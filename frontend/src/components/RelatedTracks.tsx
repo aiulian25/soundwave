@@ -8,7 +8,6 @@ import {
   ListItemAvatar,
   Avatar,
   ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   Chip,
   Skeleton,
@@ -156,11 +155,13 @@ export default function RelatedTracks({
         <Collapse in={expanded}>
           <List dense disablePadding>
             {tracks.slice(0, compact ? 3 : 8).map((track) => (
-              <ListItem key={track.id} disablePadding>
+              <ListItem key={track.id} disablePadding sx={{ gap: 0.5 }}>
                 <ListItemButton
                   onClick={() => onTrackSelect(track)}
                   sx={{
                     py: 0.5,
+                    flex: 1,
+                    minWidth: 0,
                     '&:hover': {
                       bgcolor: 'rgba(255, 255, 255, 0.05)'
                     }
@@ -174,11 +175,12 @@ export default function RelatedTracks({
                       <MusicNote fontSize="small" />
                     </Avatar>
                   </ListItemAvatar>
-                  
+
                   <ListItemText
                     primary={track.title}
                     secondary={`${track.channel_name} • ${formatDuration(track.duration)}`}
                     sx={{
+                      minWidth: 0,
                       '& .MuiListItemText-primary': {
                         fontSize: '0.85rem',
                         fontWeight: 500,
@@ -192,51 +194,53 @@ export default function RelatedTracks({
                       }
                     }}
                   />
-                  
-                  <ListItemSecondaryAction>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {track.play_count > 0 && (
-                        <Chip 
-                          label={track.play_count} 
-                          size="small" 
-                          sx={{ 
-                            fontSize: '0.7rem', 
-                            height: 20,
-                            bgcolor: 'rgba(25, 118, 210, 0.1)',
-                            color: 'primary.main'
-                          }} 
-                        />
-                      )}
-                      
-                      <Tooltip title={track.is_favorite ? t('relatedTracks.actions.removeFromFavorites') : t('relatedTracks.actions.addToFavorites')}>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleFavoriteClick(track, e)}
-                          sx={{ 
-                            color: track.is_favorite ? '#e91e63' : 'text.disabled',
-                            '&:hover': { color: '#e91e63' }
-                          }}
-                        >
-                          {track.is_favorite ? 
-                            <FavoriteIcon sx={{ fontSize: 16 }} /> : 
-                            <FavoriteBorderIcon sx={{ fontSize: 16 }} />
-                          }
-                        </IconButton>
-                      </Tooltip>
-                      
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onTrackSelect(track);
-                        }}
-                        sx={{ color: 'primary.main' }}
-                      >
-                        <PlayIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Box>
-                  </ListItemSecondaryAction>
                 </ListItemButton>
+
+                {/* Action cluster as an in-flow sibling (replaces the absolutely-positioned
+                    ListItemSecondaryAction) so it never overlaps the text and the buttons
+                    are not nested inside the row button. */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, pr: 1 }}>
+                  {track.play_count > 0 && (
+                    <Chip
+                      label={track.play_count}
+                      size="small"
+                      sx={{
+                        fontSize: '0.7rem',
+                        height: 20,
+                        bgcolor: 'rgba(25, 118, 210, 0.1)',
+                        color: 'primary.main'
+                      }}
+                    />
+                  )}
+
+                  <Tooltip title={track.is_favorite ? t('relatedTracks.actions.removeFromFavorites') : t('relatedTracks.actions.addToFavorites')}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFavoriteClick(track, e)}
+                      sx={{
+                        color: track.is_favorite ? '#e91e63' : 'text.disabled',
+                        '&:hover': { color: '#e91e63' }
+                      }}
+                    >
+                      {track.is_favorite ?
+                        <FavoriteIcon sx={{ fontSize: 16 }} /> :
+                        <FavoriteBorderIcon sx={{ fontSize: 16 }} />
+                      }
+                    </IconButton>
+                  </Tooltip>
+
+                  <IconButton
+                    size="small"
+                    aria-label={t('relatedTracks.actions.play')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTrackSelect(track);
+                    }}
+                    sx={{ color: 'primary.main' }}
+                  >
+                    <PlayIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Box>
               </ListItem>
             ))}
           </List>

@@ -520,42 +520,150 @@
       "progress": "Progres"
     },
     "items": {
-      "tracks_10": { "name": "Primii pasi", "description": "Asculta 10 melodii" },
-      "tracks_50": { "name": "Explorator muzical", "description": "Asculta 50 de melodii" },
-      "tracks_100": { "name": "Ascultator dedicat", "description": "Asculta 100 de melodii" },
-      "tracks_500": { "name": "Entuziast muzical", "description": "Asculta 500 de melodii" },
-      "tracks_1000": { "name": "Audiofil", "description": "Asculta 1.000 de melodii" },
-      "tracks_5000": { "name": "Legenda muzicii", "description": "Asculta 5.000 de melodii" },
-      "tracks_10000": { "name": "Maestru al sunetului", "description": "Asculta 10.000 de melodii" },
-      "hours_1": { "name": "Prima ora", "description": "Asculta timp de 1 ora" },
-      "hours_10": { "name": "La inceput", "description": "Asculta timp de 10 ore" },
-      "hours_24": { "name": "O zi intreaga", "description": "Asculta timp de 24 de ore" },
-      "hours_100": { "name": "Fan dedicat", "description": "Asculta timp de 100 de ore" },
-      "hours_500": { "name": "Calator in timp", "description": "Asculta timp de 500 de ore" },
-      "hours_1000": { "name": "Ascultator maraton", "description": "Asculta timp de 1.000 de ore" },
-      "streak_3": { "name": "Serie de 3 zile", "description": "Asculta 3 zile la rand" },
-      "streak_7": { "name": "Razboinicul saptamanii", "description": "Asculta 7 zile la rand" },
-      "streak_14": { "name": "Campion de doua saptamani", "description": "Asculta 14 zile la rand" },
-      "streak_30": { "name": "Maestru lunar", "description": "Asculta 30 de zile la rand" },
-      "streak_60": { "name": "Erou de doua luni", "description": "Asculta 60 de zile la rand" },
-      "streak_90": { "name": "Regele trimestrului", "description": "Asculta 90 de zile la rand" },
-      "streak_180": { "name": "Legenda jumatate de an", "description": "Asculta 180 de zile la rand" },
-      "streak_365": { "name": "Dedicare de un an", "description": "Asculta 365 de zile la rand" },
-      "artists_10": { "name": "Explorator de artisti", "description": "Asculta 10 artisti diferiti" },
-      "artists_50": { "name": "Saritor de genuri", "description": "Asculta 50 de artisti diferiti" },
-      "artists_100": { "name": "Ratacitor muzical", "description": "Asculta 100 de artisti diferiti" },
-      "artists_500": { "name": "Gust eclectic", "description": "Asculta 500 de artisti diferiti" },
-      "channels_5": { "name": "Surfer de canale", "description": "Asculta din 5 canale diferite" },
-      "channels_25": { "name": "Explorator de continut", "description": "Asculta din 25 de canale diferite" },
-      "channels_50": { "name": "Curator", "description": "Asculta din 50 de canale diferite" },
-      "channels_100": { "name": "Constructor de biblioteca", "description": "Asculta din 100 de canale diferite" },
-      "night_owl": { "name": "Bufnita de noapte", "description": "Asculta muzica dupa miezul noptii" },
-      "early_bird": { "name": "Pasarea de dimineata", "description": "Asculta muzica inainte de ora 6" },
-      "weekend_warrior": { "name": "Razboinicul de weekend", "description": "Asculta 50+ melodii intr-un weekend" },
-      "genre_master": { "name": "Maestru al genurilor", "description": "Asculta 10+ genuri diferite" },
-      "completionist": { "name": "Perfectionist", "description": "Finalizeaza complet 100 de melodii" },
-      "collector": { "name": "Colectionar", "description": "Ai 500+ melodii in biblioteca" },
-      "superfan": { "name": "Superfan", "description": "50+ redari ale aceluiasi artist" }
+      "tracks_10": {
+        "name": "Primii pasi",
+        "description": "Asculta 10 melodii"
+      },
+      "tracks_50": {
+        "name": "Explorator muzical",
+        "description": "Asculta 50 de melodii"
+      },
+      "tracks_100": {
+        "name": "Ascultator dedicat",
+        "description": "Asculta 100 de melodii"
+      },
+      "tracks_500": {
+        "name": "Entuziast muzical",
+        "description": "Asculta 500 de melodii"
+      },
+      "tracks_1000": {
+        "name": "Audiofil",
+        "description": "Asculta 1.000 de melodii"
+      },
+      "tracks_5000": {
+        "name": "Legenda muzicii",
+        "description": "Asculta 5.000 de melodii"
+      },
+      "tracks_10000": {
+        "name": "Maestru al sunetului",
+        "description": "Asculta 10.000 de melodii"
+      },
+      "hours_1": {
+        "name": "Prima ora",
+        "description": "Asculta timp de 1 ora"
+      },
+      "hours_10": {
+        "name": "La inceput",
+        "description": "Asculta timp de 10 ore"
+      },
+      "hours_24": {
+        "name": "O zi intreaga",
+        "description": "Asculta timp de 24 de ore"
+      },
+      "hours_100": {
+        "name": "Fan dedicat",
+        "description": "Asculta timp de 100 de ore"
+      },
+      "hours_500": {
+        "name": "Calator in timp",
+        "description": "Asculta timp de 500 de ore"
+      },
+      "hours_1000": {
+        "name": "Ascultator maraton",
+        "description": "Asculta timp de 1.000 de ore"
+      },
+      "streak_3": {
+        "name": "Serie de 3 zile",
+        "description": "Asculta 3 zile la rand"
+      },
+      "streak_7": {
+        "name": "Razboinicul saptamanii",
+        "description": "Asculta 7 zile la rand"
+      },
+      "streak_14": {
+        "name": "Campion de doua saptamani",
+        "description": "Asculta 14 zile la rand"
+      },
+      "streak_30": {
+        "name": "Maestru lunar",
+        "description": "Asculta 30 de zile la rand"
+      },
+      "streak_60": {
+        "name": "Erou de doua luni",
+        "description": "Asculta 60 de zile la rand"
+      },
+      "streak_90": {
+        "name": "Regele trimestrului",
+        "description": "Asculta 90 de zile la rand"
+      },
+      "streak_180": {
+        "name": "Legenda jumatate de an",
+        "description": "Asculta 180 de zile la rand"
+      },
+      "streak_365": {
+        "name": "Dedicare de un an",
+        "description": "Asculta 365 de zile la rand"
+      },
+      "artists_10": {
+        "name": "Explorator de artisti",
+        "description": "Asculta 10 artisti diferiti"
+      },
+      "artists_50": {
+        "name": "Saritor de genuri",
+        "description": "Asculta 50 de artisti diferiti"
+      },
+      "artists_100": {
+        "name": "Ratacitor muzical",
+        "description": "Asculta 100 de artisti diferiti"
+      },
+      "artists_500": {
+        "name": "Gust eclectic",
+        "description": "Asculta 500 de artisti diferiti"
+      },
+      "channels_5": {
+        "name": "Surfer de canale",
+        "description": "Asculta din 5 canale diferite"
+      },
+      "channels_25": {
+        "name": "Explorator de continut",
+        "description": "Asculta din 25 de canale diferite"
+      },
+      "channels_50": {
+        "name": "Curator",
+        "description": "Asculta din 50 de canale diferite"
+      },
+      "channels_100": {
+        "name": "Constructor de biblioteca",
+        "description": "Asculta din 100 de canale diferite"
+      },
+      "night_owl": {
+        "name": "Bufnita de noapte",
+        "description": "Asculta muzica dupa miezul noptii"
+      },
+      "early_bird": {
+        "name": "Pasarea de dimineata",
+        "description": "Asculta muzica inainte de ora 6"
+      },
+      "weekend_warrior": {
+        "name": "Razboinicul de weekend",
+        "description": "Asculta 50+ melodii intr-un weekend"
+      },
+      "genre_master": {
+        "name": "Maestru al genurilor",
+        "description": "Asculta 10+ genuri diferite"
+      },
+      "completionist": {
+        "name": "Perfectionist",
+        "description": "Finalizeaza complet 100 de melodii"
+      },
+      "collector": {
+        "name": "Colectionar",
+        "description": "Ai 500+ melodii in biblioteca"
+      },
+      "superfan": {
+        "name": "Superfan",
+        "description": "50+ redari ale aceluiasi artist"
+      }
     }
   },
   "channelDetail": {
@@ -1084,7 +1192,8 @@
     },
     "actions": {
       "removeFromFavorites": "Elimina din favorite",
-      "addToFavorites": "Adauga la favorite"
+      "addToFavorites": "Adauga la favorite",
+      "play": "Reda"
     },
     "errors": {
       "notAvailableForLocalFiles": "Recomandarile nu sunt disponibile pentru fisiere locale",
@@ -1258,7 +1367,8 @@
       "retry": "Incearca din nou",
       "loading": "Se incarca...",
       "loadMore": "Incarca mai multe",
-      "scrollToTop": "deruleaza sus"
+      "scrollToTop": "deruleaza sus",
+      "play": "Reda"
     },
     "clearDialog": {
       "title": "Sterge istoricul de ascultare",
@@ -1274,7 +1384,8 @@
     "empty": {
       "title": "Nu exista istoric de ascultare inca",
       "description": "Incepe sa asculti muzica pentru a-ti construi istoricul!"
-    }
+    },
+    "completed": "Ascultat complet"
   },
   "offlineManager": {
     "title": "Stocare offline",
@@ -1898,6 +2009,21 @@
       "invalid": "Acest link de confirmare este invalid sau a fost deja folosit.",
       "emailTaken": "Aceasta adresa de email este deja folosita.",
       "generic": "Nu am putut confirma emailul. Te rugam sa incerci din nou."
+    }
+  },
+  "appVersion": {
+    "label": "Versiune",
+    "updateButton": "Actualizare",
+    "tooltip": "Actualizare disponibila",
+    "dialog": {
+      "title": "Actualizare disponibila",
+      "running": "Rulezi v{{version}}",
+      "latest": "Cea mai recenta: v{{version}}",
+      "whatsNew": "Noutati",
+      "noNotes": "Vezi notele de lansare pe GitHub.",
+      "howToTitle": "Pentru a actualiza containerul tau self-hosted:",
+      "viewOnGithub": "Vezi lansarea pe GitHub",
+      "dismiss": "Inchide"
     }
   }
 }

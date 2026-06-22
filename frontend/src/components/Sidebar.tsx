@@ -15,6 +15,7 @@ import InsightsIcon from '@mui/icons-material/Insights';
 import HistoryIcon from '@mui/icons-material/History';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
+import AppVersionStatus from './AppVersionStatus';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -135,6 +136,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           </ListItem>
         ))}
       </List>
+
+      {/* App version + update notification, just above Settings */}
+      <AppVersionStatus />
 
       {/* Settings at bottom */}
       <Box sx={{ p: 1.5, pb: 2 }}>

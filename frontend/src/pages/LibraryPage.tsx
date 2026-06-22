@@ -22,6 +22,7 @@ import { audioAPI } from '../api/client';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
+import TrackThumbnail from '../components/TrackThumbnail';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 
@@ -205,9 +206,12 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
               >
                 <TableCell sx={{ color: 'text.secondary' }}>{index + 1}</TableCell>
                 <TableCell>
-                  <Typography variant="body2" noWrap sx={{ maxWidth: 300, fontWeight: 500 }}>
-                    {audio.title}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                    <TrackThumbnail src={audio.thumbnail_url} alt={audio.title} size={40} />
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 300, fontWeight: 500 }}>
+                      {audio.title}
+                    </Typography>
+                  </Box>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" color="text.secondary">

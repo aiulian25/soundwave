@@ -9,7 +9,6 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  ListItemSecondaryAction,
   CircularProgress,
   LinearProgress,
   Chip,
@@ -256,10 +255,8 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
                         )}
                       </Box>
                     }
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      sx: { maxWidth: 220 },
-                    }}
+                    sx={{ minWidth: 0 }}
+                    primaryTypographyProps={{ noWrap: true }}
                   />
                 </ListItem>
               ))}
@@ -277,11 +274,12 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
             </Box>
             <List dense disablePadding>
               {pendingDownloads.map((download) => (
-                <ListItem key={`local-${download.id}`}>
+                <ListItem key={`local-${download.id}`} sx={{ gap: 1 }}>
                   <ListItemIcon sx={{ minWidth: 36 }}>
                     {getStatusIcon(download.status)}
                   </ListItemIcon>
                   <ListItemText
+                    sx={{ minWidth: 0 }}
                     primary={download.title || download.url}
                     secondary={
                       <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -298,12 +296,10 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
                         )}
                       </Box>
                     }
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      sx: { maxWidth: 200 },
-                    }}
+                    primaryTypographyProps={{ noWrap: true }}
                   />
-                  <ListItemSecondaryAction>
+                  {/* In-flow action (replaces absolutely-positioned ListItemSecondaryAction). */}
+                  <Box sx={{ flexShrink: 0 }}>
                     <IconButton
                       edge="end"
                       size="small"
@@ -311,7 +307,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
-                  </ListItemSecondaryAction>
+                  </Box>
                 </ListItem>
               ))}
             </List>

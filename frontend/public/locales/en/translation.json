@@ -520,42 +520,150 @@
       "progress": "Progress"
     },
     "items": {
-      "tracks_10": { "name": "First Steps", "description": "Listen to 10 tracks" },
-      "tracks_50": { "name": "Music Explorer", "description": "Listen to 50 tracks" },
-      "tracks_100": { "name": "Dedicated Listener", "description": "Listen to 100 tracks" },
-      "tracks_500": { "name": "Music Enthusiast", "description": "Listen to 500 tracks" },
-      "tracks_1000": { "name": "Audiophile", "description": "Listen to 1,000 tracks" },
-      "tracks_5000": { "name": "Music Legend", "description": "Listen to 5,000 tracks" },
-      "tracks_10000": { "name": "Sound Master", "description": "Listen to 10,000 tracks" },
-      "hours_1": { "name": "First Hour", "description": "Listen for 1 hour" },
-      "hours_10": { "name": "Getting Started", "description": "Listen for 10 hours" },
-      "hours_24": { "name": "Full Day", "description": "Listen for 24 hours" },
-      "hours_100": { "name": "Dedicated Fan", "description": "Listen for 100 hours" },
-      "hours_500": { "name": "Time Traveler", "description": "Listen for 500 hours" },
-      "hours_1000": { "name": "Marathon Listener", "description": "Listen for 1,000 hours" },
-      "streak_3": { "name": "3-Day Streak", "description": "Listen 3 days in a row" },
-      "streak_7": { "name": "Week Warrior", "description": "Listen 7 days in a row" },
-      "streak_14": { "name": "Two Week Champion", "description": "Listen 14 days in a row" },
-      "streak_30": { "name": "Monthly Master", "description": "Listen 30 days in a row" },
-      "streak_60": { "name": "Two Month Hero", "description": "Listen 60 days in a row" },
-      "streak_90": { "name": "Quarter King", "description": "Listen 90 days in a row" },
-      "streak_180": { "name": "Half Year Legend", "description": "Listen 180 days in a row" },
-      "streak_365": { "name": "Year-Long Dedication", "description": "Listen 365 days in a row" },
-      "artists_10": { "name": "Artist Explorer", "description": "Listen to 10 different artists" },
-      "artists_50": { "name": "Genre Hopper", "description": "Listen to 50 different artists" },
-      "artists_100": { "name": "Music Wanderer", "description": "Listen to 100 different artists" },
-      "artists_500": { "name": "Eclectic Taste", "description": "Listen to 500 different artists" },
-      "channels_5": { "name": "Channel Surfer", "description": "Listen from 5 different channels" },
-      "channels_25": { "name": "Content Explorer", "description": "Listen from 25 different channels" },
-      "channels_50": { "name": "Curator", "description": "Listen from 50 different channels" },
-      "channels_100": { "name": "Library Builder", "description": "Listen from 100 different channels" },
-      "night_owl": { "name": "Night Owl", "description": "Listen to music after midnight" },
-      "early_bird": { "name": "Early Bird", "description": "Listen to music before 6 AM" },
-      "weekend_warrior": { "name": "Weekend Warrior", "description": "Listen to 50+ tracks on a weekend" },
-      "genre_master": { "name": "Genre Master", "description": "Listen to 10+ different genres" },
-      "completionist": { "name": "Completionist", "description": "Complete 100 tracks fully" },
-      "collector": { "name": "Collector", "description": "Have 500+ tracks in your library" },
-      "superfan": { "name": "Superfan", "description": "Listen to 50+ plays of a single artist" }
+      "tracks_10": {
+        "name": "First Steps",
+        "description": "Listen to 10 tracks"
+      },
+      "tracks_50": {
+        "name": "Music Explorer",
+        "description": "Listen to 50 tracks"
+      },
+      "tracks_100": {
+        "name": "Dedicated Listener",
+        "description": "Listen to 100 tracks"
+      },
+      "tracks_500": {
+        "name": "Music Enthusiast",
+        "description": "Listen to 500 tracks"
+      },
+      "tracks_1000": {
+        "name": "Audiophile",
+        "description": "Listen to 1,000 tracks"
+      },
+      "tracks_5000": {
+        "name": "Music Legend",
+        "description": "Listen to 5,000 tracks"
+      },
+      "tracks_10000": {
+        "name": "Sound Master",
+        "description": "Listen to 10,000 tracks"
+      },
+      "hours_1": {
+        "name": "First Hour",
+        "description": "Listen for 1 hour"
+      },
+      "hours_10": {
+        "name": "Getting Started",
+        "description": "Listen for 10 hours"
+      },
+      "hours_24": {
+        "name": "Full Day",
+        "description": "Listen for 24 hours"
+      },
+      "hours_100": {
+        "name": "Dedicated Fan",
+        "description": "Listen for 100 hours"
+      },
+      "hours_500": {
+        "name": "Time Traveler",
+        "description": "Listen for 500 hours"
+      },
+      "hours_1000": {
+        "name": "Marathon Listener",
+        "description": "Listen for 1,000 hours"
+      },
+      "streak_3": {
+        "name": "3-Day Streak",
+        "description": "Listen 3 days in a row"
+      },
+      "streak_7": {
+        "name": "Week Warrior",
+        "description": "Listen 7 days in a row"
+      },
+      "streak_14": {
+        "name": "Two Week Champion",
+        "description": "Listen 14 days in a row"
+      },
+      "streak_30": {
+        "name": "Monthly Master",
+        "description": "Listen 30 days in a row"
+      },
+      "streak_60": {
+        "name": "Two Month Hero",
+        "description": "Listen 60 days in a row"
+      },
+      "streak_90": {
+        "name": "Quarter King",
+        "description": "Listen 90 days in a row"
+      },
+      "streak_180": {
+        "name": "Half Year Legend",
+        "description": "Listen 180 days in a row"
+      },
+      "streak_365": {
+        "name": "Year-Long Dedication",
+        "description": "Listen 365 days in a row"
+      },
+      "artists_10": {
+        "name": "Artist Explorer",
+        "description": "Listen to 10 different artists"
+      },
+      "artists_50": {
+        "name": "Genre Hopper",
+        "description": "Listen to 50 different artists"
+      },
+      "artists_100": {
+        "name": "Music Wanderer",
+        "description": "Listen to 100 different artists"
+      },
+      "artists_500": {
+        "name": "Eclectic Taste",
+        "description": "Listen to 500 different artists"
+      },
+      "channels_5": {
+        "name": "Channel Surfer",
+        "description": "Listen from 5 different channels"
+      },
+      "channels_25": {
+        "name": "Content Explorer",
+        "description": "Listen from 25 different channels"
+      },
+      "channels_50": {
+        "name": "Curator",
+        "description": "Listen from 50 different channels"
+      },
+      "channels_100": {
+        "name": "Library Builder",
+        "description": "Listen from 100 different channels"
+      },
+      "night_owl": {
+        "name": "Night Owl",
+        "description": "Listen to music after midnight"
+      },
+      "early_bird": {
+        "name": "Early Bird",
+        "description": "Listen to music before 6 AM"
+      },
+      "weekend_warrior": {
+        "name": "Weekend Warrior",
+        "description": "Listen to 50+ tracks on a weekend"
+      },
+      "genre_master": {
+        "name": "Genre Master",
+        "description": "Listen to 10+ different genres"
+      },
+      "completionist": {
+        "name": "Completionist",
+        "description": "Complete 100 tracks fully"
+      },
+      "collector": {
+        "name": "Collector",
+        "description": "Have 500+ tracks in your library"
+      },
+      "superfan": {
+        "name": "Superfan",
+        "description": "Listen to 50+ plays of a single artist"
+      }
     }
   },
   "channelDetail": {
@@ -1084,7 +1192,8 @@
     },
     "actions": {
       "removeFromFavorites": "Remove from favorites",
-      "addToFavorites": "Add to favorites"
+      "addToFavorites": "Add to favorites",
+      "play": "Play"
     },
     "errors": {
       "notAvailableForLocalFiles": "Recommendations not available for local files",
@@ -1258,7 +1367,8 @@
       "retry": "Retry",
       "loading": "Loading...",
       "loadMore": "Load More",
-      "scrollToTop": "scroll to top"
+      "scrollToTop": "scroll to top",
+      "play": "Play"
     },
     "clearDialog": {
       "title": "Clear Listening History",
@@ -1274,7 +1384,8 @@
     "empty": {
       "title": "No listening history yet",
       "description": "Start playing some music to build your history!"
-    }
+    },
+    "completed": "Listened to completion"
   },
   "offlineManager": {
     "title": "Offline Storage",
@@ -1898,6 +2009,21 @@
       "invalid": "This confirmation link is invalid or has already been used.",
       "emailTaken": "That email address is already in use.",
       "generic": "We couldn't confirm your email. Please try again."
+    }
+  },
+  "appVersion": {
+    "label": "Version",
+    "updateButton": "Update",
+    "tooltip": "Update available",
+    "dialog": {
+      "title": "Update available",
+      "running": "You're running v{{version}}",
+      "latest": "Latest: v{{version}}",
+      "whatsNew": "What's new",
+      "noNotes": "See the release notes on GitHub.",
+      "howToTitle": "To update your self-hosted container:",
+      "viewOnGithub": "View release on GitHub",
+      "dismiss": "Dismiss"
     }
   }
 }

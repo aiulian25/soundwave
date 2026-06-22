@@ -85,6 +85,11 @@ api.interceptors.response.use(
 
 export default api;
 
+// App version / self-hosted update check
+export const versionAPI = {
+  getInfo: () => api.get('/version/'),
+};
+
 // Audio API
 export const audioAPI = {
   list: (params?: any) => api.get('/audio/list/', { params }),

@@ -8,7 +8,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   Chip,
   Alert,
@@ -246,6 +245,7 @@ export default function OfflineManagerPage() {
                   <ListItem
                     sx={{
                       py: 2,
+                      gap: 1,
                       cursor: 'pointer',
                       '&:hover': {
                         bgcolor: 'rgba(255, 255, 255, 0.05)',
@@ -254,6 +254,7 @@ export default function OfflineManagerPage() {
                     onClick={() => navigate(`/playlists/${playlist.playlist_id}`)}
                   >
                     <ListItemText
+                      sx={{ minWidth: 0 }}
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
@@ -283,7 +284,8 @@ export default function OfflineManagerPage() {
                         </Box>
                       }
                     />
-                    <ListItemSecondaryAction>
+                    {/* In-flow action (replaces absolutely-positioned ListItemSecondaryAction). */}
+                    <Box sx={{ flexShrink: 0 }}>
                       <IconButton
                         edge="end"
                         color="error"
@@ -298,7 +300,7 @@ export default function OfflineManagerPage() {
                       >
                         <DeleteIcon />
                       </IconButton>
-                    </ListItemSecondaryAction>
+                    </Box>
                   </ListItem>
                 </Box>
               ))}

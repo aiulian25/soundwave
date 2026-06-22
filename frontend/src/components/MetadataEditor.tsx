@@ -11,7 +11,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   CircularProgress,
   Chip,
@@ -395,12 +394,14 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
               <ListItem
                 key={index}
                 sx={{
+                  gap: 1,
                   borderBottom: '1px solid',
                   borderColor: 'divider',
                   '&:last-child': { borderBottom: 'none' },
                 }}
               >
                 <ListItemText
+                  sx={{ minWidth: 0 }}
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Typography variant="body2" fontWeight={500}>
@@ -429,18 +430,21 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
                     </Box>
                   }
                 />
-                <ListItemSecondaryAction>
+                {/* In-flow action (replaces absolutely-positioned ListItemSecondaryAction). */}
+                <Box sx={{ flexShrink: 0 }}>
                   <Tooltip title={t('metadataEditor.actions.applyThisMetadata')}>
-                    <IconButton
-                      edge="end"
-                      onClick={() => handleApplyResult(result)}
-                      disabled={loading || !result.musicbrainz_id}
-                      color="primary"
-                    >
-                      <CheckIcon />
-                    </IconButton>
+                    <span>
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleApplyResult(result)}
+                        disabled={loading || !result.musicbrainz_id}
+                        color="primary"
+                      >
+                        <CheckIcon />
+                      </IconButton>
+                    </span>
                   </Tooltip>
-                </ListItemSecondaryAction>
+                </Box>
               </ListItem>
             ))}
           </List>

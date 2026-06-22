@@ -571,6 +571,11 @@ A full security assessment (`SECURITY_ASSESSMENT.md`) was completed and every ac
 #### Reliability (read-only rootfs entrypoint)
 - ✅ **Entrypoint fixes** — `HOME=/tmp` (gunicorn control server), non-fatal `collectstatic`, and the Celery **beat** schedule/pidfile moved to `/tmp` so the periodic scheduler no longer crash-loops on the read-only production filesystem.
 
+#### UX & PWA
+- ✅ **Responsive list rows** — Replaced the absolutely-positioned `ListItemSecondaryAction` across 7 components (History, Related Tracks, Offline, Downloads, Metadata, PWA settings) with in-flow flex clusters, so date/badge/action controls no longer overlap on phones; the Listening History row stacks its controls on very narrow screens.
+- ✅ **Per-track thumbnails everywhere** — A shared, lazy-loaded `TrackThumbnail` (with music-note fallback) now appears on the Library and Favorites lists too, not just History/Stats. Lazy loading keeps the un-virtualized Library table responsive even with hundreds of tracks; `referrerPolicy="no-referrer"` avoids leaking the app URL to the image CDN.
+- ✅ **In-app update notification** — The sidebar shows the running version with a pulsing "Update" button when a newer **GitHub Release** exists; clicking it opens the release notes plus the `docker compose pull` command and a GitHub link. The check is **server-side and cached** (`/api/version/`), fails closed offline, and never auto-updates. Bump `APP_VERSION` and publish a `v<version>` GitHub Release to drive it.
+
 ### v1.11.0 - Full Audit Implementation & i18n (May 2026)
 
 #### Internationalisation (i18n) — All Pages

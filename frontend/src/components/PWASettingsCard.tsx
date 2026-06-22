@@ -15,7 +15,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Chip,
 } from '@mui/material';
 import {
@@ -337,27 +336,27 @@ const PWASettingsCard: React.FC = () => {
                 primary={t('pwa.offlineModeBadge')}
                 secondary={t('pwaSettings.features.offlineMode')}
               />
-              <ListItemSecondaryAction>
+              <Box sx={{ flexShrink: 0, pl: 1 }}>
                 <Chip label={t('pwaSettings.features.active')} color="success" size="small" />
-              </ListItemSecondaryAction>
+              </Box>
             </ListItem>
             <ListItem>
               <ListItemText
                 primary={t('pwaSettings.features.backgroundSyncTitle')}
                 secondary={t('pwaSettings.features.backgroundSync')}
               />
-              <ListItemSecondaryAction>
+              <Box sx={{ flexShrink: 0, pl: 1 }}>
                 <Chip label={t('pwaSettings.features.active')} color="success" size="small" />
-              </ListItemSecondaryAction>
+              </Box>
             </ListItem>
             <ListItem>
               <ListItemText
                 primary={t('pwaSettings.features.audioCachingTitle')}
                 secondary={t('pwaSettings.features.audioCaching')}
               />
-              <ListItemSecondaryAction>
+              <Box sx={{ flexShrink: 0, pl: 1 }}>
                 <Chip label={t('pwaSettings.features.active')} color="success" size="small" />
-              </ListItemSecondaryAction>
+              </Box>
             </ListItem>
           </List>
         </Box>

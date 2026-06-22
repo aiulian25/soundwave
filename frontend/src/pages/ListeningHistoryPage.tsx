@@ -20,7 +20,6 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  ListItemSecondaryAction,
   Avatar,
   IconButton,
   Chip,
@@ -34,6 +33,7 @@ import {
   Skeleton,
   Tooltip,
   useTheme,
+  useMediaQuery,
   alpha,
   Collapse,
   Paper,
@@ -50,6 +50,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   MusicNote as MusicNoteIcon,
+  CheckCircle as CheckCircleIcon,
   Celebration as CelebrationIcon,
   Refresh as RefreshIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
@@ -125,12 +126,14 @@ const HistoryEntryItem = memo(({
   t: (key: string, options?: Record<string, unknown>) => string;
 }) => {
   const theme = useTheme();
-  
+  const isNarrow = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
     <ListItem
       sx={{
         borderRadius: 2,
         mb: 0.5,
+        gap: 1,
         cursor: 'pointer',
         transition: 'background-color 0.15s ease',
         '&:hover': {
@@ -140,11 +143,11 @@ const HistoryEntryItem = memo(({
       onClick={() => onPlay(entry)}
     >
       <ListItemAvatar>
-        <Avatar 
-          src={entry.thumbnail_url} 
+        <Avatar
+          src={entry.thumbnail_url}
           variant="rounded"
-          sx={{ 
-            width: 56, 
+          sx={{
+            width: 56,
             height: 56,
             boxShadow: 2,
           }}
@@ -153,48 +156,65 @@ const HistoryEntryItem = memo(({
         </Avatar>
       </ListItemAvatar>
       <ListItemText
+        sx={{ ml: 1, my: 0, minWidth: 0 }}
         primary={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body1" fontWeight={500} noWrap sx={{ maxWidth: '70%' }}>
-              {entry.title}
-            </Typography>
-            {entry.completed && (
-              <Chip label="✓" size="small" color="success" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', minWidth: 24 }} />
-            )}
-          </Box>
+          <Typography variant="body1" fontWeight={500} noWrap>
+            {entry.title}
+          </Typography>
         }
         secondary={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, minWidth: 0 }}>
             <Typography variant="body2" color="text.secondary" noWrap>
               {entry.artist || entry.channel_name}
             </Typography>
             <Typography variant="caption" color="text.disabled">•</Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
               {formatDuration(entry.duration_listened)}
             </Typography>
           </Box>
         }
-        sx={{ ml: 1 }}
       />
-      <ListItemSecondaryAction>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {/* Right cluster in normal flow (replaces absolutely-positioned ListItemSecondaryAction
+          so the date/badge/play controls always reserve real space and never overlap). On
+          narrow screens it stacks: play on top, completed-badge + date underneath. */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexShrink: 0,
+          flexDirection: isNarrow ? 'column' : 'row',
+          alignItems: isNarrow ? 'flex-end' : 'center',
+          gap: isNarrow ? 0.25 : 1,
+        }}
+      >
+        <IconButton
+          size="small"
+          color="primary"
+          aria-label={t('listeningHistory.actions.play')}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay(entry);
+          }}
+          sx={{ order: isNarrow ? 0 : 2 }}
+        >
+          <PlayIcon />
+        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, order: 1 }}>
+          {entry.completed && (
+            <Tooltip title={t('listeningHistory.completed')}>
+              <CheckCircleIcon
+                color="success"
+                aria-label={t('listeningHistory.completed')}
+                sx={{ fontSize: 18 }}
+              />
+            </Tooltip>
+          )}
           <Tooltip title={new Date(entry.listened_at).toLocaleString()}>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" noWrap>
               {formatTimeAgo(entry.listened_at, t)}
             </Typography>
           </Tooltip>
-          <IconButton 
-            size="small" 
-            color="primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay(entry);
-            }}
-          >
-            <PlayIcon />
-          </IconButton>
         </Box>
-      </ListItemSecondaryAction>
+      </Box>
     </ListItem>
   );
 });

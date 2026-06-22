@@ -5,6 +5,7 @@ from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
 from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
 
@@ -13,6 +14,20 @@ from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTok
 def ping(request):
     """Unauthenticated health check endpoint for Docker HEALTHCHECK."""
     return JsonResponse({"status": "ok"})
+
+
+class AppVersionView(APIView):
+    """Running app version + whether a newer GitHub Release is available.
+
+    The GitHub check is server-side and cached (see common.update_check), so users'
+    browsers never reach GitHub and the API is never hammered. Fails closed.
+    """
+    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from common.update_check import get_update_info
+        return Response(get_update_info())
 
 
 def _get_public_base_url(request):
