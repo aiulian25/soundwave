@@ -5,7 +5,7 @@ Bump APP_VERSION on every release and tag the release on GitHub as ``v<APP_VERSI
 value against the latest GitHub Release.
 """
 
-APP_VERSION = "1.12.1"
+APP_VERSION = "1.12.2"
 
 GITHUB_REPO = "aiulian25/soundwave"
 GITHUB_REPO_URL = "https://github.com/aiulian25/soundwave"

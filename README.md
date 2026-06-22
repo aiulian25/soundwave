@@ -534,6 +534,10 @@ ports:
 
 ## 📝 Recent Changes
 
+### v1.12.2 - Fix in-app version reporting (June 2026)
+
+- ✅ **Accurate version after upgrade** — `/api/version/` cached its whole result (including `current_version`) in Redis for 6h, so after upgrading the image the app kept reporting the *previous* version until the cache expired (Redis outlives the app container). Now only the GitHub release lookup is cached; `current_version` is always read live from the running build, so an upgrade reflects immediately.
+
 ### v1.12.1 - Performance & Memory (June 2026)
 
 #### Memory & performance (from a PWA memory-leak audit)
