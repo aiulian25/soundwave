@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { login, E2E_TRACK_TITLE } from './helpers';
+import {
+  login,
+  E2E_TRACK_TITLE,
+  E2E_TRACK_YOUTUBE_ID,
+  SW_PINNED_AUDIO_CACHE,
+} from './helpers';
 
 // The core offline-PWA guarantee: once the service worker is active, going offline and
 // reloading still serves the cached app shell (no browser network-error page), and a
@@ -56,6 +61,65 @@ test('a previously-played track still plays while offline', async ({ page, conte
     // (readyState >= HAVE_CURRENT_DATA) — more robust than a raw currentTime threshold.
     return !el.paused && el.readyState >= 2;
   });
+
+  expect(playableOffline).toBe(true);
+  await context.setOffline(false);
+});
+
+// Guard for the PINNED offline path (separate keying from casual /media/ streaming):
+// "Make available offline" caches /api/audio/<id>/download/ in the pinned audio cache.
+// The service worker must then serve that download — with HTTP range support, as an
+// <audio> element requests — while offline. This is exactly the path the Player read-path
+// rewrite (Steps 2-4) will lean on, so it must stay green independently of the casual
+// /media/ path. We drive the SW + an <audio> element directly to avoid the Player's
+// in-memory cache-index mount-timing race (the index is not observable from the test).
+test('a "made available offline" download is served to <audio> while offline', async ({
+  page,
+  context,
+}) => {
+  await login(page);
+  await page.goto('/library');
+  await expect(page.getByText(E2E_TRACK_TITLE).first()).toBeVisible({ timeout: 20_000 });
+
+  const downloadUrl = `/api/audio/${E2E_TRACK_YOUTUBE_ID}/download/`;
+
+  // Pin it exactly like the feature does: cache the credentialed, same-origin /download/
+  // response in the SW's pinned audio cache. We never stream /media/, so the only cached
+  // copy is this pinned entry.
+  const pinned = await page.evaluate(
+    async ([url, cacheName]) => {
+      if (!('caches' in window)) return false;
+      const cache = await caches.open(cacheName);
+      try {
+        await cache.add(url); // same-origin GET sends the session cookie
+      } catch {
+        return false;
+      }
+      return !!(await cache.match(url));
+    },
+    [downloadUrl, SW_PINNED_AUDIO_CACHE] as const,
+  );
+  expect(pinned).toBe(true);
+
+  await context.setOffline(true);
+
+  // Offline, an <audio> element pointed at the pinned download must play: the SW serves
+  // the cached bytes (handleRangeRequest answers the element's Range request).
+  const playableOffline = await page.evaluate(async (url) => {
+    const el = document.createElement('audio');
+    el.src = url;
+    el.muted = true;
+    document.body.appendChild(el);
+    try {
+      await el.play();
+    } catch {
+      /* autoplay handled by the launch flag */
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+    const ok = !el.paused && el.readyState >= 2;
+    el.remove();
+    return ok;
+  }, downloadUrl);
 
   expect(playableOffline).toBe(true);
   await context.setOffline(false);
