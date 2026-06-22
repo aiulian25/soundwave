@@ -35,9 +35,10 @@ test('pull-to-refresh shows the update indicator on Home', async ({ page }) => {
       );
     };
 
+    // Drag far enough that distance * resistance(0.5) clears the ~70px threshold.
     fire('touchstart', 10);
-    fire('touchmove', 60);
-    fire('touchmove', 140); // past the ~70px threshold → "release to update"
+    fire('touchmove', 90);
+    fire('touchmove', 260); // ~125px after resistance → "release to update"
     void target;
   });
 

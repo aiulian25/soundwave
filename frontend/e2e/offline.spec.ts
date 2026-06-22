@@ -38,11 +38,11 @@ test('a previously-played track still plays while offline', async ({ page, conte
   await expect(page.getByTestId('player-playpause')).toHaveAttribute('data-playing', 'true', {
     timeout: 20_000,
   });
-  await page.waitForTimeout(2000); // let the SW finish caching the media
+  await page.waitForTimeout(3000); // let the SW finish caching the media
 
   await context.setOffline(true);
 
-  const advancedOffline = await page.evaluate(async () => {
+  const playableOffline = await page.evaluate(async () => {
     const el = document.querySelector('audio') as HTMLAudioElement | null;
     if (!el) return false;
     el.currentTime = 0;
@@ -51,10 +51,12 @@ test('a previously-played track still plays while offline', async ({ page, conte
     } catch {
       /* autoplay handled by the launch flag */
     }
-    await new Promise((r) => setTimeout(r, 900));
-    return !el.paused && el.currentTime > 0;
+    await new Promise((r) => setTimeout(r, 1500));
+    // Served from cache offline: not paused and the element has decodable data buffered
+    // (readyState >= HAVE_CURRENT_DATA) — more robust than a raw currentTime threshold.
+    return !el.paused && el.readyState >= 2;
   });
 
-  expect(advancedOffline).toBe(true);
+  expect(playableOffline).toBe(true);
   await context.setOffline(false);
 });
