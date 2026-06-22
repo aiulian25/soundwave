@@ -72,14 +72,14 @@ export default function AppVersionStatus() {
   return (
     <Box sx={{ px: 2, pt: 1, pb: 0.5 }}>
       <Typography
-        sx={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: 'text.secondary' }}
+        sx={{ fontSize: 11, letterSpacing: 0.5, fontWeight: 700, color: 'text.secondary' }}
       >
         {t('appVersion.label')}
       </Typography>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
         <Typography sx={{ fontSize: 18, fontWeight: 700, color: BLUE }}>
-          v{info.current_version}
+          V{info.current_version}
         </Typography>
 
         {/* Always-on round status button: blue = up to date, red = update available. */}

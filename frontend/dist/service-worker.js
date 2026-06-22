@@ -4,6 +4,13 @@ const API_CACHE_NAME = 'soundwave-api-v3';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
 const IMAGE_CACHE_NAME = 'soundwave-images-v4';
 
+// Casual-stream eviction limits for AUDIO_CACHE_NAME. Tracks the user explicitly
+// "Made available offline" hit /api/audio/<id>/download/ and are PINNED — never
+// evicted; only opportunistically-streamed audio files are trimmed (oldest-first).
+const AUDIO_STREAM_MAX_ENTRIES = 40;
+const AUDIO_STREAM_MAX_BYTES = 500 * 1024 * 1024; // 500 MB, mirrors the IndexedDB cap
+const PINNED_AUDIO_RE = /\/api\/audio\/[^/]+\/download\/?$/;
+
 // Assets to cache on install
 const STATIC_ASSETS = [
   '/',
@@ -208,13 +215,56 @@ async function cacheFirstStrategy(request, cacheName) {
     if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
       const responseClone = networkResponse.clone();
       const cache = await caches.open(cacheName);
-      cache.put(request, responseClone);
+      if (cacheName === AUDIO_CACHE_NAME) {
+        // Trim the (casual-stream) audio cache after each new write so it stays bounded.
+        cache.put(request, responseClone).then(() => trimAudioCache()).catch(() => {});
+      } else {
+        cache.put(request, responseClone);
+      }
     }
-    
+
     return networkResponse;
   } catch (error) {
     console.error('[Service Worker] Cache and network failed:', error);
     throw error;
+  }
+}
+
+// Bound the AUDIO_CACHE so casual streaming doesn't grow Cache Storage without limit.
+// Evicts oldest *streamed* entries (insertion order) once over the count or byte budget;
+// pinned "Make available offline" downloads are never touched.
+async function trimAudioCache() {
+  try {
+    const cache = await caches.open(AUDIO_CACHE_NAME);
+    const keys = await cache.keys(); // insertion order — oldest first
+    const streamKeys = keys.filter((req) => !PINNED_AUDIO_RE.test(new URL(req.url).pathname));
+
+    // Measure sizes via Content-Length headers (does not read the bodies).
+    let total = 0;
+    const sized = [];
+    for (const req of streamKeys) {
+      const res = await cache.match(req);
+      const len = res ? Number(res.headers.get('content-length')) || 0 : 0;
+      sized.push({ req, len });
+      total += len;
+    }
+
+    let evicted = 0;
+    let i = 0;
+    while (
+      i < sized.length &&
+      (sized.length - i > AUDIO_STREAM_MAX_ENTRIES || total > AUDIO_STREAM_MAX_BYTES)
+    ) {
+      await cache.delete(sized[i].req);
+      total -= sized[i].len;
+      i++;
+      evicted++;
+    }
+    if (evicted > 0) {
+      console.log(`[Service Worker] Audio cache trimmed: evicted ${evicted} streamed entr${evicted === 1 ? 'y' : 'ies'}`);
+    }
+  } catch (error) {
+    console.warn('[Service Worker] Audio cache trim failed:', error);
   }
 }
 
@@ -280,15 +330,17 @@ async function audioCacheFirstStrategy(request) {
 // Handle range requests for cached audio (required for iOS Safari seeking)
 async function handleRangeRequest(cachedResponse, rangeHeader) {
   try {
-    const arrayBuffer = await cachedResponse.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-    const totalLength = bytes.length;
-    
+    // Use the Blob (disk-backed in Cache Storage) and slice it. blob.slice() returns a
+    // zero-copy view, so we never pull the whole file into the JS heap the way
+    // arrayBuffer() did — important because iOS Safari issues many range requests.
+    const blob = await cachedResponse.blob();
+    const totalLength = blob.size;
+
     // Parse range header: "bytes=0-" or "bytes=123-456"
     const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
     if (!rangeMatch) {
       // Invalid range header, return full response
-      return new Response(bytes, {
+      return new Response(blob, {
         status: 200,
         headers: {
           'Content-Type': cachedResponse.headers.get('Content-Type') || 'audio/mpeg',
@@ -297,24 +349,22 @@ async function handleRangeRequest(cachedResponse, rangeHeader) {
         }
       });
     }
-    
+
     let start = rangeMatch[1] ? parseInt(rangeMatch[1], 10) : 0;
     let end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalLength - 1;
-    
+
     // Clamp values
     start = Math.max(0, Math.min(start, totalLength - 1));
     end = Math.max(start, Math.min(end, totalLength - 1));
-    
-    const slicedBytes = bytes.slice(start, end + 1);
-    
-    console.log(`[Service Worker] Range request: bytes ${start}-${end}/${totalLength}`);
-    
-    return new Response(slicedBytes, {
+
+    const slicedBlob = blob.slice(start, end + 1);
+
+    return new Response(slicedBlob, {
       status: 206,
       statusText: 'Partial Content',
       headers: {
         'Content-Type': cachedResponse.headers.get('Content-Type') || 'audio/mpeg',
-        'Content-Length': slicedBytes.length.toString(),
+        'Content-Length': slicedBlob.size.toString(),
         'Content-Range': `bytes ${start}-${end}/${totalLength}`,
         'Accept-Ranges': 'bytes',
       }

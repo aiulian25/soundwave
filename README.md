@@ -534,6 +534,17 @@ ports:
 
 ## 📝 Recent Changes
 
+### v1.12.1 - Performance & Memory (June 2026)
+
+#### Memory & performance (from a PWA memory-leak audit)
+- ✅ **Bounded service-worker audio cache** — Casually-streamed audio is now evicted oldest-first once over 40 tracks / 500 MB, so Cache Storage no longer grows unboundedly across sessions. Tracks you explicitly **"Made available offline" are pinned and never evicted**.
+- ✅ **Streaming range requests** — Cached-audio range requests now slice the `Blob` directly (zero-copy) instead of reading the whole file into RAM via `arrayBuffer()` on every seek (iOS Safari issues many) — far lower memory spikes during playback.
+- ✅ **Serialized prefetch** — Upcoming-track prefetch runs one at a time (cap of 1 in-flight), so at most a single audio blob is held in memory instead of several coexisting on fast connections.
+- ✅ **Lighter long lists** — Library & Favorites tables use `content-visibility` so off-screen rows skip layout/paint (keeping refs, highlight-scroll and scroll-to-top intact).
+
+#### UI
+- ✅ **Version label** — The sidebar now reads **“SoundWave V<version>”** with the always-on status button (blue = up to date, red = update available).
+
 ### v1.12.0 - Deep Security Assessment Remediation (June 2026)
 
 A full security assessment (`SECURITY_ASSESSMENT.md`) was completed and every actionable finding remediated. All new user-facing strings are localized (English + Romanian).

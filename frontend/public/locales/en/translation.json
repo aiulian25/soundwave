@@ -2012,7 +2012,7 @@
     }
   },
   "appVersion": {
-    "label": "Version",
+    "label": "SoundWave",
     "updateButton": "Update",
     "tooltip": "Update available",
     "dialog": {

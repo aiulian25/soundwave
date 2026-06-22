@@ -20,6 +20,9 @@ const CACHE_CONFIG = {
   maxCacheSize: 500 * 1024 * 1024, // 500MB max cache
   maxCachedTracks: 50, // Maximum number of tracks to cache
   prefetchCount: 3, // Number of tracks to prefetch ahead
+  // Cap concurrent prefetches so at most one full audio Blob is held in memory at a
+  // time (each track is tens of MB; parallel prefetch let several coexist in RAM).
+  maxConcurrentPrefetch: 1,
   staleTime: 7 * 24 * 60 * 60 * 1000, // 7 days
   cleanupInterval: 60 * 60 * 1000, // 1 hour
 };
@@ -325,7 +328,10 @@ class AudioCacheManager {
     
     // Skip if being prefetched
     if (this.prefetchingInProgress.has(youtubeId)) return;
-    
+
+    // Cap total in-flight prefetches so we never hold multiple full audio Blobs in RAM.
+    if (this.prefetchingInProgress.size >= CACHE_CONFIG.maxConcurrentPrefetch) return;
+
     // Double-check with DB
     if (await this.isCached(youtubeId)) {
       console.log(`[AudioCache] Already cached: ${audio.title}`);
@@ -419,18 +425,13 @@ class AudioCacheManager {
       randomIndices.forEach(idx => tracksToPrefetch.push(queue[idx]));
     }
 
-    // Prefetch sequentially on slower connections, in parallel on fast ones
-    if (networkInfo.quality === 'excellent' || networkInfo.quality === 'good') {
-      // Parallel prefetch on good connections
-      for (let i = 0; i < tracksToPrefetch.length; i++) {
-        const priority = i === 0 ? 'high' : i < 2 ? 'normal' : 'low';
-        this.prefetchTrack(tracksToPrefetch[i], priority);
-      }
-    } else {
-      // Sequential prefetch on moderate connections (one at a time)
-      for (let i = 0; i < tracksToPrefetch.length; i++) {
-        await this.prefetchTrack(tracksToPrefetch[i], 'high');
-      }
+    // Always prefetch one track at a time so at most one full audio Blob is in memory.
+    // (Previously fast connections fired all prefetches in parallel, letting several
+    // tens-of-MB blobs coexist.) Higher-quality networks just prefetch more tracks.
+    const fastNetwork = networkInfo.quality === 'excellent' || networkInfo.quality === 'good';
+    for (let i = 0; i < tracksToPrefetch.length; i++) {
+      const priority = fastNetwork ? (i === 0 ? 'high' : i < 2 ? 'normal' : 'low') : 'high';
+      await this.prefetchTrack(tracksToPrefetch[i], priority);
     }
   }
 

@@ -192,8 +192,12 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
               <TableRow
                 key={audio.id}
                 ref={getTrackRef(audio.youtube_id)}
-                sx={{ 
+                sx={{
                   cursor: 'pointer',
+                  // Skip layout/paint for off-screen rows (DOM stays, so refs,
+                  // highlight-scroll and the scroll-to-top FAB keep working).
+                  contentVisibility: 'auto',
+                  containIntrinsicSize: 'auto 64px',
                   transition: 'background-color 0.3s ease',
                   '&:hover': {
                     bgcolor: 'rgba(19, 236, 106, 0.05)',
