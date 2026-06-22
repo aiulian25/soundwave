@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   Box,
   Typography,
-  ButtonBase,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -10,9 +9,10 @@ import {
   Button,
   IconButton,
   Tooltip,
+  alpha,
 } from '@mui/material';
 import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CloseIcon from '@mui/icons-material/Close';
@@ -28,12 +28,17 @@ interface UpdateInfo {
   repo_url: string;
 }
 
+const BLUE = '#58a6ff';
+const RED = '#ff5252';
+
 /**
- * Sidebar version line + "update available" notification.
+ * Sidebar version line + update status.
  *
- * The newer-version check is performed and cached server-side (see backend
- * common.update_check), so this only reads one cached endpoint. When no update
- * exists (or the user is offline) it simply shows the version line.
+ * A round, flashing status button always sits next to the version: blue when the
+ * app is up to date, red when a newer GitHub Release exists. Clicking it opens a
+ * dialog (release notes + GitHub link; the update command only when an update is
+ * available). The newer-version check is server-side + cached (common.update_check),
+ * so this only reads one cached endpoint and shows just the version line if offline.
  */
 export default function AppVersionStatus() {
   const { t } = useTranslation();
@@ -57,8 +62,12 @@ export default function AppVersionStatus() {
 
   if (!info) return null;
 
+  const updateAvailable = info.update_available;
+  const color = updateAvailable ? RED : BLUE;
+  const statusLabel = updateAvailable ? t('appVersion.tooltip') : t('appVersion.upToDate');
   const updateCmd =
     'docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d';
+  const hasNotes = !!info.release_notes?.trim();
 
   return (
     <Box sx={{ px: 2, pt: 1, pb: 0.5 }}>
@@ -68,51 +77,54 @@ export default function AppVersionStatus() {
         {t('appVersion.label')}
       </Typography>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25, flexWrap: 'wrap' }}>
-        <Typography sx={{ fontSize: 18, fontWeight: 700, color: '#58a6ff' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
+        <Typography sx={{ fontSize: 18, fontWeight: 700, color: BLUE }}>
           v{info.current_version}
         </Typography>
 
-        {info.update_available && (
-          <Tooltip title={t('appVersion.tooltip')}>
-            <ButtonBase
-              onClick={() => setOpen(true)}
-              aria-label={t('appVersion.tooltip')}
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 0.5,
-                px: 1,
-                py: 0.4,
-                borderRadius: 9999,
-                fontSize: 10.5,
-                fontWeight: 800,
-                letterSpacing: 0.5,
-                color: '#58a6ff',
-                border: '1px solid #58a6ff',
-                bgcolor: 'rgba(88,166,255,0.14)',
-                animation: 'swUpdatePulse 1.4s ease-in-out infinite',
-                '@keyframes swUpdatePulse': {
-                  '0%,100%': { boxShadow: '0 0 0 0 rgba(88,166,255,0.45)' },
-                  '50%': { boxShadow: '0 0 10px 3px rgba(88,166,255,0.55)' },
-                },
-                // Accessibility: don't animate for users who prefer reduced motion.
-                '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-              }}
-            >
-              <FiberManualRecordIcon sx={{ fontSize: 8 }} />
-              {t('appVersion.updateButton')}
-            </ButtonBase>
-          </Tooltip>
-        )}
+        {/* Always-on round status button: blue = up to date, red = update available. */}
+        <Tooltip title={statusLabel}>
+          <IconButton
+            onClick={() => setOpen(true)}
+            aria-label={statusLabel}
+            size="small"
+            sx={{
+              width: 30,
+              height: 30,
+              color,
+              border: `1px solid ${color}`,
+              bgcolor: alpha(color, 0.14),
+              '&:hover': { bgcolor: alpha(color, 0.24) },
+              animation: 'swStatusPulse 1.6s ease-in-out infinite',
+              '@keyframes swStatusPulse': {
+                '0%, 100%': { boxShadow: `0 0 0 0 ${alpha(color, 0.45)}` },
+                '50%': { boxShadow: `0 0 9px 3px ${alpha(color, 0.55)}` },
+              },
+              // Accessibility: don't animate for users who prefer reduced motion.
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+            }}
+          >
+            {updateAvailable ? (
+              <SystemUpdateAltIcon sx={{ fontSize: 16 }} />
+            ) : (
+              <CloudDoneIcon sx={{ fontSize: 16 }} />
+            )}
+          </IconButton>
+        </Tooltip>
       </Box>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 6 }}>
-          <SystemUpdateAltIcon sx={{ color: '#58a6ff' }} />
+          {updateAvailable ? (
+            <SystemUpdateAltIcon sx={{ color: RED }} />
+          ) : (
+            <CloudDoneIcon sx={{ color: BLUE }} />
+          )}
           <Box sx={{ minWidth: 0 }}>
             <Typography component="span" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-              {t('appVersion.dialog.title')}
+              {updateAvailable
+                ? t('appVersion.dialog.title')
+                : t('appVersion.dialog.upToDateTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary" noWrap>
               {t('appVersion.dialog.running', { version: info.current_version })}
@@ -130,11 +142,7 @@ export default function AppVersionStatus() {
         </DialogTitle>
 
         <DialogContent dividers>
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{ display: 'block', mb: 1 }}
-          >
+          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
             {t('appVersion.dialog.whatsNew')}
           </Typography>
           {/* Rendered as plain pre-wrapped text (not HTML) so release notes can't inject markup. */}
@@ -143,29 +151,31 @@ export default function AppVersionStatus() {
             variant="body2"
             sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', m: 0 }}
           >
-            {info.release_notes?.trim() || t('appVersion.dialog.noNotes')}
+            {hasNotes ? info.release_notes.trim() : t('appVersion.dialog.noNotes')}
           </Typography>
 
-          <Box
-            sx={{
-              mt: 2,
-              p: 1.5,
-              borderRadius: 1,
-              bgcolor: 'action.hover',
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-              {t('appVersion.dialog.howToTitle')}
-            </Typography>
-            <Typography
-              component="code"
-              sx={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all' }}
+          {updateAvailable && (
+            <Box
+              sx={{
+                mt: 2,
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
             >
-              {updateCmd}
-            </Typography>
-          </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                {t('appVersion.dialog.howToTitle')}
+              </Typography>
+              <Typography
+                component="code"
+                sx={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all' }}
+              >
+                {updateCmd}
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>

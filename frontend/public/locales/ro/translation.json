@@ -2023,7 +2023,9 @@
       "noNotes": "Vezi notele de lansare pe GitHub.",
       "howToTitle": "Pentru a actualiza containerul tau self-hosted:",
       "viewOnGithub": "Vezi lansarea pe GitHub",
-      "dismiss": "Inchide"
-    }
+      "dismiss": "Inchide",
+      "upToDateTitle": "Esti la zi"
+    },
+    "upToDate": "La zi"
   }
 }

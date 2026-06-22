@@ -2023,7 +2023,9 @@
       "noNotes": "See the release notes on GitHub.",
       "howToTitle": "To update your self-hosted container:",
       "viewOnGithub": "View release on GitHub",
-      "dismiss": "Dismiss"
-    }
+      "dismiss": "Dismiss",
+      "upToDateTitle": "You're up to date"
+    },
+    "upToDate": "Up to date"
   }
 }
