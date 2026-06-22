@@ -9,6 +9,9 @@ import { getNetworkInfo, shouldPrefetch, getPrefetchCount, apiBackoffs } from '.
 
 const DB_NAME = 'soundwave-audio-cache';
 const DB_VERSION = 2;
+// MUST match AUDIO_CACHE_NAME in public/service-worker.js — the SW owns this Cache
+// Storage bucket; reading the wrong name made the offline-cache index always empty.
+const SW_AUDIO_CACHE_NAME = 'soundwave-audio-v3';
 const STORES = {
   AUDIO_BLOBS: 'audioBlobs',
   METADATA: 'metadata',
@@ -144,7 +147,7 @@ class AudioCacheManager {
     try {
       if (!('caches' in window)) return;
       
-      const cache = await caches.open('soundwave-audio-v1');
+      const cache = await caches.open(SW_AUDIO_CACHE_NAME);
       const keys = await cache.keys();
       
       this.swCachedTrackIds = new Set(
@@ -352,7 +355,7 @@ class AudioCacheManager {
         apiBackoffs.prefetch.recordFailure();
         throw new Error('Failed to get stream URL');
       }
-      
+
       const data = await response.json();
       const streamUrl = data.stream_url;
 
@@ -373,7 +376,7 @@ class AudioCacheManager {
         artist: audio.channel_name,
         duration: audio.duration,
       });
-      
+
       // Record success
       apiBackoffs.prefetch.recordSuccess();
     } catch (error) {
@@ -653,7 +656,7 @@ class AudioCacheManager {
       const downloadUrl = `/api/audio/${youtubeId}/download/`;
       
       // Check the audio cache
-      const audioCache = await caches.open('soundwave-audio-v1');
+      const audioCache = await caches.open(SW_AUDIO_CACHE_NAME);
       const cachedResponse = await audioCache.match(downloadUrl);
       
       if (cachedResponse) {
@@ -717,31 +720,30 @@ class AudioCacheManager {
   }
 
   /**
-   * Check if audio is available in any cache (IndexedDB or Service Worker)
-   * Uses in-memory index for fast lookups
+   * Whether a track is durably available offline.
+   *
+   * Single source of truth: the Service Worker **download** cache (tracks the user
+   * explicitly "Made available offline" — pinned, never evicted). The IndexedDB blobs
+   * are only a transient prefetch/speed buffer (LRU-evicted), so they are deliberately
+   * NOT counted here — otherwise a track that was merely prefetched would falsely report
+   * as "available offline" and then vanish on eviction.
    */
   async isAvailableOffline(youtubeId: string): Promise<boolean> {
-    // Fast path: check in-memory indexes
-    if (this.cachedTrackIds.has(youtubeId) || this.swCachedTrackIds.has(youtubeId)) {
+    if (this.swCachedTrackIds.has(youtubeId)) {
       return true;
     }
-    
-    // Check IndexedDB
-    if (await this.isCached(youtubeId)) {
-      return true;
-    }
-
-    // Check Service Worker cache
     try {
       if ('caches' in window) {
-        const cache = await caches.open('soundwave-audio-v1');
+        const cache = await caches.open(SW_AUDIO_CACHE_NAME);
         const response = await cache.match(`/api/audio/${youtubeId}/download/`);
-        return !!response;
+        if (response) {
+          this.swCachedTrackIds.add(youtubeId);
+          return true;
+        }
       }
     } catch {
-      // Ignore errors
+      // Ignore errors — treat as not-offline.
     }
-
     return false;
   }
 

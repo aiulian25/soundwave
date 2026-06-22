@@ -86,6 +86,11 @@
     "empty": {
       "title": "Bine ai venit in SoundWave!",
       "description": "Incepe prin a descarca muzica sau prin a explora biblioteca ta."
+    },
+    "pullToRefresh": {
+      "pull": "Trage pentru actualizare",
+      "release": "Elibereaza pentru actualizare",
+      "updating": "Se actualizeaza…"
     }
   },
   "search": {
@@ -1697,6 +1702,11 @@
       "october": "Octombrie",
       "november": "Noiembrie",
       "december": "Decembrie"
+    },
+    "lazyLoadError": {
+      "title": "Pagina nu a putut fi incarcata",
+      "description": "Posibil sa fii offline sau aplicatia tocmai s-a actualizat. Incearca din nou.",
+      "retry": "Incearca din nou"
     }
   },
   "sidebar": {

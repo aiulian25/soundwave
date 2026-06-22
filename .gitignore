@@ -60,6 +60,14 @@ cookies.txt
 security-reports/
 
 # Internal development notes — kept locally, not pushed to GitHub.
-# (README links docs/WIDGET_API.md, so that one stays tracked.)
+# (README links docs/WIDGET_API.md, and docs/screenshots/ holds README images.)
 docs/*
 !docs/WIDGET_API.md
+!docs/screenshots/
+!docs/screenshots/**
+
+# Test artifacts (Playwright e2e + vitest coverage)
+frontend/playwright-report/
+frontend/test-results/
+frontend/playwright/.cache/
+frontend/coverage/

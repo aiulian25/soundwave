@@ -212,6 +212,34 @@ class PWAManager {
   }
 
   /**
+   * User-initiated "force update" (pull-to-refresh on Home). Activates any waiting
+   * worker, drops the stale app-shell + API caches so fresh assets load, then reloads.
+   * Offline AUDIO and IMAGE caches are intentionally preserved (don't wipe downloads).
+   */
+  async forceUpdate(): Promise<void> {
+    try {
+      if (this.registration) {
+        await this.registration.update();
+        if (this.registration.waiting) {
+          this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(
+          names
+            .filter((name) => !/audio|image/i.test(name))
+            .map((name) => caches.delete(name))
+        );
+      }
+    } catch (error) {
+      console.warn('[PWA] forceUpdate failed:', error);
+    } finally {
+      window.location.reload();
+    }
+  }
+
+  /**
    * Clear all caches
    */
   async clearCache(): Promise<boolean> {

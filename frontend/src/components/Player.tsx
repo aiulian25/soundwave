@@ -32,7 +32,8 @@ import { useEqualizer } from '../context/EqualizerContext';
 import { useAchievementNotification } from '../context/AchievementNotificationContext';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { audioAPI, statsAPI } from '../api/client';
-import AudioVisualizer from './AudioVisualizer';
+// Code-split: the visualizer (17 theme renderers) loads only when the player is shown.
+const AudioVisualizer = lazy(() => import('./AudioVisualizer'));
 import WaveformSeekBar from './WaveformSeekBar';
 import { visualizerThemes } from '../config/visualizerThemes';
 import { audioCache } from '../utils/audioCache';
@@ -111,7 +112,6 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [loadingStream, setLoadingStream] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isCachedPlayback, setIsCachedPlayback] = useState(false);
-  const [visualizerData, setVisualizerData] = useState<number[]>(Array(16).fill(0));
   const [isFavorite, setIsFavorite] = useState(audio.is_favorite || false);
   const [imageLoadError, setImageLoadError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -121,7 +121,6 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const eqFiltersRef = useRef<BiquadFilterNode[]>([]);
   const dataArrayRef = useRef<Uint8Array | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
   const isPlayingRef = useRef(isPlaying);
   const isSeeking = useRef(false);
   const currentAudioId = useRef(audio.id);
@@ -626,11 +625,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   // Initialize Web Audio API for visualizer and EQ - optimized for performance
   useEffect(() => {
     if (!audioRef.current || !streamUrl) return;
+    let cancelled = false;
 
     // Create audio context, EQ filters, and analyser - deferred to avoid blocking
     if (!audioContextRef.current) {
       // Use requestIdleCallback or setTimeout to avoid blocking track start
       const initAudioChain = () => {
+        if (cancelled || !audioRef.current) return; // don't build a graph after unmount
         try {
           audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
           sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current!);
@@ -672,7 +673,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
         }
       };
 
-      // Defer initialization slightly to not block audio playback start
+      // Defer initialization slightly to not block audio playback start. The
+      // `cancelled` guard stops a pending idle callback from building a graph on a
+      // detached element after the Player unmounts.
       if ('requestIdleCallback' in window) {
         (window as any).requestIdleCallback(initAudioChain, { timeout: 100 });
       } else {
@@ -680,39 +683,65 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       }
     }
 
-    // Animate visualizer with real audio data
-    const updateVisualizer = () => {
-      if (analyserRef.current && dataArrayRef.current && isPlayingRef.current) {
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
-        
-        // Sample 16 frequencies evenly across the spectrum
-        const bars: number[] = [];
-        const step = Math.floor(dataArrayRef.current.length / 16);
-        for (let i = 0; i < 16; i++) {
-          const index = Math.min(i * step, dataArrayRef.current.length - 1);
-          // Normalize to 0-1 and apply slight boost to lower frequencies
-          const value = dataArrayRef.current[index] / 255;
-          const boost = i < 8 ? 1.3 : 1.0; // Boost bass/mid frequencies
-          bars.push(Math.min(value * boost, 1));
-        }
-        
-        setVisualizerData(bars);
-      } else if (!isPlayingRef.current) {
-        // Fade to zero when not playing
-        setVisualizerData(prev => prev.map(v => v * 0.9));
-      }
-      
-      animationFrameRef.current = requestAnimationFrame(updateVisualizer);
-    };
-    
-    updateVisualizer();
-
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      cancelled = true;
     };
   }, [streamUrl]);
+
+  // Read the latest 16 visualizer bars straight from the analyser. Passed to
+  // <AudioVisualizer>, which calls it inside its own canvas RAF — so the Player no
+  // longer pushes state ~60x/second (which forced a full re-render of this component).
+  const getBars = useCallback((): number[] => {
+    const analyser = analyserRef.current;
+    const arr = dataArrayRef.current;
+    if (!analyser || !arr) return Array(16).fill(0);
+    analyser.getByteFrequencyData(arr as any);
+    const bars: number[] = [];
+    const step = Math.floor(arr.length / 16) || 1;
+    for (let i = 0; i < 16; i++) {
+      const index = Math.min(i * step, arr.length - 1);
+      const value = arr[index] / 255;
+      const boost = i < 8 ? 1.3 : 1.0; // boost bass/mid
+      bars.push(Math.min(value * boost, 1));
+    }
+    return bars;
+  }, []);
+
+  // Drive the background glow via a CSS variable (no React re-render). The visualizer
+  // calls this each frame with the current peak (0–1).
+  const handleVizIntensity = useCallback((value: number) => {
+    playerContainerRef.current?.style.setProperty('--sw-viz-intensity', value.toFixed(3));
+  }, []);
+
+  // Reset the glow when the visualizer is turned off so it doesn't freeze mid-glow.
+  useEffect(() => {
+    if (!settings.visualizer_enabled) {
+      playerContainerRef.current?.style.setProperty('--sw-viz-intensity', '0');
+    }
+  }, [settings.visualizer_enabled]);
+
+  // Tear down the Web Audio graph on unmount — the effect above intentionally never
+  // closes it (the graph persists across track changes). Without this, every Player
+  // remount (breakpoint flip, stop, StrictMode) leaks an AudioContext + nodes, and
+  // browsers cap ~6 contexts before throwing.
+  useEffect(() => {
+    return () => {
+      eqFiltersRef.current.forEach((f) => {
+        try { f.disconnect(); } catch { /* already disconnected */ }
+      });
+      try { analyserRef.current?.disconnect(); } catch { /* noop */ }
+      try { sourceNodeRef.current?.disconnect(); } catch { /* noop */ }
+      const ctx = audioContextRef.current;
+      if (ctx && ctx.state !== 'closed') {
+        ctx.close().catch(() => { /* already closing */ });
+      }
+      audioContextRef.current = null;
+      sourceNodeRef.current = null;
+      analyserRef.current = null;
+      eqFiltersRef.current = [];
+      dataArrayRef.current = null;
+    };
+  }, []);
 
   // Apply EQ gains when they change - optimized to set all gains at once
   useEffect(() => {
@@ -932,16 +961,19 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           themeName: visualizerThemes.find((theme) => theme.id === settings.visualizer_theme)?.name || t('player.classicBars'),
         })}
       >
-        <AudioVisualizer
-          data={visualizerData}
-          isPlaying={isPlaying}
-          themeId={settings.visualizer_theme}
-          height={120}
-          showGlow={settings.visualizer_glow}
-        />
+        <Suspense fallback={null}>
+          <AudioVisualizer
+            getData={getBars}
+            onIntensity={handleVizIntensity}
+            isPlaying={isPlaying}
+            themeId={settings.visualizer_theme}
+            height={120}
+            showGlow={settings.visualizer_glow}
+          />
+        </Suspense>
       </Box>
     );
-  }, [visualizerData, isPlaying, settings.visualizer_theme, settings.visualizer_enabled, settings.visualizer_glow, handleVisualizerClick]);
+  }, [getBars, handleVizIntensity, isPlaying, settings.visualizer_theme, settings.visualizer_enabled, settings.visualizer_glow, handleVisualizerClick]);
 
   return (
     <Box
@@ -976,22 +1008,21 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             zIndex: 10,
           }}
         />
-        {/* Animated gradient overlay based on audio intensity */}
+        {/* Audio-reactive glow. Opacity is driven by the --sw-viz-intensity CSS
+            variable that the visualizer updates each frame (no React re-render). */}
         <Box
-          sx={{
+          sx={(theme) => ({
             position: 'absolute',
             inset: 0,
-            background: (theme) => {
-              const intensity = isPlaying ? Math.max(...visualizerData) * 0.15 : 0;
-              const isDark = theme.palette.mode === 'dark';
-              // More subtle on light themes
-              const adjustedIntensity = isDark ? intensity : intensity * 0.4;
-              return `radial-gradient(ellipse at center, ${theme.palette.primary.main}${Math.round(adjustedIntensity * 255).toString(16).padStart(2, '0')} 0%, transparent 70%)`;
-            },
+            background: `radial-gradient(ellipse at center, ${theme.palette.primary.main} 0%, transparent 70%)`,
+            opacity:
+              theme.palette.mode === 'dark'
+                ? 'calc(var(--sw-viz-intensity, 0) * 0.18)'
+                : 'calc(var(--sw-viz-intensity, 0) * 0.07)',
             zIndex: 11,
-            transition: 'background 0.15s ease',
+            transition: 'opacity 0.15s ease',
             pointerEvents: 'none',
-          }}
+          })}
         />
         <Box
           sx={{
@@ -1483,6 +1514,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               <IconButton
                 onClick={() => setIsPlaying(!isPlaying)}
                 disabled={loadingStream}
+                data-testid="player-playpause"
+                data-playing={isPlaying ? 'true' : 'false'}
                 sx={{
                   width: 64,
                   height: 64,

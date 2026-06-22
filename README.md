@@ -6,6 +6,37 @@
 
 **SoundWave** is a self-hosted audio archiving and streaming platform inspired by TubeArchivist. Download, organize, and enjoy your YouTube audio collection offline through a beautiful dark-themed web interface.
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/hero.png" alt="SoundWave — library, now-playing and live visualizer" width="900">
+</p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/home.png" alt="Home"><br/><sub><b>Home</b></sub></td>
+    <td width="33%"><img src="docs/screenshots/search.png" alt="Search"><br/><sub><b>Search</b></sub></td>
+    <td width="33%"><img src="docs/screenshots/history.png" alt="Listening History"><br/><sub><b>Listening History</b></sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/smart.png" alt="Smart Playlists"><br/><sub><b>Smart Playlists</b></sub></td>
+    <td><img src="docs/screenshots/analytics.png" alt="Analytics"><br/><sub><b>Analytics</b></sub></td>
+    <td><img src="docs/screenshots/achievements.png" alt="Achievements"><br/><sub><b>Achievements</b></sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/channels.png" alt="Channels"><br/><sub><b>Channels</b></sub></td>
+    <td><img src="docs/screenshots/playlists.png" alt="Playlists"><br/><sub><b>Playlists</b></sub></td>
+    <td><img src="docs/screenshots/offline.png" alt="Offline Manager"><br/><sub><b>Offline (PWA)</b></sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/lyrics_synced.png" alt="Synced lyrics with timestamps"><br/><sub><b>Synced lyrics</b></sub></td>
+    <td><img src="docs/screenshots/lyrics_fetch.png" alt="Fetching lyrics"><br/><sub><b>Lyrics fetch</b></sub></td>
+    <td><img src="docs/screenshots/settings.png" alt="Settings"><br/><sub><b>Settings</b></sub></td>
+  </tr>
+</table>
+
+<sub>UI previews shown with placeholder data only (no real titles, artwork, or personal data).</sub>
+
 ## ✨ Features
 
 ### Core Features
@@ -533,6 +564,23 @@ ports:
 ```
 
 ## 📝 Recent Changes
+
+### v1.13.0 - Performance, PWA & a test harness (June 2026)
+
+#### Performance & memory
+- ✅ **Visualizer decoupled from React state** — the audio visualizer no longer pushes state ~60×/second; it reads the analyser inside its own canvas RAF and stops entirely when idle. The Player stopped re-rendering continuously (the bulk of the high idle CPU/memory).
+- ✅ **Web Audio graph torn down on unmount** — the `AudioContext` + nodes are now closed/disconnected, fixing a native-memory leak and the eventual "max AudioContexts" failure on breakpoint flips.
+- ✅ **Code-split** — rare/heavy routes (Settings, Analytics, Yearly Wrapped, the 17 visualizer themes, …) load on demand; the main JS bundle dropped **~38% (644 K → ~400 K)** for a faster first paint. A `LazyRouteBoundary` recovers chunk-load failures (reload on stale deploy, localized retry offline).
+- ✅ **Offline-cache consistency** — fixed the SW audio-cache name mismatch, and "available offline" is now defined by a single source of truth (the pinned download cache), not the transient prefetch buffer.
+
+#### PWA
+- ✅ **Pull-to-refresh on Home** — drag down at the top of the Home page to force a PWA update (clears the app-shell cache, activates the new service worker, reloads) — without manually clearing cache, and without deleting offline downloads. Scoped to Home so it can't fire during playback.
+
+#### Testing (new)
+- ✅ **Frontend test harness** — Vitest unit tests (backoff logic, password-error mapping, and a guard that fails if the SW cache name drifts) run in CI before the image builds; Playwright e2e (login / play / offline playback / pull-to-refresh) with a deterministic `seed_e2e` backend command and a dedicated CI job.
+
+#### Docs
+- ✅ **README screenshots** — a gallery of the UI (placeholder data only).
 
 ### v1.12.2 - Fix in-app version reporting (June 2026)
 

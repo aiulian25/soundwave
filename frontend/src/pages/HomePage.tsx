@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { statsAPI } from '../api/client';
+import { pwaManager } from '../utils/pwa';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { Audio } from '../types';
 
 // Types for homepage data
@@ -88,6 +90,11 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
   const [data, setData] = useState<HomepageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Pull-to-refresh → force a PWA update. Scoped to Home only so it can never fire
+  // while the user is on a playback page.
+  const { rootRef, pullDistance, refreshing: pulling, threshold: pullThreshold } =
+    usePullToRefresh(useCallback(() => pwaManager.forceUpdate(), []));
 
   const formatHomeTimeLeft = useCallback(
     (minutes: number, seconds: number) => t('home.timeLeft', { minutes, seconds }),
@@ -217,7 +224,41 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
   }
 
   return (
-    <Box sx={{ pb: 4 }}>
+    <Box ref={rootRef} data-testid="home-root" sx={{ pb: 4, position: 'relative' }}>
+      {/* Pull-to-refresh indicator (Home only): drag down at the top to update the app */}
+      {(pullDistance > 0 || pulling) && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            height: Math.max(pullDistance, pulling ? pullThreshold : 0),
+            color: 'text.secondary',
+            pointerEvents: 'none',
+          }}
+        >
+          <CircularProgress
+            size={18}
+            thickness={5}
+            variant={pulling ? 'indeterminate' : 'determinate'}
+            value={Math.min((pullDistance / pullThreshold) * 100, 100)}
+          />
+          <Typography variant="caption">
+            {pulling
+              ? t('home.pullToRefresh.updating')
+              : pullDistance >= pullThreshold
+                ? t('home.pullToRefresh.release')
+                : t('home.pullToRefresh.pull')}
+          </Typography>
+        </Box>
+      )}
+
       {/* Continue Listening Section */}
       {data?.continue_listening && data.continue_listening.length > 0 && (
         <Box sx={{ mb: 5 }}>

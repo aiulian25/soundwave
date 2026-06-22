@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Box, IconButton, Typography, useMediaQuery, useTheme } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -10,21 +10,23 @@ import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
 import SearchPage from './pages/SearchPage';
 import FavoritesPage from './pages/FavoritesPage';
-import ChannelsPage from './pages/ChannelsPage';
-import ChannelDetailPage from './pages/ChannelDetailPage';
-import PlaylistsPage from './pages/PlaylistsPage';
-import PlaylistDetailPage from './pages/PlaylistDetailPage';
-import SmartPlaylistsPage from './pages/SmartPlaylistsPage';
-import SmartPlaylistDetailPage from './pages/SmartPlaylistDetailPage';
-import SettingsPage from './pages/SettingsPage';
-import LocalFilesPage from './pages/LocalFilesPageNew';
-import AdminUsersPage from './pages/AdminUsersPage';
-import OfflineManagerPage from './pages/OfflineManagerPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import AchievementsPage from './pages/AchievementsPage';
-import YearlyWrappedPage from './pages/YearlyWrappedPage';
-import ListeningHistoryPage from './pages/ListeningHistoryPage';
+// Rare / heavy routes are code-split so they stay out of the first-paint bundle.
+const ChannelsPage = lazy(() => import('./pages/ChannelsPage'));
+const ChannelDetailPage = lazy(() => import('./pages/ChannelDetailPage'));
+const PlaylistsPage = lazy(() => import('./pages/PlaylistsPage'));
+const PlaylistDetailPage = lazy(() => import('./pages/PlaylistDetailPage'));
+const SmartPlaylistsPage = lazy(() => import('./pages/SmartPlaylistsPage'));
+const SmartPlaylistDetailPage = lazy(() => import('./pages/SmartPlaylistDetailPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const LocalFilesPage = lazy(() => import('./pages/LocalFilesPageNew'));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const OfflineManagerPage = lazy(() => import('./pages/OfflineManagerPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const AchievementsPage = lazy(() => import('./pages/AchievementsPage'));
+const YearlyWrappedPage = lazy(() => import('./pages/YearlyWrappedPage'));
+const ListeningHistoryPage = lazy(() => import('./pages/ListeningHistoryPage'));
 import AdminRoute from './components/AdminRoute';
+import LazyRouteBoundary from './components/LazyRouteBoundary';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Player from './components/Player';
@@ -711,6 +713,14 @@ function App() {
             scrollbarWidth: 'none',
           }}
         >
+          <LazyRouteBoundary>
+          <Suspense
+            fallback={
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+                <Box sx={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid', borderColor: 'divider', borderTopColor: 'primary.main', animation: 'spin 0.8s linear infinite', '@keyframes spin': { to: { transform: 'rotate(360deg)' } } }} />
+              </Box>
+            }
+          >
           <Routes>
             <Route path="/" element={<HomePage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/search" element={<SearchPage setCurrentAudio={setAudioWithQueue} />} />
@@ -732,6 +742,8 @@ function App() {
             <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
+          </LazyRouteBoundary>
         </Box>
       </Box>
 

@@ -15,7 +15,12 @@ import {
 } from '../config/visualizerThemes';
 
 interface AudioVisualizerProps {
-  data: number[];
+  /** Static bars (fallback / preview). Prefer `getData` for live, state-free rendering. */
+  data?: number[];
+  /** Live source: returns the latest bars each frame (read inside the canvas RAF). */
+  getData?: () => number[];
+  /** Called each frame with the current peak (0–1), e.g. to drive a glow via a CSS var. */
+  onIntensity?: (value: number) => void;
   isPlaying: boolean;
   themeId?: string;
   style?: VisualizerStyle;
@@ -63,7 +68,9 @@ function getFrequencyBands(data: number[]): FrequencyBands {
 }
 
 export default function AudioVisualizer({
-  data,
+  data = [],
+  getData,
+  onIntensity,
   isPlaying,
   themeId = DEFAULT_VISUALIZER_THEME,
   style: styleProp,
@@ -82,10 +89,11 @@ export default function AudioVisualizer({
   const currentStyle = styleProp || visualizerTheme.style;
   const currentColorScheme = colorSchemeProp || visualizerTheme.colorScheme;
   
-  // Get colors based on scheme
-  const colors = useMemo(() => 
-    getColorArray(currentColorScheme, data.length, theme.palette.primary.main),
-    [currentColorScheme, data.length, theme.palette.primary.main]
+  // Get colors based on scheme. Sized to the fixed 16-bar output (the live `getData`
+  // source returns 16 bars; `data.length` could be 0 when using the live source).
+  const colors = useMemo(() =>
+    getColorArray(currentColorScheme, 16, theme.palette.primary.main),
+    [currentColorScheme, theme.palette.primary.main]
   );
 
   // Primary color for single-color visualizers
@@ -109,6 +117,19 @@ export default function AudioVisualizer({
     };
   }, [colors]);
 
+  // Live inputs kept in refs so the draw RAF reads the latest values without the
+  // effect re-subscribing every frame (the old changing `data` prop did exactly that).
+  const getDataRef = useRef(getData);
+  const dataPropRef = useRef(data);
+  const isPlayingRef = useRef(isPlaying);
+  const onIntensityRef = useRef(onIntensity);
+  getDataRef.current = getData;
+  dataPropRef.current = data;
+  isPlayingRef.current = isPlaying;
+  onIntensityRef.current = onIntensity;
+  const barsRef = useRef<number[]>(new Array(16).fill(0));
+  const sizeRef = useRef({ w: 0, h: 0 });
+
   // Draw visualizer on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -117,16 +138,33 @@ export default function AudioVisualizer({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    // Size the canvas to its box and re-size on layout/orientation changes (the draw
+    // loop reads sizeRef) — rather than measuring every frame.
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      sizeRef.current = { w: rect.width, h: rect.height };
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
 
     const draw = () => {
-      const width = rect.width;
-      const height = rect.height;
+      // Pull the latest bars from the live source (no React state → no re-render).
+      let data: number[];
+      if (isPlayingRef.current) {
+        data = (getDataRef.current ? getDataRef.current() : dataPropRef.current) || [];
+        barsRef.current = data;
+      } else {
+        // Fade out smoothly, then stop the RAF entirely once idle.
+        data = barsRef.current.map((v) => v * 0.9);
+        barsRef.current = data;
+      }
+      const width = sizeRef.current.w;
+      const height = sizeRef.current.h;
       const bands = getFrequencyBands(data);
       timeRef.current = Date.now();
       
@@ -187,17 +225,27 @@ export default function AudioVisualizer({
           drawBarsClassic(ctx, data, colors, width, height);
       }
 
-      animationRef.current = requestAnimationFrame(draw);
+      onIntensityRef.current?.(data.length ? Math.max(...data) : 0);
+
+      // Keep animating while playing or while the bars are still fading; otherwise stop
+      // the RAF so an idle/paused player uses zero CPU.
+      if (isPlayingRef.current || barsRef.current.some((v) => v > 0.01)) {
+        animationRef.current = requestAnimationFrame(draw);
+      } else {
+        animationRef.current = null;
+      }
     };
 
     draw();
 
     return () => {
+      resizeObserver.disconnect();
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
       }
     };
-  }, [data, colors, primaryColor, currentStyle, showGlow, isPlaying, createParticle]);
+  }, [colors, primaryColor, currentStyle, showGlow, isPlaying, createParticle, height]);
 
   return (
     <Box sx={{ width: '100%', height, position: 'relative' }}>

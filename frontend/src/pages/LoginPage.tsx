@@ -234,6 +234,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             onChange={(e) => setUsername(e.target.value)}
             onKeyPress={handleKeyPress}
             autoFocus
+            inputProps={{ 'data-testid': 'login-username' }}
             sx={{
               marginBottom: 2,
               '& .MuiOutlinedInput-root': {
@@ -275,6 +276,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyPress={handleKeyPress}
+            inputProps={{ 'data-testid': 'login-password' }}
             sx={{
               marginBottom: 1.5,
               '& .MuiOutlinedInput-root': {
@@ -405,6 +407,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             fullWidth
             variant="contained"
             onClick={handleLogin}
+            data-testid="login-submit"
             sx={{
               background: 'linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%)',
               color: '#0f172a',
