@@ -1,14 +1,17 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v18';
+const CACHE_NAME = 'soundwave-v19';
 const API_CACHE_NAME = 'soundwave-api-v3';
-const AUDIO_CACHE_NAME = 'soundwave-audio-v3';
+const AUDIO_CACHE_NAME = 'soundwave-audio-v3'; // PINNED only: "Make available offline" downloads
+const STREAM_CACHE_NAME = 'soundwave-stream-v1'; // EVICTABLE: casual + prefetched streams
 const IMAGE_CACHE_NAME = 'soundwave-images-v4';
 
-// Casual-stream eviction limits for AUDIO_CACHE_NAME. Tracks the user explicitly
-// "Made available offline" hit /api/audio/<id>/download/ and are PINNED — never
-// evicted; only opportunistically-streamed audio files are trimmed (oldest-first).
+// Two distinct audio caches, by intent:
+//   AUDIO_CACHE_NAME  — tracks the user explicitly "Made available offline"
+//                       (/api/audio/<id>/download/). PINNED: never evicted.
+//   STREAM_CACHE_NAME — opportunistically-streamed /media/ audio + prefetched
+//                       next tracks. EVICTABLE oldest-first under these budgets:
 const AUDIO_STREAM_MAX_ENTRIES = 40;
-const AUDIO_STREAM_MAX_BYTES = 500 * 1024 * 1024; // 500 MB, mirrors the IndexedDB cap
+const AUDIO_STREAM_MAX_BYTES = 500 * 1024 * 1024; // 500 MB, mirrors the old IndexedDB cap
 const PINNED_AUDIO_RE = /\/api\/audio\/[^/]+\/download\/?$/;
 
 // Assets to cache on install
@@ -50,6 +53,7 @@ self.addEventListener('activate', (event) => {
             cacheName !== CACHE_NAME &&
             cacheName !== API_CACHE_NAME &&
             cacheName !== AUDIO_CACHE_NAME &&
+            cacheName !== STREAM_CACHE_NAME &&
             cacheName !== IMAGE_CACHE_NAME
           ) {
             console.log('[Service Worker] Deleting old cache:', cacheName);
@@ -57,7 +61,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => {
+    }).then(() => pruneCasualFromPinnedCache()).then(() => {
       console.log('[Service Worker] Activated');
       return self.clients.claim(); // Take control immediately
     })
@@ -116,7 +120,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.includes('/media/local_audio/') ||
     request.destination === 'audio'
   ) {
-    event.respondWith(cacheFirstStrategy(request, AUDIO_CACHE_NAME));
+    event.respondWith(cacheFirstStrategy(request, STREAM_CACHE_NAME));
     return;
   }
 
@@ -215,9 +219,9 @@ async function cacheFirstStrategy(request, cacheName) {
     if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
       const responseClone = networkResponse.clone();
       const cache = await caches.open(cacheName);
-      if (cacheName === AUDIO_CACHE_NAME) {
+      if (cacheName === STREAM_CACHE_NAME) {
         // Trim the (casual-stream) audio cache after each new write so it stays bounded.
-        cache.put(request, responseClone).then(() => trimAudioCache()).catch(() => {});
+        cache.put(request, responseClone).then(() => trimStreamCache()).catch(() => {});
       } else {
         cache.put(request, responseClone);
       }
@@ -230,14 +234,13 @@ async function cacheFirstStrategy(request, cacheName) {
   }
 }
 
-// Bound the AUDIO_CACHE so casual streaming doesn't grow Cache Storage without limit.
-// Evicts oldest *streamed* entries (insertion order) once over the count or byte budget;
-// pinned "Make available offline" downloads are never touched.
-async function trimAudioCache() {
+// Bound the STREAM_CACHE so casual streaming + prefetch don't grow Cache Storage without
+// limit. Evicts oldest entries (insertion order) once over the count or byte budget.
+// Pinned "Make available offline" downloads live in AUDIO_CACHE and are never touched here.
+async function trimStreamCache() {
   try {
-    const cache = await caches.open(AUDIO_CACHE_NAME);
-    const keys = await cache.keys(); // insertion order — oldest first
-    const streamKeys = keys.filter((req) => !PINNED_AUDIO_RE.test(new URL(req.url).pathname));
+    const cache = await caches.open(STREAM_CACHE_NAME);
+    const streamKeys = await cache.keys(); // insertion order — oldest first
 
     // Measure sizes via Content-Length headers (does not read the bodies).
     let total = 0;
@@ -265,6 +268,28 @@ async function trimAudioCache() {
     }
   } catch (error) {
     console.warn('[Service Worker] Audio cache trim failed:', error);
+  }
+}
+
+// One-time migration: older versions streamed casual /media/ audio into AUDIO_CACHE.
+// AUDIO_CACHE is now pinned-downloads-only, so drop any non-/download/ leftovers there
+// (they're re-cached into STREAM_CACHE on next play). Pinned downloads are kept.
+async function pruneCasualFromPinnedCache() {
+  try {
+    const cache = await caches.open(AUDIO_CACHE_NAME);
+    const keys = await cache.keys();
+    let pruned = 0;
+    for (const req of keys) {
+      if (!PINNED_AUDIO_RE.test(new URL(req.url).pathname)) {
+        await cache.delete(req);
+        pruned++;
+      }
+    }
+    if (pruned > 0) {
+      console.log(`[Service Worker] Migrated audio cache: pruned ${pruned} casual stream(s) from the pinned cache`);
+    }
+  } catch (error) {
+    console.warn('[Service Worker] Pinned-cache migration failed:', error);
   }
 }
 
