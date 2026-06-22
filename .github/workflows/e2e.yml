@@ -42,7 +42,8 @@ jobs:
         run: docker build -t ghcr.io/aiulian25/soundwave:main .
 
       - name: Create runtime dirs + cookies file
-        run: mkdir -p audio cache data && touch cookies.txt
+        # The container runs as uid 1000; make the bind-mounted dirs writable by it.
+        run: mkdir -p audio cache data && touch cookies.txt && sudo chown -R 1000:1000 audio cache data
 
       - name: Start the stack
         run: docker compose -f docker-compose.prod.yml up -d
