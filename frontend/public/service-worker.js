@@ -499,6 +499,39 @@ self.addEventListener('message', (event) => {
     );
   }
   
+  // Warm the evictable STREAM_CACHE with a casual/prefetched audio URL. Fetched by the SW
+  // itself (SW-initiated fetches are not re-intercepted), so /media/ audio lands in
+  // STREAM_CACHE rather than being mis-routed to the image cache by a page-side fetch().
+  if (event.data && event.data.type === 'PREFETCH_STREAM') {
+    const { url } = event.data;
+    event.waitUntil(
+      (async () => {
+        let success = false;
+        try {
+          const cache = await caches.open(STREAM_CACHE_NAME);
+          if (await cache.match(url)) {
+            success = true; // already cached — idempotent
+          } else {
+            const resp = await fetch(url, { credentials: 'include' });
+            if (resp && resp.status === 200) {
+              await cache.put(url, resp.clone());
+              await trimStreamCache();
+              success = true;
+            }
+          }
+        } catch (err) {
+          console.warn('[Service Worker] Prefetch stream failed:', url, err);
+        }
+        if (event.ports && event.ports[0]) event.ports[0].postMessage({ success });
+      })()
+    );
+  }
+
+  // Enforce the STREAM_CACHE eviction budget on demand (e.g. after a page-side write).
+  if (event.data && event.data.type === 'TRIM_STREAM_CACHE') {
+    event.waitUntil(trimStreamCache());
+  }
+
   if (event.data && event.data.type === 'CACHE_AUDIO') {
     const { url } = event.data;
     event.waitUntil(

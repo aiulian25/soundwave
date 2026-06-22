@@ -9,9 +9,10 @@ import { getNetworkInfo, shouldPrefetch, getPrefetchCount, apiBackoffs } from '.
 
 const DB_NAME = 'soundwave-audio-cache';
 const DB_VERSION = 2;
-// MUST match AUDIO_CACHE_NAME in public/service-worker.js — the SW owns this Cache
-// Storage bucket; reading the wrong name made the offline-cache index always empty.
-const SW_AUDIO_CACHE_NAME = 'soundwave-audio-v3';
+// MUST match the cache names in public/service-worker.js — the SW owns these Cache
+// Storage buckets; reading the wrong name made the offline-cache index always empty.
+const SW_AUDIO_CACHE_NAME = 'soundwave-audio-v3'; // PINNED downloads
+const SW_STREAM_CACHE_NAME = 'soundwave-stream-v1'; // EVICTABLE casual + prefetched streams
 const STORES = {
   AUDIO_BLOBS: 'audioBlobs',
   METADATA: 'metadata',
@@ -301,84 +302,110 @@ class AudioCacheManager {
   }
 
   /**
-   * Prefetch a track in the background
-   * Network-aware: respects connection quality and save-data mode
+   * Build the same /media/ URL the Player streams for a track with a known file_path.
+   * Returns null when the track has no file_path (must resolve via the /player/ API).
+   */
+  private buildDirectUrl(audio: Audio): string | null {
+    if (!audio.file_path) return null;
+    const encodedPath = audio.file_path.split('/').map((part) => encodeURIComponent(part)).join('/');
+    return `/media/${encodedPath}`;
+  }
+
+  /** Whether a casual/prefetched stream URL is already in the SW STREAM_CACHE. */
+  private async isStreamCached(url: string): Promise<boolean> {
+    try {
+      if (!('caches' in window)) return false;
+      const cache = await caches.open(SW_STREAM_CACHE_NAME);
+      return !!(await cache.match(url));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Post a message to the active Service Worker and await its reply (via MessageChannel).
+   * Resolves false if there is no controller or the SW doesn't answer in time.
+   */
+  private postToServiceWorker(message: unknown, timeoutMs = 30000): Promise<boolean> {
+    return new Promise((resolve) => {
+      const controller = navigator.serviceWorker?.controller;
+      if (!controller) {
+        resolve(false);
+        return;
+      }
+      const channel = new MessageChannel();
+      const timer = setTimeout(() => resolve(false), timeoutMs);
+      channel.port1.onmessage = (event) => {
+        clearTimeout(timer);
+        resolve(!!(event.data && event.data.success));
+      };
+      controller.postMessage(message, [channel.port2]);
+    });
+  }
+
+  /**
+   * Prefetch a track in the background by warming the Service Worker STREAM_CACHE.
+   * Network-aware: respects connection quality and save-data mode. No audio bytes pass
+   * through the JS heap — the SW fetches and caches the stream itself.
    */
   async prefetchTrack(audio: Audio, priority: 'high' | 'normal' | 'low' = 'normal'): Promise<void> {
     const youtubeId = audio.youtube_id;
-    
+
     // Skip local files (no youtube_id)
     if (!youtubeId) return;
-    
+
     // Network quality check - skip prefetching on slow connections (unless high priority)
     if (priority !== 'high' && !shouldPrefetch()) {
       const networkInfo = getNetworkInfo();
       console.log(`[AudioCache] Skipping prefetch due to network: ${networkInfo.quality}, saveData: ${networkInfo.isSaveData}`);
       return;
     }
-    
+
     // Check backoff state for prefetch failures
     if (!apiBackoffs.prefetch.shouldAttempt()) {
       console.log(`[AudioCache] Skipping prefetch due to backoff (failures: ${apiBackoffs.prefetch.getFailureCount()})`);
       return;
     }
-    
-    // Fast path: check in-memory index first
-    if (this.cachedTrackIds.has(youtubeId)) {
-      console.log(`[AudioCache] Already cached (fast): ${audio.title}`);
-      return;
-    }
-    
-    // Skip if being prefetched
-    if (this.prefetchingInProgress.has(youtubeId)) return;
 
-    // Cap total in-flight prefetches so we never hold multiple full audio Blobs in RAM.
+    // Skip if being prefetched, or if too many are already in flight.
+    if (this.prefetchingInProgress.has(youtubeId)) return;
     if (this.prefetchingInProgress.size >= CACHE_CONFIG.maxConcurrentPrefetch) return;
 
-    // Double-check with DB
-    if (await this.isCached(youtubeId)) {
-      console.log(`[AudioCache] Already cached: ${audio.title}`);
-      return;
-    }
+    // Already durably available (pinned) — nothing to prefetch.
+    if (await this.isAvailableOffline(youtubeId)) return;
 
     this.prefetchingInProgress.add(youtubeId);
     const networkInfo = getNetworkInfo();
     console.log(`[AudioCache] Prefetching (${priority}, network: ${networkInfo.quality}): ${audio.title}`);
 
     try {
-      // Get stream URL
-      const response = await fetch(`/api/audio/${youtubeId}/player/`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        apiBackoffs.prefetch.recordFailure();
-        throw new Error('Failed to get stream URL');
+      // Resolve the exact URL the Player will stream: the direct /media/ URL when we know
+      // the file_path, otherwise the /player/ API's stream_url.
+      let streamUrl = this.buildDirectUrl(audio);
+      if (!streamUrl) {
+        const response = await fetch(`/api/audio/${youtubeId}/player/`, { credentials: 'include' });
+        if (!response.ok) {
+          apiBackoffs.prefetch.recordFailure();
+          throw new Error('Failed to get stream URL');
+        }
+        const data = await response.json();
+        streamUrl = data.stream_url;
+        if (!streamUrl) throw new Error('No stream URL returned');
       }
 
-      const data = await response.json();
-      const streamUrl = data.stream_url;
-
-      if (!streamUrl) throw new Error('No stream URL returned');
-
-      // Fetch the actual audio file
-      const audioResponse = await fetch(streamUrl);
-      if (!audioResponse.ok) {
-        apiBackoffs.prefetch.recordFailure();
-        throw new Error('Failed to fetch audio');
+      // Already cached as a casual stream? Done.
+      if (await this.isStreamCached(streamUrl)) {
+        apiBackoffs.prefetch.recordSuccess();
+        return;
       }
 
-      const blob = await audioResponse.blob();
-
-      // Cache it
-      await this.cacheAudio(youtubeId, blob, {
-        title: audio.title,
-        artist: audio.channel_name,
-        duration: audio.duration,
-      });
-
-      // Record success
-      apiBackoffs.prefetch.recordSuccess();
+      // Have the SW fetch + cache the stream into the evictable STREAM_CACHE.
+      const ok = await this.postToServiceWorker({ type: 'PREFETCH_STREAM', url: streamUrl });
+      if (ok) {
+        apiBackoffs.prefetch.recordSuccess();
+      } else {
+        apiBackoffs.prefetch.recordFailure();
+      }
     } catch (error) {
       console.error(`[AudioCache] Failed to prefetch ${audio.title}:`, error);
     } finally {

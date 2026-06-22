@@ -387,44 +387,45 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       if (audio.youtube_id) {
         try {
           setLoadingStream(true);
-          
-          // PRIORITY: Check ALL caches first (IndexedDB + Service Worker)
-          // This reduces data usage and battery consumption
-          const cachedResult = await audioCache.getAnyCachedUrl(audio.youtube_id);
-          if (cachedResult) {
-            console.log(`[Player] ✓ Playing from ${cachedResult.source} cache (saves data/battery):`, audio.title);
-            setStreamUrl(cachedResult.url);
+
+          // PINNED ("Made available offline"): let the Service Worker serve the download.
+          // It's keyed by youtube_id (distinct from casual /media/), works fully offline,
+          // and supports range/seek via the SW. No blob: URLs — the SW owns the bytes.
+          if (await audioCache.isAvailableOffline(audio.youtube_id)) {
+            const pinnedUrl = `/api/audio/${audio.youtube_id}/download/`;
+            console.log('[Player] ✓ Playing from pinned offline download:', audio.title);
+            setStreamUrl(pinnedUrl);
             setLoadingStream(false);
             setIsCachedPlayback(true);
-            return; // Always use cache if available - don't stream online
+            return;
           }
-          
-          // Check if we're offline - if so, we can't fetch from server
+
+          // Not pinned. If we know the file_path, stream the direct /media/ URL and let the
+          // SW's cache-first strategy serve it from the (evictable) STREAM_CACHE when it has
+          // been played or prefetched before — including offline. This avoids an API call.
+          if (audio.file_path) {
+            const encodedPath = audio.file_path.split('/').map(part => encodeURIComponent(part)).join('/');
+            const directUrl = `/media/${encodedPath}`;
+            console.log('[Player] → Streaming (SW serves from STREAM_CACHE when available):', audio.title);
+            setStreamUrl(directUrl);
+            setLoadingStream(false);
+            setIsCachedPlayback(false);
+
+            // Warm the SW STREAM_CACHE in the background for future (offline) plays.
+            if (settings.prefetch_enabled !== false) {
+              audioCache.prefetchTrack(audio, 'low').catch(console.error);
+            }
+            return;
+          }
+
+          // No file_path: we must resolve the stream URL from the API, which needs network.
           if (!navigator.onLine) {
             console.warn('[Player] ✗ Offline and no cached audio available:', audio.title);
             setLoadingStream(false);
             setIsCachedPlayback(false);
             return;
           }
-          
-          // OPTIMIZATION: If we have file_path, construct URL directly without API call
-          // This reduces latency and prevents buffering on track change
-          if (audio.file_path) {
-            const encodedPath = audio.file_path.split('/').map(part => encodeURIComponent(part)).join('/');
-            const directUrl = `/media/${encodedPath}`;
-            console.log('[Player] → Streaming directly (no API call):', audio.title);
-            setStreamUrl(directUrl);
-            setLoadingStream(false);
-            setIsCachedPlayback(false);
-            
-            // Cache the audio in the background for future plays
-            if (settings.prefetch_enabled !== false) {
-              audioCache.prefetchTrack(audio, 'low').catch(console.error);
-            }
-            return;
-          }
-          
-          // Fallback: fetch stream URL from API (for tracks without file_path)
+
           console.log('[Player] → Fetching stream URL from API:', audio.title);
           const response = await fetch(`/api/audio/${audio.youtube_id}/player/`, {
             credentials: 'include',
@@ -433,22 +434,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           setStreamUrl(data.stream_url);
           setLoadingStream(false);
           setIsCachedPlayback(false);
-          
-          // Cache the audio in the background for future plays (saves data next time)
+
+          // Warm the SW STREAM_CACHE in the background for future plays (saves data next time).
           if (data.stream_url && settings.prefetch_enabled !== false) {
             audioCache.prefetchTrack(audio, 'low').catch(console.error);
           }
         } catch (error) {
           console.error('Failed to fetch stream URL:', error);
-          
-          // If fetch failed (possibly offline), try one more time to get cached audio
-          const cachedResult = await audioCache.getAnyCachedUrl(audio.youtube_id);
-          if (cachedResult) {
-            console.log(`[Player] ✓ Fallback to ${cachedResult.source} cache after fetch error:`, audio.title);
-            setStreamUrl(cachedResult.url);
-            setIsCachedPlayback(true);
-          }
-          
           setLoadingStream(false);
         }
       }
