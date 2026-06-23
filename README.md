@@ -565,6 +565,17 @@ ports:
 
 ## 📝 Recent Changes
 
+### v1.14.0 - Offline-cache rewrite & compact sidebar (June 2026)
+
+#### Offline & caching
+- ✅ **Service Worker is now the single source of truth for offline audio** — the old dual cache (IndexedDB audio Blobs *and* SW Cache Storage) is consolidated into the service worker. No audio bytes pass through the JS heap anymore, removing a class of memory pressure on large libraries.
+- ✅ **Two purpose-built audio caches** — casual & prefetched streams go to an *evictable* cache (bounded by a 40-entry / 500 MB budget, oldest-first); "Make available offline" downloads go to a *pinned* cache that is never evicted. A one-time migration cleans up the old layout and deletes the legacy IndexedDB blob store on upgrade.
+- ✅ **Simpler, range-friendly playback** — prefetch warms the SW stream cache directly; the player streams pinned tracks from the download cache (with HTTP range/seek support) and casual tracks from the stream cache, online or offline.
+- ✅ **Stronger test safety net** — a second Playwright e2e guard verifies the pinned offline-download path (cache → offline → `<audio>` playback with range), alongside the existing casual-offline guard; both gated the rewrite in CI.
+
+#### UI
+- ✅ **Compact, adaptive sidebar** — navigation spacing is tighter and now scales automatically with viewport height (no width breakpoints), so the menu fits cleanly on any screen size while keeping accessible touch targets and scrolling gracefully on very short screens.
+
 ### v1.13.0 - Performance, PWA & a test harness (June 2026)
 
 #### Performance & memory

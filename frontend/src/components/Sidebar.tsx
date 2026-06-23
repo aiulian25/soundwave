@@ -22,6 +22,31 @@ interface SidebarProps {
   onMobileClose?: () => void;
 }
 
+// Shared nav-button styling. Vertical padding adapts to viewport height (clamp on vh) so
+// the list stays compact on short screens and comfortable on tall ones — automatically,
+// without width breakpoints. minHeight keeps an accessible touch/click target.
+const navButtonSx = {
+  borderRadius: '9999px',
+  py: 'clamp(0.5rem, 1vh, 0.75rem)',
+  px: 2,
+  minHeight: 40,
+  transition: 'all 0.3s ease',
+  '&.Mui-selected': {
+    bgcolor: 'rgba(19, 236, 106, 0.15)',
+    color: 'primary.main',
+    '&:hover': {
+      bgcolor: 'rgba(19, 236, 106, 0.2)',
+    },
+  },
+  '&:not(.Mui-selected)': {
+    color: 'text.secondary',
+    '&:hover': {
+      bgcolor: 'rgba(255, 255, 255, 0.05)',
+      color: 'text.primary',
+    },
+  },
+} as const;
+
 const menuItems = [
   { titleKey: 'sidebar.home', path: '/', icon: <HomeIcon /> },
   { titleKey: 'sidebar.search', path: '/search', icon: <SearchIcon /> },
@@ -77,32 +102,27 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
       </Box>
 
       {/* Navigation */}
-      <List sx={{ flexGrow: 1, px: 1.5, py: 2 }}>
+      <List
+        sx={{
+          flexGrow: 1,
+          px: 1.5,
+          py: 1,
+          // Safety net: if the list is still taller than the available height on a very
+          // short viewport, scroll it rather than clipping the bottom items.
+          overflowY: 'auto',
+          '&::-webkit-scrollbar': { width: 4 },
+          '&::-webkit-scrollbar-thumb': {
+            bgcolor: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: 2,
+          },
+        }}
+      >
         {menuItems.map((item) => (
-          <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
+          <ListItem key={item.path} disablePadding sx={{ mb: 'clamp(1px, 0.4vh, 6px)' }}>
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => handleNavigate(item.path)}
-              sx={{
-                borderRadius: '9999px',
-                py: 1.5,
-                px: 2,
-                transition: 'all 0.3s ease',
-                '&.Mui-selected': {
-                  bgcolor: 'rgba(19, 236, 106, 0.15)',
-                  color: 'primary.main',
-                  '&:hover': {
-                    bgcolor: 'rgba(19, 236, 106, 0.2)',
-                  },
-                },
-                '&:not(.Mui-selected)': {
-                  color: 'text.secondary',
-                  '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: 'text.primary',
-                  },
-                },
-              }}
+              sx={navButtonSx}
             >
               <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>
                 {item.icon}
@@ -145,26 +165,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         <ListItemButton
           selected={location.pathname === '/settings'}
           onClick={() => handleNavigate('/settings')}
-          sx={{
-            borderRadius: '9999px',
-            py: 1.5,
-            px: 2,
-            transition: 'all 0.3s ease',
-            '&.Mui-selected': {
-              bgcolor: 'rgba(19, 236, 106, 0.15)',
-              color: 'primary.main',
-              '&:hover': {
-                bgcolor: 'rgba(19, 236, 106, 0.2)',
-              },
-            },
-            '&:not(.Mui-selected)': {
-              color: 'text.secondary',
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.05)',
-                color: 'text.primary',
-              },
-            },
-          }}
+          sx={navButtonSx}
         >
           <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>
             <SettingsIcon />
