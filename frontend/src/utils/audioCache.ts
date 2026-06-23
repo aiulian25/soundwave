@@ -1,304 +1,94 @@
 /**
- * Advanced Audio Caching System
- * Intelligently prefetches likely-to-be-played tracks for seamless playback
- * Network-aware: adjusts behavior based on connection quality
+ * Audio caching coordinator.
+ *
+ * Source of truth for offline audio is the **Service Worker Cache Storage** (see
+ * public/service-worker.js), not IndexedDB:
+ *   - STREAM_CACHE (evictable) — casual + prefetched /media/ streams.
+ *   - AUDIO_CACHE  (pinned)    — "Make available offline" /download/ tracks.
+ *
+ * This module no longer stores audio Blobs in IndexedDB; it warms the SW caches and
+ * answers offline-availability + stats questions against them. The legacy IndexedDB
+ * blob store is deleted on init.
  */
 
 import { Audio } from '../types';
 import { getNetworkInfo, shouldPrefetch, getPrefetchCount, apiBackoffs } from './networkQuality';
 
-const DB_NAME = 'soundwave-audio-cache';
-const DB_VERSION = 2;
+// Legacy IndexedDB database (audio blobs) — deleted on init; kept here only so we can
+// drop it from users upgrading from the IndexedDB-backed cache.
+const LEGACY_DB_NAME = 'soundwave-audio-cache';
+
 // MUST match the cache names in public/service-worker.js — the SW owns these Cache
 // Storage buckets; reading the wrong name made the offline-cache index always empty.
 const SW_AUDIO_CACHE_NAME = 'soundwave-audio-v3'; // PINNED downloads
 const SW_STREAM_CACHE_NAME = 'soundwave-stream-v1'; // EVICTABLE casual + prefetched streams
-const STORES = {
-  AUDIO_BLOBS: 'audioBlobs',
-  METADATA: 'metadata',
-  ANALYTICS: 'analytics',
-};
 
-// Cache configuration
+// Cache configuration (surfaced to the settings UI).
 const CACHE_CONFIG = {
-  maxCacheSize: 500 * 1024 * 1024, // 500MB max cache
-  maxCachedTracks: 50, // Maximum number of tracks to cache
-  prefetchCount: 3, // Number of tracks to prefetch ahead
-  // Cap concurrent prefetches so at most one full audio Blob is held in memory at a
-  // time (each track is tens of MB; parallel prefetch let several coexist in RAM).
+  maxCacheSize: 500 * 1024 * 1024, // 500MB — mirrors the SW STREAM_CACHE byte budget
+  // Cap concurrent prefetches so we never warm several large streams at once.
   maxConcurrentPrefetch: 1,
-  staleTime: 7 * 24 * 60 * 60 * 1000, // 7 days
-  cleanupInterval: 60 * 60 * 1000, // 1 hour
 };
-
-interface CachedAudio {
-  id: string; // youtube_id
-  blob: Blob;
-  size: number;
-  cachedAt: number;
-  lastAccessed: number;
-  accessCount: number;
-  duration?: number;
-}
-
-interface CacheMetadata {
-  id: string;
-  youtube_id: string;
-  title: string;
-  artist?: string;
-  duration?: number;
-  cachedAt: number;
-  size: number;
-}
-
-interface PlayAnalytics {
-  id: string; // youtube_id
-  playCount: number;
-  lastPlayed: number;
-  skipCount: number;
-  completionRate: number;
-  listeningTime: number;
-}
 
 class AudioCacheManager {
-  private db: IDBDatabase | null = null;
   private prefetchQueue: Set<string> = new Set();
   private prefetchingInProgress: Set<string> = new Set();
-  private cleanupScheduled = false;
   private initialized = false;
-  // In-memory index for instant cache lookups (no async DB query needed)
-  private cachedTrackIds: Set<string> = new Set();
-  // Service Worker cache index (populated on init)
+  // Service Worker pinned-download cache index (populated on init).
   private swCachedTrackIds: Set<string> = new Set();
 
   /**
-   * Initialize IndexedDB for audio caching
+   * Initialise: build the SW cache index and drop the legacy IndexedDB blob store.
    */
   async init(): Promise<void> {
     if (this.initialized) return;
-    
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onerror = () => {
-        console.error('[AudioCache] Failed to open database:', request.error);
-        reject(request.error);
-      };
-      
-      request.onsuccess = () => {
-        this.db = request.result;
-        this.initialized = true;
-        this.scheduleCleanup();
-        // Build in-memory index for fast lookups
-        this.buildCacheIndex();
-        this.buildServiceWorkerCacheIndex();
-        console.log('[AudioCache] Initialized successfully');
-        resolve();
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-
-        // Audio blobs store
-        if (!db.objectStoreNames.contains(STORES.AUDIO_BLOBS)) {
-          const blobStore = db.createObjectStore(STORES.AUDIO_BLOBS, { keyPath: 'id' });
-          blobStore.createIndex('lastAccessed', 'lastAccessed', { unique: false });
-          blobStore.createIndex('cachedAt', 'cachedAt', { unique: false });
-        }
-
-        // Metadata store
-        if (!db.objectStoreNames.contains(STORES.METADATA)) {
-          db.createObjectStore(STORES.METADATA, { keyPath: 'id' });
-        }
-
-        // Analytics store for smart prefetching
-        if (!db.objectStoreNames.contains(STORES.ANALYTICS)) {
-          const analyticsStore = db.createObjectStore(STORES.ANALYTICS, { keyPath: 'id' });
-          analyticsStore.createIndex('playCount', 'playCount', { unique: false });
-          analyticsStore.createIndex('lastPlayed', 'lastPlayed', { unique: false });
-        }
-      };
-    });
+    this.initialized = true;
+    await this.buildServiceWorkerCacheIndex();
+    this.deleteLegacyDatabase();
+    console.log('[AudioCache] Initialized (Service Worker cache as source of truth)');
   }
 
-  /**
-   * Build in-memory index of cached track IDs for instant lookups
-   */
-  private async buildCacheIndex(): Promise<void> {
-    if (!this.db) return;
-    
+  /** Remove the obsolete IndexedDB audio-blob database from prior versions. */
+  private deleteLegacyDatabase(): void {
     try {
-      const transaction = this.db.transaction(STORES.AUDIO_BLOBS, 'readonly');
-      const store = transaction.objectStore(STORES.AUDIO_BLOBS);
-      const request = store.getAllKeys();
-      
-      request.onsuccess = () => {
-        this.cachedTrackIds = new Set(request.result as string[]);
-        console.log(`[AudioCache] Index built: ${this.cachedTrackIds.size} tracks in IndexedDB cache`);
-      };
-    } catch (error) {
-      console.error('[AudioCache] Failed to build cache index:', error);
+      if (typeof indexedDB !== 'undefined') {
+        indexedDB.deleteDatabase(LEGACY_DB_NAME);
+      }
+    } catch {
+      // Best-effort cleanup; ignore failures.
     }
   }
 
   /**
-   * Build in-memory index of Service Worker cached tracks
+   * Build in-memory index of Service Worker pinned-download tracks (by youtube_id).
    */
   private async buildServiceWorkerCacheIndex(): Promise<void> {
     try {
       if (!('caches' in window)) return;
-      
+
       const cache = await caches.open(SW_AUDIO_CACHE_NAME);
       const keys = await cache.keys();
-      
+
       this.swCachedTrackIds = new Set(
         keys
-          .map(req => {
+          .map((req) => {
             const match = req.url.match(/\/api\/audio\/([^/]+)\/download\//);
             return match ? match[1] : null;
           })
-          .filter((id): id is string => id !== null)
+          .filter((id): id is string => id !== null),
       );
-      
-      console.log(`[AudioCache] SW Index built: ${this.swCachedTrackIds.size} tracks in Service Worker cache`);
+
+      console.log(`[AudioCache] SW index built: ${this.swCachedTrackIds.size} pinned track(s)`);
     } catch (error) {
       console.error('[AudioCache] Failed to build SW cache index:', error);
     }
   }
 
   /**
-   * Fast synchronous check if a track is likely cached (checks in-memory index)
-   * Use this for instant UI feedback, then verify with async methods if needed
+   * Fast synchronous check whether a track is likely available offline (pinned index).
    */
   isLikelyCached(youtubeId: string): boolean {
-    return this.cachedTrackIds.has(youtubeId) || this.swCachedTrackIds.has(youtubeId);
-  }
-
-  /**
-   * Check if a track is cached
-   */
-  async isCached(youtubeId: string): Promise<boolean> {
-    // Fast path: check in-memory index first
-    if (this.cachedTrackIds.has(youtubeId)) {
-      return true;
-    }
-    
-    if (!this.db) await this.init();
-    
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction(STORES.AUDIO_BLOBS, 'readonly');
-        const store = transaction.objectStore(STORES.AUDIO_BLOBS);
-        const request = store.get(youtubeId);
-
-        request.onsuccess = () => {
-          const exists = !!request.result;
-          if (exists) {
-            this.cachedTrackIds.add(youtubeId); // Update index
-          }
-          resolve(exists);
-        };
-        request.onerror = () => resolve(false);
-      } catch {
-        resolve(false);
-      }
-    });
-  }
-
-  /**
-   * Get cached audio blob
-   */
-  async getCachedAudio(youtubeId: string): Promise<Blob | null> {
-    if (!this.db) await this.init();
-
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction(STORES.AUDIO_BLOBS, 'readwrite');
-        const store = transaction.objectStore(STORES.AUDIO_BLOBS);
-        const request = store.get(youtubeId);
-
-        request.onsuccess = () => {
-          const cached = request.result as CachedAudio | undefined;
-          if (cached) {
-            // Update access stats
-            cached.lastAccessed = Date.now();
-            cached.accessCount += 1;
-            store.put(cached);
-            resolve(cached.blob);
-          } else {
-            resolve(null);
-          }
-        };
-        request.onerror = () => resolve(null);
-      } catch {
-        resolve(null);
-      }
-    });
-  }
-
-  /**
-   * Get cached audio URL (creates object URL from blob)
-   */
-  async getCachedUrl(youtubeId: string): Promise<string | null> {
-    const blob = await this.getCachedAudio(youtubeId);
-    if (blob) {
-      return URL.createObjectURL(blob);
-    }
-    return null;
-  }
-
-  /**
-   * Cache an audio track
-   */
-  async cacheAudio(youtubeId: string, blob: Blob, metadata?: Partial<CacheMetadata>): Promise<boolean> {
-    if (!this.db) await this.init();
-
-    // Check if we need to free up space
-    await this.ensureCacheSpace(blob.size);
-
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction([STORES.AUDIO_BLOBS, STORES.METADATA], 'readwrite');
-        const blobStore = transaction.objectStore(STORES.AUDIO_BLOBS);
-        const metaStore = transaction.objectStore(STORES.METADATA);
-
-        const now = Date.now();
-        const cachedAudio: CachedAudio = {
-          id: youtubeId,
-          blob,
-          size: blob.size,
-          cachedAt: now,
-          lastAccessed: now,
-          accessCount: 1,
-          duration: metadata?.duration,
-        };
-
-        blobStore.put(cachedAudio);
-
-        if (metadata) {
-          const meta: CacheMetadata = {
-            id: youtubeId,
-            youtube_id: youtubeId,
-            title: metadata.title || '',
-            artist: metadata.artist,
-            duration: metadata.duration,
-            cachedAt: now,
-            size: blob.size,
-          };
-          metaStore.put(meta);
-        }
-
-        transaction.oncomplete = () => {
-          // Update in-memory index
-          this.cachedTrackIds.add(youtubeId);
-          console.log(`[AudioCache] Cached: ${youtubeId} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`);
-          resolve(true);
-        };
-        transaction.onerror = () => resolve(false);
-      } catch {
-        resolve(false);
-      }
-    });
+    return this.swCachedTrackIds.has(youtubeId);
   }
 
   /**
@@ -415,8 +205,7 @@ class AudioCacheManager {
   }
 
   /**
-   * Intelligent prefetch based on queue position, play patterns, and network quality
-   * Network-aware: adjusts prefetch count based on connection
+   * Intelligent prefetch based on queue position and network quality.
    */
   async prefetchUpcoming(queue: Audio[], currentIndex: number, shuffleEnabled: boolean = false): Promise<void> {
     if (queue.length === 0) return;
@@ -424,18 +213,18 @@ class AudioCacheManager {
     // Get network-aware prefetch count
     const networkPrefetchCount = getPrefetchCount();
     const networkInfo = getNetworkInfo();
-    
+
     // Skip all prefetching on poor connections or save-data mode
     if (networkPrefetchCount === 0) {
       console.log(`[AudioCache] Skipping prefetch - poor network (${networkInfo.quality}) or save-data enabled`);
       return;
     }
-    
+
     console.log(`[AudioCache] Prefetching ${networkPrefetchCount} tracks (network: ${networkInfo.quality})`);
 
     const tracksToPrefetch: Audio[] = [];
-    
-    // Prefetch next N tracks based on network quality (not fixed CACHE_CONFIG.prefetchCount)
+
+    // Prefetch next N tracks based on network quality
     for (let i = 1; i <= networkPrefetchCount; i++) {
       const nextIndex = currentIndex + i;
       if (nextIndex < queue.length) {
@@ -448,16 +237,14 @@ class AudioCacheManager {
       const randomIndices = new Set<number>();
       while (randomIndices.size < Math.min(1, queue.length - currentIndex - 1)) {
         const randomIndex = Math.floor(Math.random() * queue.length);
-        if (randomIndex !== currentIndex && !tracksToPrefetch.find(t => t.id === queue[randomIndex].id)) {
+        if (randomIndex !== currentIndex && !tracksToPrefetch.find((t) => t.id === queue[randomIndex].id)) {
           randomIndices.add(randomIndex);
         }
       }
-      randomIndices.forEach(idx => tracksToPrefetch.push(queue[idx]));
+      randomIndices.forEach((idx) => tracksToPrefetch.push(queue[idx]));
     }
 
-    // Always prefetch one track at a time so at most one full audio Blob is in memory.
-    // (Previously fast connections fired all prefetches in parallel, letting several
-    // tens-of-MB blobs coexist.) Higher-quality networks just prefetch more tracks.
+    // Always prefetch one track at a time. Higher-quality networks just prefetch more.
     const fastNetwork = networkInfo.quality === 'excellent' || networkInfo.quality === 'good';
     for (let i = 0; i < tracksToPrefetch.length; i++) {
       const priority = fastNetwork ? (i === 0 ? 'high' : i < 2 ? 'normal' : 'low') : 'high';
@@ -466,294 +253,49 @@ class AudioCacheManager {
   }
 
   /**
-   * Record play analytics for smarter prefetching
+   * Cache statistics for the (evictable) casual stream cache — what the settings UI shows
+   * and the "clear cache" button manages. Pinned downloads are managed per-playlist.
    */
-  async recordPlay(youtubeId: string, completed: boolean, listenedSeconds: number): Promise<void> {
-    if (!this.db) await this.init();
-
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction(STORES.ANALYTICS, 'readwrite');
-        const store = transaction.objectStore(STORES.ANALYTICS);
-        const request = store.get(youtubeId);
-
-        request.onsuccess = () => {
-          const existing = request.result as PlayAnalytics | undefined;
-          const analytics: PlayAnalytics = existing || {
-            id: youtubeId,
-            playCount: 0,
-            lastPlayed: 0,
-            skipCount: 0,
-            completionRate: 0,
-            listeningTime: 0,
-          };
-
-          analytics.playCount += 1;
-          analytics.lastPlayed = Date.now();
-          analytics.listeningTime += listenedSeconds;
-          
-          if (!completed) {
-            analytics.skipCount += 1;
-          }
-          
-          // Calculate completion rate
-          const totalPlays = analytics.playCount;
-          const completedPlays = totalPlays - analytics.skipCount;
-          analytics.completionRate = completedPlays / totalPlays;
-
-          store.put(analytics);
-          resolve();
-        };
-        request.onerror = () => resolve();
-      } catch {
-        resolve();
+  async getCacheStats(): Promise<{ count: number; totalSize: number }> {
+    let count = 0;
+    let totalSize = 0;
+    try {
+      if ('caches' in window) {
+        const cache = await caches.open(SW_STREAM_CACHE_NAME);
+        const keys = await cache.keys();
+        count = keys.length;
+        for (const req of keys) {
+          const res = await cache.match(req);
+          totalSize += res ? Number(res.headers.get('content-length')) || 0 : 0;
+        }
       }
-    });
-  }
-
-  /**
-   * Get frequently played tracks for proactive caching
-   */
-  async getFrequentlyPlayed(limit: number = 10): Promise<string[]> {
-    if (!this.db) await this.init();
-
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction(STORES.ANALYTICS, 'readonly');
-        const store = transaction.objectStore(STORES.ANALYTICS);
-        const index = store.index('playCount');
-        const request = index.openCursor(null, 'prev');
-
-        const results: string[] = [];
-        
-        request.onsuccess = () => {
-          const cursor = request.result;
-          if (cursor && results.length < limit) {
-            const analytics = cursor.value as PlayAnalytics;
-            // Only include tracks with good completion rate
-            if (analytics.completionRate > 0.5) {
-              results.push(analytics.id);
-            }
-            cursor.continue();
-          } else {
-            resolve(results);
-          }
-        };
-        request.onerror = () => resolve([]);
-      } catch {
-        resolve([]);
-      }
-    });
-  }
-
-  /**
-   * Ensure we have space for new cache entry
-   */
-  private async ensureCacheSpace(neededBytes: number): Promise<void> {
-    if (!this.db) return;
-
-    const stats = await this.getCacheStats();
-    
-    if (stats.totalSize + neededBytes > CACHE_CONFIG.maxCacheSize) {
-      // Need to evict old entries
-      const bytesToFree = stats.totalSize + neededBytes - CACHE_CONFIG.maxCacheSize + (10 * 1024 * 1024); // Free extra 10MB
-      await this.evictOldest(bytesToFree);
+    } catch (error) {
+      console.error('[AudioCache] Failed to read cache stats:', error);
     }
-
-    if (stats.count >= CACHE_CONFIG.maxCachedTracks) {
-      // Too many tracks, evict some
-      await this.evictOldest(0, 5);
-    }
+    return { count, totalSize };
   }
 
   /**
-   * Evict oldest/least used cache entries
-   */
-  private async evictOldest(bytesToFree: number = 0, minToEvict: number = 0): Promise<void> {
-    if (!this.db) return;
-
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction(STORES.AUDIO_BLOBS, 'readwrite');
-        const store = transaction.objectStore(STORES.AUDIO_BLOBS);
-        const index = store.index('lastAccessed');
-        const request = index.openCursor();
-
-        let freedBytes = 0;
-        let evictedCount = 0;
-
-        request.onsuccess = () => {
-          const cursor = request.result;
-          if (cursor) {
-            const entry = cursor.value as CachedAudio;
-            
-            // Check if entry is stale
-            const isStale = Date.now() - entry.cachedAt > CACHE_CONFIG.staleTime;
-            const shouldEvict = isStale || 
-              freedBytes < bytesToFree || 
-              evictedCount < minToEvict;
-
-            if (shouldEvict) {
-              console.log(`[AudioCache] Evicting: ${entry.id} (${(entry.size / 1024 / 1024).toFixed(2)}MB)`);
-              cursor.delete();
-              freedBytes += entry.size;
-              evictedCount++;
-            }
-
-            cursor.continue();
-          } else {
-            console.log(`[AudioCache] Cleanup complete: evicted ${evictedCount} tracks, freed ${(freedBytes / 1024 / 1024).toFixed(2)}MB`);
-            resolve();
-          }
-        };
-        request.onerror = () => resolve();
-      } catch {
-        resolve();
-      }
-    });
-  }
-
-  /**
-   * Get cache statistics
-   */
-  async getCacheStats(): Promise<{ count: number; totalSize: number; oldestEntry: number }> {
-    if (!this.db) await this.init();
-
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction(STORES.AUDIO_BLOBS, 'readonly');
-        const store = transaction.objectStore(STORES.AUDIO_BLOBS);
-        const request = store.getAll();
-
-        request.onsuccess = () => {
-          const entries = request.result as CachedAudio[];
-          const totalSize = entries.reduce((sum, e) => sum + e.size, 0);
-          const oldestEntry = entries.length > 0 
-            ? Math.min(...entries.map(e => e.cachedAt))
-            : Date.now();
-
-          resolve({
-            count: entries.length,
-            totalSize,
-            oldestEntry,
-          });
-        };
-        request.onerror = () => resolve({ count: 0, totalSize: 0, oldestEntry: Date.now() });
-      } catch {
-        resolve({ count: 0, totalSize: 0, oldestEntry: Date.now() });
-      }
-    });
-  }
-
-  /**
-   * Clear all cached audio
+   * Clear the casual stream cache (does not touch pinned "available offline" downloads).
    */
   async clearCache(): Promise<void> {
-    if (!this.db) await this.init();
-
-    return new Promise((resolve) => {
-      try {
-        const transaction = this.db!.transaction([STORES.AUDIO_BLOBS, STORES.METADATA], 'readwrite');
-        transaction.objectStore(STORES.AUDIO_BLOBS).clear();
-        transaction.objectStore(STORES.METADATA).clear();
-        transaction.oncomplete = () => {
-          console.log('[AudioCache] Cache cleared');
-          resolve();
-        };
-        transaction.onerror = () => resolve();
-      } catch {
-        resolve();
-      }
-    });
-  }
-
-  /**
-   * Check Service Worker cache for offline audio (used by "Cache for Offline" feature)
-   * This is different from IndexedDB cache - it uses the Cache API
-   */
-  async getServiceWorkerCachedUrl(youtubeId: string): Promise<string | null> {
     try {
-      // Check if Cache API is available
-      if (!('caches' in window)) {
-        console.log('[AudioCache] Cache API not available');
-        return null;
+      if ('caches' in window) {
+        await caches.delete(SW_STREAM_CACHE_NAME);
+        console.log('[AudioCache] Stream cache cleared');
       }
-
-      // The download URL that was cached by "Make Available Offline"
-      const downloadUrl = `/api/audio/${youtubeId}/download/`;
-      
-      // Check the audio cache
-      const audioCache = await caches.open(SW_AUDIO_CACHE_NAME);
-      const cachedResponse = await audioCache.match(downloadUrl);
-      
-      if (cachedResponse) {
-        console.log('[AudioCache] Found in Service Worker cache:', youtubeId);
-        const blob = await cachedResponse.blob();
-        return URL.createObjectURL(blob);
-      }
-      
-      return null;
     } catch (error) {
-      console.error('[AudioCache] Error checking Service Worker cache:', error);
-      return null;
+      console.error('[AudioCache] Failed to clear stream cache:', error);
     }
-  }
-
-  /**
-   * Get any cached audio URL - checks both IndexedDB and Service Worker cache
-   * Priority: IndexedDB (faster) -> Service Worker Cache (offline feature)
-   * Optimized with in-memory index for instant lookups
-   */
-  async getAnyCachedUrl(youtubeId: string): Promise<{ url: string; source: 'indexeddb' | 'serviceworker' } | null> {
-    // Fast path: check in-memory indexes first to determine where to look
-    const inIndexedDb = this.cachedTrackIds.has(youtubeId);
-    const inServiceWorker = this.swCachedTrackIds.has(youtubeId);
-    
-    // If not in any index, skip expensive lookups
-    if (!inIndexedDb && !inServiceWorker) {
-      return null;
-    }
-    
-    // Check IndexedDB first if likely there (fastest for blob retrieval)
-    if (inIndexedDb) {
-      const indexedDbUrl = await this.getCachedUrl(youtubeId);
-      if (indexedDbUrl) {
-        return { url: indexedDbUrl, source: 'indexeddb' };
-      }
-    }
-
-    // Then check Service Worker cache
-    if (inServiceWorker) {
-      const swUrl = await this.getServiceWorkerCachedUrl(youtubeId);
-      if (swUrl) {
-        return { url: swUrl, source: 'serviceworker' };
-      }
-    }
-    
-    // Fallback: check both caches anyway (index might be stale)
-    const indexedDbUrl = await this.getCachedUrl(youtubeId);
-    if (indexedDbUrl) {
-      this.cachedTrackIds.add(youtubeId); // Update index
-      return { url: indexedDbUrl, source: 'indexeddb' };
-    }
-
-    const swUrl = await this.getServiceWorkerCachedUrl(youtubeId);
-    if (swUrl) {
-      this.swCachedTrackIds.add(youtubeId); // Update index
-      return { url: swUrl, source: 'serviceworker' };
-    }
-
-    return null;
   }
 
   /**
    * Whether a track is durably available offline.
    *
    * Single source of truth: the Service Worker **download** cache (tracks the user
-   * explicitly "Made available offline" — pinned, never evicted). The IndexedDB blobs
-   * are only a transient prefetch/speed buffer (LRU-evicted), so they are deliberately
-   * NOT counted here — otherwise a track that was merely prefetched would falsely report
-   * as "available offline" and then vanish on eviction.
+   * explicitly "Made available offline" — pinned, never evicted). Casual/prefetched
+   * streams in STREAM_CACHE are deliberately NOT counted — they are LRU-evictable, so a
+   * merely-prefetched track must not report as durably "available offline".
    */
   async isAvailableOffline(youtubeId: string): Promise<boolean> {
     if (this.swCachedTrackIds.has(youtubeId)) {
@@ -775,29 +317,14 @@ class AudioCacheManager {
   }
 
   /**
-   * Schedule periodic cleanup
-   */
-  private scheduleCleanup(): void {
-    if (this.cleanupScheduled) return;
-    this.cleanupScheduled = true;
-
-    setInterval(async () => {
-      console.log('[AudioCache] Running scheduled cleanup...');
-      await this.evictOldest(0, 0); // Just clean stale entries
-    }, CACHE_CONFIG.cleanupInterval);
-  }
-
-  /**
-   * Refresh the Service Worker cache index
-   * Call this after caching a playlist to update the in-memory index
+   * Refresh the Service Worker cache index (call after caching a playlist offline).
    */
   async refreshServiceWorkerIndex(): Promise<void> {
     await this.buildServiceWorkerCacheIndex();
   }
 
   /**
-   * Add a track ID to the Service Worker cache index
-   * Call this when you know a track was just cached
+   * Add a track ID to the Service Worker cache index (when known to be freshly pinned).
    */
   addToServiceWorkerIndex(youtubeId: string): void {
     this.swCachedTrackIds.add(youtubeId);
