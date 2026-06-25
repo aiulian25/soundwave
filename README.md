@@ -1,4 +1,4 @@
-# 🎵 SoundWave
+# SoundWave
 
 ![SoundWave Banner](https://img.shields.io/badge/SoundWave-Audio%20Archive-5C6BC0?style=for-the-badge)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](https://www.docker.com/)
@@ -6,7 +6,7 @@
 
 **SoundWave** is a self-hosted audio archiving and streaming platform inspired by TubeArchivist. Download, organize, and enjoy your YouTube audio collection offline through a beautiful dark-themed web interface.
 
-## 📸 Screenshots
+## Screenshots
 
 <p align="center">
   <img src="docs/screenshots/hero.png" alt="SoundWave — library, now-playing and live visualizer" width="900">
@@ -37,66 +37,66 @@
 
 <sub>UI previews shown with placeholder data only (no real titles, artwork, or personal data).</sub>
 
-## ✨ Features
+## Features
 
 ### Core Features
-- 🎧 **Audio-Only Downloads** - Extract high-quality audio from YouTube using yt-dlp
-- 📚 **Smart Organization** - Index audio files with full metadata (title, artist, duration, etc.)
-- 🔍 **Powerful Search** - Find your audio quickly with ElasticSearch-powered indexing
-- 🎵 **Built-in Player** - Stream your collection directly in the browser
-- ▶️ **Auto-Play / Continuous Playback** - Automatically plays next track in queue
-- 🔁 **Repeat Modes** - Repeat one track, repeat all, or normal playback
-- 🔀 **Shuffle** - Smart shuffle and regular shuffle modes
-- 📊 **Channel Subscriptions** - Subscribe to YouTube channels and automatically download new audio
-- 📝 **Playlists** - Create custom playlists or sync YouTube playlists
-- 🔄 **Force Recheck** - Per-playlist force recheck to verify and re-download missing files
-- ✨ **Smart Playlists** - Dynamic auto-updating playlists based on rules (Most Played, Recently Added, Genre filters, and more)
-- 🌐 **Multi-Language UI** - Full English and Romanian translations across all pages
+- **Audio-Only Downloads** - Extract high-quality audio from YouTube using yt-dlp
+- **Smart Organization** - Index audio files with full metadata (title, artist, duration, etc.)
+- **Powerful Search** - Find your audio quickly with ElasticSearch-powered indexing
+- **Built-in Player** - Stream your collection directly in the browser
+- **Auto-Play / Continuous Playback** - Automatically plays next track in queue
+- **Repeat Modes** - Repeat one track, repeat all, or normal playback
+- **Shuffle** - Smart shuffle and regular shuffle modes
+- **Channel Subscriptions** - Subscribe to YouTube channels and automatically download new audio
+- **Playlists** - Create custom playlists or sync YouTube playlists
+- **Force Recheck** - Per-playlist force recheck to verify and re-download missing files
+- **Smart Playlists** - Dynamic auto-updating playlists based on rules (Most Played, Recently Added, Genre filters, and more)
+- **Multi-Language UI** - Full English and Romanian translations across all pages
 
 ### Analytics & Achievements
-- 🏆 **Achievements System** - 37 unlockable achievements across 6 categories (Tracks, Hours, Streaks, Artists, Channels, Special)
-- 🔥 **Listening Streaks** - Track daily listening streaks with visual weekly activity grid
-- 📅 **Yearly Wrapped** - Spotify-style year-in-review with top artists, tracks, and personalized insights
-- 🎉 **Achievement Notifications** - Real-time celebration popup with confetti when unlocking achievements
-- 📈 **Listening History** - Complete history of played tracks with "On This Day" memories
-- 📊 **Analytics Dashboard** - Detailed listening insights, genre breakdown, peak hours, and more
+- **Achievements System** - 37 unlockable achievements across 6 categories (Tracks, Hours, Streaks, Artists, Channels, Special)
+- **Listening Streaks** - Track daily listening streaks with visual weekly activity grid
+- **Yearly Wrapped** - Spotify-style year-in-review with top artists, tracks, and personalized insights
+- **Achievement Notifications** - Real-time celebration popup with confetti when unlocking achievements
+- **Listening History** - Complete history of played tracks with "On This Day" memories
+- **Analytics Dashboard** - Detailed listening insights, genre breakdown, peak hours, and more
 
 ### Lyrics Features
-- 🎤 **Synced Lyrics** - Display lyrics in sync with music playback (online & offline)
-- 📤 **LRC Upload** - Upload your own .lrc files for synced lyrics
-- 🔎 **Lyrics Search** - Search and apply lyrics from LRCLIB database
-- 💾 **Persistent Lyrics** - Uploaded lyrics are saved permanently with the track
+- **Synced Lyrics** - Display lyrics in sync with music playback (online & offline)
+- **LRC Upload** - Upload your own .lrc files for synced lyrics
+- **Lyrics Search** - Search and apply lyrics from LRCLIB database
+- **Persistent Lyrics** - Uploaded lyrics are saved permanently with the track
 
 ### Export & Download
-- 📥 **Export Dialog** - Export tracks as MP3 or FLAC with embedded metadata
-- 🎵 **Embedded Lyrics** - Export with synced lyrics (SYLT for MP3, LRC for FLAC)
-- 🖼️ **Embedded Artwork** - Include album art in exported files
-- 🎚️ **Quality Selection** - Choose export quality (320kbps, 192kbps, 128kbps)
+- **Export Dialog** - Export tracks as MP3 or FLAC with embedded metadata
+- **Embedded Lyrics** - Export with synced lyrics (SYLT for MP3, LRC for FLAC)
+- **Embedded Artwork** - Include album art in exported files
+- **Quality Selection** - Choose export quality (320kbps, 192kbps, 128kbps)
 
 ### PWA & Offline Features
-- 📱 **PWA Support** - Install as mobile/desktop app with rounded app icon
-- 💾 **Full Offline Playback** - Cache playlists with audio, lyrics, and metadata for offline use
-- 🔄 **Background Caching** - Non-blocking progress indicator while caching
-- 🖼️ **Media Session Artwork** - Album art in system notifications (all browsers)
-- 🔋 **Battery Efficient** - Lightweight frontend with no background polling; server handles all heavy work
-- ⚙️ **Configurable Sync** - Optional cross-device playback sync (can be disabled in settings)
+- **PWA Support** - Install as mobile/desktop app with rounded app icon
+- **Full Offline Playback** - Cache playlists with audio, lyrics, and metadata for offline use
+- **Background Caching** - Non-blocking progress indicator while caching
+- **Media Session Artwork** - Album art in system notifications (all browsers)
+- **Battery Efficient** - Lightweight frontend with no background polling; server handles all heavy work
+- **Configurable Sync** - Optional cross-device playback sync (can be disabled in settings)
 
 ### Visual & UI
-- 🌙 **Dark Theme** - Beautiful Material Design dark UI
-- 🎨 **Audio Visualizer** - Multiple visualization themes (Classic, Neon, Minimal, etc.)
-- 📐 **Responsive Grid** - 2-column layout on mobile, scales to 4 columns on desktop
-- 🖼️ **Offline Fallbacks** - Album art fallback icons when offline
+- **Dark Theme** - Beautiful Material Design dark UI
+- **Audio Visualizer** - Multiple visualization themes (Classic, Neon, Minimal, etc.)
+- **Responsive Grid** - 2-column layout on mobile, scales to 4 columns on desktop
+- **Offline Fallbacks** - Album art fallback icons when offline
 
 ### Other Features
-- 📈 **Statistics** - Track plays, downloads, and library stats
-- 🔐 **User Management** - Multi-user support with authentication
-- ⚡ **Background Tasks** - Celery-powered async downloads and updates
-- 💾 **Persistent Storage** - Data survives container rebuilds
-- 🚫 **Smart Error Handling** - Automatically skips permanently unavailable videos (copyright blocked, private, removed)
-- 🗑️ **Deleted Video Detection** - Detects `[Deleted video]` / `[Private video]` entries from YouTube, skips download attempts, and preserves locally-kept copies
-- 👤 **Admin User Management** - Full user deletion with cascade cleanup of audio files, channels, playlists, and avatars
+- **Statistics** - Track plays, downloads, and library stats
+- **User Management** - Multi-user support with authentication
+- **Background Tasks** - Celery-powered async downloads and updates
+- **Persistent Storage** - Data survives container rebuilds
+- **Smart Error Handling** - Automatically skips permanently unavailable videos (copyright blocked, private, removed)
+- **Deleted Video Detection** - Detects `[Deleted video]` / `[Private video]` entries from YouTube, skips download attempts, and preserves locally-kept copies
+- **Admin User Management** - Full user deletion with cascade cleanup of audio files, channels, playlists, and avatars
 
-## 🏗️ Architecture
+## Architecture
 
 - **Backend**: Django REST Framework (Python)
 - **Frontend**: React + TypeScript + Material-UI
@@ -106,7 +106,7 @@
 - **Audio Extraction**: yt-dlp + FFmpeg
 - **Containerization**: Docker
 
-## 📋 Prerequisites
+## Prerequisites
 
 - **Docker** (version 20.10+) and **Docker Compose V2** (`docker compose`, not the old `docker-compose`)
 - **Python 3** on the host (for generating secrets in Step 3 — usually pre-installed)
@@ -114,24 +114,7 @@
 - Dual-core CPU (quad-core recommended)
 - Storage space for your audio library
 
-## ⚠️ Important Notes
-
-### Elasticsearch Version Update (v9.0.0)
-
-As of February 2026, SoundWave uses **Elasticsearch 9.0.0**. If you're upgrading from a previous installation that used Elasticsearch 8.x:
-
-- **New installations**: No action needed, just follow the Quick Start guide.
-- **Existing installations with ES 8.x data**: Your data will be automatically upgraded on first start with ES 9.x.
-- **Downgrade warning**: If you previously ran ES 9.x and try to use ES 8.x, it will fail because Lucene index formats are not backwards compatible. Always ensure your docker-compose uses ES 9.0.0 or later.
-
-If you encounter Elasticsearch startup errors mentioning "Lucene912 codec not found", update your `docker-compose.yml` to use `elasticsearch:9.0.0` or delete the ES volume to start fresh:
-```bash
-docker compose down
-docker volume rm soundwave_es_data  # Warning: this deletes search index data
-docker compose up -d
-```
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Step 1: Download Files
 
@@ -223,11 +206,11 @@ Docker will automatically create the `pg_data` volume for PostgreSQL data. No ma
 grep SW_PASSWORD .env
 ```
 
-> ⚠️ **First login:** You'll be **required to set a new admin password** before you can use the app — the initial `SW_PASSWORD` cannot remain in use. Choose something strong and memorable.
+> **First login:** You'll be **required to set a new admin password** before you can use the app — the initial `SW_PASSWORD` cannot remain in use. Choose something strong and memorable.
 
 Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to initialize before SoundWave starts.
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -275,7 +258,7 @@ Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to
 | `es_data` (Docker volume) | Elasticsearch index — created automatically by Docker Compose |
 | `redis_data` (Docker volume) | Redis persistence — created automatically by Docker Compose |
 
-## � Dashboard Integration (Homepage)
+## Dashboard Integration (Homepage)
 
 SoundWave provides a TubeArchivist-compatible API for integration with [Homepage](https://gethomepage.dev/) and other dashboard applications.
 
@@ -307,7 +290,7 @@ SoundWave provides a TubeArchivist-compatible API for integration with [Homepage
 
 For detailed API documentation, see [docs/WIDGET_API.md](docs/WIDGET_API.md).
 
-## �📖 Usage
+## Usage
 
 ### Downloading Audio
 
@@ -334,12 +317,12 @@ Smart Playlists automatically update based on rules you define:
 
 1. Go to **Smart Playlists** in the sidebar
 2. **Auto Playlists** (system presets) are created automatically:
-   - 🔥 **Most Played** - Your top 50 most played tracks
-   - ✨ **Recently Added** - Tracks added in the last 30 days
-   - 🕰️ **Rediscover** - Tracks not played in over 60 days
-   - 🆕 **Never Played** - Tracks you haven't listened to yet
-   - ⚡ **Quick Hits** - Tracks under 3 minutes
-   - 🎸 **Epic Tracks** - Tracks over 6 minutes
+   - **Most Played** - Your top 50 most played tracks
+   - **Recently Added** - Tracks added in the last 30 days
+   - **Rediscover** - Tracks not played in over 60 days
+   - **Never Played** - Tracks you haven't listened to yet
+   - **Quick Hits** - Tracks under 3 minutes
+   - **Epic Tracks** - Tracks over 6 minutes
 3. **Create Custom Smart Playlists**:
    - Click "Create" to make a new smart playlist
    - Add rules like "Genre contains Rock" or "Play count > 10"
@@ -387,7 +370,7 @@ Smart Playlists automatically update based on rules you define:
    - Total **hours, tracks, artists, and channels**
 3. Use the year dropdown to view previous years' summaries
 
-## 🛠️ Development
+## Development
 
 ### Build From Source
 
@@ -432,7 +415,7 @@ npm run dev
 
 The frontend will be available at `http://localhost:3000` with hot reload.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 soundwave/
@@ -465,7 +448,7 @@ soundwave/
 └── README.md             # This file
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Permission Denied Errors
 
@@ -502,44 +485,11 @@ docker inspect --format='{{.State.Health.Status}}' soundwave-pg
 docker compose logs soundwave-pg
 ```
 
-If the `pg_data` volume is corrupted, you can reset it (⚠️ **this deletes all data**):
+If the `pg_data` volume is corrupted, you can reset it ( **this deletes all data**):
 
 ```bash
 docker compose down
 docker volume rm soundwave_pg_data
-docker compose up -d
-```
-
-### Upgrading from SQLite (existing v1.10.x installations)
-
-If you are upgrading from a version that used SQLite (`./data/db.sqlite3`), your data needs to be migrated once to PostgreSQL.
-
-**Before starting**, make sure your `.env` contains the new `POSTGRES_*` variables (see Step 3 in Quick Start).
-
-```bash
-# 1. Pull the new images
-docker compose pull
-
-# 2. Stop the old soundwave container (keep other services running)
-docker compose stop soundwave
-
-# 3. Start PostgreSQL
-docker compose up -d soundwave-pg
-
-# Wait for it to become healthy
-until [ "$(docker inspect --format='{{.State.Health.Status}}' soundwave-pg 2>/dev/null)" = "healthy" ]; do
-  echo -n "."; sleep 2
-done && echo " PostgreSQL ready!"
-
-# 4. Create the PostgreSQL schema
-docker compose run --rm soundwave python /app/backend/manage.py migrate --no-input
-
-# 5. Download and run the data migration script
-wget https://raw.githubusercontent.com/aiulian25/soundwave/main/scripts/migrate_sqlite_to_pg.py -O ./data/migrate.py
-docker compose run --rm soundwave python /app/data/migrate.py
-rm ./data/migrate.py
-
-# 6. Start everything
 docker compose up -d
 ```
 
@@ -562,335 +512,7 @@ Change the port in `docker-compose.yml`:
 ports:
   - "YOUR_PORT:8888"
 ```
-
-## 📝 Recent Changes
-
-### v1.14.0 - Offline-cache rewrite & compact sidebar (June 2026)
-
-#### Offline & caching
-- ✅ **Service Worker is now the single source of truth for offline audio** — the old dual cache (IndexedDB audio Blobs *and* SW Cache Storage) is consolidated into the service worker. No audio bytes pass through the JS heap anymore, removing a class of memory pressure on large libraries.
-- ✅ **Two purpose-built audio caches** — casual & prefetched streams go to an *evictable* cache (bounded by a 40-entry / 500 MB budget, oldest-first); "Make available offline" downloads go to a *pinned* cache that is never evicted. A one-time migration cleans up the old layout and deletes the legacy IndexedDB blob store on upgrade.
-- ✅ **Simpler, range-friendly playback** — prefetch warms the SW stream cache directly; the player streams pinned tracks from the download cache (with HTTP range/seek support) and casual tracks from the stream cache, online or offline.
-- ✅ **Stronger test safety net** — a second Playwright e2e guard verifies the pinned offline-download path (cache → offline → `<audio>` playback with range), alongside the existing casual-offline guard; both gated the rewrite in CI.
-
-#### UI
-- ✅ **Compact, adaptive sidebar** — navigation spacing is tighter and now scales automatically with viewport height (no width breakpoints), so the menu fits cleanly on any screen size while keeping accessible touch targets and scrolling gracefully on very short screens.
-
-### v1.13.0 - Performance, PWA & a test harness (June 2026)
-
-#### Performance & memory
-- ✅ **Visualizer decoupled from React state** — the audio visualizer no longer pushes state ~60×/second; it reads the analyser inside its own canvas RAF and stops entirely when idle. The Player stopped re-rendering continuously (the bulk of the high idle CPU/memory).
-- ✅ **Web Audio graph torn down on unmount** — the `AudioContext` + nodes are now closed/disconnected, fixing a native-memory leak and the eventual "max AudioContexts" failure on breakpoint flips.
-- ✅ **Code-split** — rare/heavy routes (Settings, Analytics, Yearly Wrapped, the 17 visualizer themes, …) load on demand; the main JS bundle dropped **~38% (644 K → ~400 K)** for a faster first paint. A `LazyRouteBoundary` recovers chunk-load failures (reload on stale deploy, localized retry offline).
-- ✅ **Offline-cache consistency** — fixed the SW audio-cache name mismatch, and "available offline" is now defined by a single source of truth (the pinned download cache), not the transient prefetch buffer.
-
-#### PWA
-- ✅ **Pull-to-refresh on Home** — drag down at the top of the Home page to force a PWA update (clears the app-shell cache, activates the new service worker, reloads) — without manually clearing cache, and without deleting offline downloads. Scoped to Home so it can't fire during playback.
-
-#### Testing (new)
-- ✅ **Frontend test harness** — Vitest unit tests (backoff logic, password-error mapping, and a guard that fails if the SW cache name drifts) run in CI before the image builds; Playwright e2e (login / play / offline playback / pull-to-refresh) with a deterministic `seed_e2e` backend command and a dedicated CI job.
-
-#### Docs
-- ✅ **README screenshots** — a gallery of the UI (placeholder data only).
-
-### v1.12.2 - Fix in-app version reporting (June 2026)
-
-- ✅ **Accurate version after upgrade** — `/api/version/` cached its whole result (including `current_version`) in Redis for 6h, so after upgrading the image the app kept reporting the *previous* version until the cache expired (Redis outlives the app container). Now only the GitHub release lookup is cached; `current_version` is always read live from the running build, so an upgrade reflects immediately.
-
-### v1.12.1 - Performance & Memory (June 2026)
-
-#### Memory & performance (from a PWA memory-leak audit)
-- ✅ **Bounded service-worker audio cache** — Casually-streamed audio is now evicted oldest-first once over 40 tracks / 500 MB, so Cache Storage no longer grows unboundedly across sessions. Tracks you explicitly **"Made available offline" are pinned and never evicted**.
-- ✅ **Streaming range requests** — Cached-audio range requests now slice the `Blob` directly (zero-copy) instead of reading the whole file into RAM via `arrayBuffer()` on every seek (iOS Safari issues many) — far lower memory spikes during playback.
-- ✅ **Serialized prefetch** — Upcoming-track prefetch runs one at a time (cap of 1 in-flight), so at most a single audio blob is held in memory instead of several coexisting on fast connections.
-- ✅ **Lighter long lists** — Library & Favorites tables use `content-visibility` so off-screen rows skip layout/paint (keeping refs, highlight-scroll and scroll-to-top intact).
-
-#### UI
-- ✅ **Version label** — The sidebar now reads **“SoundWave V<version>”** with the always-on status button (blue = up to date, red = update available).
-
-### v1.12.0 - Deep Security Assessment Remediation (June 2026)
-
-A full security assessment (`SECURITY_ASSESSMENT.md`) was completed and every actionable finding remediated. All new user-facing strings are localized (English + Romanian).
-
-#### Authentication & Account Security
-- ✅ **Forced admin password change (APP-01)** — The bootstrap admin must set a new password on first login; the initial `SW_PASSWORD` can no longer remain in use on an exposed instance.
-- ✅ **Password strength policy** — New/changed passwords are validated for length and complexity, with localized error messages.
-- ✅ **2FA secrets encrypted at rest** — TOTP secrets are Fernet-encrypted in the database, and backup codes are hashed instead of stored in plaintext.
-- ✅ **Verified email changes** — When SMTP is configured, changing an account email sends a confirmation link and only applies once confirmed (`pending_email`).
-- ✅ **Login lockout hardening** — Per-IP/username lockout derives the real client IP via `NUM_PROXIES`, preventing spoofing behind a reverse proxy.
-
-#### Access Control & Data Isolation
-- ✅ **Per-user media authorization (IDOR fix, APP-05)** — Streaming a file now checks ownership; users can only access their own audio (admins bypass).
-- ✅ **Signed, short-lived media tickets** — Long-lived `?token=` media auth replaced with expiring, HMAC-signed, path-bound tickets.
-- ✅ **Object-ownership filtering (BOLA)** — API list/detail views filter by owner so users can't read others' objects by ID.
-- ✅ **No wildcard CORS on media (APP-11)** — Media responses no longer send `Access-Control-Allow-Origin: *`.
-- ✅ **Restricted API docs/schema** — Swagger/OpenAPI schema is limited to users who can manage users.
-- ✅ **Complete account deletion** — Deleting a user removes all on-disk files (downloaded audio, **local uploads + cover art**, custom avatar) and cascades every DB relationship; no delete route can orphan files.
-
-#### Input & Request Hardening
-- ✅ **SSRF guard** — Outbound URL fetches (artwork, public links) validate the resolved host and block private/internal targets.
-- ✅ **Avatar upload validation** — Uploads are verified by image magic-bytes, not just extension or content-type.
-
-#### Container & Dependency Hardening
-- ✅ **Non-root container user (CNT-01)** — The image runs as an unprivileged `appuser`.
-- ✅ **Pinned `yt-dlp` (CNT-02)** — Installed and pinned in the image (`2026.6.9`); there is no runtime `pip` on the read-only rootfs.
-- ✅ **Leaner image (CNT-04)** — `--no-install-recommends`, pinned build tools, and pruned unused Mesa GPU drivers shrink the attack surface and CVE count.
-
-#### Secrets, Network & Supply-chain
-- ✅ **Strong unique service secrets (DEP-01)** — `setup.sh` generates them; `scripts/rotate-secrets.sh` rotates live Postgres/Redis/Elasticsearch credentials in place.
-- ✅ **Network isolation (DEP-04)** — Postgres/Redis/Elasticsearch live on an `internal` Docker network with no host reachability and no internet egress; only the app is externally reachable.
-- ✅ **Secure cookies / HSTS (DEP-05/06)** — `SECURE_COOKIES`/`SSL_REDIRECT` for HTTPS deployments, with startup warnings when misconfigured (e.g. an HTTPS `SW_HOST` without Secure cookies).
-- ✅ **Automated security scanning** — Weekly CI (Trivy, Grype, Syft, Hadolint, Gitleaks) plus no-cache image rebuilds.
-
-#### Reliability (read-only rootfs entrypoint)
-- ✅ **Entrypoint fixes** — `HOME=/tmp` (gunicorn control server), non-fatal `collectstatic`, and the Celery **beat** schedule/pidfile moved to `/tmp` so the periodic scheduler no longer crash-loops on the read-only production filesystem.
-
-#### UX & PWA
-- ✅ **Responsive list rows** — Replaced the absolutely-positioned `ListItemSecondaryAction` across 7 components (History, Related Tracks, Offline, Downloads, Metadata, PWA settings) with in-flow flex clusters, so date/badge/action controls no longer overlap on phones; the Listening History row stacks its controls on very narrow screens.
-- ✅ **Per-track thumbnails everywhere** — A shared, lazy-loaded `TrackThumbnail` (with music-note fallback) now appears on the Library and Favorites lists too, not just History/Stats. Lazy loading keeps the un-virtualized Library table responsive even with hundreds of tracks; `referrerPolicy="no-referrer"` avoids leaking the app URL to the image CDN.
-- ✅ **In-app update notification** — The sidebar shows the running version with an always-on, flashing round status button next to it: **blue when up to date, red when a newer GitHub Release exists**. Clicking it opens a dialog with the release notes, a GitHub link, and (when an update exists) the `docker compose pull` command. The check is **server-side and cached** (`/api/version/`), fails closed offline, and never auto-updates. Bump `APP_VERSION` (in `backend/config/version.py` and `frontend/src/version.ts`) and publish a `v<version>` GitHub Release to drive it.
-- ✅ **Localization cache-bust** — Translation files are fetched with a `?v=<APP_VERSION>` query and the service-worker cache is versioned, so new/changed UI strings load immediately after an update instead of showing stale cached text (or raw keys).
-
-### v1.11.0 - Full Audit Implementation & i18n (May 2026)
-
-#### Internationalisation (i18n) — All Pages
-- ✅ **Fully translated UI** — Every page, label, and error message supports English and Romanian
-- ✅ **Smart Playlists** — System preset names and descriptions translated by `preset_type`
-- ✅ **Achievements** — All 36 achievement names/descriptions translated in both locales
-- ✅ **Listening streak day names** — Backend abbreviated day names (Mon/Tue/…) correctly translated
-- ✅ **Year Wrapped** — Listening personality types, peak month, and favorite day translated
-- ✅ **Settings page** — Full-width single-column layout on desktop (no artificial 600 px cap)
-
-#### Security Hardening (Audit fixes)
-- ✅ **SSRF allowlist fix (#14)** — Artwork URL validation parses hostname, not string prefix; bypasses like `i.ytimg.com.evil.com` now rejected
-- ✅ **MD5 → SHA-256 (#4)** — Rate-limiter cache keys now use SHA-256 instead of MD5
-- ✅ **`DJANGO_DEBUG` defaults to `False` (#17)** — Debug mode must be explicitly enabled via env var
-- ✅ **`AuthDebugMiddleware` conditional (#11)** — Middleware only loaded when `AUTH_DEBUG=true`
-- ✅ **Celery result expiry (#13)** — Task results auto-expire after 1 hour (env-overridable) to prevent Redis bloat
-- ✅ **Atomic `play_count` increment (#9)** — Uses `F('play_count') + 1` to eliminate race condition
-- ✅ **File-delete order fix (#15)** — `Audio.delete()` removes DB row first, then cleans up disk file
-- ✅ **Bare `except:` replaced (#16)** — Swallowed exceptions now emit structured `logger.warning/exception` calls
-- ✅ **Backup file removed (#10)** — `LoginPage.tsx.backup` removed; `*.backup`/`*.bak` added to `.gitignore`
-- ✅ **`/media/` rate limiting (#12)** — Cache-backed concurrent stream limiter per user/IP
-- ✅ **API versioning (#18)** — All routes available under `/api/v1/` with `/api/` as backward-compatible alias
-- ✅ **Dynamic sitemap/robots.txt (#19)** — Served by Django using `SW_HOST` so self-hosted domains are correct
-- ✅ **PWA offline fallback page (#20)** — Custom `offline.html` precached in service worker; returned on navigation miss
-
-#### Database Migration
-- ✅ **PostgreSQL as production database (#8)** — Replaces SQLite for multi-process safety; SQLite retained for local dev fallback
-- ✅ **Migration script** — One-time SQLite → PostgreSQL data migration for existing deployments
-
-### v1.10.1 - Security Hardening (March 2026)
-
-#### Container Hardening
-- ✅ **Drop All Capabilities** - `cap_drop: ALL` on all containers in production
-- ✅ **No Privilege Escalation** - `security_opt: no-new-privileges:true` on all services
-- ✅ **Read-Only Root Filesystem** - Production container runs with `read_only: true` + tmpfs for /tmp
-- ✅ **Resource Limits** - CPU and memory limits on all containers to reduce DoS risk
-- ✅ **Docker HEALTHCHECK** - Dockerfile-level health check for the application
-- ✅ **OS Security Patches** - `apt-get upgrade` in Dockerfile applies latest patches at build time
-- ✅ **Service Health Dependencies** - `depends_on: condition: service_healthy` for proper startup ordering
-
-#### Redis Authentication
-- ✅ **Password-Protected Redis** - Redis requires authentication in production (`REDIS_PASSWORD` env var)
-- ✅ **Authenticated Celery Broker** - Celery connects to Redis with password
-- ✅ **Authenticated Django Cache** - Cache backend uses Redis password
-
-#### Application Security Headers
-- ✅ **Content-Security-Policy** - Restrictive CSP preventing XSS, clickjacking, and injection attacks
-- ✅ **Referrer-Policy** - `strict-origin-when-cross-origin` to prevent URL leakage
-- ✅ **Permissions-Policy** - Disables camera, geolocation, microphone, payment, USB APIs
-- ✅ **Cross-Origin-Resource-Policy** - `same-origin` on non-media responses
-- ✅ **Cross-Origin-Opener-Policy** - Always `same-origin` (previously HTTPS-only)
-
-#### Production Server
-- ✅ **Gunicorn** - Production uses gunicorn instead of Django runserver (3 workers, 2 threads)
-- ✅ **Worker Recycling** - `max-requests` prevents memory leaks in long-running workers
-- ✅ **Custom Session Cookie Name** - `sw_session` reduces fingerprinting surface
-
-#### Security Logging & Monitoring
-- ✅ **Audit Logging** - Login success/failure, lockouts, and logouts logged with IP (no secrets logged)
-- ✅ **Django Security Logger** - `django.security` and `django.request` loggers configured
-- ✅ **Vulnerability Scanning** - `make scan` target runs Trivy, Grype, and Hadolint
-
-### v1.10.0 - Playlist Recheck & Admin Tools (March 2026)
-
-#### Force Recheck Per Playlist
-- ✅ **Force Recheck Button** - Available on both PlaylistCard (grid view) and PlaylistDetailPage
-- ✅ **File Verification** - Verifies every track's audio file exists on disk, re-downloads missing ones
-- ✅ **Retry Unavailable** - Force mode retries previously permanently-failed videos (copyright, private)
-- ✅ **Backend `force=True` flag** - `download_playlist_task` accepts force parameter for deep recheck
-
-#### Deleted / Private Video Detection
-- ✅ **Auto-Detection** - Recognizes `[Deleted video]` and `[Private video]` entries from yt-dlp extract_flat
-- ✅ **Skip Downloads** - Never attempts to download deleted/private videos (saves time and avoids errors)
-- ✅ **Preserve Local Files** - If we already have the audio locally, it is kept even if YouTube removes the video
-- ✅ **Force Recheck Protection** - Force recheck never deletes local copies of deleted/private videos
-- ✅ **Accurate Counts** - `downloaded_count` now uses PlaylistItems to correctly count locally-kept tracks
-- ✅ **Summary Logging** - Sync messages include count of deleted/private videos skipped
-
-#### Admin: Permanent User Deletion
-- ✅ **Full Cascade Delete** - Removes user and all related data (audio, channels, playlists, queue, stats, settings)
-- ✅ **Filesystem Cleanup** - Deletes audio files and empty channel directories from disk
-- ✅ **Avatar Cleanup** - Removes user avatar files
-- ✅ **Safety Guards** - Prevents self-deletion and deletion of the last admin
-- ✅ **Username Confirmation** - Frontend requires typing the username to confirm deletion
-
-#### Playlist Sync Reliability
-- ✅ **YouTube Cookies Support** - All yt-dlp calls use cookies.txt for authenticated requests
-- ✅ **Eliminated API Amplification** - `link_audio_to_playlists` uses DB lookups instead of re-fetching YouTube
-- ✅ **Better Error Visibility** - Removed silent failures, added proper logging
-- ✅ **Task Name Collision Fix** - Renamed offline download task to avoid Celery registry conflicts
-
-### v1.9.0 - Achievements & Yearly Wrapped (February 2026)
-
-#### Achievement System
-- ✅ **37 Achievements** across 6 categories:
-  - 🎵 **Tracks**: First Song, 100/500/1000/5000/10000/50000 songs milestones
-  - ⏱️ **Hours**: 1/10/50/100/500/1000 hours listening milestones
-  - 🔥 **Streaks**: 3/7/14/30/60/90/180/365 day streak achievements
-  - 🎤 **Artists**: 10/25/50/100 different artists explored
-  - 📺 **Channels**: 5/10/25/50 different channels discovered
-  - ⭐ **Special**: Night Owl, Early Bird, Weekend Warrior, Marathon Listener, Explorer, Dedicated Fan
-- ✅ **Achievement Notifications** - Real-time popup with confetti animation when unlocking
-- ✅ **Progress Tracking** - Visual progress bars for each achievement
-- ✅ **Achievement Categories** - Tabbed interface to browse by category
-
-#### Listening Streaks
-- ✅ **Daily Streak Tracking** - Track consecutive listening days
-- ✅ **Weekly Activity Grid** - Visual 7-day activity indicator
-- ✅ **Current & Longest Streak** - Display of streak statistics
-- ✅ **Streak Preservation** - Automatic daily tracking via listening history
-
-#### Yearly Wrapped
-- ✅ **Spotify-Style Summary** - Beautiful year-in-review page
-- ✅ **Listening Personality** - AI-determined personality type based on habits
-- ✅ **Monthly Listening Chart** - Visual breakdown of listening by month
-- ✅ **Top 5 Artists & Tracks** - With album artwork and play counts
-- ✅ **Stats Cards** - Total hours, tracks, artists, and channels
-- ✅ **Year Selector** - View wrapped for any previous year
-
-#### UI/UX Improvements
-- ✅ **Achievements Page** - New dedicated page accessible from sidebar
-- ✅ **Wrapped Page** - New yearly wrapped page with gradient design
-- ✅ **Navigation Links** - Trophy and gift icons in sidebar
-- ✅ **AchievementNotification Component** - Modal with multi-achievement support
-
-### v1.9.2 - Media Streaming Auth Fix (February 2026)
-- ✅ **Multi-Method Auth** - Media streaming supports session, header token, and query param authentication
-- ✅ **Browser Compatibility** - Audio/video elements work with `?token=xxx` since they can't send Authorization headers
-- ✅ **Fixes 403 Errors** - Resolves media playback failures after v1.9.1 security hardening
-
-### v1.9.1 - Deep Security Hardening (February 2026)
-
-#### SSRF Protection
-- ✅ **URL Allowlist** - All external artwork fetching restricted to trusted domains (YouTube, MusicBrainz, Fanart.tv, Last.fm)
-- ✅ **Audio Export** - Artwork URL validation prevents server-side request forgery
-- ✅ **Tag Writer** - Cover art downloads validated against allowlist
-- ✅ **Artwork Proxy** - Centralized URL validation for all artwork requests
-
-#### Input Validation
-- ✅ **Smart Playlists** - Allowlist validation for fields, operators, and order_by parameters
-- ✅ **File Uploads** - Extension and MIME type validation for local audio uploads
-- ✅ **500MB Size Limit** - Maximum file size enforcement for uploads
-
-#### Brute Force Protection
-- ✅ **Password Change** - Per-user rate limiting (5 attempts, 30-min lockout)
-- ✅ **2FA Endpoints** - Rate limiting on verify, disable, and regenerate codes
-- ✅ **Profile Updates** - Protection against automated attacks
-
-#### Information Disclosure Fixes
-- ✅ **Error Messages** - Generic messages prevent exception detail exposure
-- ✅ **Debug Logging** - Sensitive data removed from logs (requires `DEBUG_LOGGING=true`)
-- ✅ **Auth Debug** - Token/cookie values no longer logged (requires `AUTH_DEBUG=true`)
-
-#### Media Security
-- ✅ **Authentication Required** - All `/media/*` endpoints now require authentication
-- ✅ **Streaming Protected** - Audio files no longer accessible without valid token
-
-### v1.8.0 - Security Hardening & Session Management (February 2026)
-
-#### Login Security
-- ✅ **Rate Limiting** - 3 failed login attempts triggers 60-minute lockout
-- ✅ **Visual Feedback** - Shows remaining attempts after each failed login
-- ✅ **Lockout Timer** - Countdown display when account is locked
-- ✅ **Redis-backed** - Lockout state persists across restarts
-
-#### Session & Token Security
-- ✅ **Token Expiry** - API tokens expire after 7 days (configurable)
-- ✅ **Session Timeout** - Automatic logout on token expiration
-- ✅ **Secure Cookies** - HTTPS-only cookies in production
-- ✅ **HTTPOnly Cookies** - Prevents XSS cookie theft
-
-#### Host Security
-- ✅ **ALLOWED_HOSTS** - Dynamic host validation (no more `*` wildcard)
-- ✅ **Local Network Support** - Private IPs (192.168.x.x) allowed by default
-- ✅ **HSTS Headers** - Strict Transport Security for HTTPS deployments
-
-#### Additional Security Headers
-- ✅ `X-Frame-Options: DENY` - Prevents clickjacking
-- ✅ `X-Content-Type-Options: nosniff` - Prevents MIME sniffing
-- ✅ `Secure` cookie flag for HTTPS
-
-### v1.7.0 - LRC Upload, Export & Media Session (January 2026)
-
-#### LRC Upload & Lyrics Management
-- ✅ Upload custom .lrc files for synced lyrics
-- ✅ Persistent storage of uploaded lyrics with original filename
-- ✅ Enhanced lyrics search with suggestions panel
-- ✅ Fixed lyrics suggestions overflow UI
-
-#### Export Dialog
-- ✅ Export tracks as MP3 or FLAC format
-- ✅ Embed synced lyrics (SYLT tag for MP3, LRC metadata for FLAC)
-- ✅ Embed plain lyrics (USLT tag)
-- ✅ Embed album artwork in exported files
-- ✅ Quality selection (High/Medium/Low for MP3)
-
-#### PWA & Media Session
-- ✅ New rounded app icon with gradient design
-- ✅ Album artwork in system media notifications
-- ✅ Artwork proxy endpoint for Chromium browser support
-- ✅ Fixed favicon and all PWA icon sizes
-
-#### Player Improvements
-- ✅ Fixed repeat button (repeat one, repeat all, off)
-- ✅ Proper queue wrap-around for repeat all mode
-- ✅ Channel name fallback for artist in notifications
-
-### v1.6.0 - Auto-Play & Infrastructure Improvements (January 2026)
-
-#### Auto-Play / Continuous Playback
-- ✅ Continuous playback - songs auto-play next track when finished
-- ✅ Queue system for Library, Playlists, Search, Favorites, Channels, Home
-- ✅ Previous/Next track navigation in player
-- ✅ Smart shuffle and regular shuffle modes
-- ✅ Works from any starting position in a list
-
-#### Infrastructure Improvements
-- ✅ Replaced third-party ElasticSearch image with official `docker.elastic.co/elasticsearch/elasticsearch:8.11.3`
-- ✅ Fixed SQLite "database is locked" errors with 30-second timeout
-- ✅ Reduced Celery worker concurrency to 2 to prevent DB contention
-- ✅ ElasticSearch health checks and disk watermark configuration
-
-### v1.5.0 - Offline Playback & UI Improvements (January 2026)
-
-#### Offline Playback
-- ✅ Full offline playback with cached audio, lyrics, and metadata
-- ✅ Service Worker authentication fix for 406 errors
-- ✅ IndexedDB lyrics caching (database version 2)
-- ✅ Proper playlist lookup by playlist_id for offline mode
-- ✅ Album art fallback icons when images fail to load offline
-- ✅ Non-blocking caching progress snackbar (auto-dismisses after 2s)
-- ✅ Completion notification when caching finishes
-
-#### UI/UX Improvements
-- ✅ Responsive 2-column playlist grid on mobile (3 on tablet, 4 on desktop)
-- ✅ Audio visualizer with multiple themes
-- ✅ Synced lyrics display with swipe gesture
-- ✅ Auto-dismissing offline notification (5 seconds)
-
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -900,30 +522,20 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Inspired by [TubeArchivist](https://github.com/tubearchivist/tubearchivist)
 - Built with [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - UI designed with [Material-UI](https://mui.com/)
 
-## 📚 Documentation
+## Support
 
-- 📖 [Quick Reference](docs/QUICK_REFERENCE.md) - Quick start guide
-- 🔧 [Data Persistence Fix](docs/DATA_PERSISTENCE_FIX.md) - Technical details on persistence
-- 📱 [Offline Playlists Guide](docs/OFFLINE_PLAYLISTS_GUIDE.md) - PWA offline features
-- ✅ [Audit Summary](docs/AUDIT_SUMMARY_COMPLETE.md) - Complete audit results
-- 🎨 [PWA Implementation](docs/PWA_COMPLETE.md) - Progressive Web App features
-- 🔒 [Security Audit](docs/SECURITY_AND_PWA_AUDIT_COMPLETE.md) - Security verification
-- 📝 [Change Log](docs/CHANGELOG.md) - Recent changes and improvements
-
-## 📞 Support
-
-- 🐛 [Issue Tracker](https://github.com/aiulian25/soundwave/issues)
+- [Issue Tracker](https://github.com/aiulian25/soundwave/issues)
 
 ---
 
-Made with ❤️ by the SoundWave team
+Made by the SoundWave team
