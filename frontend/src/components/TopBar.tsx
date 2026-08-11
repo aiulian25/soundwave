@@ -4,6 +4,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AvatarDialog from './AvatarDialog';
 import DownloadStatus from './DownloadStatus';
+import ActivityCenter from './ActivityCenter';
 import { userAPI } from '../api/client';
 import { useTranslation } from 'react-i18next';
 
@@ -122,7 +123,10 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
           {/* Download Status */}
           <DownloadStatus />
-          
+
+          {/* Download & task activity center */}
+          <ActivityCenter />
+
           <Tooltip title={t('topbar.logout')} arrow>
             <IconButton 
               onClick={onLogout}

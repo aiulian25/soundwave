@@ -6,6 +6,8 @@
 
 import { Box, Typography, useTheme } from '@mui/material';
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import type { Chapter } from '../types';
+import ChapterMarkers from './ChapterMarkers';
 
 interface WaveformSeekBarProps {
   audioElement: HTMLAudioElement | null;
@@ -14,6 +16,7 @@ interface WaveformSeekBarProps {
   onSeek: (time: number) => void;
   onSeekCommitted: (time: number) => void;
   streamUrl?: string;
+  chapters?: Chapter[] | null;
 }
 
 // Cache waveform data by URL
@@ -26,6 +29,7 @@ export default function WaveformSeekBar({
   onSeek,
   onSeekCommitted,
   streamUrl,
+  chapters,
 }: WaveformSeekBarProps) {
   const theme = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -339,6 +343,9 @@ export default function WaveformSeekBar({
             display: 'block',
           }}
         />
+
+        {/* Chapter boundary ticks (F2) — non-interactive overlay */}
+        <ChapterMarkers chapters={chapters} duration={duration} />
 
         {/* Seek handle/thumb */}
         <Box

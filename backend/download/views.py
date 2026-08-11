@@ -13,9 +13,11 @@ class DownloadListView(ApiBaseView):
     permission_classes = [AdminWriteOnly]
 
     def get(self, request):
-        """Get download queue"""
+        """Get download queue. filter=<status> narrows by status; filter=all returns every row."""
         status_filter = request.query_params.get('filter', 'pending')
-        queryset = DownloadQueue.objects.filter(owner=request.user, status=status_filter)
+        queryset = DownloadQueue.objects.filter(owner=request.user)
+        if status_filter and status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
         serializer = DownloadQueueSerializer(queryset, many=True)
         return Response({'data': serializer.data})
 

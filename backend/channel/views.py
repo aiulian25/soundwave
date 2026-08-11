@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from channel.models import Channel
-from channel.serializers import ChannelSerializer
+from channel.serializers import ChannelSerializer, ChannelSyncDepthSerializer
 from common.views import ApiBaseView, AdminWriteOnly
 
 
@@ -86,6 +86,15 @@ class ChannelDetailView(ApiBaseView):
         
         return Response(data)
 
+    def patch(self, request, channel_id):
+        """Update per-channel sync settings (currently the sync depth)."""
+        channel = get_object_or_404(Channel, channel_id=channel_id, owner=request.user)
+        serializer = ChannelSyncDepthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        channel.sync_depth = serializer.validated_data['sync_depth']
+        channel.save(update_fields=['sync_depth'])
+        return Response(ChannelSerializer(channel).data)
+
     def delete(self, request, channel_id):
         """Delete channel and all associated audio files"""
         from audio.models import Audio
@@ -109,3 +118,25 @@ class ChannelDetailView(ApiBaseView):
         return Response({
             'message': f'Channel deleted successfully. Removed {deleted_count} audio files.'
         }, status=status.HTTP_200_OK)
+
+
+class ChannelSyncView(ApiBaseView):
+    """Trigger an immediate sync (deep backfill) for a single channel."""
+    permission_classes = [AdminWriteOnly]
+
+    def post(self, request, channel_id):
+        """Queue a sync for the channel using its stored sync_depth."""
+        channel = get_object_or_404(Channel, channel_id=channel_id, owner=request.user)
+
+        if channel.sync_status == 'syncing':
+            return Response(
+                {'message': 'Channel is already syncing'},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        from task.tasks import download_channel_task
+        task = download_channel_task.delay(channel.id)
+        return Response(
+            {'message': 'Channel sync started', 'task_id': str(task.id)},
+            status=status.HTTP_202_ACCEPTED
+        )

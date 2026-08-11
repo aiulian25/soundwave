@@ -32,6 +32,8 @@ const modeIcons: Record<RadioMode, string> = {
   favorites: '❤️',
   discovery: '🔍',
   recent: '✨',
+  sonic: '🎛️',
+  autodj: '🎚️',
 };
 
 interface RadioIndicatorProps {
@@ -49,6 +51,8 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
     favorites: t('radioIndicator.modes.favorites'),
     discovery: t('radioIndicator.modes.discovery'),
     recent: t('radioIndicator.modes.recent'),
+    sonic: t('radioIndicator.modes.sonic'),
+    autodj: t('radioIndicator.modes.autodj'),
   };
   
   if (!isRadioMode || !radioSession) return null;

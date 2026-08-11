@@ -23,3 +23,10 @@ psutil>=5.9.0
 whitenoise>=6.5.0
 gunicorn>=22.0.0
 psycopg[binary]>=3.1.19
+# F16 sonic analysis. Pulls numpy/scipy/soundfile/numba/llvmlite transitively and adds
+# ~a few hundred MB to the image. Imported lazily in extract_features_task so non-feature
+# code, the Celery worker, and CI tests all load without it. numpy pinned <2.0 for the
+# numba/llvmlite ABI. Needs libsndfile1 (installed in the Dockerfile runtime stage).
+librosa>=0.10.2
+numpy>=1.26,<2.0
+scipy>=1.11

@@ -105,9 +105,16 @@ class SmartPlaylistTracksView(ApiBaseView):
         # Get matching tracks
         tracks = smart_playlist.get_queryset()
         
-        # Pagination
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get('page_size', 50))
+        # Pagination: fall back to defaults on non-numeric input and clamp page_size
+        # (max 100) so a client can't request an unbounded result set.
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = min(100, max(1, int(request.query_params.get('page_size', 50))))
+        except (TypeError, ValueError):
+            page_size = 50
         start = (page - 1) * page_size
         end = start + page_size
         

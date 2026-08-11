@@ -36,7 +36,19 @@ class Audio(models.Model):
     like_count = models.BigIntegerField(default=0)
     audio_format = models.CharField(max_length=20, default='m4a')
     bitrate = models.IntegerField(null=True, blank=True, help_text="Bitrate in kbps")
-    
+    # Integrated loudness in LUFS (EBU R128), measured post-download for volume
+    # normalization in the player (F9). Null until measured.
+    loudness_lufs = models.FloatField(null=True, blank=True, help_text="Integrated loudness (LUFS)")
+    # Chapter markers captured from yt-dlp at download: [{'title','start','end'}, ...] (F2)
+    chapters = models.JSONField(default=list, blank=True, help_text="Chapter markers [{title,start,end}]")
+
+    # Audio-feature analysis (F16), computed post-download by extract_features_task (librosa).
+    # Null/empty until extracted; backfillable. Never user-supplied (derived from the file).
+    bpm = models.FloatField(null=True, blank=True, help_text="Estimated tempo (beats/min)")
+    music_key = models.CharField(max_length=8, blank=True, help_text="Estimated musical key, e.g. 'A'")
+    energy = models.FloatField(null=True, blank=True, help_text="Normalized RMS energy 0..1")
+    feature_vector = models.JSONField(default=list, blank=True, help_text="Normalized 6-dim sonic feature vector")
+
     # Enhanced metadata (from external sources)
     artist = models.CharField(max_length=500, blank=True, help_text="Artist name from metadata lookup")
     album = models.CharField(max_length=500, blank=True, help_text="Album name")

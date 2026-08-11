@@ -1,4 +1,4 @@
-import { Box, IconButton, Slider, Typography, LinearProgress, Fade, Skeleton, CircularProgress, Tabs, Tab, useMediaQuery, useTheme, Tooltip, Chip, Menu, MenuItem, ListItemIcon, ListItemText, Divider } from '@mui/material';
+import { Box, IconButton, Slider, Typography, LinearProgress, Fade, Skeleton, CircularProgress, Tabs, Tab, useMediaQuery, useTheme, Tooltip, Chip, Menu, MenuItem, ListItemIcon, ListItemText, Divider, Collapse, List, ListItemButton } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
@@ -24,7 +24,7 @@ import BedtimeIcon from '@mui/icons-material/Bedtime';
 import QueueMusicIcon from '@mui/icons-material/QueueMusic';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import type { Audio } from '../types';
+import type { Audio, Chapter } from '../types';
 import { useSettings } from '../context/SettingsContext';
 import { useRadio } from '../context/RadioContext';
 import { useSleepTimer } from '../context/SleepTimerContext';
@@ -84,7 +84,7 @@ interface PlayerProps {
 
 export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect, onTimeUpdate, initialSeek, isRadioMode = false, queue = [], currentQueueIndex = 0, onQueueReorder, onRemoveFromQueue, onPlayQueueTrack, onClearQueue }: PlayerProps) {
   const { t } = useTranslation();
-  const { settings, updateSetting } = useSettings();
+  const { settings, updateSetting, getExtraSetting } = useSettings();
   const { isRadioMode: radioActive, stopRadio } = useRadio();
   const { timerState: sleepTimerState, getFadeVolume, shouldStop: shouldSleepStop, onSongEnded } = useSleepTimer();
   const { enabled: eqEnabled, gains: eqGains, connectAudioSource } = useEqualizer();
@@ -120,12 +120,14 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const eqFiltersRef = useRef<BiquadFilterNode[]>([]);
+  const normGainRef = useRef<GainNode | null>(null);  // F9 loudness-normalization gain
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const isPlayingRef = useRef(isPlaying);
   const isSeeking = useRef(false);
   const currentAudioId = useRef(audio.id);
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playStartTimeRef = useRef<number>(0);
+  const [graphReady, setGraphReady] = useState(false);  // Web Audio graph built (F9)
   const listenedDurationRef = useRef<number>(0);
   const hasRecordedPlayRef = useRef<boolean>(false);
   const initialSeekApplied = useRef<boolean>(false);  // Track if initial seek was applied
@@ -654,11 +656,21 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             lastNode = filter;
           });
           
+          // Normalization gain (F9): make-up gain toward the target LUFS. Unity (1.0) by
+          // default; the effect below sets it from the track's measured loudness + the
+          // user's setting. Inserted between the EQ chain and the analyser so the
+          // visualizer reflects the normalized level.
+          normGainRef.current = audioContextRef.current.createGain();
+          normGainRef.current.gain.value = 1;
+          lastNode.connect(normGainRef.current);
+          lastNode = normGainRef.current;
+
           // Connect to analyser and then to destination
           lastNode.connect(analyserRef.current);
           analyserRef.current.connect(audioContextRef.current.destination);
-          
+
           dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+          setGraphReady(true);
           console.log('[Player] Audio chain initialized (optimized)');
         } catch (error) {
           console.error('Web Audio API not supported:', error);
@@ -712,6 +724,28 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     }
   }, [settings.visualizer_enabled]);
 
+  // Loudness normalization make-up gain (F9). Recomputes when the track, its measured
+  // loudness, the normalization setting, or graph readiness changes. Off (or unmeasured)
+  // => unity gain (bit-identical to no normalization).
+  useEffect(() => {
+    const g = normGainRef.current;
+    const ctx = audioContextRef.current;
+    if (!g) return;
+    const norm = getExtraSetting('normalization', { enabled: false, targetLufs: -14 }) || {};
+    let linear = 1;
+    if (norm.enabled && typeof audio.loudness_lufs === 'number') {
+      const target = typeof norm.targetLufs === 'number' ? norm.targetLufs : -14;
+      const dB = Math.max(-12, Math.min(12, target - audio.loudness_lufs));
+      linear = Math.pow(10, dB / 20);
+    }
+    try {
+      if (ctx) g.gain.setTargetAtTime(linear, ctx.currentTime, 0.05);  // smooth, click-free
+      else g.gain.value = linear;
+    } catch {
+      g.gain.value = linear;
+    }
+  }, [audio.id, audio.loudness_lufs, settings.extra_settings, graphReady, getExtraSetting]);
+
   // Tear down the Web Audio graph on unmount — the effect above intentionally never
   // closes it (the graph persists across track changes). Without this, every Player
   // remount (breakpoint flip, stop, StrictMode) leaks an AudioContext + nodes, and
@@ -721,6 +755,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       eqFiltersRef.current.forEach((f) => {
         try { f.disconnect(); } catch { /* already disconnected */ }
       });
+      try { normGainRef.current?.disconnect(); } catch { /* noop */ }
       try { analyserRef.current?.disconnect(); } catch { /* noop */ }
       try { sourceNodeRef.current?.disconnect(); } catch { /* noop */ }
       const ctx = audioContextRef.current;
@@ -730,6 +765,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       audioContextRef.current = null;
       sourceNodeRef.current = null;
       analyserRef.current = null;
+      normGainRef.current = null;
       eqFiltersRef.current = [];
       dataArrayRef.current = null;
     };
@@ -897,6 +933,29 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
+
+  // --- Chapters (F2) ---------------------------------------------------------
+  const chapters: Chapter[] = useMemo(
+    () => (Array.isArray(audio.chapters) ? audio.chapters : []),
+    [audio.chapters],
+  );
+  const [chaptersOpen, setChaptersOpen] = useState(false);
+  // Index of the chapter currently playing (last chapter whose start <= currentTime).
+  const currentChapterIndex = useMemo(() => {
+    if (chapters.length < 2) return -1;
+    let idx = -1;
+    for (let i = 0; i < chapters.length; i++) {
+      const s = chapters[i].start;
+      if (typeof s === 'number' && s <= currentTime + 0.001) idx = i;
+    }
+    return idx;
+  }, [chapters, currentTime]);
+  const currentChapter = currentChapterIndex >= 0 ? chapters[currentChapterIndex] : null;
+  // Jump playback to a specific time (mirrors the seek-bar's onSeek + onSeekCommitted).
+  const seekTo = useCallback((time: number) => {
+    handleSeekChange(null, time);
+    handleSeekCommitted(null, time);
+  }, [handleSeekChange, handleSeekCommitted]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(!isMuted);
@@ -1223,6 +1282,15 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5, textAlign: 'center', px: 2, color: 'text.primary' }}>
             {audio.title}
           </Typography>
+          {currentChapter?.title && (
+            <Typography
+              variant="body2"
+              sx={{ textAlign: 'center', color: 'text.secondary', mb: 0.5, px: 2 }}
+              noWrap
+            >
+              {t('player.chapters.current', { title: currentChapter.title })}
+            </Typography>
+          )}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
             <Typography variant="body1" sx={{ fontWeight: 500, color: 'primary.main' }}>
               {currentAudioData.artist || audio.channel_name}
@@ -1445,7 +1513,42 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             onSeek={(time) => handleSeekChange(null, time)}
             onSeekCommitted={(time) => handleSeekCommitted(null, time)}
             streamUrl={streamUrl}
+            chapters={chapters}
           />
+
+          {/* Chapter list (F2) — accessible, touch/keyboard-friendly navigation */}
+          {chapters.length >= 2 && (
+            <Box>
+              <Chip
+                icon={<QueueMusicIcon />}
+                label={`${t('player.chapters.title')} (${chapters.length})`}
+                onClick={() => setChaptersOpen((o) => !o)}
+                variant="outlined"
+                size="small"
+                aria-expanded={chaptersOpen}
+                sx={{ mb: chaptersOpen ? 1 : 0 }}
+              />
+              <Collapse in={chaptersOpen}>
+                <List dense disablePadding sx={{ maxHeight: 220, overflowY: 'auto' }}>
+                  {chapters.map((ch, i) => (
+                    <ListItemButton
+                      key={i}
+                      selected={i === currentChapterIndex}
+                      onClick={() => seekTo(typeof ch.start === 'number' ? ch.start : 0)}
+                      sx={{ borderRadius: 1, py: 0.25 }}
+                    >
+                      <ListItemText
+                        primary={ch.title || `${i + 1}`}
+                        secondary={typeof ch.start === 'number' ? formatTime(ch.start) : undefined}
+                        primaryTypographyProps={{ noWrap: true, fontSize: '0.85rem' }}
+                        secondaryTypographyProps={{ fontSize: '0.7rem', sx: { fontVariantNumeric: 'tabular-nums' } }}
+                      />
+                    </ListItemButton>
+                  ))}
+                </List>
+              </Collapse>
+            </Box>
+          )}
 
           {/* Buttons */}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
@@ -1716,6 +1819,10 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               embedded={true}
               visualizerTheme={settings.visualizer_theme}
               isLightMode={theme.palette.mode === 'light'}
+              description={currentAudioData.description}
+              viewCount={currentAudioData.view_count}
+              likeCount={currentAudioData.like_count}
+              publishedDate={currentAudioData.published_date}
               onSeek={(time) => {
                 if (audioRef.current) {
                   audioRef.current.currentTime = time;

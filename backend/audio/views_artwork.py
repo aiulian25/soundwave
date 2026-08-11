@@ -4,9 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 
 from audio.models import Audio
+from channel.models import Channel
 from audio.models_artwork import Artwork, MusicMetadata, ArtistInfo
 from audio.serializers_artwork import (
     ArtworkSerializer,
@@ -33,29 +34,35 @@ class ArtworkViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
-        
+        # Multi-tenant isolation: only artwork attached to the user's own audio or
+        # channels. Artwork.audio / Artwork.channel are both nullable, so match either.
+        queryset = super().get_queryset().filter(
+            Q(audio__owner=self.request.user) | Q(channel__owner=self.request.user)
+        )
+
         # Filter by audio
         audio_id = self.request.query_params.get('audio_id')
         if audio_id:
             queryset = queryset.filter(audio_id=audio_id)
-        
+
         # Filter by channel
         channel_id = self.request.query_params.get('channel_id')
         if channel_id:
             queryset = queryset.filter(channel_id=channel_id)
-        
+
         # Filter by type
         artwork_type = self.request.query_params.get('type')
         if artwork_type:
             queryset = queryset.filter(artwork_type=artwork_type)
-        
+
         # Filter by source
         source = self.request.query_params.get('source')
         if source:
             queryset = queryset.filter(source=source)
-        
-        return queryset.order_by('-priority', '-created_at')
+
+        # NOTE: Artwork's timestamp field is `fetched_date` (there is no `created_at`);
+        # ordering by a non-existent field raised FieldError and 500'd this endpoint.
+        return queryset.order_by('-priority', '-fetched_date')
     
     @action(detail=True, methods=['post'])
     def download(self, request, pk=None):
@@ -101,13 +108,14 @@ class MusicMetadataViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
-        
+        # Multi-tenant isolation: only metadata for the user's own audio.
+        queryset = super().get_queryset().filter(audio__owner=self.request.user)
+
         # Filter by audio
         audio_id = self.request.query_params.get('audio_id')
         if audio_id:
             queryset = queryset.filter(audio_id=audio_id)
-        
+
         return queryset
     
     @action(detail=True, methods=['post'])
@@ -139,13 +147,14 @@ class ArtistInfoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
-        
+        # Multi-tenant isolation: only artist info for the user's own channels.
+        queryset = super().get_queryset().filter(channel__owner=self.request.user)
+
         # Filter by channel
         channel_id = self.request.query_params.get('channel_id')
         if channel_id:
             queryset = queryset.filter(channel_id=channel_id)
-        
+
         return queryset
     
     @action(detail=True, methods=['post'])
@@ -166,7 +175,7 @@ class AudioArtworkViewSet(viewsets.ViewSet):
     
     def retrieve(self, request, pk=None):
         """Get audio with all artwork"""
-        audio = get_object_or_404(Audio, pk=pk)
+        audio = get_object_or_404(Audio, pk=pk, owner=request.user)
         
         artwork = Artwork.objects.filter(audio=audio).order_by('-priority')
         try:
@@ -187,7 +196,7 @@ class AudioArtworkViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'])
     def fetch_artwork(self, request, pk=None):
         """Fetch artwork for audio"""
-        audio = get_object_or_404(Audio, pk=pk)
+        audio = get_object_or_404(Audio, pk=pk, owner=request.user)
         fetch_artwork_for_audio.delay(audio.id)
         return Response({
             'message': 'Artwork fetch queued',
@@ -197,7 +206,7 @@ class AudioArtworkViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'])
     def fetch_metadata(self, request, pk=None):
         """Fetch metadata for audio"""
-        audio = get_object_or_404(Audio, pk=pk)
+        audio = get_object_or_404(Audio, pk=pk, owner=request.user)
         fetch_metadata_for_audio.delay(audio.id)
         return Response({
             'message': 'Metadata fetch queued',
@@ -207,7 +216,7 @@ class AudioArtworkViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'])
     def embed_artwork(self, request, pk=None):
         """Embed artwork in audio file"""
-        audio = get_object_or_404(Audio, pk=pk)
+        audio = get_object_or_404(Audio, pk=pk, owner=request.user)
         artwork_id = request.data.get('artwork_id')
         
         if artwork_id:
@@ -228,7 +237,10 @@ class ChannelArtworkViewSet(viewsets.ViewSet):
     
     def retrieve(self, request, pk=None):
         """Get channel with all artwork"""
-        channel = get_object_or_404(Channel, pk=pk)
+        # Scope to the requesting user's own channels (multi-tenant isolation).
+        # Fixing the missing Channel import makes this endpoint reachable, so it must
+        # not expose another tenant's channel by numeric pk (BOLA — see report Step 5).
+        channel = get_object_or_404(Channel, pk=pk, owner=request.user)
         
         artwork = Artwork.objects.filter(channel=channel).order_by('-priority')
         try:
@@ -248,7 +260,7 @@ class ChannelArtworkViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'])
     def fetch_artwork(self, request, pk=None):
         """Fetch artwork for channel"""
-        channel = get_object_or_404(Channel, pk=pk)
+        channel = get_object_or_404(Channel, pk=pk, owner=request.user)
         fetch_artist_artwork.delay(channel.id)
         return Response({
             'message': 'Artist artwork fetch queued',
@@ -258,7 +270,7 @@ class ChannelArtworkViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'])
     def fetch_info(self, request, pk=None):
         """Fetch artist info for channel"""
-        channel = get_object_or_404(Channel, pk=pk)
+        channel = get_object_or_404(Channel, pk=pk, owner=request.user)
         fetch_artist_info.delay(channel.id)
         return Response({
             'message': 'Artist info fetch queued',

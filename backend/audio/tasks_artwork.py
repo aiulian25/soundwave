@@ -332,7 +332,20 @@ def download_artwork(self, artwork_id: int):
         if not artwork.url:
             logger.warning(f"No URL for artwork {artwork_id}")
             return
-        
+
+        # SSRF guard (report Step 6): Artwork.url can be user-supplied via the
+        # ArtworkViewSet create endpoint, so validate it resolves to a PUBLIC http(s)
+        # host before the worker fetches it — the same control the download queue uses
+        # (task/tasks.py). Blocks loopback/private/link-local/reserved/metadata targets
+        # (e.g. 169.254.169.254). NB (per common.url_security): DNS can re-resolve
+        # between this check and the fetch, so pair with egress-restricted networking
+        # for full defence in depth.
+        from common.url_security import check_public_http_url
+        ok, _code = check_public_http_url(artwork.url)
+        if not ok:
+            logger.warning("Blocked SSRF artwork fetch for artwork %s: %s", artwork_id, artwork.url)
+            return
+
         # Download image
         response = requests.get(artwork.url, timeout=30, stream=True)
         response.raise_for_status()
@@ -396,7 +409,7 @@ def embed_artwork_in_audio(self, audio_id: int, artwork_id: int = None):
     try:
         audio = Audio.objects.get(id=audio_id)
         
-        if not audio.media_url:
+        if not audio.file_path:
             logger.warning(f"No media file for audio {audio_id}")
             return
         
@@ -435,7 +448,7 @@ def embed_artwork_in_audio(self, audio_id: int, artwork_id: int = None):
         
         # Embed in audio file
         service = ID3TagService()
-        audio_path = Path(settings.MEDIA_ROOT) / audio.media_url
+        audio_path = Path(settings.MEDIA_ROOT) / audio.file_path
         
         if audio_path.exists():
             success = service.embed_cover_art(str(audio_path), image_data, mime_type)
@@ -507,12 +520,12 @@ def update_id3_tags_from_metadata(audio_id: int):
     try:
         audio = Audio.objects.get(id=audio_id)
         
-        if not audio.media_url:
+        if not audio.file_path:
             logger.warning(f"No media file for audio {audio_id}")
             return
         
         from django.conf import settings
-        audio_path = Path(settings.MEDIA_ROOT) / audio.media_url
+        audio_path = Path(settings.MEDIA_ROOT) / audio.file_path
         
         if not audio_path.exists():
             logger.error(f"Audio file not found: {audio_path}")

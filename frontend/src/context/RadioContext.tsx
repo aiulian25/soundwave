@@ -11,7 +11,8 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
 import { radioAPI } from '../api/client';
 import type { Audio } from '../types';
 
-export type RadioMode = 'track' | 'artist' | 'favorites' | 'discovery' | 'recent';
+export type RadioMode = 'track' | 'artist' | 'favorites' | 'discovery' | 'recent' | 'sonic' | 'autodj';
+export type RadioCurve = 'focus' | 'party' | 'winddown';
 
 export interface RadioSession {
   mode: RadioMode;
@@ -44,7 +45,7 @@ interface RadioContextValue {
   currentReason: string;
   
   // Actions
-  startRadio: (mode: RadioMode, seedYoutubeId?: string, seedChannelId?: string, varietyLevel?: number) => Promise<Audio | null>;
+  startRadio: (mode: RadioMode, seedYoutubeId?: string, seedChannelId?: string, varietyLevel?: number, curve?: RadioCurve) => Promise<Audio | null>;
   stopRadio: () => Promise<void>;
   getNextTrack: () => Promise<Audio | null>;
   reportSkip: () => Promise<void>;  // Simplified - uses current track info
@@ -93,7 +94,8 @@ export function RadioProvider({ children }: { children: React.ReactNode }) {
     mode: RadioMode,
     seedYoutubeId?: string,
     seedChannelId?: string,
-    varietyLevel: number = 50
+    varietyLevel: number = 50,
+    curve?: RadioCurve
   ): Promise<Audio | null> => {
     setIsLoading(true);
     try {
@@ -102,6 +104,7 @@ export function RadioProvider({ children }: { children: React.ReactNode }) {
         seed_youtube_id: seedYoutubeId,
         seed_channel_id: seedChannelId,
         variety_level: varietyLevel,
+        curve,
       });
       
       if (response.data?.session) {

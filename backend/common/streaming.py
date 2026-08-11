@@ -380,8 +380,12 @@ def serve_media_with_range(request, path, document_root):
         response['Content-Length'] = str(file_size)
         response['Accept-Ranges'] = 'bytes'
     
-    # Add caching headers for better performance
-    response['Cache-Control'] = 'public, max-age=3600'
+    # Caching headers. Use `private`: this media is per-user (ownership enforced by
+    # user_can_access_media above), so it must NEVER be stored by shared/proxy/CDN
+    # caches and served to another tenant. `private` still lets the browser's own HTTP
+    # cache — and the Service Worker Cache Storage, which is independent of
+    # Cache-Control — cache it for seek/offline performance.
+    response['Cache-Control'] = 'private, max-age=3600'
     response['Last-Modified'] = http_date(full_path.stat().st_mtime)
     
     # Add Content-Disposition for download fallback

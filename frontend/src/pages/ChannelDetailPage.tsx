@@ -18,7 +18,12 @@ import {
   Card,
   Avatar,
   Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
   Pause as PauseIcon,
@@ -27,6 +32,7 @@ import {
   Shuffle as ShuffleIcon,
   YouTube as YouTubeIcon,
   PlaylistPlay as PlayAllIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -46,6 +52,7 @@ interface ChannelDetail {
   downloaded_count: number;
   last_refreshed: string;
   sync_status: 'pending' | 'syncing' | 'success' | 'failed' | 'stale';
+  sync_depth: number;
   status_display: string;
   error_message: string;
   active: boolean;
@@ -86,6 +93,39 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
       setError(err.response?.data?.detail || t('channelDetail.errors.loadFailed'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncDepthChange = async (event: SelectChangeEvent<number>) => {
+    if (!channel) {
+      return;
+    }
+    const nextDepth = Number(event.target.value);
+    const previousDepth = channel.sync_depth;
+    setChannel({ ...channel, sync_depth: nextDepth });
+    try {
+      await channelAPI.updateSyncDepth(channel.channel_id, nextDepth);
+      setSnackbarMessage(t('channelDetail.syncDepth.saved'));
+      setSnackbarOpen(true);
+    } catch {
+      setChannel({ ...channel, sync_depth: previousDepth });
+      setSnackbarMessage(t('channelDetail.syncDepth.saveFailed'));
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleBackfill = async () => {
+    if (!channel) {
+      return;
+    }
+    try {
+      await channelAPI.sync(channel.channel_id);
+      setSnackbarMessage(t('channelDetail.syncDepth.backfillStarted'));
+      setSnackbarOpen(true);
+      loadChannel();
+    } catch {
+      setSnackbarMessage(t('channelDetail.syncDepth.backfillFailed'));
+      setSnackbarOpen(true);
     }
   };
 
@@ -290,6 +330,33 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                   </Button>
                 </>
               )}
+            </Box>
+
+            {/* Sync depth + manual backfill */}
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center', mt: 2 }}>
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel id="channel-sync-depth-label">{t('channelDetail.syncDepth.label')}</InputLabel>
+                <Select
+                  labelId="channel-sync-depth-label"
+                  label={t('channelDetail.syncDepth.label')}
+                  value={channel.sync_depth}
+                  onChange={handleSyncDepthChange}
+                >
+                  <MenuItem value={25}>{t('channelDetail.syncDepth.options.25')}</MenuItem>
+                  <MenuItem value={50}>{t('channelDetail.syncDepth.options.50')}</MenuItem>
+                  <MenuItem value={100}>{t('channelDetail.syncDepth.options.100')}</MenuItem>
+                  <MenuItem value={200}>{t('channelDetail.syncDepth.options.200')}</MenuItem>
+                  <MenuItem value={0}>{t('channelDetail.syncDepth.options.all')}</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="outlined"
+                startIcon={<SyncIcon />}
+                onClick={handleBackfill}
+                disabled={channel.sync_status === 'syncing'}
+              >
+                {t('channelDetail.syncDepth.backfill')}
+              </Button>
             </Box>
           </Box>
         </Box>

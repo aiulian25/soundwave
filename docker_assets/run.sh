@@ -125,44 +125,19 @@ PY
     fi
 fi
 
-# Create migrations
-echo "=== Creating migrations ==="
-python manage.py makemigrations
-
-# Run migrations with error handling
+# Apply database migrations. Migrations are authored during development and committed
+# to the image; production only APPLIES them — it never generates them at boot (which
+# could create ad-hoc migrations from model drift). If a migration fails, FAIL LOUDLY
+# and stop; never mutate django_migrations bookkeeping. Genuine data repair belongs in
+# a reviewed, one-off management command, not the entrypoint.
 echo "=== Running migrations ==="
-python manage.py migrate 2>&1
+python manage.py migrate --noinput
 MIGRATE_EXIT=$?
-
 if [ $MIGRATE_EXIT -ne 0 ]; then
-    echo "=== Migration failed (exit code: $MIGRATE_EXIT), attempting to fix... ==="
-    
-    # First try: fake-initial for initial migrations
-    echo "Trying --fake-initial..."
-    python manage.py migrate --fake-initial 2>&1
-    
-    if [ $? -ne 0 ]; then
-        echo "=== Still failing. Resetting all migration state... ==="
-        # Clear all migration history and start fresh
-        python manage.py shell << 'FIXMIG'
-from django.db import connection
-cursor = connection.cursor()
-try:
-    # Check what tables exist
-        tables = connection.introspection.table_names()
-    print(f"Existing tables: {tables}")
-    
-    if 'django_migrations' in tables:
-        # Clear problematic migration records
-        cursor.execute("DELETE FROM django_migrations WHERE app IN ('user', 'channel', 'audio', 'playlist', 'download', 'stats');")
-        connection.commit()
-        print("Cleared app migration history")
-except Exception as e:
-    print(f"Error during fix: {e}")
-FIXMIG
-        # Try migration again
-        python manage.py migrate 2>&1
-    fi
+    echo "FATAL: database migration failed (exit code: $MIGRATE_EXIT)."
+    echo "Refusing to start with an unmigrated/partial schema. Migration history is left untouched."
+    echo "Investigate the migration error above, fix it, then restart the container."
+    exit 1
 fi
 echo "=== Migrations complete ==="
 

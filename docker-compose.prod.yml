@@ -181,8 +181,14 @@ services:
           cpus: "0.5"
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
-    # Require authentication
-    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env} --maxmemory 200mb --maxmemory-policy allkeys-lru
+    # Require authentication. Use `noeviction` (NOT allkeys-lru): this Redis is the
+    # Celery broker + result backend (DB 0) as well as the Django cache (DB 1), and
+    # Redis eviction is GLOBAL across DBs — allkeys-lru would silently evict/drop queued
+    # download tasks under memory pressure. With noeviction, writes fail loudly at the
+    # 200mb cap (kept below the 256m container limit) instead of losing tasks. If the cap
+    # is ever hit, raise --maxmemory AND the container memory limit together, or move the
+    # Django cache onto a separate Redis instance so cache pressure never touches the broker.
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env} --maxmemory 200mb --maxmemory-policy noeviction
     expose:
       - "6379"
     volumes:

@@ -80,9 +80,12 @@ class AudioListView(ApiBaseView):
         if favorites == 'true':
             queryset = queryset.filter(is_favorite=True)
 
-        # Pagination
+        # Pagination (page_size is fixed; guard `page` against non-numeric input).
         page_size = 50
-        page = int(request.query_params.get('page', 1))
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
         start = (page - 1) * page_size
         end = start + page_size
 
@@ -429,7 +432,6 @@ class AudioExportView(ApiBaseView):
     
     def post(self, request, youtube_id):
         """Export audio with specified format and embedded metadata"""
-        import subprocess
         import tempfile
         import shutil
         from django.http import FileResponse
@@ -465,97 +467,37 @@ class AudioExportView(ApiBaseView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Get lyrics if requested
-        plain_lyrics = None
-        synced_lyrics = None
-        if embed_lyrics:
-            try:
-                from audio.models_lyrics import Lyrics
-                lyrics_obj = Lyrics.objects.get(audio=audio)
-                plain_lyrics = lyrics_obj.plain_lyrics
-                synced_lyrics = lyrics_obj.synced_lyrics
-            except Lyrics.DoesNotExist:
-                logger.info("[Export POST] No lyrics found for %s", youtube_id)
-            except Exception as e:
-                logger.warning("[Export POST] Error loading lyrics for %s: %s", youtube_id, e)
-        
-        # Get artwork
-        cover_art_data = None
-        if embed_artwork:
-            import requests as http_requests
-            
-            # Priority: custom URL > cover_art_url > thumbnail
-            art_url = artwork_url or audio.cover_art_url or audio.thumbnail_url
-            
-            # SSRF protection: validate URL is from allowed sources
-            if art_url and is_safe_artwork_url(art_url):
-                try:
-                    resp = http_requests.get(art_url, timeout=10)
-                    if resp.status_code == 200:
-                        cover_art_data = resp.content
-                except Exception as e:
-                    logger.warning("[Export POST] Failed to fetch artwork for %s: %s", youtube_id, e)
-        
-        # Create temporary file for conversion
+        # Convert + embed metadata into a temp file (shared export core).
         temp_dir = tempfile.mkdtemp()
         try:
-            safe_title = "".join(c for c in audio.title if c.isalnum() or c in (' ', '-', '_')).strip()[:100]
-            if not safe_title:
-                safe_title = f"audio_{youtube_id}"
-            
-            output_filename = f"{safe_title}.{target_format}"
-            output_path = Path(temp_dir) / output_filename
-            
-            # Determine if conversion is needed
-            source_ext = source_path.suffix.lower()
-            needs_conversion = (
-                (target_format == 'mp3' and source_ext != '.mp3') or
-                (target_format == 'flac' and source_ext != '.flac')
+            from audio.export import (
+                export_track_to_file,
+                AudioConversionError,
+                ExportSourceUnavailable,
             )
-            
-            if needs_conversion:
-                # Use ffmpeg for conversion
-                ffmpeg_cmd = ['ffmpeg', '-y', '-i', str(source_path)]
-                
-                if target_format == 'mp3':
-                    # Quality settings for MP3
-                    if quality == 'high':
-                        ffmpeg_cmd.extend(['-codec:a', 'libmp3lame', '-b:a', '320k'])
-                    elif quality == 'medium':
-                        ffmpeg_cmd.extend(['-codec:a', 'libmp3lame', '-b:a', '192k'])
-                    else:
-                        ffmpeg_cmd.extend(['-codec:a', 'libmp3lame', '-b:a', '128k'])
-                elif target_format == 'flac':
-                    ffmpeg_cmd.extend(['-codec:a', 'flac', '-compression_level', '8'])
-                
-                ffmpeg_cmd.append(str(output_path))
-                
-                result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
-                if result.returncode != 0:
-                    logger.warning("FFmpeg error: %s", result.stderr)
-                    return Response(
-                        {'error': 'Audio conversion failed'},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
-            else:
-                # Just copy the file
-                shutil.copy2(source_path, output_path)
-            
-            # Write metadata tags including lyrics and artwork
-            from audio.tag_writer import write_metadata_to_file
-            
-            write_metadata_to_file(
-                file_path=str(output_path),
-                title=audio.title,
-                artist=audio.artist or audio.channel_name,
-                album=audio.album,
-                year=audio.year,
-                genre=audio.genre,
-                track_number=audio.track_number,
-                cover_art_data=cover_art_data,
-                lyrics=plain_lyrics,
-                synced_lyrics=synced_lyrics,
-            )
+
+            try:
+                output_path = export_track_to_file(
+                    audio,
+                    target_format,
+                    quality,
+                    temp_dir,
+                    embed_lyrics=embed_lyrics,
+                    embed_artwork=embed_artwork,
+                    artwork_url=artwork_url,
+                )
+            except ExportSourceUnavailable:
+                return Response(
+                    {'error': 'Source audio file not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            except AudioConversionError:
+                return Response(
+                    {'error': 'Audio conversion failed'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            output_filename = output_path.name
             
             # Determine content type
             content_type = 'audio/mpeg' if target_format == 'mp3' else 'audio/flac'

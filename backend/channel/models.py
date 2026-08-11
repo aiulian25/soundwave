@@ -75,6 +75,10 @@ class Channel(models.Model):
         default='auto',
         choices=[('auto', 'Auto'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('ultra', 'Ultra')]
     )
+    sync_depth = models.IntegerField(
+        default=50,
+        help_text="Number of most-recent videos to scan per sync (0 = entire channel history)"
+    )
 
     class Meta:
         ordering = ['channel_name']

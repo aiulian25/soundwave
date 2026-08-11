@@ -32,8 +32,11 @@ import {
   Typography,
   CircularProgress,
   Box,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import RadioIcon from '@mui/icons-material/Radio';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
@@ -87,7 +90,46 @@ export default function TrackActionsMenu({
   const [containingPlaylists, setContainingPlaylists] = useState<ContainingPlaylist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [isFavorite, setIsFavorite] = useState(track.is_favorite);
-  
+  const [splitting, setSplitting] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'info' | 'error' }>(
+    { open: false, message: '', severity: 'success' },
+  );
+
+  // "Split into tracks" is offered for long mixes or already-chaptered tracks (F3).
+  const canSplit = !!track.youtube_id
+    && (((track.duration || 0) > 600) || ((track.chapters?.length || 0) > 1));
+
+  const handleSplit = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    handleCloseMenu();
+    if (!track.youtube_id || splitting) return;
+    setSplitting(true);
+    try {
+      const resp = await audioAPI.splitTrack(track.youtube_id);
+      // The parsed parts are persisted and (for description-sourced splits) written to
+      // the track's chapters, so they render as navigable parts in the player.
+      if (resp.data?.audio && onTrackUpdate) {
+        onTrackUpdate(resp.data.audio as Audio);
+      }
+      setSnackbar({
+        open: true,
+        message: t('trackActionsMenu.split.success', { count: resp.data?.count ?? 0 }),
+        severity: 'success',
+      });
+    } catch (err: any) {
+      const code = err?.response?.data?.code;
+      setSnackbar({
+        open: true,
+        message: code === 'no_tracklist'
+          ? t('trackActionsMenu.split.noTracklist')
+          : t('trackActionsMenu.split.error'),
+        severity: code === 'no_tracklist' ? 'info' : 'error',
+      });
+    } finally {
+      setSplitting(false);
+    }
+  };
+
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     setMenuAnchor(event.currentTarget);
@@ -263,7 +305,17 @@ export default function TrackActionsMenu({
           </ListItemIcon>
           <ListItemText>{t('trackActionsMenu.actions.addToPlaylist')}</ListItemText>
         </MenuItem>
-        
+
+        {/* Split into tracks (F3) — long mixes / chaptered tracks */}
+        {canSplit && (
+          <MenuItem onClick={handleSplit} disabled={splitting}>
+            <ListItemIcon>
+              {splitting ? <CircularProgress size={18} /> : <CallSplitIcon fontSize="small" />}
+            </ListItemIcon>
+            <ListItemText>{t('trackActionsMenu.split.action')}</ListItemText>
+          </MenuItem>
+        )}
+
         {/* Download */}
         {onDownload && (
           <MenuItem onClick={handleDownload}>
@@ -360,6 +412,23 @@ export default function TrackActionsMenu({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Split result feedback (F3) */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </>
   );
 }

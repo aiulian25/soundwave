@@ -5,6 +5,11 @@ from channel.models import Channel
 import re
 
 
+# Allowed per-channel sync depths (0 = entire channel history). The allow-list bounds
+# how many videos a single sync can request, preventing an oversized YouTube fetch.
+ALLOWED_SYNC_DEPTHS = (0, 25, 50, 100, 200)
+
+
 class ChannelSubscribeSerializer(serializers.Serializer):
     """Channel subscription from URL"""
     url = serializers.URLField(required=True, help_text="YouTube channel URL")
@@ -29,6 +34,18 @@ class ChannelSubscribeSerializer(serializers.Serializer):
             return value
             
         raise serializers.ValidationError("Invalid YouTube channel URL")
+
+
+class ChannelSyncDepthSerializer(serializers.Serializer):
+    """Validate a per-channel sync-depth update (0 = all history)."""
+    sync_depth = serializers.IntegerField(min_value=0)
+
+    def validate_sync_depth(self, value):
+        if value not in ALLOWED_SYNC_DEPTHS:
+            raise serializers.ValidationError(
+                f"sync_depth must be one of {ALLOWED_SYNC_DEPTHS}"
+            )
+        return value
 
 
 class ChannelSerializer(serializers.ModelSerializer):

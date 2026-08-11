@@ -140,7 +140,7 @@ class LyricsDownloadView(ApiBaseView):
         """Download lyrics as .lrc or .txt file"""
         import re
         
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         
         try:
             lyrics = Lyrics.objects.get(audio=audio)
@@ -211,12 +211,17 @@ class LyricsViewSet(viewsets.ModelViewSet):
     lookup_url_kwarg = 'youtube_id'
     
     def get_queryset(self):
-        """Get lyrics queryset"""
-        return Lyrics.objects.select_related('audio').all()
+        """Get lyrics queryset — scoped to the requesting user (multi-tenant isolation).
+
+        Backs DRF's default actions (e.g. list). The custom handlers below use their
+        own owner-scoped Audio lookups; scoping here keeps every default/future action
+        tenant-safe as well (report Step 4 recommendation).
+        """
+        return Lyrics.objects.filter(audio__owner=self.request.user).select_related('audio')
     
     def retrieve(self, request, youtube_id=None):
         """Get lyrics for a specific audio track"""
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         
         # Get or create lyrics entry
         lyrics, created = Lyrics.objects.get_or_create(audio=audio)
@@ -232,7 +237,7 @@ class LyricsViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def fetch(self, request, youtube_id=None):
         """Manually fetch lyrics for an audio track"""
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         
         # Validate request data
         fetch_serializer = LyricsFetchSerializer(data=request.data)
@@ -250,7 +255,7 @@ class LyricsViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['put', 'patch'])
     def update_lyrics(self, request, youtube_id=None):
         """Manually update lyrics for an audio track"""
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         lyrics, created = Lyrics.objects.get_or_create(audio=audio)
         
         # Validate and update
@@ -277,7 +282,7 @@ class LyricsViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def suggestions(self, request, youtube_id=None):
         """Get lyrics suggestions from LRCLIB for an audio track"""
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         
         # Get query from params or use cleaned title
         query = request.query_params.get('q', '')
@@ -306,7 +311,7 @@ class LyricsViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def apply_suggestion(self, request, youtube_id=None):
         """Apply a selected lyrics suggestion to an audio track"""
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         lyrics, created = Lyrics.objects.get_or_create(audio=audio)
         
         # Get suggestion data from request
@@ -332,7 +337,7 @@ class LyricsViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['delete'])
     def delete_lyrics(self, request, youtube_id=None):
         """Delete lyrics for an audio track"""
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         
         try:
             lyrics = Lyrics.objects.get(audio=audio)
@@ -381,12 +386,19 @@ class LyricsViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Get lyrics statistics"""
-        total_audio = Audio.objects.filter(downloaded=True).count()
-        total_lyrics = Lyrics.objects.filter(fetch_attempted=True).count()
-        with_synced = Lyrics.objects.exclude(synced_lyrics='').count()
-        with_plain = Lyrics.objects.exclude(plain_lyrics='').count()
-        instrumental = Lyrics.objects.filter(is_instrumental=True).count()
-        failed = Lyrics.objects.filter(
+        # Scope every count to the requesting user's own library (multi-tenant
+        # isolation), consistent with the rest of the API. `downloaded` is a model
+        # @property, not a DB column, so filter on the underlying file_path — the same
+        # "has a downloaded file" test used in tasks_lyrics.auto_fetch_lyrics.
+        user_audio = Audio.objects.filter(owner=request.user)
+        user_lyrics = Lyrics.objects.filter(audio__owner=request.user)
+
+        total_audio = user_audio.exclude(file_path='').exclude(file_path__isnull=True).count()
+        total_lyrics = user_lyrics.filter(fetch_attempted=True).count()
+        with_synced = user_lyrics.exclude(synced_lyrics='').count()
+        with_plain = user_lyrics.exclude(plain_lyrics='').count()
+        instrumental = user_lyrics.filter(is_instrumental=True).count()
+        failed = user_lyrics.filter(
             fetch_attempted=True,
             synced_lyrics='',
             plain_lyrics='',

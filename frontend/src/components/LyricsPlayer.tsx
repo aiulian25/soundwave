@@ -39,11 +39,13 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useTranslation } from 'react-i18next';
 import api, { audioAPI } from '../api/client';
 import { offlineStorage } from '../utils/offlineStorage';
 import { getLyricsColors, LyricsThemeColors, DEFAULT_VISUALIZER_THEME } from '../config/visualizerThemes';
 import { useSettings } from '../context/SettingsContext';
+import TrackDetails, { hasTrackDetails } from './TrackDetails';
 
 interface LyricsData {
   audio_id: string;
@@ -90,9 +92,13 @@ interface LyricsPlayerProps {
   onSeek?: (time: number) => void; // Optional callback to seek to a specific time
   visualizerTheme?: string; // Theme ID for lyrics colors (optional, falls back to settings)
   isLightMode?: boolean; // Whether the app is in light mode (optional, auto-detected)
+  description?: string;
+  viewCount?: number;
+  likeCount?: number;
+  publishedDate?: string;
 }
 
-export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek, visualizerTheme, isLightMode }: LyricsPlayerProps) {
+export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek, visualizerTheme, isLightMode, description, viewCount, likeCount, publishedDate }: LyricsPlayerProps) {
   const { t } = useTranslation();
   // Get settings and theme for automatic detection
   const { settings } = useSettings();
@@ -136,6 +142,9 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   // LRC Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  // Offline-cache save failure (surfaced instead of being swallowed silently)
+  const [offlineSaveError, setOfflineSaveError] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
@@ -200,7 +209,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               setParsedLyrics(parsed);
             }
             // Update cache (fire and forget)
-            offlineStorage.saveLyrics(youtubeId, response.data).catch(() => {});
+            offlineStorage.saveLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
           }).catch(() => {});
         }
         return;
@@ -222,7 +231,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       }
       
       // Cache for offline use (fire and forget)
-      offlineStorage.saveLyrics(youtubeId, response.data).catch(() => {});
+      offlineStorage.saveLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
     } catch (err: any) {
       setError(err.response?.data?.error || t('lyrics.errors.loadFailed'));
     } finally {
@@ -411,8 +420,8 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       }
       
       // Update offline cache
-      offlineStorage.saveLyrics(youtubeId, response.data).catch(() => {});
-      
+      offlineStorage.saveLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
+
       setUploadSuccess(true);
       setEditMode(false);
       
@@ -490,6 +499,63 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     }
   };
 
+  const trackHasDetails = hasTrackDetails({ description, viewCount, likeCount, publishedDate });
+
+  const renderDetailsToggleButton = () => {
+    if (!trackHasDetails) {
+      return null;
+    }
+    return (
+      <Tooltip title={t('player.details.title')}>
+        <IconButton
+          size="small"
+          onClick={() => setShowDetails((previous) => !previous)}
+          sx={{ mr: 1 }}
+          color={showDetails ? 'primary' : 'default'}
+          aria-label={t('player.details.title')}
+        >
+          <InfoOutlinedIcon />
+        </IconButton>
+      </Tooltip>
+    );
+  };
+
+  if (showDetails && trackHasDetails) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 2, py: 1 }}>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            {t('player.details.title')}
+          </Typography>
+          <Tooltip title={t('lyrics.title')}>
+            <IconButton
+              size="small"
+              onClick={() => setShowDetails(false)}
+              sx={{ mr: 1 }}
+              color="primary"
+              aria-label={t('lyrics.title')}
+            >
+              <InfoOutlinedIcon />
+            </IconButton>
+          </Tooltip>
+          {onClose && (
+            <IconButton size="small" onClick={onClose} aria-label={t('common.close')}>
+              <CloseIcon />
+            </IconButton>
+          )}
+        </Box>
+        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+          <TrackDetails
+            description={description}
+            viewCount={viewCount}
+            likeCount={likeCount}
+            publishedDate={publishedDate}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
   if (loading) {
     return (
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -537,7 +603,8 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     return (
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {onClose && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', p: 1 }}>
+            {renderDetailsToggleButton()}
             <IconButton size="small" onClick={onClose}>
               <CloseIcon />
             </IconButton>
@@ -597,7 +664,8 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     return (
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {onClose && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', p: 1 }}>
+            {renderDetailsToggleButton()}
             <IconButton size="small" onClick={onClose}>
               <CloseIcon />
             </IconButton>
@@ -834,6 +902,8 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         <IconButton size="small" onClick={fetchLyrics} sx={{ mr: 1 }} title={t('lyrics.actions.refreshLyrics')}>
           <RefreshIcon />
         </IconButton>
+
+        {renderDetailsToggleButton()}
         
         {onClose && (
           <IconButton size="small" onClick={onClose}>
@@ -850,7 +920,16 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         message={t('lyrics.messages.uploadSuccess')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
-      
+
+      {/* Offline-save failure snackbar */}
+      <Snackbar
+        open={offlineSaveError}
+        autoHideDuration={4000}
+        onClose={() => setOfflineSaveError(false)}
+        message={t('lyrics.messages.offlineSaveFailed')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
       {/* Edit mode panel - Find different lyrics */}
       <Collapse in={editMode}>
         <Box sx={{ p: 2, bgcolor: 'action.hover', borderBottom: 1, borderColor: 'divider' }}>
@@ -977,12 +1056,36 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       </Collapse>
 
       {lyrics.is_synced && (
-        <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="caption" color="text.secondary">
-            {t('lyrics.source')}: {lyrics.source === 'upload' && lyrics.uploaded_filename 
-              ? `📤 ${lyrics.uploaded_filename}` 
-              : lyrics.source} {lyrics.language && `• ${lyrics.language}`}
-          </Typography>
+        <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary">
+              {t('lyrics.source.label')}:
+            </Typography>
+            {lyrics.source === 'captions' ? (
+              <Tooltip title={t('lyrics.source.captionsHint')}>
+                <Chip
+                  label={t('lyrics.source.captions')}
+                  size="small"
+                  variant="outlined"
+                  color="info"
+                  sx={{ height: 20 }}
+                />
+              </Tooltip>
+            ) : (
+              <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+                {lyrics.source === 'upload' && lyrics.uploaded_filename
+                  ? `📤 ${lyrics.uploaded_filename}`
+                  : lyrics.source === 'lrclib'
+                    ? t('lyrics.source.lrclib')
+                    : lyrics.source}
+              </Typography>
+            )}
+            {lyrics.language && (
+              <Typography variant="caption" color="text.secondary">
+                • {lyrics.language}
+              </Typography>
+            )}
+          </Box>
           <FormControlLabel
             control={
               <Switch

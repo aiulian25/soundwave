@@ -8,6 +8,8 @@ from download.models import DownloadQueue
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db.models import Q
+from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
 import os
 import logging
 
@@ -26,6 +28,191 @@ def get_yt_dlp_cookies_opts():
     if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
         return {'cookiefile': COOKIES_FILE}
     return {}
+
+
+# Cache of each YouTube playlist's ordered video-id list. Written by
+# download_playlist_task during a sync and read by link_audio_to_playlists so a
+# freshly-downloaded track is attached to its playlist(s) WITHOUT re-fetching every
+# playlist from YouTube per track. The old behaviour made N downloads x P playlists
+# yt-dlp extract_info calls, which triggered rate-limiting. Keyed by the PUBLIC YouTube
+# playlist_id (safely shared across users subscribed to the same playlist); the value is
+# a list of video ids preserving playlist order (so track position can be derived).
+PLAYLIST_YTIDS_CACHE_PREFIX = 'playlist_ytids:'
+PLAYLIST_YTIDS_CACHE_TTL = 24 * 60 * 60  # 24h; refreshed on every sync (beat runs ~15m)
+
+
+def _cache_playlist_video_ids(playlist_id, ordered_ids):
+    """Best-effort cache of a playlist's ordered video-id list for post-download linkage."""
+    try:
+        cache.set(
+            f'{PLAYLIST_YTIDS_CACHE_PREFIX}{playlist_id}',
+            list(ordered_ids),
+            PLAYLIST_YTIDS_CACHE_TTL,
+        )
+    except Exception as exc:  # cache is best-effort — never break a sync over it
+        logger.debug('Could not cache playlist video ids for %s: %s', playlist_id, exc)
+
+
+# --- Download audio-quality resolution (F1) --------------------------------------
+# Maps a user/channel quality tier to the yt-dlp FFmpegExtractAudio postprocessor and
+# the resulting file extension / stored Audio.audio_format. The two settings use
+# different vocabularies — UserConfig.audio_quality = low/medium/high/best;
+# Channel.download_quality = auto/low/medium/high/ultra — so both, plus a 'flac' alias,
+# are normalized here. best/ultra/flac = lossless FLAC; unknown/'auto' falls through to
+# the historical default (m4a @ 192 kbps).
+_QUALITY_PRESETS = {
+    'flac':   {'pp': {'preferredcodec': 'flac'},                           'ext': 'flac'},
+    'best':   {'pp': {'preferredcodec': 'flac'},                           'ext': 'flac'},
+    'ultra':  {'pp': {'preferredcodec': 'flac'},                           'ext': 'flac'},
+    'high':   {'pp': {'preferredcodec': 'm4a', 'preferredquality': '320'}, 'ext': 'm4a'},
+    'medium': {'pp': {'preferredcodec': 'm4a', 'preferredquality': '192'}, 'ext': 'm4a'},
+    'low':    {'pp': {'preferredcodec': 'opus', 'preferredquality': '96'}, 'ext': 'opus'},
+}
+_DEFAULT_QUALITY = 'medium'
+
+
+def _quality_preset(quality):
+    return _QUALITY_PRESETS.get((quality or '').strip().lower(), _QUALITY_PRESETS[_DEFAULT_QUALITY])
+
+
+def _postprocessor_for_quality(quality):
+    """FFmpegExtractAudio options (WITHOUT the 'key') for a quality tier.
+
+    e.g. 'flac' -> {'preferredcodec': 'flac'}; 'high' -> {'preferredcodec':'m4a','preferredquality':'320'}.
+    """
+    return dict(_quality_preset(quality)['pp'])
+
+
+def _ext_for_quality(quality):
+    """Output file extension / Audio.audio_format for a quality tier (flac/m4a/opus)."""
+    return _quality_preset(quality)['ext']
+
+
+def _resolve_download_quality(queue_item):
+    """Effective quality tier for this download.
+
+    Precedence: the originating channel's `download_quality` (when the item came from a
+    channel subscription and that channel isn't 'auto') > the owner's
+    `UserConfig.audio_quality` > the historical default (medium / m4a-192).
+    """
+    # Per-channel override — channel-subscription downloads stamp `channel_name`.
+    if queue_item.channel_name:
+        channel = Channel.objects.filter(
+            owner=queue_item.owner, channel_name=queue_item.channel_name
+        ).first()
+        if channel and channel.download_quality and channel.download_quality.strip().lower() != 'auto':
+            return channel.download_quality
+    # Owner's Settings preference (UserConfig is a OneToOne with related_name 'config').
+    try:
+        cfg_quality = queue_item.owner.config.audio_quality
+    except ObjectDoesNotExist:
+        cfg_quality = None
+    return cfg_quality or _DEFAULT_QUALITY
+
+
+def measure_loudness_lufs(file_path):
+    """Measure integrated loudness (EBU R128 / LUFS) of an audio file via ffmpeg (F9).
+
+    Uses ffmpeg's `loudnorm` analysis pass (JSON output on stderr). Best-effort: returns
+    a float LUFS value, or None on any failure/silence. No shell, fixed argv (no injection).
+    """
+    import subprocess
+    import json as _json
+    import re as _re
+
+    if not file_path or not os.path.isfile(file_path):
+        return None
+    try:
+        result = subprocess.run(
+            ['ffmpeg', '-hide_banner', '-nostats', '-i', file_path,
+             '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
+            capture_output=True, text=True, timeout=1800,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning('Loudness measurement failed to run for %s: %s', file_path, exc)
+        return None
+
+    # loudnorm prints a flat JSON object (input_i, input_tp, ...) to stderr.
+    match = _re.search(r'\{[^{}]*"input_i"[^{}]*\}', result.stderr or '', _re.DOTALL)
+    if not match:
+        return None
+    try:
+        value = float(_json.loads(match.group(0)).get('input_i'))
+    except (TypeError, ValueError):
+        return None
+    # Reject NaN / -inf (silent tracks) so we don't store a nonsense value.
+    if value != value or value in (float('-inf'), float('inf')):
+        return None
+    return round(value, 2)
+
+
+@shared_task(name='audio.measure_loudness')
+def measure_loudness_task(audio_id):
+    """Measure and store a track's integrated loudness after download (F9)."""
+    try:
+        audio = Audio.objects.get(id=audio_id)
+    except Audio.DoesNotExist:
+        return f"Audio {audio_id} no longer exists"
+    if not audio.file_path:
+        return f"Audio {audio_id} has no file"
+    lufs = measure_loudness_lufs(os.path.join('/app/audio', audio.file_path))
+    if lufs is None:
+        return f"Loudness not measured for {audio_id}"
+    audio.loudness_lufs = lufs
+    audio.save(update_fields=['loudness_lufs'])
+    return f"Measured loudness for {audio_id}: {lufs} LUFS"
+
+
+@shared_task(name='audio.extract_features')
+def extract_features_task(audio_id):
+    """Compute per-track audio features (tempo/key/energy + 6-dim vector) with librosa (F16).
+
+    Fire-and-forget after download; never blocks it. librosa/numpy are imported lazily so this
+    module and the test suite load even when the DSP stack is not installed in the image.
+    """
+    try:
+        audio = Audio.objects.get(id=audio_id)
+    except Audio.DoesNotExist:
+        return f"Audio {audio_id} no longer exists"
+    if not audio.file_path:
+        return f"Audio {audio_id} has no file"
+
+    from django.conf import settings
+    from pathlib import Path
+    from audio.radio_features import build_feature_vector, energy_from_rms, KEY_NAMES
+
+    try:
+        import numpy as np
+        import librosa
+    except ImportError as exc:
+        logger.warning("librosa unavailable, skipping features for %s: %s", audio_id, exc)
+        return f"librosa unavailable for {audio_id}"
+
+    source_path = str(Path(settings.MEDIA_ROOT) / audio.file_path)
+    try:
+        samples, sample_rate = librosa.load(source_path, sr=22050, mono=True, duration=120)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("librosa load failed for %s: %s", audio_id, exc)
+        return f"librosa load failed for {audio_id}"
+    if samples.size == 0:
+        return f"Empty audio for {audio_id}"
+
+    rms = float(np.mean(librosa.feature.rms(y=samples)))
+    energy = energy_from_rms(rms)
+    tempo, _beats = librosa.beat.beat_track(y=samples, sr=sample_rate)
+    bpm = float(np.atleast_1d(tempo)[0])
+    centroid = float(np.mean(librosa.feature.spectral_centroid(y=samples, sr=sample_rate)))
+    zcr = float(np.mean(librosa.feature.zero_crossing_rate(samples)))
+    rolloff = float(np.mean(librosa.feature.spectral_rolloff(y=samples, sr=sample_rate)))
+    chroma = librosa.feature.chroma_stft(y=samples, sr=sample_rate)
+    key_index = int(np.argmax(np.mean(chroma, axis=1)))
+
+    audio.bpm = round(bpm, 2)
+    audio.music_key = KEY_NAMES[key_index] if 0 <= key_index < len(KEY_NAMES) else ''
+    audio.energy = round(energy, 4)
+    audio.feature_vector = [round(v, 5) for v in build_feature_vector(energy, bpm, centroid, zcr, rolloff, key_index)]
+    audio.save(update_fields=['bpm', 'music_key', 'energy', 'feature_vector'])
+    return f"Extracted features for {audio_id}: key={audio.music_key} bpm={audio.bpm} energy={audio.energy}"
 
 
 # Error patterns that indicate a video is permanently unavailable
@@ -147,7 +334,14 @@ def download_audio_task(queue_id):
     """Download audio from YouTube - AUDIO ONLY, no video"""
     try:
         queue_item = DownloadQueue.objects.get(id=queue_id)
+    except DownloadQueue.DoesNotExist:
+        # Row was deleted (e.g. the queue was cleared) between enqueue and execution.
+        # Return quietly instead of letting the broad `except` below run with
+        # `queue_item` unbound (UnboundLocalError, which would mask the real cause).
+        logger.warning("download_audio_task: queue item %s no longer exists", queue_id)
+        return
 
+    try:
         # SSRF guard (APP-02), defence-in-depth: re-validate immediately before the
         # fetch so auto-started/retried items, and anything queued before this check
         # existed, cannot make yt-dlp reach an internal/non-routable address.
@@ -165,14 +359,15 @@ def download_audio_task(queue_id):
         queue_item.started_date = timezone.now()
         queue_item.save()
 
+        # Honor the owner's (and originating channel's) audio-quality setting (F1)
+        # instead of always producing m4a/192.
+        quality = _resolve_download_quality(queue_item)
+        out_ext = _ext_for_quality(quality)
+
         # yt-dlp options for AUDIO ONLY (no video)
         ydl_opts = {
-            'format': 'bestaudio/best',  # Best audio quality, no video
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'm4a',
-                'preferredquality': '192',
-            }],
+            'format': 'bestaudio/best',  # Best available source; postprocessor sets the codec
+            'postprocessors': [{'key': 'FFmpegExtractAudio', **_postprocessor_for_quality(quality)}],
             'outtmpl': '/app/audio/%(channel)s/%(title)s-%(id)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
@@ -188,17 +383,18 @@ def download_audio_task(queue_id):
             # We need to use prepare_filename and replace the extension
             actual_filename = ydl.prepare_filename(info)
             
-            # Replace extension with .m4a since we're extracting audio
+            # Replace the source extension with the extracted-audio extension chosen by
+            # the resolved quality (flac / m4a / opus).
             import os as os_module
             base_filename = os_module.path.splitext(actual_filename)[0]
-            actual_filename = base_filename + '.m4a'
-            
+            actual_filename = base_filename + '.' + out_ext
+
             # Remove /app/audio/ prefix to get relative path
             if actual_filename.startswith('/app/audio/'):
                 file_path = actual_filename[11:]  # Remove '/app/audio/' prefix
             else:
                 # Fallback to constructed path if prepare_filename doesn't work as expected
-                file_path = f"{info.get('channel', 'unknown')}/{info.get('title', 'unknown')}-{info['id']}.m4a"
+                file_path = f"{info.get('channel', 'unknown')}/{info.get('title', 'unknown')}-{info['id']}.{out_ext}"
 
             # Create Audio object
             audio, created = Audio.objects.get_or_create(
@@ -212,6 +408,12 @@ def download_audio_task(queue_id):
                     'duration': info.get('duration', 0),
                     'file_path': file_path,
                     'file_size': info.get('filesize', 0) or 0,
+                    'audio_format': out_ext,
+                    # Capture chapter markers (F2) — empty list when the video has none.
+                    'chapters': [
+                        {'title': c.get('title', ''), 'start': c.get('start_time'), 'end': c.get('end_time')}
+                        for c in (info.get('chapters') or [])
+                    ],
                     'thumbnail_url': info.get('thumbnail', ''),
                     'published_date': datetime.strptime(info.get('upload_date', '20230101'), '%Y%m%d'),
                     'view_count': info.get('view_count', 0) or 0,
@@ -222,6 +424,11 @@ def download_audio_task(queue_id):
             # Queue a task to link this audio to playlists (optimized - runs after download)
             # This prevents blocking the download task with expensive playlist lookups
             link_audio_to_playlists.delay(audio.id, queue_item.owner.id)
+
+            # Measure loudness asynchronously (F9) so the download task stays fast.
+            if created:
+                measure_loudness_task.delay(audio.id)
+                extract_features_task.delay(audio.id)  # F16 sonic features, async, never blocks
 
         queue_item.status = 'completed'
         queue_item.completed_date = timezone.now()
@@ -250,15 +457,22 @@ def download_channel_task(channel_id):
         
         url = f"https://www.youtube.com/channel/{channel.channel_id}/videos"
         
-        # Extract flat to get list quickly
+        # Extract flat to get list quickly. sync_depth caps how far back we scan
+        # (0 = entire channel history, so playlistend is omitted).
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
-            'playlistend': 50,  # Limit to last 50 videos per sync
             'socket_timeout': 30,
             **get_yt_dlp_cookies_opts(),
         }
+        if channel.sync_depth and channel.sync_depth > 0:
+            ydl_opts['playlistend'] = channel.sync_depth
+        sync_depth_label = channel.sync_depth if channel.sync_depth else 'all'
+        logger.info(
+            '[ChannelSync] Fetching up to %s videos for "%s" (ID: %s)',
+            sync_depth_label, channel.channel_name, channel.channel_id,
+        )
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -315,6 +529,9 @@ def download_channel_task(channel_id):
                 defaults={
                     'youtube_id': video_id,
                     'title': entry.get('title', 'Unknown'),
+                    # Stamp the source channel so download_audio_task can honor this
+                    # channel's download_quality (F1).
+                    'channel_name': channel.channel_name,
                     'status': 'pending',
                     'auto_start': True
                 }
@@ -616,6 +833,12 @@ def download_playlist_task(playlist_id, force=False):
         total_items = len([e for e in info['entries'] if e])
         playlist.item_count = total_items
 
+        # Cache this playlist's ordered video-id list up front (before any download is
+        # queued) so post-download linkage (link_audio_to_playlists) can attach the new
+        # tracks with NO extra yt-dlp calls. Reused for the stale-item cleanup below.
+        yt_video_ids_ordered = [e.get('id') for e in info['entries'] if e and e.get('id')]
+        _cache_playlist_video_ids(playlist.playlist_id, yt_video_ids_ordered)
+
         # Get list of permanently unavailable videos (copyright, private, etc.)
         # When force=True, retry everything including previously unavailable
         unavailable_ids = set() if force else get_permanently_unavailable_ids(playlist.owner)
@@ -771,7 +994,7 @@ def download_playlist_task(playlist_id, force=False):
         # Any PlaylistItem whose audio youtube_id is NOT in yt_video_ids was never
         # actually part of this YouTube playlist — only the playlist link is removed,
         # the audio file itself is preserved.
-        yt_video_ids = {e.get('id') for e in info['entries'] if e and e.get('id')}
+        yt_video_ids = set(yt_video_ids_ordered)
         stale_items = PlaylistItem.objects.filter(playlist=playlist).exclude(
             audio__youtube_id__in=yt_video_ids
         )
@@ -818,72 +1041,63 @@ def download_playlist_task(playlist_id, force=False):
 
 @shared_task
 def link_audio_to_playlists(audio_id, user_id):
-    """Link newly downloaded audio to playlists that contain it.
-    
-    Uses the DownloadQueue to find which playlists triggered the download,
-    instead of re-fetching every playlist from YouTube (which caused rate-limiting).
+    """Link a freshly-downloaded track to the YouTube playlists that contain it.
+
+    Membership is resolved from each playlist's cached, yt-dlp-authoritative video-id
+    list (populated by download_playlist_task during sync) — NOT by re-fetching every
+    playlist from YouTube per track. The old behaviour made N downloads x P playlists
+    extract_info calls, which triggered rate-limiting. On a cache miss (playlist not
+    synced within the TTL) the track is left for the periodic download_playlist_task sync
+    to reconcile, so this task never makes a network call.
     """
     from playlist.models import Playlist, PlaylistItem
     from django.contrib.auth import get_user_model
-    
+
     try:
         User = get_user_model()
         user = User.objects.get(id=user_id)
         audio = Audio.objects.get(id=audio_id)
-        
-        # Only link audio to playlists that actually contain this track on YouTube.
-        # We do a lightweight yt-dlp extract_flat check for each playlist.
+
         playlists = Playlist.objects.filter(owner=user, playlist_type='youtube')
+
+        # Playlists that already contain this track — one query instead of P.
+        already_linked = set(
+            PlaylistItem.objects.filter(audio=audio, playlist__owner=user)
+            .values_list('playlist_id', flat=True)
+        )
+
         linked = 0
-        
         for playlist in playlists:
-            # Check if already linked
-            if PlaylistItem.objects.filter(playlist=playlist, audio=audio).exists():
+            if playlist.id in already_linked:
                 continue
-            
-            # Verify this track is actually in this YouTube playlist
-            # by doing a quick extract_flat and checking video IDs
+
+            # Resolve membership from the cached id list for this playlist (no yt-dlp).
+            # No cache entry (not synced recently) -> skip; the periodic sync will link
+            # it later. This is what removes the per-track YouTube fetches.
+            cached_ids = cache.get(f'{PLAYLIST_YTIDS_CACHE_PREFIX}{playlist.playlist_id}')
+            if not cached_ids or audio.youtube_id not in cached_ids:
+                continue
+
             try:
-                url = f"https://www.youtube.com/playlist?list={playlist.playlist_id}"
-                ydl_opts = {
-                    'quiet': True,
-                    'no_warnings': True,
-                    'extract_flat': True,
-                    **get_yt_dlp_cookies_opts(),
-                }
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    if not info or not info.get('entries'):
-                        continue
-                    playlist_video_ids = {e.get('id') for e in info['entries'] if e and e.get('id')}
-                    if audio.youtube_id not in playlist_video_ids:
-                        continue
-                    # Found! Get position from YouTube order
-                    position = next(
-                        (idx for idx, e in enumerate(info['entries'])
-                         if e and e.get('id') == audio.youtube_id),
-                        PlaylistItem.objects.filter(playlist=playlist).count()
-                    )
-            except Exception as e:
-                logger.debug('Could not verify playlist %s for audio %s: %s',
-                             playlist.playlist_id, audio.youtube_id, e)
-                continue
-            
+                position = cached_ids.index(audio.youtube_id)
+            except ValueError:
+                position = PlaylistItem.objects.filter(playlist=playlist).count()
+
             PlaylistItem.objects.get_or_create(
                 playlist=playlist,
                 audio=audio,
-                defaults={'position': position}
+                defaults={'position': position},
             )
-            
-            # Update downloaded count from DB
+
+            # Keep the playlist's downloaded_count accurate.
             playlist.downloaded_count = PlaylistItem.objects.filter(
                 playlist=playlist,
                 audio__file_path__isnull=False,
             ).exclude(audio__file_path='').count()
             playlist.save(update_fields=['downloaded_count'])
             linked += 1
-                
-        return f"Linked audio {audio.youtube_id} to {linked} playlists"
+
+        return f"Linked audio {audio.youtube_id} to {linked} playlist(s)"
     except Exception as e:
         logger.warning('Failed to link audio %s: %s', audio_id, e)
         return f"Failed to link audio: {str(e)}"

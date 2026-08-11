@@ -126,6 +126,9 @@ export const audioAPI = {
   // Recommendations endpoints
   getRecommendations: (youtubeId: string) => api.get(`/audio/${youtubeId}/recommendations/`),
   getSimilarTracks: (youtubeId: string) => api.get(`/audio/${youtubeId}/similar/`),
+  // Split a long mix into segments (F3)
+  splitTrack: (youtubeId: string) => api.post(`/audio/${youtubeId}/split/`),
+  getSegments: (youtubeId: string) => api.get(`/audio/${youtubeId}/segments/`),
   // Metadata endpoints
   searchMetadata: (youtubeId: string, params?: { title?: string; artist?: string }) => 
     api.get(`/audio/${youtubeId}/metadata/search/`, { params }),
@@ -141,6 +144,9 @@ export const channelAPI = {
   get: (channelId: string) => api.get(`/channel/${channelId}/`),
   subscribe: (data: any) => api.post('/channel/', data),
   unsubscribe: (channelId: string) => api.delete(`/channel/${channelId}/`),
+  updateSyncDepth: (channelId: string, syncDepth: number) =>
+    api.patch(`/channel/${channelId}/`, { sync_depth: syncDepth }),
+  sync: (channelId: string) => api.post(`/channel/${channelId}/sync/`),
 };
 
 // Playlist API
@@ -158,6 +164,11 @@ export const playlistAPI = {
   removeItem: (playlistId: string, youtubeId: string) => api.delete(`/playlist/${playlistId}/items/`, { data: { youtube_id: youtubeId } }),
   // Find playlists containing a track
   findContaining: (youtubeId: string) => api.get(`/playlist/containing/${youtubeId}/`),
+  // Export the whole playlist as a single ZIP
+  export: (
+    playlistId: string,
+    data: { format: string; quality?: string; embed_lyrics?: boolean; embed_artwork?: boolean }
+  ) => api.post(`/playlist/${playlistId}/export/`, data, { responseType: 'blob' }),
 };
 
 // Smart Playlist API
@@ -307,6 +318,8 @@ export const settingsAPI = {
   config: () => api.get('/appsettings/config/'),
   backup: () => api.get('/appsettings/backup/'),
   createBackup: () => api.post('/appsettings/backup/'),
+  restorePreview: (data: any) => api.post('/appsettings/restore/?dry_run=1', data),
+  restore: (data: any) => api.post('/appsettings/restore/', data),
 };
 
 // Playback Sync API - Cross-device playback continuity
@@ -338,10 +351,11 @@ export const playbackSyncAPI = {
 export const radioAPI = {
   // Start a new radio session
   start: (data: {
-    mode: 'track' | 'artist' | 'favorites' | 'discovery' | 'recent';
+    mode: 'track' | 'artist' | 'favorites' | 'discovery' | 'recent' | 'sonic' | 'autodj';
     seed_youtube_id?: string;
     seed_channel_id?: string;
     variety_level?: number;
+    curve?: 'focus' | 'party' | 'winddown';
   }) => api.post('/radio/start/', data),
   
   // Stop the current radio session

@@ -1,4 +1,19 @@
 {
+  "activity": {
+    "title": "Activitate",
+    "tooltip": "Activitate descarcari",
+    "empty": "Nicio activitate de descarcare",
+    "retry": "Reincearca",
+    "retryAll": "Reincearca toate esuate",
+    "refresh": "Reimprospateaza",
+    "error": "Activitatea nu a putut fi incarcata",
+    "status": {
+      "pending": "In asteptare",
+      "downloading": "Se descarca",
+      "completed": "Finalizat",
+      "failed": "Esuat"
+    }
+  },
   "login": {
     "logoAlt": "Sigla SoundWave",
     "tagline": "Centrul tau personal de muzica",
@@ -40,6 +55,22 @@
     "toggleLyrics": "Apasa pentru a afisa/ascunde versurile",
     "lyricsNotAvailableLocal": "Versurile nu sunt disponibile pentru fisiere locale",
     "playingFromCache": "Redare din cache",
+    "chapters": {
+      "title": "Capitole",
+      "none": "Fara capitole",
+      "current": "Capitol: {{title}}"
+    },
+    "segment": {
+      "playingPart": "Partea {{current}} din {{total}}"
+    },
+    "details": {
+      "title": "Detalii",
+      "views": "{{count}} vizualizari",
+      "likes": "{{count}} aprecieri",
+      "showMore": "Afiseaza mai mult",
+      "showLess": "Afiseaza mai putin",
+      "published": "Publicat pe {{date}}"
+    },
     "trackOptions": "Optiuni melodie",
     "addToPlaylist": "Adauga in playlist",
     "removeFromFavorites": "Elimina din favorite",
@@ -282,6 +313,14 @@
       "cached": "In cache",
       "availableOffline": "Disponibil offline",
       "notDownloaded": "Nedescarcata"
+    },
+    "export": {
+      "action": "Exporta playlist",
+      "summary": "{{count}} melodii descarcate vor fi exportate.",
+      "preparing": "Se pregateste exportul…",
+      "progress": "Se exporta {{count}} melodii…",
+      "done": "Export gata",
+      "failed": "Exportul a esuat"
     },
     "actions": {
       "playAll": "Reda tot",
@@ -674,6 +713,21 @@
   "channelDetail": {
     "title": "Detalii canal",
     "notAvailable": "N/A",
+    "syncDepth": {
+      "label": "Adancime sincronizare",
+      "options": {
+        "25": "Ultimele 25",
+        "50": "Ultimele 50",
+        "100": "Ultimele 100",
+        "200": "Ultimele 200",
+        "all": "Toate"
+      },
+      "backfill": "Sincronizare profunda acum",
+      "saved": "Adancimea de sincronizare a fost actualizata",
+      "saveFailed": "Adancimea de sincronizare nu a putut fi actualizata",
+      "backfillStarted": "Sincronizarea a pornit",
+      "backfillFailed": "Sincronizarea nu a putut porni"
+    },
     "actions": {
       "playAll": "Reda tot",
       "shuffle": "Amesteca",
@@ -772,7 +826,12 @@
   },
   "lyrics": {
     "title": "Versuri",
-    "source": "Sursa",
+    "source": {
+      "label": "Sursa",
+      "lrclib": "LRCLIB",
+      "captions": "din subtitrari",
+      "captionsHint": "Generat automat din subtitrarile acestui clip - sincronizarea si formularea pot fi aproximative."
+    },
     "autoScroll": "Derulare automata",
     "lastFetchError": "Ultima eroare la preluare: {{error}}",
     "instrumental": {
@@ -800,7 +859,8 @@
       "instrumental": "Instrumental"
     },
     "messages": {
-      "uploadSuccess": "Fisierul LRC a fost incarcat cu succes!"
+      "uploadSuccess": "Fisierul LRC a fost incarcat cu succes!",
+      "offlineSaveFailed": "Versurile nu au putut fi salvate pentru utilizare offline"
     },
     "actions": {
       "tryFetchLyrics": "Incearca preluarea versurilor",
@@ -1142,7 +1202,9 @@
       "artist": "Radio pe artist",
       "favorites": "Mix favorite",
       "discovery": "Mod descoperire",
-      "recent": "Adaugari noi"
+      "recent": "Adaugari noi",
+      "sonic": "Similaritate sonica",
+      "autodj": "Auto-DJ"
     },
     "sessionStats": "{{played}} redate • {{skipped}} sarite",
     "actions": {
@@ -1272,6 +1334,12 @@
       "download": "Descarca",
       "goToChannel": "Mergi la canal",
       "findInPlaylists": "Gaseste in playlisturi"
+    },
+    "split": {
+      "action": "Imparte in piese",
+      "success": "Impartit in {{count}} parti",
+      "noTracklist": "Nu s-a gasit o lista de piese in capitolele sau descrierea acestei piese.",
+      "error": "Nu s-a putut imparti aceasta piesa. Incearca din nou."
     },
     "findInPlaylists": {
       "title": "Playlisturi care contin aceasta melodie",
@@ -1772,6 +1840,23 @@
       "recent": {
         "label": "Adaugiri recente",
         "description": "Melodii adaugate recent"
+      },
+      "sonic": {
+        "label": "Similaritate sonica",
+        "description": "Melodii similare acustic"
+      },
+      "autodj": {
+        "label": "Auto-DJ",
+        "description": "O sesiune secventiata dupa energie"
+      }
+    }
+  },
+  "radio": {
+    "autodj": {
+      "curves": {
+        "focus": "Concentrare",
+        "party": "Petrecere",
+        "windDown": "Relaxare"
       }
     }
   },
@@ -1789,6 +1874,26 @@
   },
   "settings": {
     "title": "Setari",
+    "backup": {
+      "title": "Backup si restaurare",
+      "description": "Exporta definitia bibliotecii (melodii, playlist-uri, reguli de playlist inteligent, favorite si abonari la canale) intr-un fisier JSON sau restaureaz-o in acest cont. Audio se redescarca pe baza ID-urilor video salvate.",
+      "create": "Creeaza backup",
+      "restore": "Restaureaza din fisier",
+      "summary": "Previzualizare restaurare",
+      "confirm": "Aplica restaurarea",
+      "created": "Backup descarcat",
+      "createFailed": "Backup-ul nu a putut fi creat",
+      "restored": "Restaurarea a pornit",
+      "restoreFailed": "Restaurarea a esuat",
+      "invalidFile": "Alege un fisier de backup SoundWave valid (.json)",
+      "counts": {
+        "playlists": "Playlist-uri: {{count}} noi din {{total}}",
+        "smartPlaylists": "Playlist-uri inteligente: {{count}} noi din {{total}}",
+        "channels": "Abonari la canale: {{count}} noi din {{total}}",
+        "tracks": "Melodii: {{count}} noi din {{total}}",
+        "downloads": "Melodii de descarcat: {{count}}"
+      }
+    },
     "appearance": {
       "title": "Aspect",
       "description": "Personalizeaza aspectul SoundWave cu diferite teme de culori.",
@@ -1867,6 +1972,21 @@
         "enableLabel": "Activeaza amestecarea inteligenta",
         "historySize": "Dimensiune istoric: {{count}} melodii",
         "historySizeHelp": "Numarul de melodii redate recent pe care sa le evite la amestecare"
+      },
+      "normalization": {
+        "title": "Normalizare volum",
+        "enable": "Normalizeaza volumul redarii",
+        "target": "Tinta: {{value}} LUFS",
+        "hint": "Aduce piesele la un volum constant, ca melodiile line si cele puternice sa se auda la fel. Afecteaza doar piesele analizate."
+      },
+      "audioQuality": {
+        "title": "Calitate audio la descarcare",
+        "description": "Calitatea folosita cand descarci piese noi de pe YouTube. Piesele deja descarcate raman neschimbate.",
+        "flac": "FLAC (Fara pierderi)",
+        "high": "Inalta (320 kbps)",
+        "medium": "Medie (192 kbps)",
+        "low": "Scazuta (Opus 96 kbps)",
+        "storageWarning": "FLAC este fara pierderi si ocupa considerabil mai mult spatiu."
       },
       "seekDuration": {
         "title": "Durata cautare",

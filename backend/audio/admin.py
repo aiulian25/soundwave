@@ -23,3 +23,13 @@ class AudioProgressAdmin(admin.ModelAdmin):
 
 # Import lyrics admin
 from audio.admin_lyrics import *  # noqa
+
+# Register segments (F3) — also ensures the model is imported at app load.
+from audio.models_segments import AudioSegment  # noqa: E402
+
+
+@admin.register(AudioSegment)
+class AudioSegmentAdmin(admin.ModelAdmin):
+    """Audio segment admin"""
+    list_display = ('audio', 'order', 'title', 'start_seconds', 'end_seconds')
+    search_fields = ('audio__title', 'title')

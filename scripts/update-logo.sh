@@ -6,7 +6,7 @@ echo "================================"
 echo ""
 
 # Paths
-PROJECT_ROOT="/home/iulian/projects/zi-tube/soundwave"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_LOGO="$PROJECT_ROOT/frontend/public/img/logo.png"
 ICONS_DIR="$PROJECT_ROOT/frontend/public/img/icons"
 FAVICON_PATH="$PROJECT_ROOT/frontend/public/favicon.ico"

@@ -16,6 +16,7 @@ from audio.views import (
 )
 from audio.views_lyrics import LyricsViewSet, LyricsCacheViewSet, LyricsDownloadView, LyricsUploadView
 from audio.views_recommendations import AudioRecommendationsView, AudioSimilarTracksView
+from audio.views_segments import AudioSplitView, AudioSegmentsView
 
 # Create router for ViewSets
 router = DefaultRouter()
@@ -32,6 +33,9 @@ urlpatterns = [
     path('<str:youtube_id>/artwork/', ArtworkProxyView.as_view(), name='audio-artwork'),
     path('<str:youtube_id>/recommendations/', AudioRecommendationsView.as_view(), name='audio-recommendations'),
     path('<str:youtube_id>/similar/', AudioSimilarTracksView.as_view(), name='audio-similar'),
+    # Split a long mix into segments (F3)
+    path('<str:youtube_id>/split/', AudioSplitView.as_view(), name='audio-split'),
+    path('<str:youtube_id>/segments/', AudioSegmentsView.as_view(), name='audio-segments'),
     # Metadata endpoints
     path('<str:youtube_id>/metadata/search/', MetadataSearchView.as_view(), name='audio-metadata-search'),
     path('<str:youtube_id>/metadata/apply/', MetadataApplyView.as_view(), name='audio-metadata-apply'),

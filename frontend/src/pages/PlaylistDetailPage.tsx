@@ -32,10 +32,12 @@ import {
   Storage as StorageIcon,
   OfflinePin as OfflinePinIcon,
   Sync as SyncIcon,
+  FolderZip as FolderZipIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { playlistAPI, audioAPI } from '../api/client';
+import PlaylistExportDialog from '../components/PlaylistExportDialog';
 import { usePWA, CacheProgress } from '../context/PWAContext';
 import { offlineStorage } from '../utils/offlineStorage';
 import { audioCache } from '../utils/audioCache';
@@ -84,6 +86,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   const [error, setError] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [isOfflineAvailable, setIsOfflineAvailable] = useState(false);
   const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<CacheProgress | null>(null);
@@ -597,7 +600,42 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         >
           <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('playlistDetail.actions.forceRecheck')}</Box>
         </Button>
+        <Button
+          variant="outlined"
+          startIcon={<FolderZipIcon />}
+          onClick={() => setExportDialogOpen(true)}
+          disabled={!playlist.downloaded_count}
+          sx={{
+            minWidth: { xs: '48px', sm: '150px' },
+            borderColor: 'primary.main',
+            color: 'primary.main',
+            fontWeight: 600,
+            '&:hover': {
+              borderColor: 'primary.dark',
+              bgcolor: 'rgba(19, 236, 106, 0.05)',
+            },
+            '&:disabled': {
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              color: 'rgba(255, 255, 255, 0.3)',
+            },
+          }}
+          title={t('playlistDetail.export.action')}
+        >
+          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{t('playlistDetail.export.action')}</Box>
+        </Button>
       </Box>
+
+      <PlaylistExportDialog
+        open={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        playlistId={playlist.playlist_id}
+        playlistTitle={playlist.title}
+        trackCount={playlist.downloaded_count}
+        onExported={() => {
+          setSnackbarMessage(t('playlistDetail.export.done'));
+          setSnackbarOpen(true);
+        }}
+      />
 
       {/* Offline Caching Controls - PWA Feature */}
       <Card sx={{ 

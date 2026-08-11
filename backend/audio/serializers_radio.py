@@ -3,6 +3,7 @@
 from rest_framework import serializers
 from audio.models_radio import RadioSession, RadioTrackFeedback
 from audio.models import Audio
+from audio.radio_features import ENERGY_CURVES
 
 
 class RadioSessionSerializer(serializers.ModelSerializer):
@@ -65,20 +66,26 @@ class StartRadioSerializer(serializers.Serializer):
     seed_youtube_id = serializers.CharField(max_length=50, required=False, allow_blank=True)
     seed_channel_id = serializers.CharField(max_length=50, required=False, allow_blank=True)
     variety_level = serializers.IntegerField(min_value=0, max_value=100, default=50)
-    
+    curve = serializers.ChoiceField(choices=ENERGY_CURVES, required=False, allow_blank=True)
+
     def validate(self, data):
         mode = data.get('mode', 'track')
-        
+
         if mode == 'track' and not data.get('seed_youtube_id'):
             raise serializers.ValidationError({
                 'seed_youtube_id': 'Required for track-based radio'
             })
-        
+
         if mode == 'artist' and not data.get('seed_channel_id'):
             raise serializers.ValidationError({
                 'seed_channel_id': 'Required for artist-based radio'
             })
-        
+
+        if mode == 'sonic' and not data.get('seed_youtube_id'):
+            raise serializers.ValidationError({
+                'seed_youtube_id': 'Required for sonic-similarity radio'
+            })
+
         return data
 
 

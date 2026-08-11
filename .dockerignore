@@ -1,0 +1,23 @@
+# Keep the Docker build context lean and reproducible.
+#
+# The image builds its own artifacts:
+#   - Python deps in the `builder` stage (from requirements.txt)
+#   - the frontend SPA in the `frontend` stage (`npm ci && npm run build` -> /fe/dist)
+# so host-side build outputs and dependency trees must NOT be copied into the context.
+
+# Node / frontend build inputs & outputs (rebuilt inside the image)
+**/node_modules
+frontend/dist
+
+# Python caches / collected static (regenerated at build/run time)
+**/__pycache__
+*.pyc
+*.pyo
+backend/staticfiles
+
+# Orphaned, never-served legacy build output (Django serves the SPA from frontend/dist;
+# see backend/config/urls.py). Excluded so `COPY backend` never ships it.
+backend/static/assets
+
+# VCS metadata
+.git

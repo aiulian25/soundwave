@@ -18,7 +18,9 @@ import PersonIcon from '@mui/icons-material/Person';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ExploreIcon from '@mui/icons-material/Explore';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
-import { useRadio, type RadioMode } from '../context/RadioContext';
+import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import { useRadio, type RadioMode, type RadioCurve } from '../context/RadioContext';
 import { useTranslation } from 'react-i18next';
 import type { Audio } from '../types';
 
@@ -71,22 +73,35 @@ const radioModes: Array<{
     icon: <NewReleasesIcon />,
     requiresTrack: false,
   },
+  {
+    mode: 'sonic',
+    labelKey: 'startRadioMenu.modes.sonic.label',
+    descriptionKey: 'startRadioMenu.modes.sonic.description',
+    icon: <GraphicEqIcon />,
+    requiresTrack: true,
+  },
+];
+
+const autoDjCurves: Array<{ curve: RadioCurve; labelKey: string }> = [
+  { curve: 'focus', labelKey: 'radio.autodj.curves.focus' },
+  { curve: 'party', labelKey: 'radio.autodj.curves.party' },
+  { curve: 'winddown', labelKey: 'radio.autodj.curves.windDown' },
 ];
 
 export default function StartRadioMenu({ anchorEl, open, onClose, track }: StartRadioMenuProps) {
   const { t } = useTranslation();
   const { startRadio, isLoading } = useRadio();
   
-  const handleStartRadio = async (mode: RadioMode) => {
+  const handleStartRadio = async (mode: RadioMode, curve?: RadioCurve) => {
     let seedYoutubeId: string | undefined;
     let seedChannelId: string | undefined;
-    
-    if (track && (mode === 'track' || mode === 'artist')) {
+
+    if (track && (mode === 'track' || mode === 'artist' || mode === 'sonic')) {
       seedYoutubeId = track.youtube_id;
       seedChannelId = track.channel_id;
     }
-    
-    await startRadio(mode, seedYoutubeId, seedChannelId);
+
+    await startRadio(mode, seedYoutubeId, seedChannelId, 50, curve);
     onClose();
   };
   
@@ -148,6 +163,26 @@ export default function StartRadioMenu({ anchorEl, open, onClose, track }: Start
             />
           </MenuItem>
         ))}
+
+      <Divider sx={{ my: 0.5 }} />
+      <Typography variant="overline" sx={{ px: 2, color: 'text.secondary' }}>
+        {t('startRadioMenu.modes.autodj.label')}
+      </Typography>
+      <Typography variant="caption" sx={{ px: 2, pb: 0.5, display: 'block', color: 'text.secondary' }}>
+        {t('startRadioMenu.modes.autodj.description')}
+      </Typography>
+      {autoDjCurves.map((item) => (
+        <MenuItem
+          key={item.curve}
+          onClick={() => handleStartRadio('autodj', item.curve)}
+          disabled={isLoading}
+        >
+          <ListItemIcon sx={{ color: 'secondary.main' }}>
+            <AutoAwesomeIcon />
+          </ListItemIcon>
+          <ListItemText primary={t(item.labelKey)} />
+        </MenuItem>
+      ))}
     </Menu>
   );
 }

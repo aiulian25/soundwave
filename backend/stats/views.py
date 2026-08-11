@@ -254,7 +254,15 @@ class RecordListeningView(ApiBaseView):
     def post(self, request):
         """Record when a user plays/listens to a track"""
         youtube_id = request.data.get('youtube_id')
-        duration_listened = int(request.data.get('duration_listened', 0))
+        # Defensive parse: non-numeric input returns 400 (not a 500), and a negative
+        # duration is clamped to 0 so it can't corrupt listening analytics.
+        try:
+            duration_listened = max(0, int(request.data.get('duration_listened', 0)))
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'duration_listened must be a valid integer'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         completed = request.data.get('completed', False)
         
         if not youtube_id:
@@ -314,8 +322,16 @@ class ListeningHistoryView(ApiBaseView):
     
     def get(self, request):
         """Get paginated listening history"""
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get('page_size', 50))
+        # Defensive pagination: fall back to defaults on non-numeric input and clamp
+        # page_size (max 100) so a client can't request an unbounded result set.
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = min(100, max(1, int(request.query_params.get('page_size', 50))))
+        except (TypeError, ValueError):
+            page_size = 50
         
         # Optional date filter for specific day
         date_filter = request.query_params.get('date')

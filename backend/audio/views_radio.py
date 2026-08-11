@@ -1,6 +1,7 @@
 """Smart Radio / Auto-DJ API views"""
 
 from django.db.models import Count, Q, F
+from django.db.models.functions import Abs
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
@@ -12,6 +13,15 @@ from audio.serializers_radio import (
     RadioSessionSerializer,
     StartRadioSerializer,
     RadioFeedbackSerializer,
+)
+from audio.radio_features import (
+    rank_by_sonic_distance,
+    energy_target,
+    nearest_by_energy,
+    high_skip_youtube_ids,
+    CANDIDATE_POOL_LIMIT,
+    AUTODJ_SESSION_LENGTH,
+    DEFAULT_CURVE,
 )
 import random
 import re
@@ -31,7 +41,8 @@ class RadioStartView(ApiBaseView):
         data = serializer.validated_data
         mode = data['mode']
         variety_level = data.get('variety_level', 50)
-        
+        curve = data.get('curve') or ''
+
         # Get seed track/channel info
         seed_youtube_id = data.get('seed_youtube_id', '')
         seed_channel_id = data.get('seed_channel_id', '')
@@ -39,7 +50,7 @@ class RadioStartView(ApiBaseView):
         seed_artist = ''
         
         # Validate seed track exists
-        if mode == 'track' and seed_youtube_id:
+        if mode in ('track', 'sonic') and seed_youtube_id:
             try:
                 seed_audio = Audio.objects.get(youtube_id=seed_youtube_id, owner=request.user)
                 seed_title = seed_audio.title
@@ -70,7 +81,10 @@ class RadioStartView(ApiBaseView):
         elif mode == 'recent':
             seed_title = "Recently Added"
             seed_artist = "Your newest tracks"
-        
+        elif mode == 'autodj':
+            seed_title = "Auto-DJ"
+            seed_artist = "Energy-sequenced session"
+
         # Create or update radio session
         session, created = RadioSession.objects.update_or_create(
             user=request.user,
@@ -85,14 +99,15 @@ class RadioStartView(ApiBaseView):
                 'played_youtube_ids': [seed_youtube_id] if seed_youtube_id else [],
                 'skipped_youtube_ids': [],
                 'variety_level': variety_level,
+                'energy_curve': curve,
             }
         )
         
         # Get the first track (seed track or auto-selected)
-        if mode == 'track' and seed_youtube_id:
+        if mode in ('track', 'sonic') and seed_youtube_id:
             first_track = seed_audio
         else:
-            first_track = self._get_first_track_for_mode(request.user, mode, seed_channel_id)
+            first_track = self._get_first_track_for_mode(request.user, mode, seed_channel_id, curve)
             if first_track:
                 session.current_youtube_id = first_track.youtube_id
                 session.played_youtube_ids = [first_track.youtube_id]
@@ -106,7 +121,7 @@ class RadioStartView(ApiBaseView):
             'first_track': AudioSerializer(first_track).data if first_track else None,
         })
     
-    def _get_first_track_for_mode(self, user, mode, seed_channel_id=None):
+    def _get_first_track_for_mode(self, user, mode, seed_channel_id=None, curve=''):
         """Get the first track for non-track modes"""
         if mode == 'artist' and seed_channel_id:
             return Audio.objects.filter(
@@ -124,6 +139,13 @@ class RadioStartView(ApiBaseView):
             return Audio.objects.filter(
                 owner=user
             ).order_by('-downloaded_date').first()
+        elif mode == 'autodj':
+            pool = list(Audio.objects.filter(owner=user).exclude(energy__isnull=True)[:CANDIDATE_POOL_LIMIT])
+            if pool:
+                target = energy_target(curve or DEFAULT_CURVE, 0.0)
+                ranked = nearest_by_energy(target, pool)
+                if ranked:
+                    return ranked[0]
         return None
 
 
@@ -241,6 +263,10 @@ class RadioNextTrackView(ApiBaseView):
             candidates, reasons = self._get_discovery_mode_candidates(user, session, base_qs, variety)
         elif session.mode == 'recent':
             candidates, reasons = self._get_recent_mode_candidates(user, session, base_qs, variety)
+        elif session.mode == 'sonic':
+            candidates, reasons = self._get_sonic_mode_candidates(user, session, base_qs, variety)
+        elif session.mode == 'autodj':
+            candidates, reasons = self._get_autodj_mode_candidates(user, session, base_qs, variety)
         
         # If we have candidates, pick one with weighted randomness
         if candidates:
@@ -265,6 +291,69 @@ class RadioNextTrackView(ApiBaseView):
         fallback = base_qs.order_by('?').first()
         return fallback, "Random from library" if fallback else None
     
+    def _get_sonic_mode_candidates(self, user, session, base_qs, variety):
+        """Acoustically similar tracks: nearest by cosine distance over feature_vector (F16)."""
+        candidates = []
+        reasons = []
+
+        seed_audio = None
+        if session.seed_youtube_id:
+            try:
+                seed_audio = Audio.objects.get(youtube_id=session.seed_youtube_id, owner=user)
+            except Audio.DoesNotExist:
+                pass
+
+        if not seed_audio or not seed_audio.feature_vector:
+            return candidates, reasons  # no acoustic seed -> fall through to random fallback
+
+        # Narrow the pool to the tracks closest in energy FIRST (DB-side), so a library larger
+        # than the cap is not sliced arbitrarily by publish date before the in-memory ranking.
+        seed_energy = seed_audio.energy if seed_audio.energy is not None else 0.5
+        pool = list(
+            base_qs.exclude(feature_vector=[])
+            .exclude(energy__isnull=True)
+            .annotate(_energy_delta=Abs(F('energy') - seed_energy))
+            .order_by('_energy_delta')[:CANDIDATE_POOL_LIMIT]
+        )
+        ranked = rank_by_sonic_distance(
+            seed_audio.feature_vector,
+            pool,
+            seed_channel_id=seed_audio.channel_id,
+            seed_genre=seed_audio.genre,
+        )
+        # Keep the near-neighbour window tight so the weighted pick stays acoustically close.
+        window = 3 + int(variety * 4)
+        for track in ranked[:window]:
+            candidates.append(track)
+            reasons.append("Sonically similar")
+        return candidates, reasons
+
+    def _get_autodj_mode_candidates(self, user, session, base_qs, variety):
+        """Sequence along an energy curve: pick tracks nearest this position's target energy (F16)."""
+        candidates = []
+        reasons = []
+
+        curve = session.energy_curve or DEFAULT_CURVE
+        position = len(session.played_youtube_ids)
+        progress = min(position / AUTODJ_SESSION_LENGTH, 1.0) if AUTODJ_SESSION_LENGTH else 1.0
+        target = energy_target(curve, progress)
+
+        skip_ids = high_skip_youtube_ids(user)
+        # Order by closeness to the target energy DB-side so the cap keeps the relevant tracks.
+        pool = [
+            track
+            for track in base_qs.exclude(energy__isnull=True)
+            .annotate(_energy_delta=Abs(F('energy') - target))
+            .order_by('_energy_delta')[:CANDIDATE_POOL_LIMIT]
+            if track.youtube_id not in skip_ids
+        ]
+        ranked = nearest_by_energy(target, pool)
+        window = 2 + int(variety * 4)
+        for track in ranked[:window]:
+            candidates.append(track)
+            reasons.append(f"Auto-DJ ({curve}): energy ~{target:.2f}")
+        return candidates, reasons
+
     def _get_track_mode_candidates(self, user, session, base_qs, variety):
         """Get candidates for track-based radio"""
         candidates = []

@@ -19,6 +19,8 @@ class RadioSession(models.Model):
         ('favorites', 'Favorites Mix'),   # Mix of user's favorite tracks
         ('discovery', 'Discovery Mode'),  # Explore less-played tracks
         ('recent', 'Recently Added'),     # Focus on new additions
+        ('sonic', 'Sonic Similarity'),    # Acoustically similar tracks (F16)
+        ('autodj', 'Auto-DJ'),            # Energy-curve sequenced session (F16)
     ]
     
     user = models.OneToOneField(
@@ -52,6 +54,7 @@ class RadioSession(models.Model):
     # Settings
     max_history_size = models.IntegerField(default=50, help_text="Max tracks to remember for non-repeat")
     variety_level = models.IntegerField(default=50, help_text="0-100, higher = more variety, lower = stick to similar")
+    energy_curve = models.CharField(max_length=12, blank=True, help_text="Auto-DJ energy curve: focus|party|winddown")
     
     # Timestamps
     started_at = models.DateTimeField(auto_now_add=True)

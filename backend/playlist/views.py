@@ -257,3 +257,140 @@ class TrackPlaylistsView(ApiBaseView):
         except Exception as e:
             logger.exception(f"Error finding playlists for track {youtube_id}: {str(e)}")
             return Response({'error': 'Failed to find playlists for track'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Maximum tracks a single synchronous playlist export will process. Each track is one
+# in-request ffmpeg pass, so the cap bounds how long one export can occupy a worker.
+MAX_EXPORT_TRACKS = 50
+
+# One in-flight export per user at a time (best-effort cache lock); the timeout is a
+# safety release in case a worker dies mid-export.
+_EXPORT_LOCK_TIMEOUT_SECONDS = 900
+
+_ZIP_CONTENT_TYPE = 'application/zip'
+
+
+def _unique_zip_arcname(audio, target_format, used_names):
+    """Build a collision-free, path-safe archive name for a track."""
+    from audio.export import sanitize_export_filename
+    base = sanitize_export_filename(audio.title, f"audio_{audio.youtube_id or audio.id}")
+    arcname = f"{base}.{target_format}"
+    index = 2
+    while arcname in used_names:
+        arcname = f"{base} ({index}).{target_format}"
+        index += 1
+    used_names.add(arcname)
+    return arcname
+
+
+class PlaylistExportView(ApiBaseView):
+    """Export all downloaded tracks in a playlist as a single ZIP (F13)."""
+    permission_classes = [AdminWriteOnly]
+
+    def post(self, request, playlist_id):
+        """Convert each downloaded track to the requested format and stream a ZIP."""
+        import shutil
+        import tempfile
+        import zipfile
+        from pathlib import Path
+        from django.core.cache import cache
+        from django.http import FileResponse
+        from audio.export import (
+            export_track_to_file,
+            sanitize_export_filename,
+            AudioConversionError,
+            ExportSourceUnavailable,
+            SUPPORTED_EXPORT_FORMATS,
+        )
+
+        playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
+
+        target_format = str(request.data.get('format', 'mp3')).lower()
+        quality = request.data.get('quality', 'high')
+        embed_lyrics = request.data.get('embed_lyrics', True)
+        embed_artwork = request.data.get('embed_artwork', True)
+
+        if target_format not in SUPPORTED_EXPORT_FORMATS:
+            return Response(
+                {'error': 'Invalid format. Supported: mp3, flac'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        items = (
+            PlaylistItem.objects
+            .filter(playlist=playlist)
+            .select_related('audio')
+            .order_by('position')
+        )
+        exportable = [item.audio for item in items if item.audio and item.audio.file_path]
+
+        if not exportable:
+            return Response(
+                {'error': 'Playlist has no downloaded tracks to export'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(exportable) > MAX_EXPORT_TRACKS:
+            return Response(
+                {'error': f'Playlist too large to export ({len(exportable)} tracks; limit is {MAX_EXPORT_TRACKS}).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Best-effort guard: one synchronous export per user at a time, so a single user
+        # cannot tie up multiple workers with concurrent multi-track ffmpeg runs.
+        lock_key = f'playlist_export_lock:{request.user.id}'
+        if not cache.add(lock_key, True, timeout=_EXPORT_LOCK_TIMEOUT_SECONDS):
+            return Response(
+                {'error': 'An export is already in progress. Please wait for it to finish.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            work_dir = Path(temp_dir) / 'tracks'
+            work_dir.mkdir()
+            zip_base = sanitize_export_filename(playlist.title, playlist.playlist_id)
+            zip_path = Path(temp_dir) / f"{zip_base}.zip"
+
+            used_names = set()
+            exported_count = 0
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as archive:
+                for audio in exportable:
+                    arcname = _unique_zip_arcname(audio, target_format, used_names)
+                    try:
+                        written = export_track_to_file(
+                            audio,
+                            target_format,
+                            quality,
+                            work_dir,
+                            embed_lyrics=embed_lyrics,
+                            embed_artwork=embed_artwork,
+                            filename=arcname,
+                        )
+                    except (AudioConversionError, ExportSourceUnavailable) as exc:
+                        logger.warning("[PlaylistExport] Skipping '%s': %s", audio.title, exc)
+                        continue
+                    archive.write(written, arcname=arcname)
+                    written.unlink(missing_ok=True)  # free disk as the ZIP grows
+                    exported_count += 1
+
+            if exported_count == 0:
+                return Response(
+                    {'error': 'No tracks could be exported'},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
+            zip_handle = open(zip_path, 'rb')
+            response = FileResponse(
+                zip_handle,
+                as_attachment=True,
+                filename=f"{zip_base}.zip",
+                content_type=_ZIP_CONTENT_TYPE,
+            )
+            return response
+        finally:
+            # Runs on every path (success, 422, error). On success the ZIP fd is already
+            # open, so removing the temp dir is safe — the inode stays alive on Linux
+            # until the response finishes streaming.
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            cache.delete(lock_key)

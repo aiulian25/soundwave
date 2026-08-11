@@ -3,7 +3,8 @@
 from django.conf import settings
 from rest_framework.response import Response
 from appsettings.serializers import AppConfigSerializer
-from common.views import ApiBaseView, AdminOnly
+from appsettings import backup as backup_service
+from common.views import ApiBaseView, AdminWriteOnly
 
 
 class AppConfigView(ApiBaseView):
@@ -23,15 +24,27 @@ class AppConfigView(ApiBaseView):
 
 
 class BackupView(ApiBaseView):
-    """Backup management endpoint"""
-    permission_classes = [AdminOnly]
+    """Per-user library backup (F14). GET a manifest, POST to build the backup JSON."""
+    permission_classes = [AdminWriteOnly]
 
     def get(self, request):
-        """Get list of backups"""
-        # TODO: Implement backup listing
-        return Response({'backups': []})
+        """Return current-library counts (there is no server-side backup store)."""
+        return Response({'library': backup_service.library_counts(request.user)})
 
     def post(self, request):
-        """Create backup"""
-        # TODO: Implement backup creation
-        return Response({'message': 'Backup created'})
+        """Build and return the full library backup JSON for the requesting user."""
+        return Response(backup_service.build_backup(request.user))
+
+
+class RestoreView(ApiBaseView):
+    """Restore a library backup for the requesting user (owner-scoped, idempotent)."""
+    permission_classes = [AdminWriteOnly]
+
+    def post(self, request):
+        """Apply the backup, or preview it when ?dry_run=1 (counts only, no writes)."""
+        dry_run = request.query_params.get('dry_run') in ('1', 'true', 'True')
+        try:
+            summary = backup_service.restore_backup(request, request.data, dry_run=dry_run)
+        except backup_service.BackupValidationError as exc:
+            return Response({'error': exc.message}, status=exc.status_code)
+        return Response({'dry_run': dry_run, 'summary': summary})

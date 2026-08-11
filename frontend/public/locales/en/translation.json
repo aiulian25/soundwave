@@ -1,4 +1,19 @@
 {
+  "activity": {
+    "title": "Activity",
+    "tooltip": "Download activity",
+    "empty": "No download activity",
+    "retry": "Retry",
+    "retryAll": "Retry all failed",
+    "refresh": "Refresh",
+    "error": "Couldn't load activity",
+    "status": {
+      "pending": "Pending",
+      "downloading": "Downloading",
+      "completed": "Completed",
+      "failed": "Failed"
+    }
+  },
   "login": {
     "logoAlt": "SoundWave logo",
     "tagline": "Your Personal Music Hub",
@@ -40,6 +55,22 @@
     "toggleLyrics": "Click to toggle lyrics",
     "lyricsNotAvailableLocal": "Lyrics not available for local files",
     "playingFromCache": "Playing from cache",
+    "chapters": {
+      "title": "Chapters",
+      "none": "No chapters",
+      "current": "Chapter: {{title}}"
+    },
+    "segment": {
+      "playingPart": "Part {{current}} of {{total}}"
+    },
+    "details": {
+      "title": "Details",
+      "views": "{{count}} views",
+      "likes": "{{count}} likes",
+      "showMore": "Show more",
+      "showLess": "Show less",
+      "published": "Published {{date}}"
+    },
     "trackOptions": "Track options",
     "addToPlaylist": "Add to Playlist",
     "removeFromFavorites": "Remove from Favorites",
@@ -282,6 +313,14 @@
       "cached": "Cached",
       "availableOffline": "Available offline",
       "notDownloaded": "Not Downloaded"
+    },
+    "export": {
+      "action": "Export playlist",
+      "summary": "{{count}} downloaded tracks will be exported.",
+      "preparing": "Preparing export…",
+      "progress": "Exporting {{count}} tracks…",
+      "done": "Export ready",
+      "failed": "Export failed"
     },
     "actions": {
       "playAll": "Play All",
@@ -674,6 +713,21 @@
   "channelDetail": {
     "title": "Channel Details",
     "notAvailable": "N/A",
+    "syncDepth": {
+      "label": "Sync depth",
+      "options": {
+        "25": "Last 25",
+        "50": "Last 50",
+        "100": "Last 100",
+        "200": "Last 200",
+        "all": "All"
+      },
+      "backfill": "Deep backfill now",
+      "saved": "Sync depth updated",
+      "saveFailed": "Couldn't update sync depth",
+      "backfillStarted": "Backfill started",
+      "backfillFailed": "Couldn't start backfill"
+    },
     "actions": {
       "playAll": "Play All",
       "shuffle": "Shuffle",
@@ -772,7 +826,12 @@
   },
   "lyrics": {
     "title": "Lyrics",
-    "source": "Source",
+    "source": {
+      "label": "Source",
+      "lrclib": "LRCLIB",
+      "captions": "from captions",
+      "captionsHint": "Auto-generated from this video's captions — timing and wording may be approximate."
+    },
     "autoScroll": "Auto-scroll",
     "lastFetchError": "Last fetch error: {{error}}",
     "instrumental": {
@@ -800,7 +859,8 @@
       "instrumental": "Instrumental"
     },
     "messages": {
-      "uploadSuccess": "LRC file uploaded successfully!"
+      "uploadSuccess": "LRC file uploaded successfully!",
+      "offlineSaveFailed": "Couldn't save lyrics for offline use"
     },
     "actions": {
       "tryFetchLyrics": "Try Fetch Lyrics",
@@ -1142,7 +1202,9 @@
       "artist": "Artist Radio",
       "favorites": "Favorites Mix",
       "discovery": "Discovery Mode",
-      "recent": "New Additions"
+      "recent": "New Additions",
+      "sonic": "Sonic Similarity",
+      "autodj": "Auto-DJ"
     },
     "sessionStats": "{{played}} played • {{skipped}} skipped",
     "actions": {
@@ -1272,6 +1334,12 @@
       "download": "Download",
       "goToChannel": "Go to Channel",
       "findInPlaylists": "Find in Playlists"
+    },
+    "split": {
+      "action": "Split into tracks",
+      "success": "Split into {{count}} parts",
+      "noTracklist": "No tracklist found in this track's chapters or description.",
+      "error": "Couldn't split this track. Please try again."
     },
     "findInPlaylists": {
       "title": "Playlists containing this track",
@@ -1772,6 +1840,23 @@
       "recent": {
         "label": "New Additions",
         "description": "Recently added tracks"
+      },
+      "sonic": {
+        "label": "Sonic Similarity",
+        "description": "Acoustically similar tracks"
+      },
+      "autodj": {
+        "label": "Auto-DJ",
+        "description": "An energy-sequenced session"
+      }
+    }
+  },
+  "radio": {
+    "autodj": {
+      "curves": {
+        "focus": "Focus",
+        "party": "Party",
+        "windDown": "Wind-down"
       }
     }
   },
@@ -1789,6 +1874,26 @@
   },
   "settings": {
     "title": "Settings",
+    "backup": {
+      "title": "Backup & Restore",
+      "description": "Export your library definition (tracks, playlists, smart-playlist rules, favorites, and channel subscriptions) as a JSON file, or restore it into this account. Audio re-downloads from the saved video IDs.",
+      "create": "Create backup",
+      "restore": "Restore from file",
+      "summary": "Restore preview",
+      "confirm": "Apply restore",
+      "created": "Backup downloaded",
+      "createFailed": "Couldn't create the backup",
+      "restored": "Restore started",
+      "restoreFailed": "Couldn't restore the backup",
+      "invalidFile": "Please choose a valid SoundWave backup (.json)",
+      "counts": {
+        "playlists": "Playlists: {{count}} new of {{total}}",
+        "smartPlaylists": "Smart playlists: {{count}} new of {{total}}",
+        "channels": "Channel subscriptions: {{count}} new of {{total}}",
+        "tracks": "Tracks: {{count}} new of {{total}}",
+        "downloads": "Tracks to download: {{count}}"
+      }
+    },
     "appearance": {
       "title": "Appearance",
       "description": "Customize the look and feel of SoundWave with different color themes.",
@@ -1867,6 +1972,21 @@
         "enableLabel": "Enable smart shuffle",
         "historySize": "History size: {{count}} tracks",
         "historySizeHelp": "Number of recently played songs to avoid when shuffling"
+      },
+      "normalization": {
+        "title": "Volume Normalization",
+        "enable": "Normalize playback volume",
+        "target": "Target: {{value}} LUFS",
+        "hint": "Levels tracks to a consistent loudness so quiet and loud songs play at a similar volume. Only affects analyzed tracks."
+      },
+      "audioQuality": {
+        "title": "Download Audio Quality",
+        "description": "Quality used when downloading new tracks from YouTube. Already-downloaded tracks are unchanged.",
+        "flac": "FLAC (Lossless)",
+        "high": "High (320 kbps)",
+        "medium": "Medium (192 kbps)",
+        "low": "Low (Opus 96 kbps)",
+        "storageWarning": "FLAC is lossless and uses considerably more storage."
       },
       "seekDuration": {
         "title": "Seek Duration",

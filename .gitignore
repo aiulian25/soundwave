@@ -20,8 +20,12 @@ celerybeat.pid
 
 # Node
 node_modules/
-# frontend/dist/  # Include dist for GitHub deployment
+# frontend/dist is a build output (matched by `dist/` above) and is built inside the
+# Docker image (frontend stage) — do NOT commit it.
 .pnpm-debug.log*
+
+# Orphaned/legacy built assets — never served (Django serves the SPA from frontend/dist)
+backend/static/assets/
 
 # Docker
 /audio/

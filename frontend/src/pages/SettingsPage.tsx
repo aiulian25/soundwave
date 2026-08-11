@@ -45,6 +45,8 @@ import GroupIcon from '@mui/icons-material/Group';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import FastForwardIcon from '@mui/icons-material/FastForward';
+import HighQualityIcon from '@mui/icons-material/HighQuality';
+import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CachedIcon from '@mui/icons-material/Cached';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import SyncIcon from '@mui/icons-material/Sync';
@@ -63,6 +65,7 @@ import VisualizerThemePreview from '../components/VisualizerThemePreview';
 import QuickSyncSettings from '../components/QuickSyncSettings';
 import PWASettingsCard from '../components/PWASettingsCard';
 import UserProfileCard from '../components/UserProfileCard';
+import BackupRestoreCard from '../components/BackupRestoreCard';
 import { useSettings } from '../context/SettingsContext';
 import { visualizerThemes } from '../config/visualizerThemes';
 import { useTranslation } from 'react-i18next';
@@ -102,7 +105,7 @@ export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { themeMode, setThemeMode } = useThemeContext();
-  const { settings, updateSetting } = useSettings();
+  const { settings, updateSetting, updateExtraSetting } = useSettings();
   const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus>({ enabled: false, backup_codes_count: 0 });
   const [setupDialogOpen, setSetupDialogOpen] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
@@ -728,6 +731,80 @@ export default function SettingsPage() {
 
           <Divider sx={{ my: 2 }} />
 
+          {/* Volume Normalization Section (F9) */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <GraphicEqIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
+              <Typography variant="body2" fontWeight={500}>
+                {t('settings.playback.normalization.title')}
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.extra_settings?.normalization?.enabled ?? false}
+                  onChange={(e) => updateExtraSetting('normalization', {
+                    targetLufs: settings.extra_settings?.normalization?.targetLufs ?? -14,
+                    enabled: e.target.checked,
+                  })}
+                />
+              }
+              label={t('settings.playback.normalization.enable')}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, mb: 1.5, display: 'block' }}>
+              {t('settings.playback.normalization.hint')}
+            </Typography>
+            {(settings.extra_settings?.normalization?.enabled ?? false) && (
+              <FormControl size="small" sx={{ minWidth: 180, maxWidth: '100%' }}>
+                <Select
+                  value={settings.extra_settings?.normalization?.targetLufs ?? -14}
+                  onChange={(e) => updateExtraSetting('normalization', {
+                    enabled: settings.extra_settings?.normalization?.enabled ?? true,
+                    targetLufs: Number(e.target.value),
+                  })}
+                >
+                  <MenuItem value={-14}>{t('settings.playback.normalization.target', { value: -14 })}</MenuItem>
+                  <MenuItem value={-16}>{t('settings.playback.normalization.target', { value: -16 })}</MenuItem>
+                  <MenuItem value={-18}>{t('settings.playback.normalization.target', { value: -18 })}</MenuItem>
+                  <MenuItem value={-23}>{t('settings.playback.normalization.target', { value: -23 })}</MenuItem>
+                </Select>
+              </FormControl>
+            )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Download Audio Quality Section */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <HighQualityIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1.1rem' }} />
+              <Typography variant="body2" fontWeight={500}>
+                {t('settings.playback.audioQuality.title')}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+              {t('settings.playback.audioQuality.description')}
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 200, maxWidth: '100%' }}>
+              <Select
+                value={settings.audio_quality || 'high'}
+                onChange={(e) => updateSetting('audio_quality', e.target.value as 'low' | 'medium' | 'high' | 'best')}
+              >
+                <MenuItem value="best">{t('settings.playback.audioQuality.flac')}</MenuItem>
+                <MenuItem value="high">{t('settings.playback.audioQuality.high')}</MenuItem>
+                <MenuItem value="medium">{t('settings.playback.audioQuality.medium')}</MenuItem>
+                <MenuItem value="low">{t('settings.playback.audioQuality.low')}</MenuItem>
+              </Select>
+            </FormControl>
+            {settings.audio_quality === 'best' && (
+              <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
+                {t('settings.playback.audioQuality.storageWarning')}
+              </Typography>
+            )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
           {/* Seek Duration Section */}
           <Box sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -1126,6 +1203,9 @@ export default function SettingsPage() {
           </AccordionDetails>
         </Accordion>
       </Card>
+
+      {/* Library Backup & Restore */}
+      <BackupRestoreCard />
 
       {/* User Profile Management */}
       <UserProfileCard />

@@ -67,7 +67,10 @@ class QuickSyncService:
         """
         try:
             resources = {
-                'cpu_percent': psutil.cpu_percent(interval=1),
+                # Non-blocking: returns CPU% since the previous call (0.0 on the first
+                # call per worker process). interval=1 blocked the Gunicorn worker for a
+                # full second on every Quick Sync status request the SPA polls on load.
+                'cpu_percent': psutil.cpu_percent(interval=None),
                 'memory_percent': psutil.virtual_memory().percent,
                 'memory_available_mb': psutil.virtual_memory().available / (1024 * 1024),
                 'disk_usage_percent': psutil.disk_usage('/').percent,

@@ -647,20 +647,42 @@ class LyricsService:
                 if result and not result.get('not_found') and (result.get('synced_lyrics') or result.get('plain_lyrics')):
                     logger.info(f"Found lyrics with: track='{track_title}', artist='{artist_name}'")
                     break
-            
+
+            # F4 fallback: when LRCLIB has nothing, try the video's own timed captions.
+            lrclib_found = bool(
+                result and not result.get('not_found')
+                and (result.get('synced_lyrics') or result.get('plain_lyrics'))
+            )
+            if not lrclib_found and audio_obj.youtube_id:
+                from audio.captions_service import fetch_captions_lrc
+                captions_lrc = fetch_captions_lrc(audio_obj.youtube_id)
+                if captions_lrc:
+                    logger.info(f"Using caption fallback for {audio_obj.title}")
+                    plain = re.sub(r'^\[\d{1,2}:\d{2}(?:\.\d{1,2})?\]\s*', '',
+                                   captions_lrc, flags=re.MULTILINE)
+                    result = {
+                        'synced_lyrics': captions_lrc,
+                        'plain_lyrics': plain,
+                        'instrumental': False,
+                        'language': '',
+                        'not_found': False,
+                        'source': 'captions',
+                    }
+
             # Update lyrics entry
             existing.synced_lyrics = result.get('synced_lyrics', '') if result else ''
             existing.plain_lyrics = result.get('plain_lyrics', '') if result else ''
             existing.is_instrumental = result.get('instrumental', False) if result else False
             existing.language = result.get('language', '') if result else ''
-            existing.source = 'lrclib'
+            existing.source = (result.get('source') if result else None) or 'lrclib'
             existing.fetch_attempted = True
             existing.fetch_attempts += 1
             existing.last_error = result.get('error', '') if result else ''
             existing.save()
-            
-            # Store in cache with cleaned title
-            if result and not result.get('not_found'):
+
+            # Store in cache with cleaned title (LRCLIB matches only — captions are
+            # per-video, not keyed by title/artist/duration, so they must not be shared).
+            if result and not result.get('not_found') and result.get('source', 'lrclib') != 'captions':
                 LyricsCache.objects.update_or_create(
                     title=clean_track,
                     artist_name=clean_artist,

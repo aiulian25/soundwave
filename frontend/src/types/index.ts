@@ -1,3 +1,9 @@
+export interface Chapter {
+  title: string;
+  start: number | null;
+  end: number | null;
+}
+
 export interface Audio {
   id: number;
   youtube_id?: string;  // Optional for local files
@@ -15,6 +21,8 @@ export interface Audio {
   like_count?: number;
   audio_format?: string;
   bitrate?: number;
+  loudness_lufs?: number | null;
+  chapters?: Chapter[];
   play_count: number;
   last_played?: string;
   is_favorite?: boolean;
