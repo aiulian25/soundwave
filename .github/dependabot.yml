@@ -7,6 +7,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # yt-dlp is bumped by the dedicated daily .github/workflows/yt-dlp-update.yml on a
+      # faster cadence — don't let Dependabot also open PRs for it.
+      - dependency-name: "yt-dlp"
 
   # GitHub Actions (codeql, checkout, build-push, ...). Catches action deprecations
   # (e.g. codeql-action v3 -> v4) automatically.

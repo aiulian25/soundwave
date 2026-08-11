@@ -4,8 +4,9 @@ django-cors-headers>=4.0.0
 celery>=5.3.0
 redis>=4.5.0
 elasticsearch>=8.8.0
-# Pinned deliberately (CNT-02). Bump via PR when YouTube extraction breaks; the CI
-# trivy/grype gate flags known-vulnerable pins. Do not rely on runtime auto-update.
+# Pinned deliberately (CNT-02). The daily .github/workflows/yt-dlp-update.yml opens a bump
+# PR when a newer release ships; the CI trivy/grype gate flags known-vulnerable pins. Do
+# not rely on runtime auto-update. (Dependabot ignores yt-dlp — see .github/dependabot.yml.)
 yt-dlp==2026.7.4
 Pillow>=10.0.0
 python-dateutil>=2.8.2

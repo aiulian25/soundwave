@@ -1,0 +1,82 @@
+name: Update yt-dlp
+
+# yt-dlp is the YouTube extraction engine (CNT-02, pinned in backend/requirements.txt).
+# YouTube changes break extraction between releases, so Dependabot's weekly cadence is too
+# slow. This checks PyPI daily and, when a newer yt-dlp ships, opens a PR that bumps the
+# pin and arms auto-merge. Branch protection (e2e image build + Trivy CVE gate + BOLA
+# tests) gates it, so it lands only on green — same trust level as any other dep bump.
+# Dependabot ignores yt-dlp so the two don't double up (see .github/dependabot.yml).
+#
+# TOKEN: a workflow-created PR using the default GITHUB_TOKEN does NOT trigger the
+# pull_request checks (GitHub's loop guard), so with branch protection those checks never
+# run and the PR can't merge. A fine-grained PAT (this repo only; Contents + Pull requests:
+# write) stored as the secret soundwave makes the push/PR run CI and auto-merge complete.
+# Without it the PR still opens as a signal, but you'd merge it by hand.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: yt-dlp-update
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump yt-dlp to the latest PyPI release
+    runs-on: ubuntu-latest
+    env:
+      REQ_FILE: backend/requirements.txt
+      GH_TOKEN: ${{ secrets.soundwave || secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # PAT (if set) so the branch push triggers the pull_request checks that
+          # branch protection requires; falls back to GITHUB_TOKEN (PR opens, no CI).
+          token: ${{ secrets.soundwave || secrets.GITHUB_TOKEN }}
+
+      - name: Check PyPI and open a bump PR when newer
+        run: |
+          set -euo pipefail
+
+          current="$(grep -oP '^yt-dlp==\K\S+' "$REQ_FILE")"
+          latest="$(curl -fsSL https://pypi.org/pypi/yt-dlp/json | jq -r '.info.version')"
+          echo "yt-dlp: pinned=$current latest=$latest"
+
+          # Date-based versions string-sort wrong (2026.10 vs 2026.7), so gate on `sort -V`:
+          # act only when latest differs AND version-sorts strictly above the current pin.
+          if [ "$current" = "$latest" ] || \
+             [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n1)" != "$latest" ]; then
+            echo "Already current (PyPI is not newer) — nothing to do."
+            exit 0
+          fi
+
+          branch="chore/bump-yt-dlp-${latest}"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "Branch $branch already exists — a bump PR is already open."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          sed -i -E "s/^yt-dlp==.*/yt-dlp==${latest}/" "$REQ_FILE"
+          git commit -am "deps(backend): bump yt-dlp ${current} -> ${latest}"
+          git push origin "$branch"
+
+          gh pr create --base main --head "$branch" \
+            --title "deps(backend): bump yt-dlp ${current} -> ${latest}" \
+            --body "Automated yt-dlp bump (YouTube extraction engine, CNT-02).
+
+          From ${current} to ${latest}.
+          Release notes: https://github.com/yt-dlp/yt-dlp/releases/tag/${latest}
+
+          CI here verifies the image builds and the pin carries no known CVEs (Trivy); it does NOT exercise a real YouTube download. Smoke-test if downloads are critical before relying on auto-merge."
+
+          gh pr merge "$branch" --auto --squash \
+            || echo "Could not arm auto-merge (needs the soundwave secret so CI runs). PR left open for manual merge."
