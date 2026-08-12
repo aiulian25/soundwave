@@ -140,6 +140,29 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     setCurrentAudioData(audio);
   }, [audio]);
 
+  // The track-details (i) view needs description / view+like counts / published_date.
+  // Lean sources (the homepage sections build Audio objects without them) would hide the
+  // button, making it appear only for tracks opened from a playlist/library. When those
+  // fields are absent, fetch the full owner-scoped record once and merge it in — so the
+  // details button is available for every track, without fattening list payloads.
+  useEffect(() => {
+    if (!audio.youtube_id || audio.published_date || !navigator.onLine) {
+      return;
+    }
+    let cancelled = false;
+    audioAPI
+      .get(audio.youtube_id)
+      .then((response) => {
+        if (!cancelled) {
+          setCurrentAudioData((previous) => ({ ...previous, ...response.data }));
+        }
+      })
+      .catch(() => undefined); // non-fatal: the details button simply stays hidden
+    return () => {
+      cancelled = true;
+    };
+  }, [audio.youtube_id, audio.published_date]);
+
   // Handle initial seek for cross-device resume
   useEffect(() => {
     if (initialSeek && initialSeek > 0 && !initialSeekApplied.current && audioRef.current && streamUrl) {
