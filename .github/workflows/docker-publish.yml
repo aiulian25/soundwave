@@ -12,6 +12,13 @@ on:
     - cron: '0 5 * * 1'   # Mondays 05:00 UTC
   workflow_dispatch:
 
+# Serialize publish runs per ref so a slower OLDER main push can't finish last and
+# overwrite :latest with a stale image. Keyed on github.ref, so tag builds (refs/tags/v*)
+# land in a separate group and are never cancelled by a main push — :X.Y.Z still publishes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # Use docker.io for Docker Hub, ghcr.io for GitHub Container Registry
   REGISTRY: ghcr.io
