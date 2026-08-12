@@ -292,7 +292,7 @@ class RadioNextTrackView(ApiBaseView):
         return fallback, "Random from library" if fallback else None
     
     def _get_sonic_mode_candidates(self, user, session, base_qs, variety):
-        """Acoustically similar tracks: nearest by cosine distance over feature_vector (F16)."""
+        """Acoustically similar tracks: nearest by Euclidean (L2) distance over feature_vector (F16)."""
         candidates = []
         reasons = []
 

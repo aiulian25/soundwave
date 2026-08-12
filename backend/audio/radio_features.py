@@ -28,7 +28,7 @@ DEFAULT_CURVE = CURVE_FOCUS
 # How many positions the curve spans before it plateaus at its terminal target.
 AUTODJ_SESSION_LENGTH = 25
 
-# Bound the in-memory candidate scan so a huge library can't create an unbounded cosine pass.
+# Bound the in-memory candidate scan so a huge library can't create an unbounded distance pass.
 CANDIDATE_POOL_LIMIT = 400
 HIGH_SKIP_THRESHOLD = 3
 

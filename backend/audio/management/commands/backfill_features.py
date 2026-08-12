@@ -1,4 +1,4 @@
-"""Backfill sonic audio features (tempo/key/energy + 6-dim vector) for downloaded tracks (F16).
+"""Backfill sonic audio features (tempo/key/energy + 7-dim vector) for downloaded tracks (F16).
 
 Enqueues extract_features_task (librosa runs on the Celery worker) for Audio rows that have a
 file but no feature_vector yet, so Sonic radio / Auto-DJ can rank them acoustically.

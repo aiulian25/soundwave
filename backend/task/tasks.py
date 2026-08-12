@@ -165,7 +165,7 @@ def measure_loudness_task(audio_id):
 
 @shared_task(name='audio.extract_features')
 def extract_features_task(audio_id):
-    """Compute per-track audio features (tempo/key/energy + 6-dim vector) with librosa (F16).
+    """Compute per-track audio features (tempo/key/energy + 7-dim vector) with librosa (F16).
 
     Fire-and-forget after download; never blocks it. librosa/numpy are imported lazily so this
     module and the test suite load even when the DSP stack is not installed in the image.
