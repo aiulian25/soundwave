@@ -40,6 +40,7 @@ import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useTranslation } from 'react-i18next';
 import api, { audioAPI } from '../api/client';
 import { offlineStorage } from '../utils/offlineStorage';
@@ -524,25 +525,20 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     return (
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 2, py: 1 }}>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            {t('player.details.title')}
-          </Typography>
           <Tooltip title={t('lyrics.title')}>
             <IconButton
               size="small"
               onClick={() => setShowDetails(false)}
+              edge="start"
               sx={{ mr: 1 }}
-              color="primary"
               aria-label={t('lyrics.title')}
             >
-              <InfoOutlinedIcon />
+              <ArrowBackIcon />
             </IconButton>
           </Tooltip>
-          {onClose && (
-            <IconButton size="small" onClick={onClose} aria-label={t('common.close')}>
-              <CloseIcon />
-            </IconButton>
-          )}
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            {t('player.details.title')}
+          </Typography>
         </Box>
         <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
           <TrackDetails
