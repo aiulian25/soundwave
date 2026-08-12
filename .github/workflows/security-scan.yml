@@ -44,7 +44,7 @@ jobs:
           no-fail: true   # report, do not block PRs on style warnings
 
       - name: Gitleaks (secret scan)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITLEAKS_CONFIG: .gitleaks.toml
 
