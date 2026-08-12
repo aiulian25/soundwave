@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0   # full history so gitleaks can scan commits
 
       - name: Hadolint (Dockerfile lint)
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.4.0
         with:
           dockerfile: Dockerfile
           no-fail: true   # report, do not block PRs on style warnings
