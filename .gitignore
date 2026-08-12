@@ -75,3 +75,6 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/playwright/.cache/
 frontend/coverage/
+
+# Local release runbook — kept on the machine, never pushed (see the file's header)
+/build and push.md
