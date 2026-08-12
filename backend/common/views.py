@@ -27,7 +27,12 @@ class AppVersionView(APIView):
 
     def get(self, request):
         from common.update_check import get_update_info
-        return Response(get_update_info())
+        response = Response(get_update_info())
+        # Never cache the version/update check: it must always reflect the running
+        # container's live APP_VERSION. A cached response makes a freshly-redeployed
+        # instance keep reporting the old version (and nagging) until the cache expires.
+        response['Cache-Control'] = 'no-store'
+        return response
 
 
 def _get_public_base_url(request):

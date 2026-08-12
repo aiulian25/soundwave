@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
   Typography,
@@ -16,6 +16,8 @@ import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DoneIcon from '@mui/icons-material/Done';
 import { useTranslation } from 'react-i18next';
 import { versionAPI } from '../api/client';
 
@@ -31,6 +33,9 @@ interface UpdateInfo {
 const BLUE = '#58a6ff';
 const RED = '#ff5252';
 
+// Plain default compose file — self-hosters run the standard docker-compose.yml, not the prod one.
+const UPDATE_COMMAND = 'docker compose pull && docker compose up -d';
+
 /**
  * Sidebar version line + update status.
  *
@@ -44,29 +49,64 @@ export default function AppVersionStatus() {
   const { t } = useTranslation();
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copyResetRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const loadInfo = useCallback(() => {
     versionAPI
       .getInfo()
-      .then((res) => {
-        if (active) setInfo(res.data);
-      })
+      .then((res) => setInfo(res.data))
       .catch(() => {
         /* offline / not logged in — show nothing, never error */
       });
-    return () => {
-      active = false;
-    };
   }, []);
+
+  // Fetch on mount, and re-check when the tab becomes visible again or reconnects — so a
+  // redeployed container's new version is picked up without a manual reload (the response is
+  // also sent no-store server-side, so it is never served from a stale cache).
+  useEffect(() => {
+    loadInfo();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadInfo();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', loadInfo);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', loadInfo);
+      if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+    };
+  }, [loadInfo]);
+
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(UPDATE_COMMAND);
+      } else {
+        // Fallback for non-secure contexts (some LAN HTTP setups): temp textarea + execCommand.
+        const textarea = document.createElement('textarea');
+        textarea.value = UPDATE_COMMAND;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+      copyResetRef.current = window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the command stays visible for manual copy */
+    }
+  };
 
   if (!info) return null;
 
   const updateAvailable = info.update_available;
   const color = updateAvailable ? RED : BLUE;
   const statusLabel = updateAvailable ? t('appVersion.tooltip') : t('appVersion.upToDate');
-  const updateCmd =
-    'docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d';
   const hasNotes = !!info.release_notes?.trim();
 
   return (
@@ -165,15 +205,34 @@ export default function AppVersionStatus() {
                 borderColor: 'divider',
               }}
             >
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                {t('appVersion.dialog.howToTitle')}
-              </Typography>
-              <Typography
-                component="code"
-                sx={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all' }}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t('appVersion.dialog.howToTitle')}
+                </Typography>
+                <Tooltip title={copied ? t('appVersion.dialog.copied') : t('appVersion.dialog.copy')}>
+                  <IconButton
+                    size="small"
+                    onClick={handleCopy}
+                    aria-label={t('appVersion.dialog.copy')}
+                    color={copied ? 'success' : 'default'}
+                    sx={{ mt: -0.5, mr: -0.5 }}
+                  >
+                    {copied ? <DoneIcon sx={{ fontSize: 16 }} /> : <ContentCopyIcon sx={{ fontSize: 16 }} />}
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box
+                component="pre"
+                sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.8rem',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  m: 0,
+                }}
               >
-                {updateCmd}
-              </Typography>
+                {UPDATE_COMMAND}
+              </Box>
             </Box>
           )}
         </DialogContent>

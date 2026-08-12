@@ -2154,6 +2154,8 @@
       "whatsNew": "What's new",
       "noNotes": "See the release notes on GitHub.",
       "howToTitle": "To update your self-hosted container:",
+      "copy": "Copy",
+      "copied": "Copied!",
       "viewOnGithub": "View release on GitHub",
       "dismiss": "Dismiss",
       "upToDateTitle": "You're up to date"
