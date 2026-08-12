@@ -5,6 +5,8 @@
     "empty": "No download activity",
     "retry": "Retry",
     "retryAll": "Retry all failed",
+    "dismiss": "Dismiss (don't show again)",
+    "dismissAll": "Dismiss all failed",
     "refresh": "Refresh",
     "error": "Couldn't load activity",
     "status": {

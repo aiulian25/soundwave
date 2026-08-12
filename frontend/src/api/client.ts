@@ -238,6 +238,7 @@ export const downloadAPI = {
   clear: (filter?: string) => api.delete('/download/', { params: { filter } }),
   status: () => api.get('/download/status/'),
   retry: (id?: number) => api.post('/download/retry/', id ? { id } : {}),
+  ignore: (id?: number) => api.post('/download/ignore/', id ? { id } : {}),
 };
 
 // Stats API

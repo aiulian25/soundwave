@@ -138,5 +138,18 @@ export function useActivityCenter(active: boolean) {
     start();
   }, [start]);
 
-  return { items, loading, error, refresh: start, retry, retryAll };
+  const ignore = useCallback(
+    async (id: number) => {
+      await downloadAPI.ignore(id);
+      start(); // the item flips to 'ignored' and drops out of the failed group
+    },
+    [start],
+  );
+
+  const ignoreAll = useCallback(async () => {
+    await downloadAPI.ignore();
+    start();
+  }, [start]);
+
+  return { items, loading, error, refresh: start, retry, retryAll, ignore, ignoreAll };
 }

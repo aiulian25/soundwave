@@ -89,3 +89,41 @@ class RetryTests(TestCase):
         fake_delay.assert_not_called()
         item.refresh_from_db()
         self.assertEqual(item.status, 'failed')  # unchanged
+
+
+class IgnoreTests(TestCase):
+    """Dismissing a permanently-dead download flips it to 'ignored' (stops the nagging)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = Account.objects.create_user('alice_ig', 'alice_ig@test.local', 'Alicepw_2026!')
+        cls.bob = Account.objects.create_user('bob_ig', 'bob_ig@test.local', 'Bobpw_2026!')
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.alice)
+
+    def test_ignore_flips_failed_to_ignored(self):
+        item = _queue(self.alice, 'https://www.youtube.com/watch?v=x', status='failed', error_message='removed')
+        resp = self.client.post('/api/download/ignore/', {'id': item.id}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.status, 'ignored')
+
+    def test_ignore_all_dismisses_only_failed(self):
+        _queue(self.alice, 'https://www.youtube.com/watch?v=a', status='failed')
+        _queue(self.alice, 'https://www.youtube.com/watch?v=b', status='failed')
+        keep = _queue(self.alice, 'https://www.youtube.com/watch?v=c', status='pending')
+        resp = self.client.post('/api/download/ignore/', {}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['count'], 2)
+        self.assertEqual(DownloadQueue.objects.filter(owner=self.alice, status='ignored').count(), 2)
+        keep.refresh_from_db()
+        self.assertEqual(keep.status, 'pending')  # non-failed untouched
+
+    def test_ignore_cross_owner_is_404(self):
+        item = _queue(self.bob, 'https://www.youtube.com/watch?v=z', status='failed')
+        resp = self.client.post('/api/download/ignore/', {'id': item.id}, format='json')
+        self.assertEqual(resp.status_code, 404)
+        item.refresh_from_db()
+        self.assertEqual(item.status, 'failed')  # unchanged

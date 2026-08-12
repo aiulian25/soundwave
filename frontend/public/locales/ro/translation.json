@@ -5,6 +5,8 @@
     "empty": "Nicio activitate de descarcare",
     "retry": "Reincearca",
     "retryAll": "Reincearca toate esuate",
+    "dismiss": "Ignora (nu mai arata)",
+    "dismissAll": "Ignora toate esuate",
     "refresh": "Reimprospateaza",
     "error": "Activitatea nu a putut fi incarcata",
     "status": {

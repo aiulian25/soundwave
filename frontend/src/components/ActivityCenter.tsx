@@ -21,6 +21,7 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import BlockIcon from '@mui/icons-material/Block';
 import { useTranslation } from 'react-i18next';
 import { useActivityCenter } from '../hooks/useActivityCenter';
 
@@ -31,7 +32,7 @@ export default function ActivityCenter() {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
-  const { items, loading, error, retry, retryAll, refresh } = useActivityCenter(open);
+  const { items, loading, error, retry, retryAll, ignore, ignoreAll, refresh } = useActivityCenter(open);
 
   const attentionCount = items.filter(
     (item) => item.status === 'pending' || item.status === 'downloading' || item.status === 'failed',
@@ -122,22 +123,37 @@ export default function ActivityCenter() {
                   </Typography>
                   <Chip label={group.rows.length} size="small" sx={{ height: 18 }} />
                   {group.status === 'failed' && group.rows.length > 1 && (
-                    <Button size="small" onClick={retryAll} sx={{ ml: 'auto' }} startIcon={<RefreshIcon />}>
-                      {t('activity.retryAll')}
-                    </Button>
+                    <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Button size="small" onClick={retryAll} startIcon={<RefreshIcon />}>
+                        {t('activity.retryAll')}
+                      </Button>
+                      <Tooltip title={t('activity.dismissAll')} arrow>
+                        <IconButton size="small" onClick={ignoreAll} aria-label={t('activity.dismissAll')}>
+                          <BlockIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   )}
                 </Box>
                 <List dense disablePadding>
                   {group.rows.map((item) => (
                     <ListItem
                       key={item.id}
+                      sx={{ pr: item.status === 'failed' ? 10 : undefined }}
                       secondaryAction={
                         item.status === 'failed' ? (
-                          <Tooltip title={t('activity.retry')} arrow>
-                            <IconButton edge="end" size="small" onClick={() => retry(item.id)} aria-label={t('activity.retry')}>
-                              <RefreshIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Tooltip title={t('activity.retry')} arrow>
+                              <IconButton size="small" onClick={() => retry(item.id)} aria-label={t('activity.retry')}>
+                                <RefreshIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title={t('activity.dismiss')} arrow>
+                              <IconButton edge="end" size="small" onClick={() => ignore(item.id)} aria-label={t('activity.dismiss')}>
+                                <BlockIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
                         ) : null
                       }
                     >

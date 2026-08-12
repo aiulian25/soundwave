@@ -106,6 +106,42 @@ class RetryFailedView(ApiBaseView):
             })
 
 
+class IgnoreFailedView(ApiBaseView):
+    """Dismiss failed downloads so they stop nagging in the activity center.
+
+    Marks them 'ignored' — a permanent tombstone, not a delete. The queue is keyed on
+    (owner, url) via get_or_create, so an ignored row also stops a later re-sync from
+    re-queuing the same dead video (removed / private / ToS-struck). Never touches the
+    downloaded audio: a track grabbed before YouTube removed the source stays put.
+    """
+
+    def post(self, request):
+        """Ignore all failed downloads, or a specific one by id."""
+        download_id = request.data.get('id')
+
+        if download_id:
+            try:
+                download = DownloadQueue.objects.get(
+                    id=download_id,
+                    owner=request.user,
+                    status='failed',
+                )
+            except DownloadQueue.DoesNotExist:
+                return Response(
+                    {'error': 'Download not found or not failed'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            download.status = 'ignored'
+            download.save(update_fields=['status'])
+            return Response({'detail': 'Download dismissed', 'id': download.id})
+
+        count = DownloadQueue.objects.filter(
+            owner=request.user,
+            status='failed',
+        ).update(status='ignored')
+        return Response({'detail': f'Dismissed {count} downloads', 'count': count})
+
+
 class DownloadStatusView(ApiBaseView):
     """Get comprehensive download status"""
     
