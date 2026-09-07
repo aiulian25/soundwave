@@ -17,12 +17,12 @@ from playlist.serializers_smart import (
     SmartPlaylistRuleSerializer,
 )
 from audio.serializers import AudioSerializer
-from common.views import ApiBaseView, AdminWriteOnly
+from common.views import ApiBaseView, AuthenticatedOwnerAccess
 
 
 class SmartPlaylistListView(ApiBaseView):
     """Smart playlist list endpoint"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
     
     def get(self, request):
         """Get all smart playlists for the user"""
@@ -47,7 +47,7 @@ class SmartPlaylistListView(ApiBaseView):
 
 class SmartPlaylistDetailView(ApiBaseView):
     """Smart playlist detail endpoint"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
     
     def get(self, request, playlist_id):
         """Get smart playlist details with tracks"""
@@ -146,7 +146,7 @@ class SmartPlaylistTracksView(ApiBaseView):
 
 class SmartPlaylistRulesView(ApiBaseView):
     """Manage rules for a smart playlist"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
     
     def get(self, request, playlist_id):
         """Get rules for a smart playlist"""

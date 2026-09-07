@@ -5,12 +5,12 @@ from rest_framework import status
 from rest_framework.response import Response
 from channel.models import Channel
 from channel.serializers import ChannelSerializer, ChannelSyncDepthSerializer
-from common.views import ApiBaseView, AdminWriteOnly
+from common.views import ApiBaseView, AuthenticatedOwnerAccess
 
 
 class ChannelListView(ApiBaseView):
     """Channel list endpoint"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def get(self, request):
         """Get channel list"""
@@ -61,7 +61,7 @@ class ChannelListView(ApiBaseView):
 
 class ChannelDetailView(ApiBaseView):
     """Channel detail endpoint"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def get(self, request, channel_id):
         """Get channel details with audio files"""
@@ -122,7 +122,7 @@ class ChannelDetailView(ApiBaseView):
 
 class ChannelSyncView(ApiBaseView):
     """Trigger an immediate sync (deep backfill) for a single channel."""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def post(self, request, channel_id):
         """Queue a sync for the channel using its stored sync_depth."""

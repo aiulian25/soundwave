@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from playlist.models import Playlist, PlaylistItem
 from playlist.serializers import PlaylistSerializer, PlaylistItemSerializer
-from common.views import ApiBaseView, AdminWriteOnly
+from common.views import ApiBaseView, AuthenticatedOwnerAccess
 from audio.models import Audio
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class PlaylistListView(ApiBaseView):
     """Playlist list endpoint"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def get(self, request):
         """Get playlist list"""
@@ -72,7 +72,7 @@ class PlaylistListView(ApiBaseView):
 
 class PlaylistDetailView(ApiBaseView):
     """Playlist detail endpoint"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def get(self, request, playlist_id):
         """Get playlist details with items"""
@@ -285,7 +285,7 @@ def _unique_zip_arcname(audio, target_format, used_names):
 
 class PlaylistExportView(ApiBaseView):
     """Export all downloaded tracks in a playlist as a single ZIP (F13)."""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def post(self, request, playlist_id):
         """Convert each downloaded track to the requested format and stream a ZIP."""

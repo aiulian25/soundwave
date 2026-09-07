@@ -173,7 +173,7 @@ class BackupRestoreTests(TestCase):
     def test_regular_non_staff_user_can_backup(self):
         self.assertFalse(self.alice.is_staff)
         resp = self._client(self.alice).post('/api/appsettings/backup/')
-        self.assertEqual(resp.status_code, 200)  # AdminWriteOnly (per-user), not AdminOnly
+        self.assertEqual(resp.status_code, 200)  # AuthenticatedOwnerAccess (per-user), not AdminOnly
 
     def test_restore_clamps_out_of_range_sync_depth(self):
         backup = {

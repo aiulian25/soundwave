@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework.response import Response
 from appsettings.serializers import AppConfigSerializer
 from appsettings import backup as backup_service
-from common.views import ApiBaseView, AdminWriteOnly
+from common.views import ApiBaseView, AuthenticatedOwnerAccess
 
 
 class AppConfigView(ApiBaseView):
@@ -25,7 +25,7 @@ class AppConfigView(ApiBaseView):
 
 class BackupView(ApiBaseView):
     """Per-user library backup (F14). GET a manifest, POST to build the backup JSON."""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def get(self, request):
         """Return current-library counts (there is no server-side backup store)."""
@@ -38,7 +38,7 @@ class BackupView(ApiBaseView):
 
 class RestoreView(ApiBaseView):
     """Restore a library backup for the requesting user (owner-scoped, idempotent)."""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def post(self, request):
         """Apply the backup, or preview it when ?dry_run=1 (counts only, no writes)."""
