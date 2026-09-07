@@ -5,8 +5,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import PermissionDenied
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import F, Q, Value
+from django.db.models.functions import Greatest
 
 from audio.models_local import LocalAudio, LocalAudioPlaylist, LocalAudioPlaylistItem
 from audio.serializers_local import (
@@ -16,6 +20,8 @@ from audio.serializers_local import (
     LocalAudioPlaylistItemSerializer,
 )
 from common.permissions import IsOwnerOrAdmin
+
+BYTES_PER_GB = 1024 ** 3
 
 
 class LocalAudioViewSet(viewsets.ModelViewSet):
@@ -76,33 +82,41 @@ class LocalAudioViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-uploaded_date')
     
     def perform_create(self, serializer):
-        """Set owner on creation"""
+        """Set owner on creation, enforcing the storage quota atomically."""
         user = self.request.user
-        
-        # Check storage quota
-        if not (user.is_admin or user.is_superuser):
-            if user.storage_used_gb >= user.storage_quota_gb:
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied(f"Storage quota exceeded ({user.storage_used_gb:.1f} / {user.storage_quota_gb} GB)")
-        
-        local_audio = serializer.save(owner=user)
-        
-        # Update user storage
-        file_size_gb = local_audio.file_size / (1024 ** 3)
-        user.storage_used_gb += file_size_gb
-        user.save()
-    
+
+        with transaction.atomic():
+            # Re-read the row under a lock so two concurrent uploads cannot both observe
+            # the same pre-upload usage and both pass the check. select_for_update is a
+            # no-op on SQLite (no SELECT ... FOR UPDATE), which serializes writers anyway.
+            account = get_user_model().objects.select_for_update().get(pk=user.pk)
+            has_unlimited_storage = account.is_admin or account.is_superuser
+            is_over_quota = account.storage_used_gb >= account.storage_quota_gb
+            if not has_unlimited_storage and is_over_quota:
+                raise PermissionDenied(
+                    f"Storage quota exceeded ({account.storage_used_gb:.1f} / {account.storage_quota_gb} GB)"
+                )
+
+            local_audio = serializer.save(owner=user)
+
+            # Let the database do the arithmetic: a concurrent upload cannot clobber the
+            # counter, and no other field on the account row is rewritten.
+            file_size_gb = local_audio.file_size / BYTES_PER_GB
+            get_user_model().objects.filter(pk=user.pk).update(
+                storage_used_gb=F('storage_used_gb') + file_size_gb
+            )
+
     def perform_destroy(self, instance):
-        """Update storage on deletion"""
-        user = instance.owner
-        file_size_gb = instance.file_size / (1024 ** 3)
-        
-        # Delete the instance
-        instance.delete()
-        
-        # Update user storage
-        user.storage_used_gb = max(0, user.storage_used_gb - file_size_gb)
-        user.save()
+        """Release the owner's quota when a local file is removed."""
+        owner_pk = instance.owner_id
+        file_size_gb = instance.file_size / BYTES_PER_GB
+
+        with transaction.atomic():
+            instance.delete()
+            # Greatest(..., 0) keeps an already under-counted total from going negative.
+            get_user_model().objects.filter(pk=owner_pk).update(
+                storage_used_gb=Greatest(F('storage_used_gb') - file_size_gb, Value(0.0))
+            )
     
     @action(detail=True, methods=['post'])
     def play(self, request, pk=None):

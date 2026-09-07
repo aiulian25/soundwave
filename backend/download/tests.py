@@ -127,3 +127,87 @@ class IgnoreTests(TestCase):
         self.assertEqual(resp.status_code, 404)
         item.refresh_from_db()
         self.assertEqual(item.status, 'failed')  # unchanged
+
+
+class ActivityFeedShapeTests(TestCase):
+    """CODE_REVIEW_REPORT Step 16 — dismissed rows are tombstones, not activity."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = Account.objects.create_user('alice_feed', 'alice_feed@test.local', 'Alicepw_2026!')
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.alice)
+
+    def test_filter_all_omits_ignored_rows(self):
+        _queue(self.alice, 'https://www.youtube.com/watch?v=keep', status='failed')
+        _queue(self.alice, 'https://www.youtube.com/watch?v=gone', status='ignored')
+        resp = self.client.get('/api/download/?filter=all')
+        statuses = [row['status'] for row in resp.json()['data']]
+        self.assertEqual(statuses, ['failed'])
+
+    def test_ignored_rows_remain_addressable_by_explicit_filter(self):
+        # Excluding them from the feed must not make them unqueryable — the row still exists
+        # and 'ignored' is a real status a client may ask for.
+        _queue(self.alice, 'https://www.youtube.com/watch?v=gone', status='ignored')
+        resp = self.client.get('/api/download/?filter=ignored')
+        self.assertEqual(len(resp.json()['data']), 1)
+
+    def test_feed_is_newest_first(self):
+        older = _queue(self.alice, 'https://www.youtube.com/watch?v=old', status='completed')
+        newer = _queue(self.alice, 'https://www.youtube.com/watch?v=new', status='completed')
+        resp = self.client.get('/api/download/?filter=all')
+        ids = [row['id'] for row in resp.json()['data']]
+        self.assertEqual(ids, [newer.id, older.id])
+
+
+class ClearQueueTests(TestCase):
+    """CODE_REVIEW_REPORT Step 15 — DELETE honours the same filter the list does."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = Account.objects.create_user('alice_clear', 'alice_clear@test.local', 'Alicepw_2026!')
+        cls.bob = Account.objects.create_user('bob_clear', 'bob_clear@test.local', 'Bobpw_2026!')
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.alice)
+
+    def test_delete_all_clears_every_status(self):
+        _queue(self.alice, 'https://www.youtube.com/watch?v=a', status='pending')
+        _queue(self.alice, 'https://www.youtube.com/watch?v=b', status='failed')
+        _queue(self.alice, 'https://www.youtube.com/watch?v=c', status='completed')
+
+        resp = self.client.delete('/api/download/?filter=all')
+
+        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(DownloadQueue.objects.filter(owner=self.alice).count(), 0)
+
+    def test_delete_defaults_to_pending_only(self):
+        _queue(self.alice, 'https://www.youtube.com/watch?v=a', status='pending')
+        _queue(self.alice, 'https://www.youtube.com/watch?v=b', status='failed')
+
+        resp = self.client.delete('/api/download/')
+
+        self.assertEqual(resp.status_code, 204)
+        remaining = list(DownloadQueue.objects.filter(owner=self.alice).values_list('status', flat=True))
+        self.assertEqual(remaining, ['failed'])
+
+    def test_delete_of_one_status_leaves_the_others(self):
+        _queue(self.alice, 'https://www.youtube.com/watch?v=a', status='pending')
+        _queue(self.alice, 'https://www.youtube.com/watch?v=b', status='failed')
+
+        resp = self.client.delete('/api/download/?filter=failed')
+
+        self.assertEqual(resp.status_code, 204)
+        remaining = list(DownloadQueue.objects.filter(owner=self.alice).values_list('status', flat=True))
+        self.assertEqual(remaining, ['pending'])
+
+    def test_delete_all_never_touches_another_owner(self):
+        _queue(self.alice, 'https://www.youtube.com/watch?v=a', status='pending')
+        _queue(self.bob, 'https://www.youtube.com/watch?v=z', status='pending')
+
+        self.client.delete('/api/download/?filter=all')
+
+        self.assertEqual(DownloadQueue.objects.filter(owner=self.bob).count(), 1)

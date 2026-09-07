@@ -5,12 +5,16 @@ from rest_framework import status
 from rest_framework.response import Response
 from download.models import DownloadQueue
 from download.serializers import DownloadQueueSerializer, AddToDownloadSerializer
-from common.views import ApiBaseView, AdminWriteOnly
+from common.views import ApiBaseView, AuthenticatedOwnerAccess
+
+# The activity centre polls filter=all every few seconds and never renders 'ignored'
+# tombstones, so they are excluded and the feed is capped.
+ACTIVITY_FEED_LIMIT = 200
 
 
 class DownloadListView(ApiBaseView):
     """Download queue list endpoint"""
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def get(self, request):
         """Get download queue. filter=<status> narrows by status; filter=all returns every row."""
@@ -18,6 +22,8 @@ class DownloadListView(ApiBaseView):
         queryset = DownloadQueue.objects.filter(owner=request.user)
         if status_filter and status_filter != 'all':
             queryset = queryset.filter(status=status_filter)
+        else:
+            queryset = queryset.exclude(status='ignored').order_by('-added_date')[:ACTIVITY_FEED_LIMIT]
         serializer = DownloadQueueSerializer(queryset, many=True)
         return Response({'data': serializer.data})
 
@@ -48,7 +54,10 @@ class DownloadListView(ApiBaseView):
     def delete(self, request):
         """Clear download queue"""
         status_filter = request.query_params.get('filter', 'pending')
-        DownloadQueue.objects.filter(owner=request.user, status=status_filter).delete()
+        queryset = DownloadQueue.objects.filter(owner=request.user)
+        if status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
+        queryset.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
