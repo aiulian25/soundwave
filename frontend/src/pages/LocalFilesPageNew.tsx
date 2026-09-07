@@ -27,6 +27,7 @@ import {
 import { localAudioDB, type LocalAudioFile } from '../utils/localAudioDB';
 import { extractMetadata, getAudioDuration } from '../utils/id3Reader';
 import type { Audio } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 interface LocalFilesPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -456,9 +457,8 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                   </TableCell>
                   <TableCell>
                     <Box>
-                      <Typography 
+                      <ScrollingText 
                         variant="body2" 
-                        noWrap 
                         sx={{ 
                           maxWidth: { xs: 150, sm: 200, md: 300 }, 
                           fontWeight: 500,
@@ -467,7 +467,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                         }}
                       >
                         {file.title}
-                      </Typography>
+                      </ScrollingText>
                       <Typography 
                         variant="caption" 
                         noWrap

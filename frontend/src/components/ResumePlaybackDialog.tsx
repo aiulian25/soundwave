@@ -24,6 +24,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import { useTranslation } from 'react-i18next';
 import type { PlaybackSession } from '../hooks/usePlaybackSync';
+import ScrollingText from './ScrollingText';
 
 interface ResumePlaybackDialogProps {
   open: boolean;
@@ -109,9 +110,9 @@ export default function ResumePlaybackDialog({
           </Avatar>
           
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" fontWeight={600} noWrap>
+            <ScrollingText variant="subtitle1" fontWeight={600}>
               {audio_details.title}
-            </Typography>
+            </ScrollingText>
             <Typography variant="body2" color="text.secondary" noWrap>
               {audio_details.artist || audio_details.channel_name}
             </Typography>

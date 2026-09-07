@@ -58,6 +58,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { statsAPI } from '../api/client';
 import type { Audio } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 interface HistoryEntry {
   id: number;
@@ -158,9 +159,9 @@ const HistoryEntryItem = memo(({
       <ListItemText
         sx={{ ml: 1, my: 0, minWidth: 0 }}
         primary={
-          <Typography variant="body1" fontWeight={500} noWrap>
+          <ScrollingText variant="body1" fontWeight={500}>
             {entry.title}
-          </Typography>
+          </ScrollingText>
         }
         secondary={
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, minWidth: 0 }}>
@@ -590,13 +591,12 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                             </Avatar>
                           </ListItemAvatar>
                           <ListItemText
-                            primary={track.title}
+                            primary={
+                              <ScrollingText sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                                {track.title}
+                              </ScrollingText>
+                            }
                             secondary={track.artist || track.channel_name}
-                            primaryTypographyProps={{ 
-                              noWrap: true, 
-                              fontSize: '0.875rem',
-                              fontWeight: 500,
-                            }}
                             secondaryTypographyProps={{ noWrap: true, fontSize: '0.75rem' }}
                           />
                           <IconButton 

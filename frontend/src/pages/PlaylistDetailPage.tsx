@@ -44,6 +44,7 @@ import { audioCache } from '../utils/audioCache';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 interface PlaylistItem {
   id: number;
@@ -815,9 +816,8 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                   <TableCell>
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Typography
+                        <ScrollingText
                           variant="body2"
-                          noWrap
                           sx={{
                             maxWidth: { xs: 180, sm: 280, md: 380 },
                             fontWeight: 500,
@@ -825,7 +825,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                           }}
                         >
                           {item.audio.title}
-                        </Typography>
+                        </ScrollingText>
                         {item.audio.youtube_id && offlineTracks.has(item.audio.youtube_id) && (
                           <Tooltip title={t('playlistDetail.status.availableOffline')}>
                             <OfflinePinIcon sx={{ fontSize: 14, color: 'success.main', flexShrink: 0 }} />

@@ -30,6 +30,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { audioAPI } from '../api/client';
 import type { Audio } from '../types';
+import ScrollingText from './ScrollingText';
 
 interface RelatedTracksProps {
   currentAudio: Audio;
@@ -177,17 +178,14 @@ export default function RelatedTracks({
                   </ListItemAvatar>
 
                   <ListItemText
-                    primary={track.title}
+                    primary={
+                      <ScrollingText sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                        {track.title}
+                      </ScrollingText>
+                    }
                     secondary={`${track.channel_name} • ${formatDuration(track.duration)}`}
                     sx={{
                       minWidth: 0,
-                      '& .MuiListItemText-primary': {
-                        fontSize: '0.85rem',
-                        fontWeight: 500,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      },
                       '& .MuiListItemText-secondary': {
                         fontSize: '0.75rem',
                         color: 'text.disabled'

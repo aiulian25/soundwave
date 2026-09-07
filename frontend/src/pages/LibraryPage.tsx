@@ -25,6 +25,7 @@ import TrackActionsMenu from '../components/TrackActionsMenu';
 import TrackThumbnail from '../components/TrackThumbnail';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 interface LibraryPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -212,9 +213,9 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
                     <TrackThumbnail src={audio.thumbnail_url} alt={audio.title} size={40} />
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 300, fontWeight: 500 }}>
+                    <ScrollingText variant="body2" sx={{ maxWidth: 300, fontWeight: 500 }}>
                       {audio.title}
-                    </Typography>
+                    </ScrollingText>
                   </Box>
                 </TableCell>
                 <TableCell>

@@ -36,6 +36,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { playlistAPI } from '../api/client';
 import type { Audio } from '../types';
+import ScrollingText from './ScrollingText';
 
 interface Playlist {
   id: number;
@@ -176,9 +177,9 @@ export default function AddToPlaylistDialog({
         <DialogContent dividers>
           {track && (
             <Box sx={{ mb: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
-              <Typography variant="body2" noWrap fontWeight="medium">
+              <ScrollingText variant="body2" fontWeight="medium">
                 {track.title}
-              </Typography>
+              </ScrollingText>
               <Typography variant="caption" color="text.secondary" noWrap>
                 {track.artist || track.channel_name}
               </Typography>

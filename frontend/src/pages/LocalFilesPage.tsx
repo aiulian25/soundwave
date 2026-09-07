@@ -48,6 +48,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import api from '../api/client';
 import ScrollToTop from '../components/ScrollToTop';
+import ScrollingText from '../components/ScrollingText';
 
 interface LocalAudio {
   id: number;
@@ -488,9 +489,9 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
                         )}
                       </CardMedia>
                       <CardContent sx={{ flexGrow: 1 }}>
-                        <Typography variant="h6" noWrap title={audio.title}>
+                        <ScrollingText variant="h6" title={audio.title}>
                           {audio.title}
-                        </Typography>
+                        </ScrollingText>
                         <Typography variant="body2" color="textSecondary" noWrap>
                           {audio.artist || t('player.unknownArtist')}
                         </Typography>

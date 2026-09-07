@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { statsAPI } from '../api/client';
 import type { YearlyWrapped } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 export default function YearlyWrappedPage() {
   const { t, i18n } = useTranslation();
@@ -250,9 +251,9 @@ export default function YearlyWrappedPage() {
                         </Avatar>
                       )}
                       <Box sx={{ overflow: 'hidden' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }} noWrap>
+                        <ScrollingText variant="h6" sx={{ fontWeight: 700 }}>
                           {wrapped.top_track.title}
-                        </Typography>
+                        </ScrollingText>
                         <Typography variant="body2" color="text.secondary" noWrap>
                           {wrapped.top_track.artist}
                         </Typography>
@@ -332,9 +333,9 @@ export default function YearlyWrappedPage() {
                           />
                         )}
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                          <ScrollingText variant="body2" sx={{ fontWeight: 500 }}>
                             {track.title}
-                          </Typography>
+                          </ScrollingText>
                           <Typography variant="caption" color="text.secondary" noWrap>
                             {t('yearlyWrapped.trackSummary', { artist: track.artist, count: track.play_count })}
                           </Typography>

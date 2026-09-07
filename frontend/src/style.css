@@ -84,3 +84,24 @@ html {
   border-left: 3px solid #13ec6a !important;
   position: relative;
 }
+
+/* Long titles that do not fit scroll themselves into view and back (ScrollingText).
+   The element only carries data-scrolling when it actually overflows, so titles that
+   fit are never animated. --scroll-distance and --scroll-duration are measured. */
+.scrolling-text-content[data-scrolling='true'] {
+  animation: scrollingTextTravel var(--scroll-duration) ease-in-out infinite alternate;
+}
+
+@keyframes scrollingTextTravel {
+  0%,
+  18% {
+    transform: translateX(0);
+  }
+  82%,
+  100% {
+    transform: translateX(var(--scroll-distance));
+  }
+}
+
+/* Reduced motion is already handled globally in styles/pwa.css, which forces every
+   animation to 0.01ms with !important -- a local override here would be dead weight. */

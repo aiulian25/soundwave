@@ -33,6 +33,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { audioAPI } from '../api/client';
 import type { Audio } from '../types';
+import ScrollingText from './ScrollingText';
 
 interface MetadataResult {
   title: string | null;
@@ -241,9 +242,9 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
             Track
             {t('metadataEditor.sections.track')}
           </Typography>
-          <Typography variant="body1" fontWeight={500} noWrap>
+          <ScrollingText variant="body1" fontWeight={500}>
             {audio.title}
-          </Typography>
+          </ScrollingText>
           <Typography variant="body2" color="text.secondary">
             {audio.channel_name}
           </Typography>

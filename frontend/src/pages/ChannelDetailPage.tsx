@@ -40,6 +40,7 @@ import { channelAPI, audioAPI } from '../api/client';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 interface ChannelDetail {
   id: number;
@@ -425,9 +426,9 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                         }}
                       />
                       <Box>
-                        <Typography variant="body2" fontWeight="medium" noWrap>
+                        <ScrollingText variant="body2" fontWeight="medium">
                           {audio.title}
-                        </Typography>
+                        </ScrollingText>
                         <Typography variant="caption" color="text.secondary">
                           {t('channelDetail.stats.views', { count: formatNumber(audio.view_count || 0) })}
                         </Typography>

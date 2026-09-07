@@ -8,6 +8,7 @@ import { statsAPI } from '../api/client';
 import { pwaManager } from '../utils/pwa';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { Audio } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 // Types for homepage data
 interface ContinueListeningItem {
@@ -341,9 +342,9 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   </IconButton>
                 </Box>
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <Typography variant="body2" noWrap sx={{ fontWeight: 600, mb: 0.25 }}>
+                  <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
                     {item.title}
-                  </Typography>
+                  </ScrollingText>
                   <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mb: 0.5 }}>
                     {item.artist || item.channel_name}
                   </Typography>
@@ -489,9 +490,9 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                     <PlayArrowIcon />
                   </IconButton>
                 </Box>
-                <Typography variant="body2" noWrap sx={{ fontWeight: 600, mb: 0.25 }}>
+                <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
                   {item.title}
-                </Typography>
+                </ScrollingText>
                 <Typography variant="caption" color="primary.main" noWrap sx={{ fontWeight: 500 }}>
                   {getRecommendationReason(item)}
                 </Typography>
@@ -595,9 +596,9 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                     <PlayArrowIcon />
                   </IconButton>
                 </Box>
-                <Typography variant="body2" noWrap sx={{ fontWeight: 600, mb: 0.5 }}>
+                <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
                   {item.title}
-                </Typography>
+                </ScrollingText>
                 <Typography variant="caption" color="text.secondary" noWrap>
                   {item.artist || item.channel_name}
                 </Typography>
@@ -701,9 +702,9 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                     <PlayArrowIcon />
                   </IconButton>
                 </Box>
-                <Typography variant="body2" noWrap sx={{ fontWeight: 600, mb: 0.5 }}>
+                <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
                   {item.title}
-                </Typography>
+                </ScrollingText>
                 <Typography variant="caption" color="text.secondary" noWrap>
                   {item.artist || item.channel_name}
                 </Typography>

@@ -51,6 +51,7 @@ import { smartPlaylistAPI, audioAPI } from '../api/client';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio, SmartPlaylist, SmartPlaylistRule, SmartPlaylistChoices } from '../types';
+import ScrollingText from '../components/ScrollingText';
 
 interface SmartPlaylistDetailPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -376,9 +377,9 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                         />
                       )}
                       <Box sx={{ overflow: 'hidden' }}>
-                        <Typography variant="body2" noWrap>
+                        <ScrollingText variant="body2">
                           {track.title}
-                        </Typography>
+                        </ScrollingText>
                         <Typography variant="caption" color="text.secondary" sx={{ display: { sm: 'none' } }}>
                           {track.artist || track.channel_name}
                         </Typography>

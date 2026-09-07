@@ -36,6 +36,7 @@ import {
   YouTube as YouTubeIcon,
 } from '@mui/icons-material';
 import { statsAPI } from '../api/client';
+import ScrollingText from '../components/ScrollingText';
 
 interface TopArtist {
   artist: string;
@@ -505,16 +506,8 @@ export default function AnalyticsPage() {
                         </Avatar>
                       </ListItemAvatar>
                       <ListItemText
-                        primary={track.title}
+                        primary={<ScrollingText sx={{ fontWeight: 500 }}>{track.title}</ScrollingText>}
                         secondary={track.artist}
-                        primaryTypographyProps={{ 
-                          fontWeight: 500,
-                          sx: {
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }
-                        }}
                         secondaryTypographyProps={{
                           sx: {
                             overflow: 'hidden',
@@ -571,7 +564,7 @@ export default function AnalyticsPage() {
                         </Avatar>
                       </ListItemAvatar>
                       <ListItemText
-                        primary={track.title}
+                        primary={<ScrollingText sx={{ fontWeight: 500 }}>{track.title}</ScrollingText>}
                         secondary={
                           <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <span>{track.artist || track.channel_name}</span>
@@ -582,14 +575,6 @@ export default function AnalyticsPage() {
                             )}
                           </Box>
                         }
-                        primaryTypographyProps={{
-                          fontWeight: 500,
-                          sx: {
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }
-                        }}
                       />
                       <Typography variant="caption" color="text.secondary">
                         {new Date(track.listened_at).toLocaleString(i18n.language === 'ro' ? 'ro-RO' : 'en-US')}
