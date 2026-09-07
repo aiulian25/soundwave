@@ -60,17 +60,12 @@ export REDIS_URL
 
 # Wait for Redis
 echo "Waiting for Redis..."
-if [ -n "${REDIS_PASSWORD}" ]; then
-    until python -c "import redis; r = redis.Redis(host='${REDIS_HOST}', port=6379, password='${REDIS_PASSWORD}'); r.ping()" 2>/dev/null; do
-        echo "Redis is unavailable - sleeping"
-        sleep 3
-    done
-else
-    until python -c "import redis; r = redis.Redis(host='${REDIS_HOST}', port=6379); r.ping()" 2>/dev/null; do
-        echo "Redis is unavailable - sleeping"
-        sleep 3
-    done
-fi
+# Secrets are read from the environment, never interpolated into the source: a quote in a
+# password would otherwise break (or inject into) the generated Python.
+until python -c "import os, redis; redis.Redis(host=os.environ.get('REDIS_HOST', 'localhost'), port=6379, password=os.environ.get('REDIS_PASSWORD') or None).ping()" 2>/dev/null; do
+    echo "Redis is unavailable - sleeping"
+    sleep 3
+done
 echo "Redis is up!"
 
 # Wait for PostgreSQL when the app is configured to use it.
@@ -142,10 +137,17 @@ fi
 echo "=== Migrations complete ==="
 
 # Create superuser if it doesn't exist
-python manage.py shell << END
+python manage.py shell <<'END'
+import os
 from user.models import Account
-if not Account.objects.filter(username='$SW_USERNAME').exists():
-    user = Account.objects.create_superuser('$SW_USERNAME', 'admin@soundwave.local', '$SW_PASSWORD')
+
+# Quoted heredoc + os.environ: the shell never substitutes secrets into this source.
+username = os.environ.get('SW_USERNAME', 'admin')
+password = os.environ.get('SW_PASSWORD', '')
+if not password:
+    print('SW_PASSWORD not set; skipping superuser bootstrap')
+elif not Account.objects.filter(username=username).exists():
+    user = Account.objects.create_superuser(username, 'admin@soundwave.local', password)
     # APP-01: force the bootstrap admin to set a new password on first login so the
     # default SW_PASSWORD cannot remain in use on an internet-exposed instance.
     user.password_change_required = True
@@ -198,6 +200,7 @@ if [ "$IS_PRODUCTION" = "true" ]; then
         --max-requests 1000 \
         --max-requests-jitter 100 \
         --access-logfile - \
+        --access-logformat '%(h)s %(l)s %(u)s %(t)s "%(m)s %(U)s" %(s)s %(b)s' \
         --error-logfile - \
         --log-level info
 else

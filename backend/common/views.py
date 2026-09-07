@@ -7,7 +7,9 @@ from django.views.decorators.http import require_GET
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
+from rest_framework.authentication import SessionAuthentication
+
+from common.authentication import CsrfExemptTokenAuthentication
 
 
 @require_GET
@@ -22,7 +24,7 @@ class AppVersionView(APIView):
     The GitHub check is server-side and cached (see common.update_check), so users'
     browsers never reach GitHub and the API is never hammered. Fails closed.
     """
-    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
+    authentication_classes = [CsrfExemptTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -102,7 +104,7 @@ def robots_txt(request):
 
 class ApiBaseView(APIView):
     """Base API view - TubeArchivist pattern"""
-    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
+    authentication_classes = [CsrfExemptTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def filter_owned(self, queryset, field=None, allow_admin_all=False):
@@ -136,10 +138,5 @@ class AdminOnly(IsAdminUser):
     pass
 
 
-class AdminWriteOnly(IsAuthenticated):
-    """Allow all authenticated users to read and write their own data"""
-
-    def has_permission(self, request, view):
-        # All authenticated users can perform any action
-        # Data isolation is enforced at the view/queryset level via owner field
-        return request.user and request.user.is_authenticated
+class AuthenticatedOwnerAccess(IsAuthenticated):
+    """Any authenticated user; ownership is enforced by each view's owner-scoped queries (APP-04)."""

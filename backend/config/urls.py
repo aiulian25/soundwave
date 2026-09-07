@@ -9,7 +9,6 @@ from django.views.static import serve
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from common.streaming import serve_media_with_range
 from common.views import robots_txt, sitemap_xml
-import os
 
 api_urlpatterns = [
     path("", include("common.urls")),
@@ -32,8 +31,12 @@ urlpatterns = [
     path("api/v1/", include(api_urlpatterns)),
     path('robots.txt', robots_txt, name='robots-txt'),
     path('sitemap.xml', sitemap_xml, name='sitemap-xml'),
-    path("admin/", admin.site.urls),
 ]
+
+# Opt-in only (settings.ENABLE_DJANGO_ADMIN documents why). While disabled the
+# catch-all below still excludes 'admin/', so /admin/ is a clean 404, not the SPA.
+if settings.ENABLE_DJANGO_ADMIN:
+    urlpatterns.append(path("admin/", admin.site.urls))
 
 # Serve static files
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

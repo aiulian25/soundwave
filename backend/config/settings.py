@@ -132,8 +132,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Security headers (CSP, Referrer-Policy, Permissions-Policy)
     'config.security_middleware.SecurityHeadersMiddleware',
-    # Custom middleware for multi-tenancy
-    'config.middleware.UserIsolationMiddleware',
     'config.middleware.StorageQuotaMiddleware',
 ]
 
@@ -349,7 +347,6 @@ REST_FRAMEWORK = {
         'login': '10/minute',
         'burst': '60/minute',
         'sustained': '10000/hour',  # Increased from 1000 to prevent 429 on page load
-        'strict_anon': '5/minute',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
@@ -450,6 +447,11 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+# Django admin is off unless explicitly enabled: it bypasses the login lockout,
+# rate limiting and forced-password-change that user.views.LoginView enforces, so an
+# exposed /admin/ is an unthrottled credential-brute-force surface.
+ENABLE_DJANGO_ADMIN = _env_bool('DJANGO_ENABLE_ADMIN', False)
 
 # Spectacular settings
 SPECTACULAR_SETTINGS = {

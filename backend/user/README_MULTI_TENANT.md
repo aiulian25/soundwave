@@ -78,14 +78,14 @@ Regular User
 
 ### Middleware (`config/middleware.py`)
 
-**UserIsolationMiddleware**:
-- Adds `request.filter_by_user()` helper
-- Automatically filters querysets by owner
-- Admins bypass filtering
-
 **StorageQuotaMiddleware**:
 - Tracks storage usage
 - Prevents uploads when quota exceeded
+
+> Isolation is **not** middleware-based. It is enforced per view by
+> `ApiBaseView.filter_owned` (`common/views.py`). A `request.filter_by_user()` helper
+> once lived here and let admins bypass owner scoping; it was unused and was removed --
+> use `filter_owned` instead.
 
 ### Permissions (`common/permissions.py`)
 
@@ -214,8 +214,8 @@ Audio.objects.all()
 
 # After
 Audio.objects.filter(owner=request.user)
-# or use middleware
-request.filter_by_user(Audio.objects.all())
+# or, inside an ApiBaseView subclass:
+self.filter_owned(Audio.objects.all())
 ```
 
 ### Step 4: Update Serializers
@@ -326,10 +326,11 @@ def can_add_playlist(self):
 
 ### Data Isolation
 
-1. **Queryset Filtering**: All queries automatically filtered by owner
-2. **Middleware**: UserIsolationMiddleware enforces filtering
+1. **Queryset Filtering**: All queries are filtered by owner
+2. **Views**: `ApiBaseView.filter_owned` scopes strictly by owner -- including admins
 3. **Permissions**: IsOwnerOrAdmin checks object-level permissions
-4. **Admin Bypass**: Admins can access all data for management
+4. **Cross-tenant access**: an endpoint that must span tenants has to opt in explicitly
+   with `filter_owned(..., allow_admin_all=True)`
 
 ### Authentication
 

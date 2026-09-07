@@ -10,7 +10,9 @@ from pathlib import Path
 import logging
 import shutil
 
-from common.authentication import CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication
+from rest_framework.authentication import SessionAuthentication
+
+from common.authentication import CsrfExemptTokenAuthentication
 from common.permissions import CanManageUsers
 from user.models import UserYouTubeAccount
 from user.serializers_admin import (
@@ -46,7 +48,7 @@ class IsAdminOrSelf(IsAuthenticated):
 class UserManagementViewSet(viewsets.ModelViewSet):
     """Admin viewset for managing users"""
     queryset = User.objects.all()
-    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
+    authentication_classes = [CsrfExemptTokenAuthentication, SessionAuthentication]
     permission_classes = [CanManageUsers]
     
     def get_serializer_class(self):
@@ -273,7 +275,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
 class UserYouTubeAccountViewSet(viewsets.ModelViewSet):
     """ViewSet for managing user YouTube accounts"""
-    authentication_classes = [CsrfExemptSessionAuthentication, CsrfExemptTokenAuthentication]
+    authentication_classes = [CsrfExemptTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAdminOrSelf]
     
     def get_serializer_class(self):

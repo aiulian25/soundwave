@@ -15,7 +15,9 @@ from audio.serializers import (
     AudioProgressUpdateSerializer,
     PlayerSerializer,
 )
-from common.views import ApiBaseView, AdminWriteOnly
+from common.authentication import APIKeyAuthentication
+from common.streaming import make_media_ticket, resolve_media_ticket
+from common.views import ApiBaseView, AuthenticatedOwnerAccess
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,22 @@ ALLOWED_ARTWORK_HOST_SCHEMES = {
     'assets.fanart.tv': {'https'},
     'lastfm.freetls.fastly.net': {'https'},
 }
+
+MAX_ARTWORK_BYTES = 5 * 1024 * 1024
+ARTWORK_FETCH_TIMEOUT_SECONDS = 10
+ARTWORK_CACHE_MAX_AGE_SECONDS = 86400
+DEFAULT_ARTWORK_CONTENT_TYPE = 'image/jpeg'
+ARTWORK_TICKET_PREFIX = 'artwork:'
+
+
+def artwork_ticket_path(youtube_id):
+    """Ticket scope for a track's artwork.
+
+    Namespaced so a media ticket issued for a stream path cannot be replayed against
+    the artwork endpoint (and vice versa), and so the issuing and resolving sides
+    cannot drift apart.
+    """
+    return f'{ARTWORK_TICKET_PREFIX}{youtube_id}'
 
 
 def is_safe_artwork_url(url: str) -> bool:
@@ -104,7 +122,7 @@ class AudioDetailView(ApiBaseView):
     POST: trigger actions (download)
     DELETE: delete audio file
     """
-    permission_classes = [AdminWriteOnly]
+    permission_classes = [AuthenticatedOwnerAccess]
 
     def get(self, request, youtube_id):
         """Get audio details"""
@@ -209,13 +227,15 @@ class AudioPlayerView(ApiBaseView):
         stream_url = f"/media/{encoded_path}"
         # APP-05: also offer a short-lived signed URL for clients that cannot use the
         # session cookie (cross-origin / non-browser). The SPA keeps using stream_url.
-        from common.streaming import make_media_ticket
         stream_ticket_url = f"/media/{encoded_path}?t={make_media_ticket(request.user, audio.file_path)}"
+        artwork_ticket = make_media_ticket(request.user, artwork_ticket_path(audio.youtube_id))
+        artwork_ticket_url = f"/api/audio/{audio.youtube_id}/artwork/?t={artwork_ticket}"
 
         data = {
             'audio': AudioSerializer(audio).data,
             'stream_url': stream_url,
             'stream_ticket_url': stream_ticket_url,
+            'artwork_ticket_url': artwork_ticket_url,
         }
         if progress:
             data['progress'] = {
@@ -731,59 +751,75 @@ class MetadataAutoFetchView(ApiBaseView):
 
 
 class ArtworkProxyView(APIView):
-    """Proxy artwork images to avoid CORS issues for Media Session API
-    
-    This view allows unauthenticated access because the Media Session API
-    cannot pass authentication headers when fetching artwork URLs.
-    Security is maintained because:
-    1. Only serves publicly available artwork URLs (YouTube thumbnails, etc.)
-    2. Does not expose any user data
-    3. The youtube_id must exist in the database
-    4. URLs are validated to prevent SSRF attacks
+    """Proxy cover art for the Media Session API and other cookie-less clients.
+
+    Authorization is carried by the URL because artwork fetches (OS lock screen, media
+    controls, external widgets) do not reliably send the session cookie: a short-lived,
+    path-bound media ticket (`?t=`) or an API key both work, and a normal session is
+    still accepted. The lookup is owner-scoped, so this endpoint cannot be used to probe
+    which tracks an instance holds. Outbound fetches stay restricted to
+    ALLOWED_ARTWORK_HOST_SCHEMES (SSRF) and are size-capped.
     """
-    authentication_classes = []
+
+    authentication_classes = [APIKeyAuthentication]
     permission_classes = []
-    
+
+    def _authorized_user(self, request, youtube_id):
+        """Resolve the user allowed to read this artwork, or None."""
+        ticket_user, _ = resolve_media_ticket(
+            artwork_ticket_path(youtube_id), request.query_params.get('t', '')
+        )
+        if ticket_user is not None:
+            return ticket_user
+
+        request_user = getattr(request, 'user', None)
+        if request_user is not None and request_user.is_authenticated:
+            return request_user
+
+        return None
+
     def get(self, request, youtube_id):
         """Proxy artwork for a track"""
         import requests as http_requests
         from django.http import HttpResponse
-        
-        # Allow any user's audio since this doesn't expose sensitive data
-        audio = get_object_or_404(Audio, youtube_id=youtube_id)
-        
-        # Get artwork URL
+
+        user = self._authorized_user(request, youtube_id)
+        if user is None:
+            return Response(
+                {'error': 'Authentication required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=user)
+
         artwork_url = audio.cover_art_url or audio.thumbnail_url
-        
         if not artwork_url:
             return Response(
                 {'error': 'No artwork available'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         # SSRF protection: validate URL is from allowed sources
         if not is_safe_artwork_url(artwork_url):
             return Response(
                 {'error': 'Invalid artwork source'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         try:
-            # Fetch the image
-            resp = http_requests.get(artwork_url, timeout=10)
-            if resp.status_code == 200:
-                # Determine content type
-                content_type = resp.headers.get('content-type', 'image/jpeg')
-                
-                # Return image with CORS headers
-                response = HttpResponse(resp.content, content_type=content_type)
-                response['Access-Control-Allow-Origin'] = '*'
-                response['Cache-Control'] = 'public, max-age=86400'  # Cache for 1 day
-                return response
-            else:
-                return Response(
-                    {'error': 'Failed to fetch artwork'},
-                    status=status.HTTP_502_BAD_GATEWAY
+            with http_requests.get(
+                artwork_url, timeout=ARTWORK_FETCH_TIMEOUT_SECONDS, stream=True
+            ) as upstream:
+                if upstream.status_code != 200:
+                    return Response(
+                        {'error': 'Failed to fetch artwork'},
+                        status=status.HTTP_502_BAD_GATEWAY
+                    )
+                # Read one byte past the cap so an oversized body is rejected without
+                # ever being buffered in full.
+                content = upstream.raw.read(MAX_ARTWORK_BYTES + 1, decode_content=True)
+                upstream_content_type = upstream.headers.get(
+                    'content-type', DEFAULT_ARTWORK_CONTENT_TYPE
                 )
         except Exception:
             # Don't expose exception details in response
@@ -792,3 +828,20 @@ class ArtworkProxyView(APIView):
                 {'error': 'Error fetching artwork'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+        if len(content) > MAX_ARTWORK_BYTES:
+            return Response(
+                {'error': 'Artwork too large'},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        content_type = upstream_content_type
+        if not content_type.startswith('image/'):
+            content_type = DEFAULT_ARTWORK_CONTENT_TYPE
+
+        response = HttpResponse(content, content_type=content_type)
+        response['Access-Control-Allow-Origin'] = '*'
+        # `private`: the response is owner-scoped, so a shared cache must never hand one
+        # user's artwork to another.
+        response['Cache-Control'] = f'private, max-age={ARTWORK_CACHE_MAX_AGE_SECONDS}'
+        return response

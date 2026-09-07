@@ -19,15 +19,24 @@ These endpoints are fully compatible with the Homepage dashboard's TubeArchivist
 
 ### Authentication
 
-The API uses `Authorization: Token <API_KEY>` header (same as TubeArchivist):
+Send the key in a **request header**. Either form is accepted:
 
 ```
+Authorization: ApiKey YOUR_API_KEY
 Authorization: Token YOUR_API_KEY
 ```
 
-Also supports: 
-- `Authorization: ApiKey YOUR_API_KEY`
-- Query parameter: `?key=YOUR_API_KEY`
+`Token` is the TubeArchivist-compatible spelling, so Homepage's TubeArchivist widget
+works unchanged.
+
+#### Query parameter (discouraged)
+
+`?key=YOUR_API_KEY` still works for clients that cannot set headers, but prefer a header
+wherever you can: a key in the URL leaks into browser history, `Referer` headers sent to
+third parties, bookmarks, and any reverse proxy's access log. SoundWave's own gunicorn
+access log records the path without the query string, but an upstream proxy you put in
+front of it may not. If you must use `?key=`, issue that key a dedicated, least-privilege
+API key you can revoke on its own.
 
 ## Homepage Dashboard Configuration
 
@@ -59,7 +68,8 @@ Available fields (these map to the TubeArchivist widget fields):
 For custom integrations, a combined endpoint is also available:
 
 ```
-GET /api/stats/widget/?key=YOUR_API_KEY
+GET /api/stats/widget/
+Authorization: ApiKey YOUR_API_KEY
 ```
 
 Response:
@@ -143,11 +153,12 @@ When creating an API key, you can configure the following scopes:
 Test your API key:
 
 ```bash
-# Using query parameter
-curl "https://soundwave.example.com/api/stats/widget/?key=YOUR_API_KEY"
-
-# Using header
+# Preferred: key in a header, never in the URL
 curl -H "Authorization: ApiKey YOUR_API_KEY" \
+  "https://soundwave.example.com/api/stats/widget/"
+
+# TubeArchivist-compatible spelling
+curl -H "Authorization: Token YOUR_API_KEY" \
   "https://soundwave.example.com/api/stats/widget/"
 ```
 

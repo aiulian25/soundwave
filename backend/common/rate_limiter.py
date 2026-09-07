@@ -153,12 +153,6 @@ class SustainedRateThrottle(UserRateThrottle):
     scope = 'sustained'
 
 
-class StrictAnonThrottle(AnonRateThrottle):
-    """Very strict throttle for sensitive anonymous endpoints."""
-    rate = '5/minute'
-    scope = 'strict_anon'
-
-
 # Sensitive action rate limiting for authenticated users
 SENSITIVE_ACTION_MAX_ATTEMPTS = 5
 SENSITIVE_ACTION_LOCKOUT_DURATION = 30 * 60  # 30 minutes
