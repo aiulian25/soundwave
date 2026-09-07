@@ -78,3 +78,5 @@ frontend/coverage/
 
 # Local release runbook — kept on the machine, never pushed (see the file's header)
 /build and push.md
+# Local code-review report — maps unpatched issues; never push it
+/CODE_REVIEW_REPORT*.md
