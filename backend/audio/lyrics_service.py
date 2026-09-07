@@ -9,6 +9,12 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
+# LRC timestamps in the wild: [mm:ss], [m:ss.x], [mm:ss.xx], [mm:ss.xxx]. The fractional
+# part is OPTIONAL and minutes are unbounded (long mixes run past 99 min). The previous
+# pattern demanded [dd:dd.dd+], so bare [mm:ss] files were rejected at upload validation and
+# their lines dropped at parse time. Kept in sync with frontend/src/utils/lrc.ts.
+LRC_TIMESTAMP_PATTERN = r'\[\d+:\d{2}(?:\.\d{1,3})?\]'
+
 
 def clean_title_for_lyrics(title: str, channel_name: str = "") -> Tuple[str, str]:
     """
@@ -473,7 +479,7 @@ class LRCLIBClient:
         lines = []
         for line in synced_lyrics.split('\n'):
             # Remove all timestamp tags [mm:ss.xx]
-            cleaned = re.sub(r'\[\d{2}:\d{2}\.\d{2,3}\]', '', line)
+            cleaned = re.sub(LRC_TIMESTAMP_PATTERN, '', line)
             # Remove metadata tags [tag:value]
             cleaned = re.sub(r'\[[a-z]+:.*?\]', '', cleaned)
             if cleaned.strip():

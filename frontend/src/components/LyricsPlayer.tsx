@@ -47,6 +47,12 @@ import { offlineStorage } from '../utils/offlineStorage';
 import { getLyricsColors, LyricsThemeColors, DEFAULT_VISUALIZER_THEME } from '../config/visualizerThemes';
 import { useSettings } from '../context/SettingsContext';
 import TrackDetails, { hasTrackDetails } from './TrackDetails';
+import LyricsSuggestionList, { type LyricsSuggestion } from './LyricsSuggestionList';
+import { parseSyncedLyrics, type LyricsLine } from '../utils/lrc';
+
+const MAX_LRC_UPLOAD_BYTES = 1024 * 1024;
+const UPLOAD_SNACKBAR_DURATION_MS = 3000;
+const OFFLINE_ERROR_SNACKBAR_DURATION_MS = 4000;
 
 interface LyricsData {
   audio_id: string;
@@ -63,26 +69,6 @@ interface LyricsData {
   fetch_attempted: boolean;
   fetch_attempts: number;
   last_error: string;
-}
-
-interface LyricsSuggestion {
-  id: number;
-  track_name: string;
-  artist_name: string;
-  album_name: string;
-  duration: number;
-  has_synced: boolean;
-  has_plain: boolean;
-  synced_lyrics: string;
-  plain_lyrics: string;
-  instrumental: boolean;
-  language: string;
-}
-
-interface LyricsLine {
-  time: number;
-  text: string;
-  endTime?: number; // When this line ends (next line starts)
 }
 
 interface LyricsPlayerProps {
@@ -121,10 +107,10 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   const [tabValue, setTabValue] = useState(0);
   
   // Get theme colors for lyrics (adapts to light/dark mode, visualizer theme, and app color theme)
-  const themeColors = useMemo(() => {
-    console.log('[LyricsPlayer] Getting colors - theme:', effectiveTheme, 'lightMode:', effectiveLightMode, 'muiColor:', muiPrimaryColor);
-    return getLyricsColors(effectiveTheme, effectiveLightMode, muiPrimaryColor);
-  }, [effectiveTheme, effectiveLightMode, muiPrimaryColor]);
+  const themeColors = useMemo(
+    () => getLyricsColors(effectiveTheme, effectiveLightMode, muiPrimaryColor),
+    [effectiveTheme, effectiveLightMode, muiPrimaryColor]
+  );
   
   // Suggestions state
   const [suggestions, setSuggestions] = useState<LyricsSuggestion[]>([]);
@@ -150,6 +136,19 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const currentLineRef = useRef<HTMLDivElement>(null);
+  const loadRequestRef = useRef(0);
+
+  // Every async path that writes lyrics state claims an id first. A slower response for a
+  // previous track -- or a manual fetch the user superseded -- then sees a newer id and drops
+  // its result instead of overwriting the track that is actually playing.
+  const claimLyricsRequest = () => ++loadRequestRef.current;
+  const isStaleRequest = (requestId: number) => requestId !== loadRequestRef.current;
+
+  const applyLyricsData = (data: LyricsData) => {
+    setLyrics(data);
+    // Reset rather than leave the previous track's lines behind on an unsynced track.
+    setParsedLyrics(data.is_synced ? parseSyncedLyrics(data.synced_lyrics) : []);
+  };
 
   useEffect(() => {
     loadLyrics();
@@ -176,6 +175,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   }, [currentLineIndex, autoScroll]);
 
   const loadLyrics = async () => {
+    const requestId = claimLyricsRequest();
     try {
       setLoading(true);
       setError('');
@@ -189,26 +189,21 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         );
         cachedLyrics = await Promise.race([cachePromise, timeoutPromise]);
       } catch (cacheErr) {
-        console.log('[Lyrics] Cache check failed or timed out:', cacheErr);
+        if (import.meta.env.DEV) console.log('[Lyrics] Cache check failed or timed out:', cacheErr);
       }
       
+      if (isStaleRequest(requestId)) return;
+
       if (cachedLyrics) {
-        console.log('[Lyrics] Loading from offline cache');
-        setLyrics(cachedLyrics);
-        if (cachedLyrics.is_synced) {
-          const parsed = parseSyncedLyrics(cachedLyrics.synced_lyrics);
-          setParsedLyrics(parsed);
-        }
+        if (import.meta.env.DEV) console.log('[Lyrics] Loading from offline cache');
+        applyLyricsData(cachedLyrics);
         setLoading(false);
         
         // If online, try to refresh in background (non-blocking)
         if (navigator.onLine) {
           api.get(`/audio/${youtubeId}/lyrics/`).then(response => {
-            setLyrics(response.data);
-            if (response.data.is_synced) {
-              const parsed = parseSyncedLyrics(response.data.synced_lyrics);
-              setParsedLyrics(parsed);
-            }
+            if (isStaleRequest(requestId)) return;
+            applyLyricsData(response.data);
             // Update cache (fire and forget)
             offlineStorage.saveLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
           }).catch(() => {});
@@ -224,44 +219,39 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       }
       
       const response = await api.get(`/audio/${youtubeId}/lyrics/`);
-      setLyrics(response.data);
-      
-      if (response.data.is_synced) {
-        const parsed = parseSyncedLyrics(response.data.synced_lyrics);
-        setParsedLyrics(parsed);
-      }
+      if (isStaleRequest(requestId)) return;
+      applyLyricsData(response.data);
       
       // Cache for offline use (fire and forget)
       offlineStorage.saveLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
     } catch (err: any) {
+      if (isStaleRequest(requestId)) return;
       setError(err.response?.data?.error || t('lyrics.errors.loadFailed'));
     } finally {
-      setLoading(false);
+      if (!isStaleRequest(requestId)) setLoading(false);
     }
   };
 
   const fetchLyrics = async () => {
+    const requestId = claimLyricsRequest();
     try {
       setLoading(true);
       setError('');
       const response = await api.post(`/audio/${youtubeId}/lyrics/fetch/`, {
         force: true,
       });
-      setLyrics(response.data);
-      
-      if (response.data.is_synced) {
-        const parsed = parseSyncedLyrics(response.data.synced_lyrics);
-        setParsedLyrics(parsed);
-      }
+      if (isStaleRequest(requestId)) return;
+      applyLyricsData(response.data);
       
       // If no lyrics found, auto-load suggestions
       if (!response.data.has_lyrics && !response.data.is_instrumental) {
         loadSuggestions();
       }
     } catch (err: any) {
+      if (isStaleRequest(requestId)) return;
       setError(err.response?.data?.error || t('lyrics.errors.fetchFailed'));
     } finally {
-      setLoading(false);
+      if (!isStaleRequest(requestId)) setLoading(false);
     }
   };
 
@@ -280,6 +270,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   };
 
   const applySuggestion = async (suggestion: LyricsSuggestion) => {
+    const requestId = claimLyricsRequest();
     try {
       setApplyingId(suggestion.id);
       const response = await api.post(`/audio/${youtubeId}/lyrics/apply/`, {
@@ -290,12 +281,8 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         track_name: suggestion.track_name,
         artist_name: suggestion.artist_name,
       });
-      setLyrics(response.data);
-      
-      if (response.data.is_synced) {
-        const parsed = parseSyncedLyrics(response.data.synced_lyrics);
-        setParsedLyrics(parsed);
-      }
+      if (isStaleRequest(requestId)) return;
+      applyLyricsData(response.data);
       
       setShowSuggestions(false);
       setSuggestions([]);
@@ -308,9 +295,11 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   };
 
   const deleteLyrics = async () => {
+    const requestId = claimLyricsRequest();
     try {
       setDeleting(true);
       await api.delete(`/audio/${youtubeId}/lyrics/delete/`);
+      if (isStaleRequest(requestId)) return;
       // Reset to empty lyrics state
       setLyrics({
         audio_id: youtubeId,
@@ -343,12 +332,6 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     if (searchQuery.trim()) {
       loadSuggestions(searchQuery.trim());
     }
-  };
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleDownload = async (format: 'lrc' | 'txt') => {
@@ -401,24 +384,20 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
       return;
     }
 
-    // Validate file size (max 1MB)
-    if (file.size > 1024 * 1024) {
+    if (file.size > MAX_LRC_UPLOAD_BYTES) {
       setError(t('lyrics.errors.lrcTooLarge'));
       return;
     }
 
+    const requestId = claimLyricsRequest();
     try {
       setUploading(true);
       setError('');
       
       const response = await audioAPI.uploadLrcFile(youtubeId, file);
       
-      setLyrics(response.data);
-      
-      if (response.data.is_synced) {
-        const parsed = parseSyncedLyrics(response.data.synced_lyrics);
-        setParsedLyrics(parsed);
-      }
+      if (isStaleRequest(requestId)) return;
+      applyLyricsData(response.data);
       
       // Update offline cache
       offlineStorage.saveLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
@@ -438,39 +417,6 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     }
   };
 
-  const parseSyncedLyrics = (syncedText: string): LyricsLine[] => {
-    const lines: LyricsLine[] = [];
-    const lrcLines = syncedText.split('\n');
-    
-    for (const line of lrcLines) {
-      // Match timestamp format [mm:ss.xx]
-      const match = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
-      if (match) {
-        const minutes = parseInt(match[1]);
-        const seconds = parseInt(match[2]);
-        const centiseconds = parseInt(match[3].padEnd(2, '0').substring(0, 2));
-        const time = minutes * 60 + seconds + centiseconds / 100;
-        const text = match[4].trim();
-        
-        if (text) {
-          lines.push({ time, text });
-        }
-      }
-    }
-    
-    // Sort and calculate end times
-    const sorted = lines.sort((a, b) => a.time - b.time);
-    for (let i = 0; i < sorted.length; i++) {
-      if (i < sorted.length - 1) {
-        sorted[i].endTime = sorted[i + 1].time;
-      } else {
-        // Last line - assume it lasts 5 seconds or until track ends
-        sorted[i].endTime = sorted[i].time + 5;
-      }
-    }
-    
-    return sorted;
-  };
 
   const updateCurrentLine = () => {
     let index = -1;
@@ -501,6 +447,34 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   };
 
   const trackHasDetails = hasTrackDetails({ description, viewCount, likeCount, publishedDate });
+
+  // One hidden input + one set of feedback snackbars for all three lyrics states. They used to
+  // be copy-pasted per branch, which is why offlineSaveError only ever surfaced on one of them.
+  const renderUploadControls = () => (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".lrc"
+        style={{ display: 'none' }}
+        onChange={handleLrcUpload}
+      />
+      <Snackbar
+        open={uploadSuccess}
+        autoHideDuration={UPLOAD_SNACKBAR_DURATION_MS}
+        onClose={() => setUploadSuccess(false)}
+        message={t('lyrics.messages.uploadSuccess')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+      <Snackbar
+        open={offlineSaveError}
+        autoHideDuration={OFFLINE_ERROR_SNACKBAR_DURATION_MS}
+        onClose={() => setOfflineSaveError(false)}
+        message={t('lyrics.messages.offlineSaveFailed')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+    </>
+  );
 
   const renderDetailsToggleButton = () => {
     if (!trackHasDetails) {
@@ -635,22 +609,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               {uploading ? t('lyrics.actions.uploading') : t('lyrics.actions.uploadLrc')}
             </Button>
           </Box>
-          {/* Hidden file input for upload */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".lrc"
-            style={{ display: 'none' }}
-            onChange={handleLrcUpload}
-          />
-          {/* Success snackbar */}
-          <Snackbar
-            open={uploadSuccess}
-            autoHideDuration={3000}
-            onClose={() => setUploadSuccess(false)}
-            message={t('lyrics.messages.uploadSuccess')}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          />
+          {renderUploadControls()}
         </Box>
       </Box>
     );
@@ -698,23 +657,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             </Button>
           </Box>
           
-          {/* Hidden file input for upload */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".lrc"
-            style={{ display: 'none' }}
-            onChange={handleLrcUpload}
-          />
-          
-          {/* Success snackbar */}
-          <Snackbar
-            open={uploadSuccess}
-            autoHideDuration={3000}
-            onClose={() => setUploadSuccess(false)}
-            message={t('lyrics.messages.uploadSuccess')}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          />
+          {renderUploadControls()}
 
           {/* Search form */}
           <Box component="form" onSubmit={handleSearchSubmit} sx={{ mb: 2 }}>
@@ -747,69 +690,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
                 {t('lyrics.search.foundSuggestions', { count: suggestions.length })}
               </Typography>
-              <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
-                {suggestions.map((suggestion) => (
-                  <ListItem
-                    key={suggestion.id}
-                    sx={{
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      '&:last-child': { borderBottom: 'none' },
-                      display: 'flex',
-                      alignItems: 'center',
-                      pr: 1,
-                    }}
-                    secondaryAction={
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        onClick={() => applySuggestion(suggestion)}
-                        disabled={applyingId === suggestion.id}
-                        startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
-                        sx={{ minWidth: 70 }}
-                      >
-                        {applyingId === suggestion.id ? t('lyrics.actions.applying') : t('lyrics.actions.use')}
-                      </Button>
-                    }
-                  >
-                    <ListItemText
-                      sx={{ pr: 8 }}
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
-                            "{suggestion.track_name}"
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
-                            {t('lyrics.search.byArtist', { artist: suggestion.artist_name })}
-                          </Typography>
-                        </Box>
-                      }
-                      secondary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-                          {suggestion.has_synced && (
-                            <Chip label={t('lyrics.tags.synced')} size="small" color="success" sx={{ height: 20 }} />
-                          )}
-                          {suggestion.has_plain && !suggestion.has_synced && (
-                            <Chip label={t('lyrics.tags.plain')} size="small" sx={{ height: 20 }} />
-                          )}
-                          {suggestion.instrumental && (
-                            <Chip label={t('lyrics.tags.instrumental')} size="small" color="info" sx={{ height: 20 }} />
-                          )}
-                          <Typography variant="caption" color="text.secondary">
-                            {formatDuration(suggestion.duration)}
-                          </Typography>
-                          {suggestion.album_name && (
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              • {suggestion.album_name}
-                            </Typography>
-                          )}
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
+              <LyricsSuggestionList suggestions={suggestions} applyingId={applyingId} onApply={applySuggestion} />
             </Box>
           )}
 
@@ -887,13 +768,6 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
             {uploading ? <CircularProgress size={20} /> : <UploadFileIcon />}
           </IconButton>
         </Tooltip>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".lrc"
-          style={{ display: 'none' }}
-          onChange={handleLrcUpload}
-        />
         
         <IconButton size="small" onClick={fetchLyrics} sx={{ mr: 1 }} title={t('lyrics.actions.refreshLyrics')}>
           <RefreshIcon />
@@ -908,23 +782,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         )}
       </Box>
       
-      {/* Success snackbar for upload */}
-      <Snackbar
-        open={uploadSuccess}
-        autoHideDuration={3000}
-        onClose={() => setUploadSuccess(false)}
-        message={t('lyrics.messages.uploadSuccess')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      />
-
-      {/* Offline-save failure snackbar */}
-      <Snackbar
-        open={offlineSaveError}
-        autoHideDuration={4000}
-        onClose={() => setOfflineSaveError(false)}
-        message={t('lyrics.messages.offlineSaveFailed')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      />
+      {renderUploadControls()}
 
       {/* Edit mode panel - Find different lyrics */}
       <Collapse in={editMode}>
@@ -982,64 +840,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
               <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                 {t('lyrics.search.suggestionsFoundReplace', { count: suggestions.length })}
               </Typography>
-              <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
-                {suggestions.map((suggestion) => (
-                  <ListItem
-                    key={suggestion.id}
-                    sx={{
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      '&:last-child': { borderBottom: 'none' },
-                      display: 'flex',
-                      alignItems: 'center',
-                      pr: 1,
-                    }}
-                    secondaryAction={
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        onClick={() => applySuggestion(suggestion)}
-                        disabled={applyingId === suggestion.id}
-                        startIcon={applyingId === suggestion.id ? <CircularProgress size={16} /> : <CheckCircleIcon />}
-                        sx={{ minWidth: 70 }}
-                      >
-                        {applyingId === suggestion.id ? t('lyrics.actions.applying') : t('lyrics.actions.use')}
-                      </Button>
-                    }
-                  >
-                    <ListItemText
-                      sx={{ pr: 8 }}
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: 'break-word' }} noWrap>
-                            "{suggestion.track_name}"
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
-                            {t('lyrics.search.byArtist', { artist: suggestion.artist_name })}
-                          </Typography>
-                        </Box>
-                      }
-                      secondary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                          {suggestion.has_synced && (
-                            <Chip label={t('lyrics.tags.synced')} size="small" color="success" sx={{ height: 20 }} />
-                          )}
-                          {suggestion.has_plain && !suggestion.has_synced && (
-                            <Chip label={t('lyrics.tags.plain')} size="small" sx={{ height: 20 }} />
-                          )}
-                          {suggestion.instrumental && (
-                            <Chip label={t('lyrics.tags.instrumental')} size="small" color="info" sx={{ height: 20 }} />
-                          )}
-                          <Typography variant="caption" color="text.secondary">
-                            {formatDuration(suggestion.duration)}
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
+              <LyricsSuggestionList suggestions={suggestions} applyingId={applyingId} onApply={applySuggestion} />
             </Box>
           )}
           

@@ -18,7 +18,7 @@ from audio.serializers_lyrics import (
     LyricsCacheSerializer,
     LRCUploadSerializer,
 )
-from audio.lyrics_service import LyricsService, LRCLIBClient, clean_title_for_lyrics
+from audio.lyrics_service import LyricsService, LRCLIBClient, clean_title_for_lyrics, LRC_TIMESTAMP_PATTERN
 from audio.tasks_lyrics import fetch_lyrics_for_audio, fetch_lyrics_batch
 from common.views import ApiBaseView
 
@@ -44,14 +44,14 @@ def parse_lrc_content(lrc_content: str) -> tuple[str, str, str]:
         
         # Check for metadata tags [key:value]
         meta_match = re.match(r'\[([a-z]{2,}):(.+)\]', line, re.IGNORECASE)
-        if meta_match and not re.match(r'\[\d{2}:\d{2}', line):
+        if meta_match and not re.match(r'\[\d+:\d{2}', line):
             key = meta_match.group(1).lower()
             value = meta_match.group(2).strip()
             metadata[key] = value
             continue
         
         # Check for timestamp lines [mm:ss.xx]text
-        timestamp_match = re.match(r'(\[\d{2}:\d{2}\.\d{2,3}\])(.*)$', line)
+        timestamp_match = re.match(rf'({LRC_TIMESTAMP_PATTERN})(.*)$', line)
         if timestamp_match:
             synced_lines.append(line)
     
@@ -61,7 +61,7 @@ def parse_lrc_content(lrc_content: str) -> tuple[str, str, str]:
     # Generate plain lyrics by stripping timestamps
     plain_lines = []
     for line in synced_lines:
-        text = re.sub(r'\[\d{2}:\d{2}\.\d{2,3}\]', '', line).strip()
+        text = re.sub(LRC_TIMESTAMP_PATTERN, '', line).strip()
         if text:
             plain_lines.append(text)
     plain_lyrics = '\n'.join(plain_lines)
@@ -126,9 +126,10 @@ class LyricsUploadView(ApiBaseView):
             response_serializer = LyricsSerializer(lyrics)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
             
-        except Exception as e:
+        except Exception:
+            logger.warning("[LRC Upload] failed for %s", youtube_id, exc_info=True)
             return Response(
-                {'error': f'Failed to process LRC file: {str(e)}'},
+                {'error': 'Failed to process LRC file'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -190,7 +191,7 @@ class LyricsDownloadView(ApiBaseView):
                 txt_content = lyrics.plain_lyrics
             else:
                 # Strip timestamps from synced lyrics
-                txt_content = re.sub(r'\[\d{2}:\d{2}\.\d{2,3}\]', '', lyrics.synced_lyrics)
+                txt_content = re.sub(LRC_TIMESTAMP_PATTERN, '', lyrics.synced_lyrics)
                 txt_content = '\n'.join(line.strip() for line in txt_content.split('\n') if line.strip())
             
             # Add header

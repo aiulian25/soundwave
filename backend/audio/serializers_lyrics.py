@@ -75,11 +75,11 @@ class LRCUploadSerializer(serializers.Serializer):
             
             # Check if it contains valid LRC timestamps
             import re
-            lrc_pattern = r'\[\d{2}:\d{2}\.\d{2,3}\]'
-            if not re.search(lrc_pattern, content):
+            from audio.lyrics_service import LRC_TIMESTAMP_PATTERN
+            if not re.search(LRC_TIMESTAMP_PATTERN, content):
                 raise serializers.ValidationError(
                     "Invalid LRC file: no valid timestamps found. "
-                    "LRC files must contain timestamps in format [mm:ss.xx]"
+                    "LRC files must contain timestamps in format [mm:ss] or [mm:ss.xx]"
                 )
             
             return value
