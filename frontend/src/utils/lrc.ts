@@ -10,16 +10,13 @@
 export interface LyricsLine {
   time: number;
   text: string;
-  /** Where this line stops: the next line's start, or a short tail for the final line. */
-  endTime?: number;
 }
 
 const LRC_TIMESTAMP = /\[(\d+):(\d{2})(?:\.(\d{1,3}))?\](.*)/;
 const SECONDS_PER_MINUTE = 60;
 const CENTISECONDS_PER_SECOND = 100;
-const TRAILING_LINE_SECONDS = 5;
 
-/** Parse LRC text into time-ordered lines, each annotated with when it ends. */
+/** Parse LRC text into time-ordered lines. */
 export function parseSyncedLyrics(syncedText: string): LyricsLine[] {
   const lines: LyricsLine[] = [];
 
@@ -42,10 +39,7 @@ export function parseSyncedLyrics(syncedText: string): LyricsLine[] {
     });
   }
 
-  const sorted = lines.sort((a, b) => a.time - b.time);
-  for (let i = 0; i < sorted.length; i++) {
-    const isLast = i === sorted.length - 1;
-    sorted[i].endTime = isLast ? sorted[i].time + TRAILING_LINE_SECONDS : sorted[i + 1].time;
-  }
-  return sorted;
+  // Ordering matters: the player finds the active line by scanning backwards for the last
+  // one that has started.
+  return lines.sort((a, b) => a.time - b.time);
 }

@@ -744,6 +744,9 @@ function drawRadialBars(
   const maxLength = Math.min(width, height) * 0.35;
   const numBars = data.length * 2;
 
+  ctx.lineWidth = Math.max(2, (2 * Math.PI * innerRadius) / numBars * 0.6);
+  ctx.lineCap = 'round';
+
   for (let i = 0; i < numBars; i++) {
     const dataIndex = i % data.length;
     const value = data[dataIndex];
@@ -760,8 +763,6 @@ function drawRadialBars(
     barGradient.addColorStop(1, colors[(dataIndex + 1) % colors.length]);
     
     ctx.strokeStyle = barGradient;
-    ctx.lineWidth = Math.max(2, (2 * Math.PI * innerRadius) / numBars * 0.6);
-    ctx.lineCap = 'round';
     ctx.globalAlpha = 0.7 + value * 0.3;
     
     if (showGlow && value > 0.5) {
@@ -773,10 +774,10 @@ function drawRadialBars(
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+    ctx.shadowBlur = 0;
   }
   
   ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
   
   // Draw center circle
   const avgValue = data.reduce((a, b) => a + b, 0) / data.length;

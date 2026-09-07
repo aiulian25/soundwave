@@ -32,7 +32,7 @@ import { useEqualizer } from '../context/EqualizerContext';
 import { useAchievementNotification } from '../context/AchievementNotificationContext';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { useStreamUrl } from '../hooks/useStreamUrl';
-import { audioAPI, statsAPI } from '../api/client';
+import { audioAPI, statsAPI, getCsrfToken } from '../api/client';
 // Code-split: the visualizer (17 theme renderers) loads only when the player is shown.
 const AudioVisualizer = lazy(() => import('./AudioVisualizer'));
 import WaveformSeekBar from './WaveformSeekBar';
@@ -58,6 +58,9 @@ import {
   clearMediaSession,
 } from '../utils/mediaSession';
 import { requestWakeLock, releaseWakeLock } from '../utils/wakeLock';
+
+// Below this position a track is treated as "not really started", so no progress is stored.
+const MINIMUM_SAVEABLE_POSITION_SECONDS = 10;
 
 interface PlayerProps {
   audio: Audio;
@@ -88,7 +91,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const { settings, updateSetting, getExtraSetting } = useSettings();
   const { isRadioMode: radioActive, stopRadio } = useRadio();
   const { timerState: sleepTimerState, getFadeVolume, shouldStop: shouldSleepStop, onSongEnded } = useSleepTimer();
-  const { enabled: eqEnabled, gains: eqGains, connectAudioSource } = useEqualizer();
+  const { enabled: eqEnabled, gains: eqGains } = useEqualizer();
   const { showAchievements } = useAchievementNotification();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -114,6 +117,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [isFavorite, setIsFavorite] = useState(audio.is_favorite || false);
   const [imageLoadError, setImageLoadError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Latest playback position without the re-render cost of state. Read this from
+  // effects and callbacks that only need the value at the moment they run.
+  const currentTimeRef = useRef(0);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -325,6 +331,14 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const lastProgressSaveRef = useRef<number>(0);
   const lastSavedPositionRef = useRef<number>(0);
   
+  // The <audio> element is the source of truth while it is mounted; the ref covers unmount,
+  // when the element may already be detached. Seeks write the element but not the ref, so
+  // reading the element first keeps a save that lands after a seek from storing a stale spot.
+  const readPlaybackPosition = useCallback(
+    () => audioRef.current?.currentTime ?? currentTimeRef.current,
+    []
+  );
+
   const saveProgress = useCallback(async (completed: boolean = false) => {
     // Skip if offline - will sync when back online
     if (!navigator.onLine) {
@@ -334,7 +348,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     
     if (!audio.youtube_id) return;
     
-    const position = Math.floor(currentTime);
+    const position = Math.floor(readPlaybackPosition());
     // Only save if position has changed by at least 10 seconds (increased from 5s)
     if (!completed && Math.abs(position - lastSavedPositionRef.current) < 10) return;
     
@@ -349,7 +363,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       // Silently fail - progress save is best effort
       console.debug('[Player] Progress save failed:', error);
     }
-  }, [audio.youtube_id, currentTime]);
+  }, [audio.youtube_id, readPlaybackPosition]);
   
   // Periodic progress save while playing
   // Network-aware: only save when online and at reduced frequency
@@ -368,32 +382,40 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   
   // Save progress when pausing (only if online)
   useEffect(() => {
-    if (!isPlaying && currentTime > 10 && audio.youtube_id && navigator.onLine) {
+    if (!isPlaying && readPlaybackPosition() > MINIMUM_SAVEABLE_POSITION_SECONDS && audio.youtube_id && navigator.onLine) {
       saveProgress(false);
     }
-  }, [isPlaying, currentTime, audio.youtube_id, saveProgress]);
+  }, [isPlaying, audio.youtube_id, saveProgress, readPlaybackPosition]);
   
-  // Save progress when track changes or unmounts (only if online)
+  // Save progress when the track changes or the player unmounts (only if online).
+  // Deliberately does NOT depend on currentTime: a cleanup re-runs on every dependency
+  // change, so listing it here fired this request on every timeupdate event.
   useEffect(() => {
     return () => {
       // Skip save if offline
       if (!navigator.onLine) return;
-      
-      if (currentTime > 10 && audio.youtube_id) {
-        // Use synchronous approach for unmount
-        const position = Math.floor(currentTime);
+
+      // The element is ground truth while it is still attached; the ref covers unmount,
+      // when the element may already be gone.
+      const elapsedSeconds = audioRef.current?.currentTime ?? currentTimeRef.current;
+
+      if (elapsedSeconds > MINIMUM_SAVEABLE_POSITION_SECONDS && audio.youtube_id) {
+        // Raw fetch rather than the axios client: keepalive lets the request outlive the
+        // page, which is the whole point of saving here. That bypasses the client's
+        // interceptor, so the CSRF token has to be attached by hand.
         fetch(`/api/audio/${audio.youtube_id}/progress/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken() || '',
           },
           credentials: 'include',
-          body: JSON.stringify({ position, completed: false }),
+          body: JSON.stringify({ position: Math.floor(elapsedSeconds), completed: false }),
           keepalive: true,
         }).catch(() => {});
       }
     };
-  }, [audio.youtube_id, currentTime]);
+  }, [audio.youtube_id]);
 
 
   // Initialize Media Session API with artwork
@@ -539,17 +561,28 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     };
   }, []);
 
-  // Wake Lock - Prevent screen sleep during audio playback (critical for mobile)
-  // This prevents the system from suspending the page and stopping audio after a few songs
+  // Wake Lock — only while it is actually needed.
+  //
+  // Audio routed through Web Audio is suspended by the browser when the page is hidden, so a
+  // graph means the screen has to stay awake. Plain <audio> playback uses the OS media path and
+  // keeps going with the screen off, so holding the lock there just burns the display and GPU
+  // for the whole session.
+  //
+  // Gated on graphReady (a graph EXISTS) rather than wantsAudioGraph (the user wants one): after
+  // Step 5's lazy build those diverge when the visualizer is switched off mid-session, and the
+  // graph outlives the setting. Releasing the lock while the graph is live would stop playback
+  // as soon as the screen slept.
+  const keepScreenOn = getExtraSetting('keep_screen_on', false) === true;
+
   useEffect(() => {
-    if (isPlaying && !loadingStream) {
+    if (isPlaying && !loadingStream && (graphReady || keepScreenOn)) {
       // Request wake lock when playing
       requestWakeLock().catch(() => {
         // Wake lock request can fail on some devices, but audio will still play
         // (just might stop if screen turns off)
       });
     } else {
-      // Release wake lock when not playing
+      // Release wake lock when not needed
       releaseWakeLock();
     }
     
@@ -557,11 +590,24 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     return () => {
       releaseWakeLock();
     };
-  }, [isPlaying, loadingStream]);
+  }, [isPlaying, loadingStream, graphReady, keepScreenOn]);
+
+  // Only the visualizer and the equalizer need the Web Audio graph. Routing audio through
+  // createMediaElementSource takes it off the platform's native media path — which costs
+  // continuous DSP (ten biquads, an analyser) and makes the browser suspend playback when the
+  // page is hidden. With both features off we never build it, and the <audio> element keeps
+  // using the OS pipeline.
+  //
+  // Built lazily rather than torn down on toggle: createMediaElementSource can only be called
+  // once per element and a connected element can never return to native output, so "off" after
+  // "on" would require remounting <audio> — an audible gap mid-track, and a rebuild hazard.
+  // Enabling either feature builds the graph at that moment; disabling it leaves the graph in
+  // place until the player is closed, and the next session starts native again.
+  const wantsAudioGraph = settings.visualizer_enabled || eqEnabled;
 
   // Initialize Web Audio API for visualizer and EQ - optimized for performance
   useEffect(() => {
-    if (!audioRef.current || !streamUrl) return;
+    if (!audioRef.current || !streamUrl || !wantsAudioGraph) return;
     let cancelled = false;
 
     // Create audio context, EQ filters, and analyser - deferred to avoid blocking
@@ -633,7 +679,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     return () => {
       cancelled = true;
     };
-  }, [streamUrl]);
+  }, [streamUrl, wantsAudioGraph]);
 
   // Read the latest 16 visualizer bars straight from the analyser. Passed to
   // <AudioVisualizer>, which calls it inside its own canvas RAF — so the Player no
@@ -771,6 +817,19 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     }
   }, [streamUrl]);
 
+  // Publish the position to the OS media controller. Called on state changes only —
+  // seek, play, pause and canplay — because the Media Session spec interpolates between
+  // calls from playbackRate. Doing this per timeupdate was one IPC per tick for nothing.
+  const publishPositionState = useCallback(() => {
+    const element = audioRef.current;
+    if (!element) return;
+    setPositionState({
+      duration: audio.duration,
+      playbackRate: element.playbackRate,
+      position: element.currentTime,
+    });
+  }, [audio.duration]);
+
   // Handle play/pause state
   useEffect(() => {
     // Skip if we're currently seeking or loading
@@ -791,6 +850,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               playPromise
                 .then(() => {
                   setPlaybackState('playing');
+                  publishPositionState();
                 })
                 .catch(err => {
                   console.error('Playback failed:', err);
@@ -804,29 +864,30 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           if (!audioRef.current.paused) {
             audioRef.current.pause();
             setPlaybackState('paused');
+            publishPositionState();
           }
         }
       }
     }
-  }, [isPlaying, setIsPlaying, loadingStream, streamUrl]);
+  }, [isPlaying, setIsPlaying, loadingStream, streamUrl, publishPositionState]);
 
   const handleTimeUpdate = useCallback(() => {
     // Don't update time display while user is seeking
     if (audioRef.current && !isSeeking.current) {
       const time = audioRef.current.currentTime;
+      currentTimeRef.current = time;
       setCurrentTime(time);
       
-      // Notify parent for cross-device sync (throttled in parent)
+      // Hand the position to App for cross-device sync. App stores it in a ref, so
+      // this does not re-render the app tree.
       onTimeUpdate?.(time);
-      
-      // Update Media Session position state
-      setPositionState({
-        duration: audio.duration,
-        playbackRate: audioRef.current.playbackRate,
-        position: time,
-      });
     }
-  }, [audio.duration]);
+  }, [onTimeUpdate]);
+
+  const handleCanPlay = useCallback(() => {
+    setIsBuffering(false);
+    publishPositionState();
+  }, [publishPositionState]);
 
   const handleSeekChange = useCallback((_: Event | null, value: number | number[]) => {
     // Block time updates during drag
@@ -869,7 +930,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const handleSeeked = useCallback(() => {
     // Called when the audio element completes seeking - now it's safe to update from time events
     isSeeking.current = false;
-  }, []);
+    publishPositionState();
+  }, [publishPositionState]);
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -935,6 +997,33 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     updateSetting('visualizer_theme', visualizerThemes[nextIndex].id);
   }, [settings.visualizer_theme, updateSetting]);
 
+  // Handed to memoized children: an inline arrow would be a fresh identity on every
+  // render, so their shallow prop comparison could never bail out.
+  const handleWaveformSeek = useCallback((time: number) => handleSeekChange(null, time), [handleSeekChange]);
+  const handleWaveformSeekCommitted = useCallback((time: number) => handleSeekCommitted(null, time), [handleSeekCommitted]);
+
+  const handleQueueDrawerClose = useCallback(() => setShowQueueDrawer(false), []);
+  const handleQueuePlayTrack = useCallback((index: number) => {
+    onPlayQueueTrack?.(index);
+    setShowQueueDrawer(false);
+  }, [onPlayQueueTrack]);
+  const handleQueueRemoveTrack = useCallback((index: number) => onRemoveFromQueue?.(index), [onRemoveFromQueue]);
+  const handleQueueReorderTrack = useCallback((from: number, to: number) => onQueueReorder?.(from, to), [onQueueReorder]);
+  const handleQueueClear = useCallback(() => {
+    onClearQueue?.();
+    setShowQueueDrawer(false);
+  }, [onClearQueue]);
+
+  const handleLyricsClose = useCallback(() => setShowLyrics(false), []);
+  const handleLyricsSeek = useCallback((time: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      // Keep the ref aligned with the element so a save landing after this seek is accurate.
+      currentTimeRef.current = time;
+      setCurrentTime(time);
+    }
+  }, []);
+
   // Visualizer component with AudioVisualizer and theme support
   const VisualizerComponent = useMemo(() => {
     if (!settings.visualizer_enabled) {
@@ -962,7 +1051,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             isPlaying={isPlaying}
             themeId={settings.visualizer_theme}
             height={120}
-            showGlow={settings.visualizer_glow}
+            // Canvas shadow blur is a Gaussian pass per stroke and disproportionately
+            // expensive on phone GPUs, so the glow is skipped on small screens.
+            showGlow={settings.visualizer_glow && !isMobile}
           />
         </Suspense>
       </Box>
@@ -1029,7 +1120,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             backgroundPosition: 'center',
             filter: 'blur(60px)',
             opacity: 0.3,
+            // Overscan so the blur's faded edges fall outside the viewport.
             transform: 'scale(1.5)',
+            // Promote to its own compositor layer. Nothing here animates, but the glow layer
+            // directly above rewrites its opacity every frame; without promotion that dirties
+            // this one and re-runs a full-screen Gaussian each time. Promoted, the blur is
+            // rasterized once per artwork change and thereafter only composited.
+            willChange: 'transform',
           }}
         />
       </Box>
@@ -1056,7 +1153,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             onTimeUpdate={handleTimeUpdate}
             onSeeked={handleSeeked}
             onWaiting={() => setIsBuffering(true)}
-            onCanPlay={() => setIsBuffering(false)}
+            onCanPlay={handleCanPlay}
             onPlaying={() => setIsBuffering(false)}
             onStalled={() => {
               console.warn('[Player] Audio stalled');
@@ -1132,11 +1229,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                 cursor: audio.youtube_id ? 'pointer' : 'default',
                 transition: 'all 0.3s ease',
                 position: 'relative',
-                overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                animation: isPlaying ? 'album-pulse 2s ease-in-out infinite' : 'none',
                 '&:hover': audio.youtube_id ? {
                   transform: 'scale(1.05) rotate(2deg)',
                   boxShadow: (theme) => theme.palette.mode === 'dark'
@@ -1153,13 +1248,22 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                   alignItems: 'center',
                   justifyContent: 'center',
                 } : {},
-                '@keyframes album-pulse': {
-                  '0%, 100%': { 
-                    boxShadow: '0 8px 32px rgba(19, 236, 106, 0.4), 0 0 60px rgba(19, 236, 106, 0.2)',
-                  },
-                  '50%': { 
-                    boxShadow: '0 8px 32px rgba(19, 236, 106, 0.6), 0 0 80px rgba(19, 236, 106, 0.4)',
-                  },
+                // Compositor-only pulse: both shadows are painted once and only this layer's
+                // opacity animates. Animating box-shadow itself repainted a large blurred
+                // region every frame.
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: 'inherit',
+                  boxShadow: '0 8px 32px rgba(19, 236, 106, 0.6), 0 0 80px rgba(19, 236, 106, 0.4)',
+                  opacity: 0,
+                  animation: isPlaying ? 'album-glow 2s ease-in-out infinite' : 'none',
+                  pointerEvents: 'none',
+                },
+                '@keyframes album-glow': {
+                  '0%, 100%': { opacity: 0 },
+                  '50%': { opacity: 1 },
                 },
               }}
               title={audio.youtube_id ? t('player.toggleLyrics') : t('player.lyricsNotAvailableLocal')}
@@ -1174,6 +1278,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                   objectFit: 'cover',
                   position: 'absolute',
                   inset: 0,
+                  // The parent dropped overflow:hidden (it clipped the glow), so the artwork
+                  // rounds its own corners to match.
+                  borderRadius: 'inherit',
                 }}
                 onError={() => setImageLoadError(true)}
               />
@@ -1202,19 +1309,28 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                 boxShadow: isPlaying 
                   ? '0 8px 32px rgba(19, 236, 106, 0.4), 0 0 60px rgba(19, 236, 106, 0.2)'
                   : '0 8px 32px rgba(0, 0, 0, 0.4)',
-                animation: isPlaying ? 'album-pulse 2s ease-in-out infinite' : 'none',
                 transition: 'all 0.3s ease',
+                position: 'relative',
                 '&:hover': audio.youtube_id ? {
                   transform: 'scale(1.05)',
                   bgcolor: 'rgba(19, 236, 106, 0.2)',
                 } : {},
-                '@keyframes album-pulse': {
-                  '0%, 100%': { 
-                    boxShadow: '0 8px 32px rgba(19, 236, 106, 0.4), 0 0 60px rgba(19, 236, 106, 0.2)',
-                  },
-                  '50%': { 
-                    boxShadow: '0 8px 32px rgba(19, 236, 106, 0.6), 0 0 80px rgba(19, 236, 106, 0.4)',
-                  },
+                // Compositor-only pulse: both shadows are painted once and only this layer's
+                // opacity animates. Animating box-shadow itself repainted a large blurred
+                // region every frame.
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: 'inherit',
+                  boxShadow: '0 8px 32px rgba(19, 236, 106, 0.6), 0 0 80px rgba(19, 236, 106, 0.4)',
+                  opacity: 0,
+                  animation: isPlaying ? 'album-glow 2s ease-in-out infinite' : 'none',
+                  pointerEvents: 'none',
+                },
+                '@keyframes album-glow': {
+                  '0%, 100%': { opacity: 0 },
+                  '50%': { opacity: 1 },
                 },
               }}
               title={audio.youtube_id ? t('player.toggleLyrics') : t('player.lyricsNotAvailableLocal')}
@@ -1450,11 +1566,10 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* Waveform Progress Bar */}
           <WaveformSeekBar
-            audioElement={audioRef.current}
             currentTime={currentTime}
             duration={audio.duration}
-            onSeek={(time) => handleSeekChange(null, time)}
-            onSeekCommitted={(time) => handleSeekCommitted(null, time)}
+            onSeek={handleWaveformSeek}
+            onSeekCommitted={handleWaveformSeekCommitted}
             streamUrl={streamUrl}
             chapters={chapters}
           />
@@ -1707,10 +1822,11 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               sx={{
                 position: 'absolute',
                 inset: 0,
+                // No backdropFilter: at this opacity the blur is invisible, but it would be
+                // recomputed every frame because the visualizer behind it repaints continuously.
                 bgcolor: (theme) => theme.palette.mode === 'dark' 
                   ? 'rgba(0, 0, 0, 0.95)' 
                   : 'rgba(255, 255, 255, 0.98)',
-                backdropFilter: 'blur(10px)',
                 zIndex: 20,
                 overflow: 'auto',
                 display: 'flex',
@@ -1749,8 +1865,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             sx={{
               position: 'absolute',
               inset: 0,
+              // See the related-tracks overlay above: invisible at this opacity, recomputed
+              // every frame because the player behind it animates.
               bgcolor: 'rgba(0, 0, 0, 0.95)',
-              backdropFilter: 'blur(10px)',
               zIndex: 20,
               overflow: 'auto',
             }}
@@ -1758,7 +1875,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             <LyricsPlayer
               youtubeId={audio.youtube_id}
               currentTime={currentTime}
-              onClose={() => setShowLyrics(false)}
+              onClose={handleLyricsClose}
               embedded={true}
               visualizerTheme={settings.visualizer_theme}
               isLightMode={theme.palette.mode === 'light'}
@@ -1766,12 +1883,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               viewCount={currentAudioData.view_count}
               likeCount={currentAudioData.like_count}
               publishedDate={currentAudioData.published_date}
-              onSeek={(time) => {
-                if (audioRef.current) {
-                  audioRef.current.currentTime = time;
-                  setCurrentTime(time);
-                }
-              }}
+              onSeek={handleLyricsSeek}
             />
           </Box>
         </Fade>
@@ -1814,19 +1926,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       {/* Queue Drawer */}
       <QueueDrawer
         open={showQueueDrawer}
-        onClose={() => setShowQueueDrawer(false)}
+        onClose={handleQueueDrawerClose}
         queue={queue}
         currentIndex={currentQueueIndex}
-        onPlayTrack={(index) => {
-          onPlayQueueTrack?.(index);
-          setShowQueueDrawer(false);
-        }}
-        onRemoveTrack={(index) => onRemoveFromQueue?.(index)}
-        onReorderTrack={(from, to) => onQueueReorder?.(from, to)}
-        onClearQueue={() => {
-          onClearQueue?.();
-          setShowQueueDrawer(false);
-        }}
+        onPlayTrack={handleQueuePlayTrack}
+        onRemoveTrack={handleQueueRemoveTrack}
+        onReorderTrack={handleQueueReorderTrack}
+        onClearQueue={handleQueueClear}
       />
 
       {/* Equalizer Dialog */}

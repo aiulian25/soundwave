@@ -52,7 +52,9 @@ function App() {
   const [playerMinimized, setPlayerMinimized] = useState(false);
   const [queue, setQueue] = useState<Audio[]>([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);  // For playback sync
+  // Playback position for the sync effects below. A ref, not state: the position
+  // changes several times a second and nothing in App's render output uses it.
+  const currentTimeRef = useRef(0);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
   const navigate = useNavigate();
@@ -213,7 +215,7 @@ function App() {
       try {
         await playbackSyncAPI.syncPlayback({
           youtube_id: currentAudio.youtube_id,
-          position: currentTime,
+          position: currentTimeRef.current,
           duration: currentAudio.duration,
           is_playing: isPlaying,
           volume: settingsContext?.settings?.volume ?? 100,
@@ -248,7 +250,7 @@ function App() {
         syncIntervalRef.current = null;
       }
     };
-  }, [isAuthenticated, currentAudio?.youtube_id, currentAudio?.duration, isPlaying, currentTime, queue, currentQueueIndex, settingsContext?.settings?.volume, settingsContext?.settings?.playback_sync_enabled]);
+  }, [isAuthenticated, currentAudio?.youtube_id, currentAudio?.duration, isPlaying, queue, currentQueueIndex, settingsContext?.settings?.volume, settingsContext?.settings?.playback_sync_enabled]);
 
   // Sync when pausing (important for resume) - only when online and sync is enabled
   useEffect(() => {
@@ -261,7 +263,7 @@ function App() {
     if (!navigator.onLine) return;
 
     // When pausing, sync after a short delay (non-blocking)
-    if (!isPlaying && currentTime > 0 && currentAudio?.youtube_id) {
+    if (!isPlaying && currentTimeRef.current > 0 && currentAudio?.youtube_id) {
       // Debounce pause sync - only sync if still paused after 2 seconds
       const youtubeId = currentAudio.youtube_id; // Capture for closure
       const timeoutId = setTimeout(() => {
@@ -280,7 +282,7 @@ function App() {
 
         playbackSyncAPI.syncPlayback({
           youtube_id: youtubeId,
-          position: currentTime,
+          position: currentTimeRef.current,
           duration: currentAudio.duration,
           is_playing: false,
           volume: settingsContext?.settings?.volume ?? 100,
@@ -295,9 +297,10 @@ function App() {
     }
   }, [isPlaying]);
 
-  // Update current time from Player (via callback)
+  // Update current time from Player (via callback). Writing a ref rather than state
+  // keeps the whole App tree from reconciling on every timeupdate event.
   const handleTimeUpdate = useCallback((time: number) => {
-    setCurrentTime(time);
+    currentTimeRef.current = time;
   }, []);
 
   // Handle favorite toggle from player

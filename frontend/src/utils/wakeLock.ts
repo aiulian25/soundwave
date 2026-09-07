@@ -1,11 +1,14 @@
 /**
- * Wake Lock API utility for preventing screen sleep during audio playback
- * 
- * This is critical for mobile devices where the system suspends the page
- * when the screen turns off, which stops audio playback after a few songs.
- * 
- * The Wake Lock API keeps the screen awake while audio is playing,
- * preventing the system from suspending the audio context.
+ * Wake Lock API utility for keeping the screen awake during playback.
+ *
+ * Only needed while audio is routed through Web Audio (the visualizer or equalizer is on),
+ * because browsers suspend an AudioContext when the page is hidden. Plain <audio> playback
+ * uses the platform's media pipeline and keeps going with the screen off, so the lock is NOT
+ * requested in that case — holding it would keep the display and GPU powered for the whole
+ * listening session.
+ *
+ * Also honoured when the user opts in via the `keep_screen_on` setting (e.g. to read lyrics),
+ * which is off by default.
  */
 
 class WakeLockManager {

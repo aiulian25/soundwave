@@ -9,7 +9,7 @@
  * - Currently playing highlight
  */
 
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import {
   Box,
   Drawer,
@@ -40,6 +40,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import type { Audio } from '../types';
+import ScrollingText from './ScrollingText';
 
 interface QueueDrawerProps {
   open: boolean;
@@ -60,7 +61,7 @@ const formatDuration = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-export default function QueueDrawer({
+function QueueDrawer({
   open,
   onClose,
   queue,
@@ -220,16 +221,15 @@ export default function QueueDrawer({
         </ListItemAvatar>
         <ListItemText
           primary={
-            <Typography
+            <ScrollingText
               variant="body2"
-              noWrap
               sx={{
                 fontWeight: isCurrentTrack ? 600 : 400,
                 color: isCurrentTrack ? 'primary.main' : 'text.primary',
               }}
             >
               {track.title}
-            </Typography>
+            </ScrollingText>
           }
           secondary={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -408,3 +408,7 @@ function formatTotalDuration(tracks: Audio[], t: (key: string, options?: any) =>
   }
   return t('queueDrawer.footer.durationMinutes', { minutes: mins });
 }
+
+/* Memoized: Player re-renders on every timeupdate while music plays. The props below
+   are stabilised at the call site, so this bails out on renders that do not concern it. */
+export default memo(QueueDrawer);

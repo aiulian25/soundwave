@@ -1862,7 +1862,7 @@
       }
     },
     "sonic": {
-      "featuresPending": "Analiza acustica inca ruleaza \u2014 folosim similaritate dupa artist/titlu deocamdata"
+      "featuresPending": "Analiza acustica inca ruleaza — folosim similaritate dupa artist/titlu deocamdata"
     }
   },
   "pwa": {
@@ -1909,7 +1909,8 @@
       "description": "Alege un stil de vizualizare pentru playerul audio. Temele diferite ofera animatii si scheme de culori unice.",
       "enableLabel": "Activeaza vizualizatorul",
       "glowLabel": "Activeaza efectul de stralucire",
-      "themeSection": "Tema vizualizatorului"
+      "themeSection": "Tema vizualizatorului",
+      "glowHint": "Ignorat pe ecrane mici, unde efectul consumă mult din procesorul grafic și baterie."
     },
     "twoFactor": {
       "title": "Autentificare in doi pasi",
@@ -2015,7 +2016,9 @@
         "maxSize": "Dimensiune maxima",
         "clearing": "Se goleste...",
         "clearButton": "Goleste cache-ul"
-      }
+      },
+      "keepScreenOn": "Menține ecranul aprins în timpul redării",
+      "keepScreenOnHint": "Consumă mai multă baterie. Dezactivat implicit; ecranul se poate stinge și muzica continuă."
     },
     "downloadQuality": {
       "title": "Calitate descarcare",

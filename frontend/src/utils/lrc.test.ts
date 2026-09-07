@@ -40,21 +40,12 @@ describe('parseSyncedLyrics', () => {
     });
   });
 
-  describe('ordering and end times', () => {
+  describe('ordering', () => {
     it('sorts out-of-order lines by time', () => {
       const parsed = parseSyncedLyrics('[00:09.00]second\n[00:03.00]first');
       expect(parsed.map((line) => line.text)).toEqual(['first', 'second']);
     });
 
-    it('ends each line where the next begins', () => {
-      const parsed = parseSyncedLyrics('[00:03.00]first\n[00:09.00]second');
-      expect(parsed[0].endTime).toBeCloseTo(9);
-    });
-
-    it('gives the final line a short tail', () => {
-      const parsed = parseSyncedLyrics('[00:03.00]only');
-      expect(parsed[0].endTime).toBeCloseTo(8);
-    });
 
     it('trims surrounding whitespace from the text', () => {
       expect(parseSyncedLyrics('[00:01.00]   alpha   ')[0].text).toBe('alpha');

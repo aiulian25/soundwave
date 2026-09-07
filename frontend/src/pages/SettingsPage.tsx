@@ -105,7 +105,7 @@ export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { themeMode, setThemeMode } = useThemeContext();
-  const { settings, updateSetting, updateExtraSetting } = useSettings();
+  const { settings, updateSetting, updateExtraSetting, getExtraSetting } = useSettings();
   const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus>({ enabled: false, backup_codes_count: 0 });
   const [setupDialogOpen, setSetupDialogOpen] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
@@ -426,8 +426,11 @@ export default function SettingsPage() {
                   />
                 }
                 label={<Typography variant="body2">{t('settings.visualizer.glowLabel')}</Typography>}
-                sx={{ mb: 2, display: 'block' }}
+                sx={{ display: 'block' }}
               />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, mb: 2, display: 'block' }}>
+                {t('settings.visualizer.glowHint')}
+              </Typography>
 
               <Typography variant="body2" fontWeight={500} sx={{ mb: 1.5 }}>
                 {t('settings.visualizer.themeSection')}
@@ -680,6 +683,21 @@ export default function SettingsPage() {
             label={<Typography variant="body2">{t('settings.playback.autoplayLabel')}</Typography>}
             sx={{ mb: 2, display: 'block' }}
           />
+
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={getExtraSetting('keep_screen_on', false) === true}
+                onChange={(e) => updateExtraSetting('keep_screen_on', e.target.checked)}
+              />
+            }
+            label={<Typography variant="body2">{t('settings.playback.keepScreenOn')}</Typography>}
+            sx={{ display: 'block' }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, mb: 2, display: 'block' }}>
+            {t('settings.playback.keepScreenOnHint')}
+          </Typography>
 
           {/* Smart Shuffle Section */}
           <Box sx={{ mb: 3 }}>

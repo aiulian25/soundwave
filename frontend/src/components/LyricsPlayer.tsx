@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import {
   Box,
   Card,
@@ -85,7 +85,7 @@ interface LyricsPlayerProps {
   publishedDate?: string;
 }
 
-export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek, visualizerTheme, isLightMode, description, viewCount, likeCount, publishedDate }: LyricsPlayerProps) {
+function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek, visualizerTheme, isLightMode, description, viewCount, likeCount, publishedDate }: LyricsPlayerProps) {
   const { t } = useTranslation();
   // Get settings and theme for automatic detection
   const { settings } = useSettings();
@@ -102,7 +102,6 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
   const [error, setError] = useState('');
   const [parsedLyrics, setParsedLyrics] = useState<LyricsLine[]>([]);
   const [currentLineIndex, setCurrentLineIndex] = useState(-1);
-  const [lineProgress, setLineProgress] = useState(0); // Progress through current line (0-1)
   const [autoScroll, setAutoScroll] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   
@@ -426,24 +425,9 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
         break;
       }
     }
+    // Setting the same index is a no-op for React, so on the great majority of ticks this
+    // does not re-render the lyrics list at all.
     setCurrentLineIndex(index);
-    
-    // Calculate progress through current line for karaoke effect
-    if (index >= 0 && index < parsedLyrics.length) {
-      const line = parsedLyrics[index];
-      const lineStart = line.time;
-      const lineEnd = line.endTime || (index < parsedLyrics.length - 1 ? parsedLyrics[index + 1].time : lineStart + 5);
-      const lineDuration = lineEnd - lineStart;
-      
-      if (lineDuration > 0) {
-        const progress = Math.min(1, Math.max(0, (currentTime - lineStart) / lineDuration));
-        setLineProgress(progress);
-      } else {
-        setLineProgress(1);
-      }
-    } else {
-      setLineProgress(0);
-    }
   };
 
   const trackHasDetails = hasTrackDetails({ description, viewCount, likeCount, publishedDate });
@@ -966,45 +950,22 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
                 >
                   {isCurrentLine ? (
                     // Full line highlighting for current line with theme-colored gradient
-                    <Box sx={{ position: 'relative', overflow: 'hidden' }}>
-                      {/* Fully highlighted current line */}
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          fontSize: '1.3rem',
-                          fontWeight: 700,
-                          lineHeight: 1.6,
-                          letterSpacing: '0.02em',
-                          background: `linear-gradient(135deg, ${themeColors.gradientStart} 0%, ${themeColors.gradientMid} 50%, ${themeColors.gradientEnd} 100%)`,
-                          backgroundClip: 'text',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          filter: `drop-shadow(0 0 8px ${themeColors.glow})`,
-                          animation: 'lyricsPulse 2s ease-in-out infinite',
-                          '@keyframes lyricsPulse': {
-                            '0%, 100%': { filter: `drop-shadow(0 0 8px ${themeColors.glow})` },
-                            '50%': { filter: `drop-shadow(0 0 15px ${themeColors.glow})` },
-                          },
-                        }}
-                      >
-                        {line.text}
-                      </Typography>
-                      
-                      {/* Progress bar under the line */}
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          bottom: -6,
-                          left: 0,
-                          height: 3,
-                          borderRadius: 1.5,
-                          background: `linear-gradient(90deg, ${themeColors.gradientStart}, ${themeColors.gradientMid}, ${themeColors.gradientEnd})`,
-                          width: `${lineProgress * 100}%`,
-                          transition: 'width 0.1s linear',
-                          boxShadow: `0 0 12px ${themeColors.glow}, 0 0 4px ${themeColors.primary}`,
-                        }}
-                      />
-                    </Box>
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        fontSize: '1.3rem',
+                        fontWeight: 700,
+                        lineHeight: 1.6,
+                        letterSpacing: '0.02em',
+                        background: `linear-gradient(135deg, ${themeColors.gradientStart} 0%, ${themeColors.gradientMid} 50%, ${themeColors.gradientEnd} 100%)`,
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        filter: `drop-shadow(0 0 8px ${themeColors.glow})`,
+                      }}
+                    >
+                      {line.text}
+                    </Typography>
                   ) : (
                     // Non-current lines - use theme-aware colors with smooth transitions
                     <Typography
@@ -1060,3 +1021,7 @@ export default function LyricsPlayer({ youtubeId, currentTime, onClose, embedded
     </Card>
   );
 }
+
+/* Memoized: Player re-renders on every timeupdate while music plays. The props below
+   are stabilised at the call site, so this bails out on renders that do not concern it. */
+export default memo(LyricsPlayer);
