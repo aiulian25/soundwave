@@ -26,6 +26,11 @@ from audio.radio_features import (
 import random
 import re
 
+# Title-similarity heuristic: each keyword adds another `title ILIKE '%kw%'` term to an
+# OR that no B-tree index can serve, so every extra keyword multiplies the scan cost while
+# adding little relevance. Three is the point of diminishing returns.
+TITLE_KEYWORD_LIMIT = 3
+
 
 class RadioStartView(ApiBaseView):
     """Start a new radio session"""
@@ -114,11 +119,19 @@ class RadioStartView(ApiBaseView):
                 session.save()
         
         session_data = RadioSessionSerializer(session).data
-        
+
+        # Sonic ranking needs the seed's acoustic feature vector. Without it the mode
+        # degrades to metadata similarity, so say so instead of silently playing something
+        # the user did not ask for.
+        features_ready = True
+        if mode == 'sonic' and seed_youtube_id:
+            features_ready = bool(seed_audio.feature_vector)
+
         return Response({
             'message': 'Radio started',
             'session': session_data,
             'first_track': AudioSerializer(first_track).data if first_track else None,
+            'features_ready': features_ready,
         })
     
     def _get_first_track_for_mode(self, user, mode, seed_channel_id=None, curve=''):
@@ -140,7 +153,14 @@ class RadioStartView(ApiBaseView):
                 owner=user
             ).order_by('-downloaded_date').first()
         elif mode == 'autodj':
-            pool = list(Audio.objects.filter(owner=user).exclude(energy__isnull=True)[:CANDIDATE_POOL_LIMIT])
+            # Same skip filter the next-track path applies: opening a session with a track the
+            # user has repeatedly skipped contradicts the rest of the curve.
+            skip_ids = high_skip_youtube_ids(user)
+            pool = [
+                track
+                for track in Audio.objects.filter(owner=user).exclude(energy__isnull=True)[:CANDIDATE_POOL_LIMIT]
+                if track.youtube_id not in skip_ids
+            ]
             if pool:
                 target = energy_target(curve or DEFAULT_CURVE, 0.0)
                 ranked = nearest_by_energy(target, pool)
@@ -303,8 +323,11 @@ class RadioNextTrackView(ApiBaseView):
             except Audio.DoesNotExist:
                 pass
 
+        # No acoustic seed yet (features not extracted/backfilled): degrade to the metadata
+        # heuristics rather than falling through to the random fallback, which plays
+        # unrelated genres under a "Sonic" label.
         if not seed_audio or not seed_audio.feature_vector:
-            return candidates, reasons  # no acoustic seed -> fall through to random fallback
+            return self._get_track_mode_candidates(user, session, base_qs, variety)
 
         # Narrow the pool to the tracks closest in energy FIRST (DB-side), so a library larger
         # than the cap is not sliced arbitrarily by publish date before the in-memory ranking.
@@ -321,6 +344,10 @@ class RadioNextTrackView(ApiBaseView):
             seed_channel_id=seed_audio.channel_id,
             seed_genre=seed_audio.genre,
         )
+        # Nothing in the library carries a comparable vector yet -> same degradation.
+        if not ranked:
+            return self._get_track_mode_candidates(user, session, base_qs, variety)
+
         # Keep the near-neighbour window tight so the weighted pick stays acoustically close.
         window = 3 + int(variety * 4)
         for track in ranked[:window]:
@@ -525,7 +552,7 @@ class RadioNextTrackView(ApiBaseView):
         
         # Build Q objects
         q_objects = Q()
-        for keyword in keywords[:4]:
+        for keyword in keywords[:TITLE_KEYWORD_LIMIT]:
             q_objects |= Q(title__icontains=keyword)
         
         return queryset.filter(q_objects)

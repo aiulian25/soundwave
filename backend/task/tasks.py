@@ -3,6 +3,7 @@
 from celery import shared_task
 import yt_dlp
 from audio.models import Audio
+from audio.radio_features import RADIO_FEEDBACK_RETENTION_DAYS
 from channel.models import Channel
 from download.models import DownloadQueue
 from datetime import datetime, timedelta
@@ -10,6 +11,7 @@ from django.utils import timezone
 from django.db.models import Q
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
+from importlib.util import find_spec
 import os
 import logging
 
@@ -213,6 +215,49 @@ def extract_features_task(audio_id):
     audio.feature_vector = [round(v, 5) for v in build_feature_vector(energy, bpm, centroid, zcr, rolloff, key_index)]
     audio.save(update_fields=['bpm', 'music_key', 'energy', 'feature_vector'])
     return f"Extracted features for {audio_id}: key={audio.music_key} bpm={audio.bpm} energy={audio.energy}"
+
+
+@shared_task
+def backfill_missing_features_task(limit=200):
+    """Enqueue sonic feature extraction for downloaded tracks that have no feature_vector (F16).
+
+    Extraction otherwise only fires post-download, so a library predating F16 never gets
+    vectors and Sonic/Auto-DJ stay on the metadata fallback.
+
+    Skips entirely when the DSP stack is absent: extract_features_task returns early on
+    ImportError WITHOUT writing a vector, so those tracks stay in this queryset and every
+    run would re-enqueue the same ones forever. find_spec avoids paying librosa's (slow)
+    import cost just to test availability.
+    """
+    if find_spec('librosa') is None:
+        logger.warning("librosa unavailable; skipping sonic feature backfill")
+        return "librosa unavailable; skipped feature backfill"
+
+    audio_ids = list(
+        Audio.objects.exclude(file_path='').exclude(file_path__isnull=True)
+        .filter(feature_vector=[])
+        .order_by('-downloaded_date')
+        .values_list('id', flat=True)[:limit]
+    )
+    for audio_id in audio_ids:
+        extract_features_task.delay(audio_id)
+    return f"Enqueued {len(audio_ids)} feature extractions"
+
+
+@shared_task
+def prune_radio_feedback_task(days=RADIO_FEEDBACK_RETENTION_DAYS):
+    """Delete RadioTrackFeedback rows past the retention window (F16).
+
+    The table gains a row per skip/like and is aggregated on every Auto-DJ next-track via
+    high_skip_youtube_ids, so unbounded growth shows up as next-track latency. Nothing
+    references this model, so the delete takes Django's fast single-statement path.
+    Channel preferences live on RadioSession and are unaffected.
+    """
+    from audio.models_radio import RadioTrackFeedback
+
+    cutoff = timezone.now() - timedelta(days=days)
+    deleted, _ = RadioTrackFeedback.objects.filter(created_at__lt=cutoff).delete()
+    return f"Pruned {deleted} radio feedback rows"
 
 
 # Error patterns that indicate a video is permanently unavailable

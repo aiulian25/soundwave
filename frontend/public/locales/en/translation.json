@@ -1860,6 +1860,9 @@
         "party": "Party",
         "windDown": "Wind-down"
       }
+    },
+    "sonic": {
+      "featuresPending": "Acoustic analysis still running \u2014 using artist/title similarity for now"
     }
   },
   "pwa": {

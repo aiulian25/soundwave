@@ -43,6 +43,8 @@ interface RadioContextValue {
   radioSession: RadioSession | null;
   isLoading: boolean;
   currentReason: string;
+  /** False while the sonic seed has no acoustic vector yet (mode degrades to metadata similarity). */
+  featuresReady: boolean;
   
   // Actions
   startRadio: (mode: RadioMode, seedYoutubeId?: string, seedChannelId?: string, varietyLevel?: number, curve?: RadioCurve) => Promise<Audio | null>;
@@ -62,6 +64,7 @@ export function RadioProvider({ children }: { children: React.ReactNode }) {
   const [radioSession, setRadioSession] = useState<RadioSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentReason, setCurrentReason] = useState('');
+  const [featuresReady, setFeaturesReady] = useState(true);
   
   // Track info for reporting
   const currentTrackInfoRef = useRef<{ youtubeId: string; duration: number; startTime: number } | null>(null);
@@ -111,6 +114,7 @@ export function RadioProvider({ children }: { children: React.ReactNode }) {
         setRadioSession(response.data.session);
         setIsRadioMode(true);
         setCurrentReason('Radio started');
+        setFeaturesReady(response.data.features_ready !== false);
         
         return response.data.first_track || null;
       }
@@ -129,6 +133,7 @@ export function RadioProvider({ children }: { children: React.ReactNode }) {
       setIsRadioMode(false);
       setRadioSession(null);
       setCurrentReason('');
+      setFeaturesReady(true);
     } catch (error) {
       console.error('[Radio] Failed to stop:', error);
     }
@@ -229,6 +234,7 @@ export function RadioProvider({ children }: { children: React.ReactNode }) {
     radioSession,
     isLoading,
     currentReason,
+    featuresReady,
     startRadio,
     stopRadio,
     getNextTrack,

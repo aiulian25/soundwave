@@ -31,6 +31,10 @@ AUTODJ_SESSION_LENGTH = 25
 # Bound the in-memory candidate scan so a huge library can't create an unbounded distance pass.
 CANDIDATE_POOL_LIMIT = 400
 HIGH_SKIP_THRESHOLD = 3
+# Retention window for RadioTrackFeedback. The aggregate below and the weekly prune task
+# (task.tasks.prune_radio_feedback_task) MUST share it: a lookback wider than the retention
+# would silently query rows that have already been deleted.
+RADIO_FEEDBACK_RETENTION_DAYS = 90
 
 
 def _num(value):
@@ -71,20 +75,6 @@ def build_feature_vector(energy, bpm, spectral_centroid_hz, zcr, rolloff_hz, key
         (math.sin(key_angle) + 1.0) / 2.0,
         (math.cos(key_angle) + 1.0) / 2.0,
     ]
-
-
-def cosine_distance(a, b):
-    """Cosine distance in [0,1] for non-negative vectors; 1.0 (max) on any degenerate input."""
-    if not a or not b or len(a) != len(b):
-        return 1.0
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(y * y for y in b))
-    if norm_a == 0.0 or norm_b == 0.0:
-        return 1.0
-    similarity = dot / (norm_a * norm_b)
-    similarity = max(-1.0, min(1.0, similarity))
-    return 1.0 - similarity
 
 
 def feature_distance(a, b):
@@ -145,12 +135,18 @@ def nearest_by_energy(target, tracks):
 
 def high_skip_youtube_ids(user, min_skips=HIGH_SKIP_THRESHOLD):
     """youtube_ids this user has skipped at least `min_skips` times (durable, owner-scoped)."""
+    from datetime import timedelta
     from django.db.models import Count
+    from django.utils import timezone
     from audio.models_radio import RadioTrackFeedback
 
+    # Bounded by the retention window so this stays O(recent history) instead of growing
+    # with the user's entire listening lifetime -- it runs on every Auto-DJ next-track.
+    # Index-supported by RadioTrackFeedback's ('user', '-created_at') composite.
+    cutoff = timezone.now() - timedelta(days=RADIO_FEEDBACK_RETENTION_DAYS)
     rows = (
         RadioTrackFeedback.objects
-        .filter(user=user, feedback_type='skipped')
+        .filter(user=user, feedback_type='skipped', created_at__gte=cutoff)
         .values('youtube_id')
         .annotate(skip_count=Count('id'))
         .filter(skip_count__gte=min_skips)

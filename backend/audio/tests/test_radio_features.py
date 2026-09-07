@@ -6,6 +6,7 @@ before the lazy librosa import. No test invokes librosa.load.
 
 Run: python manage.py test audio.tests.test_radio_features --settings=config.settings_test
 """
+from datetime import timedelta
 from types import SimpleNamespace
 
 from django.test import TestCase, SimpleTestCase
@@ -19,17 +20,6 @@ from audio import radio_features as rf
 
 
 class PureMathTests(SimpleTestCase):
-    def test_cosine_distance_identical_is_zero(self):
-        self.assertAlmostEqual(rf.cosine_distance([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]), 0.0, places=6)
-
-    def test_cosine_distance_orthogonal_is_one(self):
-        self.assertAlmostEqual(rf.cosine_distance([1, 0], [0, 1]), 1.0, places=6)
-
-    def test_cosine_distance_degenerate_inputs(self):
-        self.assertEqual(rf.cosine_distance([], [1, 2]), 1.0)
-        self.assertEqual(rf.cosine_distance([0, 0], [1, 1]), 1.0)
-        self.assertEqual(rf.cosine_distance([1, 2, 3], [1, 2]), 1.0)
-
     def test_feature_distance_is_magnitude_sensitive(self):
         self.assertEqual(rf.feature_distance([0.5, 0.5], [0.5, 0.5]), 0.0)
         # scalar multiples are NOT zero distance (unlike cosine) -> magnitude counts
@@ -110,6 +100,19 @@ class HighSkipExclusionTests(TestCase):
         self.assertIn('SKIP1', rf.high_skip_youtube_ids(self.alice))
         self.assertNotIn('SKIP1', rf.high_skip_youtube_ids(self.bob))  # bob skipped only once
 
+    def test_high_skip_ignores_feedback_outside_the_retention_window(self):
+        """Keeps the per-next-track aggregate O(recent history), not O(lifetime)."""
+        for _ in range(3):
+            RadioTrackFeedback.objects.create(
+                user=self.alice, youtube_id='OLDSKIP', channel_id='c', feedback_type='skipped'
+            )
+        self.assertIn('OLDSKIP', rf.high_skip_youtube_ids(self.alice))
+
+        # created_at is auto_now_add, so backdate via queryset.update (bypasses auto fields).
+        stale = timezone.now() - timedelta(days=rf.RADIO_FEEDBACK_RETENTION_DAYS + 1)
+        RadioTrackFeedback.objects.filter(youtube_id='OLDSKIP').update(created_at=stale)
+        self.assertNotIn('OLDSKIP', rf.high_skip_youtube_ids(self.alice))
+
 
 class RadioModeViewTests(TestCase):
     @classmethod
@@ -165,3 +168,44 @@ class ExtractFeaturesGuardTests(TestCase):
             duration=1, file_path='', file_size=0, published_date=timezone.now(),
         )
         self.assertIn('has no file', extract_features_task(audio.id))
+
+
+class TitleSimilarityBoundTests(TestCase):
+    """The title heuristic ORs `title ILIKE '%kw%'` terms, which no B-tree index can serve,
+    so the number of terms is a performance guard worth pinning."""
+
+    def _helper(self):
+        from audio.views_radio import RadioNextTrackView
+        return RadioNextTrackView()._find_similar_by_title_string
+
+    def test_or_fan_out_is_capped(self):
+        from audio.views_radio import TITLE_KEYWORD_LIMIT
+
+        many_keywords = 'alpha bravo charlie delta echo foxtrot'
+        sql = str(self._helper()(many_keywords, Audio.objects.all()).query)
+        self.assertEqual(sql.count('LIKE'), TITLE_KEYWORD_LIMIT)
+
+    def test_result_stays_composable_and_meta_ordered(self):
+        """An in-helper slice would break `.filter()` on the result and drop the
+        index-backed Meta ordering, so the helper must return an unsliced queryset."""
+        qs = self._helper()('alpha bravo', Audio.objects.all())
+        self.assertIn('published_date', str(qs.query))          # (owner, -published_date) index
+        qs.filter(duration__gt=1)                               # raises if already sliced
+
+    def test_stop_words_and_short_words_are_ignored(self):
+        """A title of only stop/short words yields no keywords, so no candidates.
+
+        Asserted on results rather than SQL: the helper returns `.none()`, whose query has
+        no SQL at all and raises EmptyResultSet if stringified.
+        """
+        owner = Account.objects.create_user('tsb_u', 'tsb@test.local', 'Tsbpw_2026!')
+        Audio.objects.create(
+            owner=owner, youtube_id='TSB1', title='Official Video Alpha', channel_id='c',
+            channel_name='C', duration=100, file_path='C/TSB1.m4a', file_size=1,
+            published_date=timezone.now(),
+        )
+        library = Audio.objects.filter(owner=owner)
+
+        self.assertEqual(self._helper()('the a of official video hd', library).count(), 0)
+        # ...but a real keyword still matches, so the filter is not vacuously empty.
+        self.assertEqual(self._helper()('alpha', library).count(), 1)

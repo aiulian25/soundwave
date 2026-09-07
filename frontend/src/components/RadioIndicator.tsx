@@ -21,6 +21,7 @@ import RadioIcon from '@mui/icons-material/Radio';
 import CloseIcon from '@mui/icons-material/Close';
 import TuneIcon from '@mui/icons-material/Tune';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRadio, type RadioMode } from '../context/RadioContext';
@@ -42,7 +43,7 @@ interface RadioIndicatorProps {
 
 export default function RadioIndicator({ compact = false }: RadioIndicatorProps) {
   const { t } = useTranslation();
-  const { isRadioMode, radioSession, stopRadio, currentReason, isLoading } = useRadio();
+  const { isRadioMode, radioSession, stopRadio, currentReason, featuresReady, isLoading } = useRadio();
   const [settingsAnchor, setSettingsAnchor] = useState<null | HTMLElement>(null);
   const [varietyLevel, setVarietyLevel] = useState(radioSession?.variety_level ?? 50);
   const modeLabels: Record<RadioMode, string> = {
@@ -118,7 +119,8 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
         borderRadius: 2,
         bgcolor: 'primary.main',
         color: 'primary.contrastText',
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        background: (theme) =>
+          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
       }}
     >
       <RadioIcon 
@@ -144,9 +146,23 @@ export default function RadioIndicator({ compact = false }: RadioIndicatorProps)
         </Typography>
         
         {currentReason && (
-          <Typography variant="caption" sx={{ opacity: 0.7, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <AutoAwesomeIcon sx={{ fontSize: 12 }} />
+          <Typography
+            variant="caption"
+            sx={{ opacity: 0.7, display: 'flex', alignItems: 'flex-start', gap: 0.5 }}
+          >
+            <AutoAwesomeIcon sx={{ fontSize: 12, flexShrink: 0, mt: '2px' }} />
             {currentReason}
+          </Typography>
+        )}
+
+        {/* Sonic seed has no acoustic vector yet: say why the picks are metadata-based. */}
+        {!featuresReady && (
+          <Typography
+            variant="caption"
+            sx={{ opacity: 0.7, display: 'flex', alignItems: 'flex-start', gap: 0.5 }}
+          >
+            <HourglassEmptyIcon sx={{ fontSize: 12, flexShrink: 0, mt: '2px' }} />
+            {t('radio.sonic.featuresPending')}
           </Typography>
         )}
         

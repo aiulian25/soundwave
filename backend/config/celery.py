@@ -56,6 +56,18 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute=0, hour='*/2'),  # Every 2 hours
         'kwargs': {'limit': 50},
     },
+    # Prune radio feedback weekly, Sunday 5 AM (after the 3 AM / 4 AM lyrics jobs).
+    'prune-radio-feedback': {
+        'task': 'task.tasks.prune_radio_feedback_task',
+        'schedule': crontab(hour=5, minute=0, day_of_week=0),
+    },
+    # Backfill missing sonic feature vectors hourly (F16). Runs at :45 to avoid colliding
+    # with retry-failed-downloads, which fires on */30 (i.e. :00 and :30).
+    'backfill-missing-sonic-features': {
+        'task': 'task.tasks.backfill_missing_features_task',
+        'schedule': crontab(minute=45),  # hourly, 200 tracks per run
+        'kwargs': {'limit': 200},
+    },
     # Auto-fetch artist info daily
     'auto-fetch-artist-info': {
         'task': 'audio.auto_fetch_artist_info_batch',

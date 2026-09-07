@@ -1860,6 +1860,9 @@
         "party": "Petrecere",
         "windDown": "Relaxare"
       }
+    },
+    "sonic": {
+      "featuresPending": "Analiza acustica inca ruleaza \u2014 folosim similaritate dupa artist/titlu deocamdata"
     }
   },
   "pwa": {
