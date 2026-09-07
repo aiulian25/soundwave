@@ -8,6 +8,23 @@
  */
 
 import { getNetworkInfo, getPollingInterval, apiBackoffs } from './networkQuality';
+import { downloadAPI } from '../api/client';
+
+/** One queued download as the API returns it. */
+interface QueuedDownloadResponse {
+  id: number;
+}
+
+/** Readable text for a failed request, standing in for the raw response body the previous
+ *  hand-rolled fetch surfaced. DRF returns an object for validation errors and a string for
+ *  plain ones, so both shapes are handled. */
+export function describeRequestError(error: unknown): string {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  if (data === undefined || data === null) {
+    return String(error);
+  }
+  return typeof data === 'string' ? data : JSON.stringify(data);
+}
 
 export interface PendingDownload {
   id: number;
@@ -312,53 +329,22 @@ class BackgroundDownloadService {
    */
   private async directDownload(url: string): Promise<{ success: boolean; id?: number; error?: string }> {
     try {
-      const response = await fetch('/api/download/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          urls: [url],
-          auto_start: true,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return { success: true, id: data[0]?.id };
-      } else {
-        const errorText = await response.text();
-        return { success: false, error: errorText };
-      }
+      const response = await downloadAPI.add({ urls: [url], auto_start: true });
+      const queued: QueuedDownloadResponse[] = response.data;
+      return { success: true, id: queued[0]?.id };
     } catch (error) {
-      return { success: false, error: String(error) };
+      // Axios rejects on any non-2xx, so this covers both HTTP errors and network failures.
+      return { success: false, error: describeRequestError(error) };
     }
   }
 
   private async directDownloadBatch(urls: string[]): Promise<{ success: boolean; ids?: number[]; error?: string }> {
     try {
-      const response = await fetch('/api/download/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          urls,
-          auto_start: true,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return { success: true, ids: data.map((d: any) => d.id) };
-      } else {
-        const errorText = await response.text();
-        return { success: false, error: errorText };
-      }
+      const response = await downloadAPI.add({ urls, auto_start: true });
+      const queued: QueuedDownloadResponse[] = response.data;
+      return { success: true, ids: queued.map((item) => item.id) };
     } catch (error) {
-      return { success: false, error: String(error) };
+      return { success: false, error: describeRequestError(error) };
     }
   }
 
