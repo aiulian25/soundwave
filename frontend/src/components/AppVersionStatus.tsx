@@ -10,6 +10,7 @@ import {
   IconButton,
   Tooltip,
   alpha,
+  useTheme,
 } from '@mui/material';
 import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
@@ -30,9 +31,6 @@ interface UpdateInfo {
   repo_url: string;
 }
 
-const BLUE = '#58a6ff';
-const RED = '#ff5252';
-
 // Plain default compose file — self-hosters run the standard docker-compose.yml, not the prod one.
 const UPDATE_COMMAND = 'docker compose pull && docker compose up -d';
 
@@ -47,6 +45,7 @@ const UPDATE_COMMAND = 'docker compose pull && docker compose up -d';
  */
 export default function AppVersionStatus() {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -105,7 +104,7 @@ export default function AppVersionStatus() {
   if (!info) return null;
 
   const updateAvailable = info.update_available;
-  const color = updateAvailable ? RED : BLUE;
+  const color = updateAvailable ? theme.palette.error.main : theme.palette.info.main;
   const statusLabel = updateAvailable ? t('appVersion.tooltip') : t('appVersion.upToDate');
   const hasNotes = !!info.release_notes?.trim();
 
@@ -118,7 +117,7 @@ export default function AppVersionStatus() {
       </Typography>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
-        <Typography sx={{ fontSize: 18, fontWeight: 700, color: BLUE }}>
+        <Typography sx={{ fontSize: 18, fontWeight: 700, color: 'info.main' }}>
           V{info.current_version}
         </Typography>
 
@@ -156,9 +155,9 @@ export default function AppVersionStatus() {
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 6 }}>
           {updateAvailable ? (
-            <SystemUpdateAltIcon sx={{ color: RED }} />
+            <SystemUpdateAltIcon sx={{ color: 'error.main' }} />
           ) : (
-            <CloudDoneIcon sx={{ color: BLUE }} />
+            <CloudDoneIcon sx={{ color: 'info.main' }} />
           )}
           <Box sx={{ minWidth: 0 }}>
             <Typography component="span" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>

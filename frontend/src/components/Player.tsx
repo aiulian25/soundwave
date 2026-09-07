@@ -31,6 +31,7 @@ import { useSleepTimer } from '../context/SleepTimerContext';
 import { useEqualizer } from '../context/EqualizerContext';
 import { useAchievementNotification } from '../context/AchievementNotificationContext';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
+import { useStreamUrl } from '../hooks/useStreamUrl';
 import { audioAPI, statsAPI } from '../api/client';
 // Code-split: the visualizer (17 theme renderers) loads only when the player is shown.
 const AudioVisualizer = lazy(() => import('./AudioVisualizer'));
@@ -91,6 +92,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const { showAchievements } = useAchievementNotification();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { streamUrl, loadingStream, isCachedPlayback } = useStreamUrl(audio, settings.prefetch_enabled !== false);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(settings.volume);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>(settings.repeat_mode);
@@ -108,10 +110,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [showAddToPlaylistDialog, setShowAddToPlaylistDialog] = useState(false);
   const [currentAudioData, setCurrentAudioData] = useState<Audio>(audio);
   const [activeTab, setActiveTab] = useState(0);
-  const [streamUrl, setStreamUrl] = useState<string>('');
-  const [loadingStream, setLoadingStream] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [isCachedPlayback, setIsCachedPlayback] = useState(false);
   const [isFavorite, setIsFavorite] = useState(audio.is_favorite || false);
   const [imageLoadError, setImageLoadError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -168,7 +167,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     if (initialSeek && initialSeek > 0 && !initialSeekApplied.current && audioRef.current && streamUrl) {
       const applyInitialSeek = () => {
         if (audioRef.current && audioRef.current.readyState >= 2) {
-          console.log(`[Player] Resuming playback at ${initialSeek}s`);
+          if (import.meta.env.DEV) console.log(`[Player] Resuming playback at ${initialSeek}s`);
           audioRef.current.currentTime = initialSeek;
           setCurrentTime(initialSeek);
           initialSeekApplied.current = true;
@@ -241,7 +240,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
 
   // Sync settings from context when they change (volume, repeat, shuffle)
   useEffect(() => {
-    console.log('[Player] Settings sync triggered - volume:', settings.volume, 'repeat:', settings.repeat_mode, 'shuffle:', settings.shuffle_enabled);
+    if (import.meta.env.DEV) console.log('[Player] Settings sync triggered - volume:', settings.volume, 'repeat:', settings.repeat_mode, 'shuffle:', settings.shuffle_enabled);
     setVolume(settings.volume);
     setRepeatMode(settings.repeat_mode);
     setShuffleEnabled(settings.shuffle_enabled);
@@ -250,9 +249,6 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   // Reset stream when audio changes
   if (currentAudioId.current !== audio.id) {
     currentAudioId.current = audio.id;
-    setStreamUrl('');
-    setLoadingStream(true);
-    setIsCachedPlayback(false);
     setIsFavorite(audio.is_favorite || false);
     setImageLoadError(false); // Reset image error state for new track
     // Reset listening tracking for new track
@@ -399,87 +395,12 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     };
   }, [audio.youtube_id, currentTime]);
 
-  // Fetch stream URL when audio changes - ALWAYS prioritize cache for battery/data savings
-  useEffect(() => {
-    const fetchStreamUrl = async () => {
-      if (audio.media_url) {
-        setStreamUrl(audio.media_url);
-        setLoadingStream(false);
-        setIsCachedPlayback(false);
-        return;
-      }
-
-      if (audio.youtube_id) {
-        try {
-          setLoadingStream(true);
-
-          // PINNED ("Made available offline"): let the Service Worker serve the download.
-          // It's keyed by youtube_id (distinct from casual /media/), works fully offline,
-          // and supports range/seek via the SW. No blob: URLs — the SW owns the bytes.
-          if (await audioCache.isAvailableOffline(audio.youtube_id)) {
-            const pinnedUrl = `/api/audio/${audio.youtube_id}/download/`;
-            console.log('[Player] ✓ Playing from pinned offline download:', audio.title);
-            setStreamUrl(pinnedUrl);
-            setLoadingStream(false);
-            setIsCachedPlayback(true);
-            return;
-          }
-
-          // Not pinned. If we know the file_path, stream the direct /media/ URL and let the
-          // SW's cache-first strategy serve it from the (evictable) STREAM_CACHE when it has
-          // been played or prefetched before — including offline. This avoids an API call.
-          if (audio.file_path) {
-            const encodedPath = audio.file_path.split('/').map(part => encodeURIComponent(part)).join('/');
-            const directUrl = `/media/${encodedPath}`;
-            console.log('[Player] → Streaming (SW serves from STREAM_CACHE when available):', audio.title);
-            setStreamUrl(directUrl);
-            setLoadingStream(false);
-            setIsCachedPlayback(false);
-
-            // Warm the SW STREAM_CACHE in the background for future (offline) plays.
-            if (settings.prefetch_enabled !== false) {
-              audioCache.prefetchTrack(audio, 'low').catch(console.error);
-            }
-            return;
-          }
-
-          // No file_path: we must resolve the stream URL from the API, which needs network.
-          if (!navigator.onLine) {
-            console.warn('[Player] ✗ Offline and no cached audio available:', audio.title);
-            setLoadingStream(false);
-            setIsCachedPlayback(false);
-            return;
-          }
-
-          console.log('[Player] → Fetching stream URL from API:', audio.title);
-          const response = await fetch(`/api/audio/${audio.youtube_id}/player/`, {
-            credentials: 'include',
-          });
-          const data = await response.json();
-          setStreamUrl(data.stream_url);
-          setLoadingStream(false);
-          setIsCachedPlayback(false);
-
-          // Warm the SW STREAM_CACHE in the background for future plays (saves data next time).
-          if (data.stream_url && settings.prefetch_enabled !== false) {
-            audioCache.prefetchTrack(audio, 'low').catch(console.error);
-          }
-        } catch (error) {
-          console.error('Failed to fetch stream URL:', error);
-          setLoadingStream(false);
-        }
-      }
-    };
-
-    fetchStreamUrl();
-    // Use audio.id as single dependency to prevent double fetching
-  }, [audio.id]);
 
   // Initialize Media Session API with artwork
   useEffect(() => {
-    // Get the best available artwork URL - use our proxy to avoid CORS issues
+    // Raw CDN URL, not the /artwork/ proxy: the OS fetches Media Session artwork without
+    // our session cookie, and CSP img-src already allowlists these hosts.
     const artworkUrl = audio.cover_art_url || audio.thumbnail_url;
-    const proxyArtworkUrl = `/api/audio/${audio.youtube_id}/artwork/`;
     
     // Function to set metadata with artwork
     const updateMediaSession = (artworkArray?: Array<{src: string; sizes: string; type: string}>) => {
@@ -491,13 +412,12 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       });
     };
 
-    // Use proxied URL for artwork (works with CORS)
     if (artworkUrl) {
       updateMediaSession([
-        { src: proxyArtworkUrl, sizes: '96x96', type: 'image/jpeg' },
-        { src: proxyArtworkUrl, sizes: '128x128', type: 'image/jpeg' },
-        { src: proxyArtworkUrl, sizes: '256x256', type: 'image/jpeg' },
-        { src: proxyArtworkUrl, sizes: '512x512', type: 'image/jpeg' },
+        { src: artworkUrl, sizes: '96x96', type: 'image/jpeg' },
+        { src: artworkUrl, sizes: '128x128', type: 'image/jpeg' },
+        { src: artworkUrl, sizes: '256x256', type: 'image/jpeg' },
+        { src: artworkUrl, sizes: '512x512', type: 'image/jpeg' },
       ]);
     } else {
       updateMediaSession(undefined);
@@ -592,7 +512,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   // Sleep timer stop check
   useEffect(() => {
     if (shouldSleepStop()) {
-      console.log('[Player] Sleep timer triggered stop');
+      if (import.meta.env.DEV) console.log('[Player] Sleep timer triggered stop');
       setIsPlaying(false);
     }
   }, [shouldSleepStop, setIsPlaying]);
@@ -601,7 +521,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   useEffect(() => {
     const resumeAudioContext = () => {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        console.log('[Player] Resuming suspended AudioContext (iOS)');
+        if (import.meta.env.DEV) console.log('[Player] Resuming suspended AudioContext (iOS)');
         audioContextRef.current.resume().catch(console.error);
       }
     };
@@ -694,7 +614,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
 
           dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
           setGraphReady(true);
-          console.log('[Player] Audio chain initialized (optimized)');
+          if (import.meta.env.DEV) console.log('[Player] Audio chain initialized (optimized)');
         } catch (error) {
           console.error('Web Audio API not supported:', error);
         }
@@ -1155,7 +1075,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               
               // If sleep timer says stop, don't proceed to next track
               if (sleepTimerShouldStop) {
-                console.log('[Player] Sleep timer triggered stop - not playing next track');
+                if (import.meta.env.DEV) console.log('[Player] Sleep timer triggered stop - not playing next track');
                 setIsPlaying(false);
                 return;
               }

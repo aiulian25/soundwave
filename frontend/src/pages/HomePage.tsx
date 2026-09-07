@@ -72,9 +72,9 @@ interface HomePageProps {
 // Tag color mapping
 const tagColors: Record<string, { bg: string; text: string }> = {
   FOR_YOU: { bg: 'primary.main', text: 'background.paper' },
-  DISCOVER: { bg: '#00C853', text: '#fff' },
-  OTHER: { bg: '#2196F3', text: '#fff' },
-  THROWBACK: { bg: '#FF5722', text: '#fff' },
+  DISCOVER: { bg: 'success.main', text: 'success.contrastText' },
+  OTHER: { bg: 'info.main', text: 'info.contrastText' },
+  THROWBACK: { bg: 'warning.main', text: 'warning.contrastText' },
 };
 
 // Format time remaining
@@ -442,7 +442,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                       fontSize: '0.65rem',
                       fontWeight: 700,
                       bgcolor: tagColors[item.tag]?.bg || 'primary.main',
-                      color: tagColors[item.tag]?.text || '#fff',
+                      color: tagColors[item.tag]?.text || 'primary.contrastText',
                       '& .MuiChip-label': { px: 1 },
                     }}
                   />
