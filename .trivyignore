@@ -11,4 +11,10 @@
 # Format:
 #   CVE-2026-XXXXX   # reason — owner — review-by YYYY-MM-DD
 #
-# (intentionally empty — nothing accepted yet)
+# Django 4.2.30 — GeoDjango remote code execution.
+# Not reachable here: django.contrib.gis is not in INSTALLED_APPS, nothing imports it,
+# and the database is plain PostgreSQL (no PostGIS / SpatiaLite backend). There is no
+# 4.2.x fix because 4.2 LTS ended in April 2026; the real fix is Django 5.2 LTS.
+# `exp:` makes Trivy stop honouring this line on that date, so the gate fails again
+# instead of the deferral being forgotten.
+CVE-2026-15307 exp:2026-12-31   # not reachable (no GeoDjango) — maintainer — review-by 2026-12-31
