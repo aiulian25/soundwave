@@ -1247,7 +1247,9 @@
     },
     "syncWhenOnlinePending": "Will sync when online ({{count}} pending)",
     "errors": {
-      "blockedUrl": "This download link is invalid or points to a blocked address."
+      "blockedUrl": "This download link is invalid or points to a blocked address.",
+      "cookiesRefresh": "YouTube asked to sign in: replace cookies.txt with a fresh export, then retry (see README).",
+      "cookiesFileAccess": "SoundWave can't access cookies.txt: chown 1000:1000, chmod 600, remove :ro, then retry."
     }
   },
   "relatedTracks": {

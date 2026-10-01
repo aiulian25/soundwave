@@ -14,6 +14,7 @@ import SubscriptionsIcon from '@mui/icons-material/Subscriptions';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import DownloadDoneIcon from '@mui/icons-material/DownloadDone';
 import { useTranslation } from 'react-i18next';
+import { describeDownloadError } from '../utils/downloadErrors';
 
 interface ChannelCardProps {
   channel: {
@@ -262,7 +263,7 @@ export default function ChannelCard({
         {/* Error Message */}
         {channel.error_message && (
           <Alert severity="error" sx={{ mb: 2, py: 0, '& .MuiAlert-message': { fontSize: '0.75rem' } }}>
-            {channel.error_message}
+            {describeDownloadError(channel.error_message, t)}
           </Alert>
         )}
 

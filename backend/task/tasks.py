@@ -281,6 +281,28 @@ DELETED_VIDEO_TITLES = [
     '[private video]',
 ]
 
+# Markers prefixed onto error_message so the SPA shows a localized cookies.txt hint
+# instead of raw yt-dlp output (same convention as '[blocked_url]').
+COOKIES_REFRESH_MARKER = '[cookies_refresh]'
+COOKIES_FILE_ACCESS_MARKER = '[cookies_file_access]'
+
+# Failures a freshly exported cookies.txt fixes. YouTube's own reason text ("Sign in to
+# confirm you're not a bot" / "... your age") also covers cookies it has rotated out;
+# 'netscape format' is how yt-dlp and http.cookiejar reject a malformed file. The generic
+# "--cookies for the authentication" suffix is deliberately absent: yt-dlp appends it to
+# private-video errors too, which new cookies cannot fix.
+COOKIES_REFRESH_PATTERNS = [
+    'sign in to confirm',
+    'netscape format',
+]
+
+# yt-dlp reads cookies.txt and writes the refreshed session back after each download;
+# a read-only mount or a file the container user cannot open fails the download.
+COOKIES_FILE_ACCESS_PATTERNS = [
+    'read-only file system',
+    'permission denied',
+]
+
 
 def is_deleted_or_private_entry(entry):
     """Check if a playlist entry is a deleted or private video.
@@ -315,9 +337,24 @@ def is_invalid_channel_subscription_error(error_message):
     return (has_tab_error and has_400) or missing_channel
 
 
+def mark_cookie_errors(error_message):
+    """Prefix a marker onto errors whose fix is the cookies.txt file."""
+    message = error_message or ''
+    message_lower = message.lower()
+    cookies_file_inaccessible = COOKIES_FILE.lower() in message_lower and any(
+        pattern in message_lower for pattern in COOKIES_FILE_ACCESS_PATTERNS
+    )
+    if cookies_file_inaccessible:
+        return f'{COOKIES_FILE_ACCESS_MARKER} {message}'
+    cookies_need_refresh = any(pattern in message_lower for pattern in COOKIES_REFRESH_PATTERNS)
+    if cookies_need_refresh:
+        return f'{COOKIES_REFRESH_MARKER} {message}'
+    return message
+
+
 def register_channel_sync_failure(channel, error_message):
     """Record channel sync failure and optionally auto-disable invalid subscriptions."""
-    safe_error = (error_message or '')[:1000]
+    safe_error = mark_cookie_errors(error_message)[:1000]
     channel.sync_status = 'failed'
     channel.error_message = safe_error
     channel.last_failed_sync = timezone.now()
@@ -485,7 +522,7 @@ def download_audio_task(queue_id):
 
     except Exception as e:
         queue_item.status = 'failed'
-        queue_item.error_message = str(e)
+        queue_item.error_message = mark_cookie_errors(str(e))
         queue_item.save()
         raise
 

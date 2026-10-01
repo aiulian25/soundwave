@@ -1247,7 +1247,9 @@
     },
     "syncWhenOnlinePending": "Se va sincroniza cand esti online ({{count}} in asteptare)",
     "errors": {
-      "blockedUrl": "Acest link de descarcare este invalid sau indica o adresa blocata."
+      "blockedUrl": "Acest link de descarcare este invalid sau indica o adresa blocata.",
+      "cookiesRefresh": "YouTube cere autentificare: inlocuieste cookies.txt cu un export nou, apoi reincearca (vezi README).",
+      "cookiesFileAccess": "SoundWave nu poate accesa cookies.txt: chown 1000:1000, chmod 600, elimina :ro, apoi reincearca."
     }
   },
   "relatedTracks": {

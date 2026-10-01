@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useBackgroundDownload } from '../hooks/useBackgroundDownload';
+import { describeDownloadError } from '../utils/downloadErrors';
 
 interface DownloadStatusProps {
   variant?: 'icon' | 'button';
@@ -248,9 +249,7 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
                         />
                         {download.error_message && (
                           <Typography variant="caption" color="error" sx={{ ml: 1 }}>
-                            {download.error_message.startsWith('[blocked_url]')
-                              ? t('downloadStatus.errors.blockedUrl')
-                              : download.error_message}
+                            {describeDownloadError(download.error_message, t)}
                           </Typography>
                         )}
                       </Box>

@@ -11,7 +11,7 @@ Run: python manage.py test task --settings=config.settings_test
 """
 from unittest import mock
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from datetime import timedelta
@@ -19,7 +19,14 @@ from datetime import timedelta
 from audio.models import Audio
 from audio.models_radio import RadioTrackFeedback
 from audio.radio_features import RADIO_FEEDBACK_RETENTION_DAYS
-from task.tasks import backfill_missing_features_task, prune_radio_feedback_task
+from task.tasks import (
+    COOKIES_FILE,
+    COOKIES_FILE_ACCESS_MARKER,
+    COOKIES_REFRESH_MARKER,
+    backfill_missing_features_task,
+    mark_cookie_errors,
+    prune_radio_feedback_task,
+)
 from user.models import Account
 
 BACKFILL_TASK_NAME = 'task.tasks.backfill_missing_features_task'
@@ -139,3 +146,35 @@ class BeatScheduleTests(TestCase):
         self.assertEqual(entry['task'], PRUNE_TASK_NAME)
         self.assertIn(PRUNE_TASK_NAME, app.tasks,
                       'beat_schedule points at a task name Celery has not registered')
+
+
+class CookieErrorMarkerTests(SimpleTestCase):
+    """The SPA swaps these markers for a cookies.txt hint, so a missed or wrong marker
+    leaves users with raw yt-dlp output, or tells them to refresh cookies that are fine."""
+
+    def test_cookie_failures_get_the_marker_for_their_fix(self):
+        cases = [
+            ("ERROR: [youtube] VIDEO_ID_01: Sign in to confirm you're not a bot. "
+             "Use --cookies-from-browser or --cookies for the authentication.", COOKIES_REFRESH_MARKER),
+            ('ERROR: [youtube] VIDEO_ID_01: Sign in to confirm your age. '
+             'This video may be inappropriate for some users.', COOKIES_REFRESH_MARKER),
+            ('Cookies file must be Netscape formatted, not JSON.', COOKIES_REFRESH_MARKER),
+            (f"[Errno 30] Read-only file system: '{COOKIES_FILE}'", COOKIES_FILE_ACCESS_MARKER),
+            (f"[Errno 13] Permission denied: '{COOKIES_FILE}'", COOKIES_FILE_ACCESS_MARKER),
+        ]
+        for message, marker in cases:
+            with self.subTest(message=message):
+                self.assertEqual(mark_cookie_errors(message), f'{marker} {message}')
+
+    def test_other_failures_are_left_unchanged(self):
+        unrelated = [
+            # yt-dlp suggests cookies for private videos too, but new cookies cannot fix them.
+            "ERROR: [youtube] VIDEO_ID_01: Private video. Sign in if you've been granted "
+            "access to this video. Use --cookies-from-browser or --cookies for the authentication.",
+            "[Errno 13] Permission denied: '/app/audio/Some Channel'",
+            'ERROR: [youtube] VIDEO_ID_01: Video unavailable',
+        ]
+        for message in unrelated:
+            with self.subTest(message=message):
+                self.assertEqual(mark_cookie_errors(message), message)
+        self.assertEqual(mark_cookie_errors(None), '')

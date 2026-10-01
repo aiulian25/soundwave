@@ -24,6 +24,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import BlockIcon from '@mui/icons-material/Block';
 import { useTranslation } from 'react-i18next';
 import { useActivityCenter } from '../hooks/useActivityCenter';
+import { describeDownloadError } from '../utils/downloadErrors';
 
 type ActivityStatus = 'downloading' | 'pending' | 'failed' | 'completed';
 const STATUS_ORDER: ActivityStatus[] = ['downloading', 'pending', 'failed', 'completed'];
@@ -163,7 +164,7 @@ export default function ActivityCenter() {
                         primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
                         secondary={
                           item.status === 'failed' && item.error_message
-                            ? item.error_message
+                            ? describeDownloadError(item.error_message, t)
                             : item.channel_name || undefined
                         }
                         secondaryTypographyProps={{
