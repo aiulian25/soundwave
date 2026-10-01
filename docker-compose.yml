@@ -22,10 +22,11 @@ services:
       - ./cache:/app/cache
       - ./data:/app/data
       # YouTube session for yt-dlp (Netscape format). Without it YouTube answers server
-      # requests with "Sign in to confirm you're not a bot". Read-only: the app never
-      # needs to write it. Must exist as a FILE before `up` — Docker creates a directory
-      # in its place otherwise.
-      - ./cookies.txt:/app/cookies.txt:ro
+      # requests with "Sign in to confirm you're not a bot". Writable on purpose: yt-dlp
+      # saves the session back after every download (YouTube rotates it), and a read-only
+      # file makes that save raise and fail the download. Keep it `chmod 600` on the host.
+      # Must exist as a FILE before `up` — Docker creates a directory in its place otherwise.
+      - ./cookies.txt:/app/cookies.txt
       - ./backend:/app/backend  # Mount backend for development
       - ./backend/staticfiles:/app/backend/staticfiles
       - ./frontend/dist:/app/frontend/dist  # Mount frontend for development

@@ -23,7 +23,9 @@ services:
       - ./audio:/app/audio
       - ./cache:/app/cache
       - ./data:/app/data
-      - ./cookies.txt:/app/cookies.txt:ro
+      # Writable on purpose: yt-dlp saves the rotated YouTube session back after each
+      # download, and fails the download if it cannot. Keep it `chmod 600` on the host.
+      - ./cookies.txt:/app/cookies.txt
     # Resource limits to reduce DoS risk
     deploy:
       resources:
