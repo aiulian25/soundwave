@@ -151,6 +151,10 @@ jobs:
           load: true
           tags: soundwave:scan
           cache-from: type=gha
+          # Same cache-bust as docker-publish.yml, so the scanned image has the same fresh
+          # OS packages as the published one — otherwise the gate reports a stale cache.
+          build-args: |
+            OS_PATCH_CACHE_BUST=${{ github.run_id }}
           platforms: linux/amd64
 
       - name: Trivy image scan → SARIF (report all)

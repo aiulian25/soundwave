@@ -94,6 +94,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Unique per run, so the final stage's `apt-get upgrade` always re-runs and every
+          # published image — :main included, which is what users pull — carries the current
+          # OS security patches. Only that layer onward rebuilds; pip/npm stages stay cached.
+          build-args: |
+            OS_PATCH_CACHE_BUST=${{ github.run_id }}
           platforms: linux/amd64,linux/arm64
           # Always re-pull the base image so a fresh layer is used (CNT-01).
           pull: true

@@ -49,6 +49,13 @@ RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -d /app -s /sbi
 # F16: libsndfile1 is the soundfile backend librosa uses to decode audio for feature
 # extraction. Note: the librosa stack in requirements.txt (numpy/scipy/numba/llvmlite)
 # adds roughly a few hundred MB to the image — accepted for the sonic-similarity feature.
+#
+# CI passes a value unique to each run, so this layer — and only this layer onward —
+# always re-runs and picks up the current OS security patches. Without it the build
+# cache replayed a stale `apt-get upgrade`, shipping known-vulnerable openssl/pcre2 in
+# :main between weekly rebuilds. The expensive builder/frontend stages stay cached.
+# Unset locally, so local builds cache as before.
+ARG OS_PATCH_CACHE_BUST
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl ffmpeg libsndfile1 \
     && for pkg in libgl1-mesa-dri libglx-mesa0 mesa-libgallium; do \
