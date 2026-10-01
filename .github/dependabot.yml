@@ -1,3 +1,5 @@
+# Patch and minor PRs auto-merge once CI is green; majors open and wait for review
+# (.github/workflows/dependabot-auto-merge.yml).
 version: 2
 updates:
   # Python deps (yt-dlp, librosa, django, ...). Weekly PR; CI (security-scan +
@@ -30,10 +32,3 @@ updates:
       interval: weekly
     allow:
       - dependency-name: "denoland/deno"
-    ignore:
-      # dependabot-auto-merge.yml merges every Dependabot PR once CI is green, and CI
-      # never runs a real YouTube download. A major Deno release can change the CLI or
-      # permission model yt-dlp relies on, so majors stay a deliberate, tested upgrade;
-      # patch and minor releases (where security fixes land) flow through automatically.
-      - dependency-name: "denoland/deno"
-        update-types: ["version-update:semver-major"]

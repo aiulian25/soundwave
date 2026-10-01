@@ -1,7 +1,8 @@
 name: Dependabot auto-merge
 
-# Queues auto-merge on Dependabot PRs. GitHub holds the merge until the branch's
-# required status checks (branch protection) pass, then squash-merges automatically.
+# Queues auto-merge on Dependabot patch and minor updates. GitHub holds the merge until the
+# branch's required status checks (branch protection) pass, then squash-merges automatically.
+# Majors, and anything whose update type is unknown, stay open for a human to review.
 on: pull_request
 
 permissions:
@@ -13,7 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+
+      # Dependabot sends no update type for unpinned pip ranges, so fetch-metadata infers it
+      # from the first version in the old requirement. In a capped range that is the cap
+      # (`<2.0,>=1.26` reads as 2.0), which makes numpy 1.x -> 2.x look like a minor bump.
+      # A multi-specifier previous version therefore never auto-merges.
       - name: Enable auto-merge
+        if: >-
+          (steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+           steps.metadata.outputs.update-type == 'version-update:semver-minor') &&
+          !contains(steps.metadata.outputs.previous-version, ',')
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
