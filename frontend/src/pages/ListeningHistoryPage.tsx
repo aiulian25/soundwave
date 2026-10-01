@@ -59,6 +59,9 @@ import { useTranslation } from 'react-i18next';
 import { statsAPI } from '../api/client';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
+import { NowPlayingBadge } from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingItemSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface HistoryEntry {
   id: number;
@@ -121,10 +124,12 @@ const HistoryEntryItem = memo(({
   entry, 
   onPlay,
   t,
+  isCurrentTrack,
 }: { 
   entry: HistoryEntry;
   onPlay: (entry: HistoryEntry) => void;
   t: (key: string, options?: Record<string, unknown>) => string;
+  isCurrentTrack: boolean;
 }) => {
   const theme = useTheme();
   const isNarrow = useMediaQuery(theme.breakpoints.down('sm'));
@@ -140,10 +145,11 @@ const HistoryEntryItem = memo(({
         '&:hover': {
           bgcolor: alpha(theme.palette.primary.main, 0.08),
         },
+        ...(isCurrentTrack && nowPlayingItemSx),
       }}
       onClick={() => onPlay(entry)}
     >
-      <ListItemAvatar>
+      <ListItemAvatar sx={{ position: 'relative' }}>
         <Avatar
           src={entry.thumbnail_url}
           variant="rounded"
@@ -155,11 +161,12 @@ const HistoryEntryItem = memo(({
         >
           <MusicNoteIcon />
         </Avatar>
+        {isCurrentTrack && <NowPlayingBadge />}
       </ListItemAvatar>
       <ListItemText
         sx={{ ml: 1, my: 0, minWidth: 0 }}
         primary={
-          <ScrollingText variant="body1" fontWeight={500}>
+          <ScrollingText variant="body1" fontWeight={500} sx={isCurrentTrack ? nowPlayingTitleSx : undefined}>
             {entry.title}
           </ScrollingText>
         }
@@ -267,6 +274,7 @@ const SectionHeader = memo(({
 
 export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistoryPageProps) {
   const { t } = useTranslation();
+  const isNowPlaying = useIsNowPlaying();
   const theme = useTheme();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [onThisDay, setOnThisDay] = useState<OnThisDayData>({});
@@ -578,6 +586,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                             cursor: 'pointer',
                             borderRadius: 1,
                             '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                            ...(isNowPlaying(track.youtube_id) && nowPlayingItemSx),
                           }}
                           onClick={() => handlePlayTrack(track)}
                         >
@@ -592,7 +601,9 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                           </ListItemAvatar>
                           <ListItemText
                             primary={
-                              <ScrollingText sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                              <ScrollingText
+                                sx={{ fontSize: '0.875rem', fontWeight: 500, ...(isNowPlaying(track.youtube_id) && nowPlayingTitleSx) }}
+                              >
                                 {track.title}
                               </ScrollingText>
                             }
@@ -715,6 +726,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                           entry={entry}
                           onPlay={handlePlayTrack}
                           t={t}
+                          isCurrentTrack={isNowPlaying(entry.youtube_id)}
                         />
                         {index < Math.min(group.entries.length, 50) - 1 && <Divider variant="inset" />}
                       </Box>

@@ -41,6 +41,9 @@ import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
+import NowPlayingIndicator from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface ChannelDetail {
   id: number;
@@ -71,6 +74,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
+  const isNowPlaying = useIsNowPlaying();
   const [channel, setChannel] = useState<ChannelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -389,13 +393,14 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                     ...(shouldHighlight(audio.youtube_id) && {
                       bgcolor: 'rgba(19, 236, 106, 0.1)',
                     }),
+                    ...(isNowPlaying(audio.youtube_id) && nowPlayingRowSx),
                   }}
                   onClick={() => handlePlayTrack(audio)}
                 >
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
-                        {index + 1}
+                        {isNowPlaying(audio.youtube_id) ? <NowPlayingIndicator /> : index + 1}
                       </Typography>
                       <IconButton 
                         size="small" 
@@ -426,7 +431,11 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                         }}
                       />
                       <Box>
-                        <ScrollingText variant="body2" fontWeight="medium">
+                        <ScrollingText
+                          variant="body2"
+                          fontWeight="medium"
+                          sx={isNowPlaying(audio.youtube_id) ? nowPlayingTitleSx : undefined}
+                        >
                           {audio.title}
                         </ScrollingText>
                         <Typography variant="caption" color="text.secondary">

@@ -139,12 +139,12 @@ function QueueDrawer({
           transition: 'all 0.2s ease',
           opacity: isDragging ? 0.5 : (isPlayed ? 0.6 : 1),
           bgcolor: isCurrentTrack
-            ? alpha(theme.palette.primary.main, 0.15)
+            ? theme.palette.nowPlaying.background
             : isDragOver
               ? alpha(theme.palette.primary.main, 0.1)
               : 'transparent',
           borderLeft: isCurrentTrack
-            ? `3px solid ${theme.palette.primary.main}`
+            ? `3px solid ${theme.palette.nowPlaying.main}`
             : isDragOver
               ? `3px solid ${alpha(theme.palette.primary.main, 0.5)}`
               : '3px solid transparent',

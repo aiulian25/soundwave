@@ -52,6 +52,9 @@ import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio, SmartPlaylist, SmartPlaylistRule, SmartPlaylistChoices } from '../types';
 import ScrollingText from '../components/ScrollingText';
+import NowPlayingIndicator from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface SmartPlaylistDetailPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -62,6 +65,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
+  const isNowPlaying = useIsNowPlaying();
   const [playlist, setPlaylist] = useState<SmartPlaylist | null>(null);
   const [tracks, setTracks] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -362,10 +366,11 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                     ...(shouldHighlight(track.youtube_id) && {
                       bgcolor: 'rgba(19, 236, 106, 0.1)',
                     }),
+                    ...(isNowPlaying(track.youtube_id) && nowPlayingRowSx),
                   }}
                   onClick={() => handlePlay(index, false)}
                 >
-                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{isNowPlaying(track.youtube_id) ? <NowPlayingIndicator /> : index + 1}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {track.thumbnail_url && (
@@ -377,7 +382,10 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                         />
                       )}
                       <Box sx={{ overflow: 'hidden' }}>
-                        <ScrollingText variant="body2">
+                        <ScrollingText
+                          variant="body2"
+                          sx={isNowPlaying(track.youtube_id) ? nowPlayingTitleSx : undefined}
+                        >
                           {track.title}
                         </ScrollingText>
                         <Typography variant="caption" color="text.secondary" sx={{ display: { sm: 'none' } }}>

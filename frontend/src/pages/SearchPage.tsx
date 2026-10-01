@@ -41,6 +41,9 @@ import { audioAPI, playlistAPI, channelAPI } from '../api/client';
 import { fetchAllAudio, fetchAllPlaylists, fetchAllChannels } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
+import { NowPlayingBadge } from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingItemSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 import type { Audio } from '../types';
 
 interface SearchPageProps {
@@ -75,6 +78,7 @@ interface QuickSuggestion {
 export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const isNowPlaying = useIsNowPlaying();
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -643,8 +647,9 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             <ListItemButton
                               onClick={() => setCurrentAudio(audio, audioResults)}
                               disabled={!audio.file_path}
+                              sx={isNowPlaying(audio.youtube_id) ? nowPlayingItemSx : undefined}
                             >
-                              <ListItemAvatar>
+                              <ListItemAvatar sx={{ position: 'relative' }}>
                                 <Avatar
                                   src={audio.thumbnail_url}
                                   variant="rounded"
@@ -652,11 +657,12 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                                 >
                                   <MusicNoteIcon />
                                 </Avatar>
+                                {isNowPlaying(audio.youtube_id) && <NowPlayingBadge />}
                               </ListItemAvatar>
                               <ListItemText
                                 primary={audio.title}
                                 secondary={`${audio.channel_name} • ${formatDuration(audio.duration)}`}
-                                primaryTypographyProps={{ fontWeight: 500 }}
+                                primaryTypographyProps={{ fontWeight: 500, ...(isNowPlaying(audio.youtube_id) && nowPlayingTitleSx) }}
                               />
                               {!audio.file_path && (
                                 <Chip label={t('search.status.notDownloaded')} size="small" color="warning" sx={{ mr: 2 }} />
@@ -763,8 +769,9 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                       <ListItemButton
                         onClick={() => setCurrentAudio(audio, audioResults)}
                         disabled={!audio.file_path}
+                        sx={isNowPlaying(audio.youtube_id) ? nowPlayingItemSx : undefined}
                       >
-                        <ListItemAvatar>
+                        <ListItemAvatar sx={{ position: 'relative' }}>
                           <Avatar
                             src={audio.thumbnail_url}
                             variant="rounded"
@@ -772,11 +779,12 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                           >
                             <MusicNoteIcon />
                           </Avatar>
+                          {isNowPlaying(audio.youtube_id) && <NowPlayingBadge />}
                         </ListItemAvatar>
                         <ListItemText
                           primary={audio.title}
                           secondary={`${audio.channel_name} • ${formatDuration(audio.duration)}`}
-                          primaryTypographyProps={{ fontWeight: 500 }}
+                          primaryTypographyProps={{ fontWeight: 500, ...(isNowPlaying(audio.youtube_id) && nowPlayingTitleSx) }}
                         />
                         {!audio.file_path && (
                           <Chip label={t('search.status.notDownloaded')} size="small" color="warning" sx={{ mr: 2 }} />

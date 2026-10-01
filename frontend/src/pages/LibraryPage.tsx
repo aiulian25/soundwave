@@ -26,6 +26,9 @@ import TrackThumbnail from '../components/TrackThumbnail';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
+import NowPlayingIndicator from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface LibraryPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -37,6 +40,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
   const [loading, setLoading] = useState(false);
   const location = useLocation();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
+  const isNowPlaying = useIsNowPlaying();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -206,14 +210,20 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
                   ...(shouldHighlight(audio.youtube_id) && {
                     bgcolor: 'rgba(19, 236, 106, 0.1)',
                   }),
+                  ...(isNowPlaying(audio.youtube_id) && nowPlayingRowSx),
                 }}
                 onClick={() => setCurrentAudio(audio, audioList)}
               >
-                <TableCell sx={{ color: 'text.secondary' }}>{index + 1}</TableCell>
+                <TableCell sx={{ color: 'text.secondary' }}>
+                  {isNowPlaying(audio.youtube_id) ? <NowPlayingIndicator /> : index + 1}
+                </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
                     <TrackThumbnail src={audio.thumbnail_url} alt={audio.title} size={40} />
-                    <ScrollingText variant="body2" sx={{ maxWidth: 300, fontWeight: 500 }}>
+                    <ScrollingText
+                      variant="body2"
+                      sx={{ maxWidth: 300, fontWeight: 500, ...(isNowPlaying(audio.youtube_id) && nowPlayingTitleSx) }}
+                    >
                       {audio.title}
                     </ScrollingText>
                   </Box>

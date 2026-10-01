@@ -37,6 +37,7 @@ export interface Audio {
   metadata_source?: string;
   metadata_updated?: string;
   media_url?: string;  // For local file playback (blob URLs)
+  local_file_id?: string;  // Browser-stored local file the track was built from
 }
 
 export interface Channel {

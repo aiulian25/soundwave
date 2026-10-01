@@ -2169,5 +2169,8 @@
       "upToDateTitle": "Esti la zi"
     },
     "upToDate": "La zi"
+  },
+  "nowPlaying": {
+    "label": "Se reda acum"
   }
 }

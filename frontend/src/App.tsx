@@ -37,6 +37,7 @@ import { useSmartShuffle } from './hooks/useSmartShuffle';
 import { useIntelligentPrefetch } from './hooks/useIntelligentPrefetch';
 import { useSettings } from './context/SettingsContext';
 import { useRadio } from './context/RadioContext';
+import { NowPlayingProvider, getTrackKey } from './context/NowPlayingContext';
 import { checkPlaybackSession, type PlaybackSession } from './hooks/usePlaybackSync';
 import { offlineStorage } from './utils/offlineStorage';
 import { pwaManager } from './utils/pwa';
@@ -724,6 +725,7 @@ function App() {
               </Box>
             }
           >
+          <NowPlayingProvider trackKey={getTrackKey(currentAudio)} isPlaying={isPlaying}>
           <Routes>
             <Route path="/" element={<HomePage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/search" element={<SearchPage setCurrentAudio={setAudioWithQueue} />} />
@@ -745,6 +747,7 @@ function App() {
             <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </NowPlayingProvider>
           </Suspense>
           </LazyRouteBoundary>
         </Box>

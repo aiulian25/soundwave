@@ -9,6 +9,9 @@ import { pwaManager } from '../utils/pwa';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
+import { NowPlayingBadge } from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingArtworkSx, nowPlayingItemSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 // Types for homepage data
 interface ContinueListeningItem {
@@ -88,6 +91,7 @@ const formatTimeLeft = (seconds: number, format: (minutes: number, seconds: numb
 export default function HomePage({ setCurrentAudio }: HomePageProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const isNowPlaying = useIsNowPlaying();
   const [data, setData] = useState<HomepageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -310,6 +314,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   '&:hover .play-button': {
                     opacity: 1,
                   },
+                  ...(isNowPlaying(item.youtube_id) && nowPlayingItemSx),
                 }}
               >
                 <Box sx={{ position: 'relative', flexShrink: 0 }}>
@@ -340,9 +345,13 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   >
                     <PlayArrowIcon sx={{ fontSize: 18 }} />
                   </IconButton>
+                  {isNowPlaying(item.youtube_id) && <NowPlayingBadge />}
                 </Box>
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
+                  <ScrollingText
+                    variant="body2"
+                    sx={{ fontWeight: 600, mb: 0.25, ...(isNowPlaying(item.youtube_id) && nowPlayingTitleSx) }}
+                  >
                     {item.title}
                   </ScrollingText>
                   <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mb: 0.5 }}>
@@ -428,6 +437,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                     borderRadius: 3,
                     overflow: 'hidden',
                     mb: 1.5,
+                    ...(isNowPlaying(item.youtube_id) && nowPlayingArtworkSx),
                   }}
                 >
                   {/* Tag Badge */}
@@ -489,8 +499,12 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   >
                     <PlayArrowIcon />
                   </IconButton>
+                  {isNowPlaying(item.youtube_id) && <NowPlayingBadge />}
                 </Box>
-                <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
+                <ScrollingText
+                  variant="body2"
+                  sx={{ fontWeight: 600, mb: 0.25, ...(isNowPlaying(item.youtube_id) && nowPlayingTitleSx) }}
+                >
                   {item.title}
                 </ScrollingText>
                 <Typography variant="caption" color="primary.main" noWrap sx={{ fontWeight: 500 }}>
@@ -554,6 +568,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                     borderRadius: 3,
                     overflow: 'hidden',
                     mb: 1.5,
+                    ...(isNowPlaying(item.youtube_id) && nowPlayingArtworkSx),
                   }}
                 >
                   <Box
@@ -595,8 +610,12 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   >
                     <PlayArrowIcon />
                   </IconButton>
+                  {isNowPlaying(item.youtube_id) && <NowPlayingBadge />}
                 </Box>
-                <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <ScrollingText
+                  variant="body2"
+                  sx={{ fontWeight: 600, mb: 0.5, ...(isNowPlaying(item.youtube_id) && nowPlayingTitleSx) }}
+                >
                   {item.title}
                 </ScrollingText>
                 <Typography variant="caption" color="text.secondary" noWrap>
@@ -660,6 +679,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                     borderRadius: 3,
                     overflow: 'hidden',
                     mb: 1.5,
+                    ...(isNowPlaying(item.youtube_id) && nowPlayingArtworkSx),
                   }}
                 >
                   <Box
@@ -701,8 +721,12 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                   >
                     <PlayArrowIcon />
                   </IconButton>
+                  {isNowPlaying(item.youtube_id) && <NowPlayingBadge />}
                 </Box>
-                <ScrollingText variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <ScrollingText
+                  variant="body2"
+                  sx={{ fontWeight: 600, mb: 0.5, ...(isNowPlaying(item.youtube_id) && nowPlayingTitleSx) }}
+                >
                   {item.title}
                 </ScrollingText>
                 <Typography variant="caption" color="text.secondary" noWrap>

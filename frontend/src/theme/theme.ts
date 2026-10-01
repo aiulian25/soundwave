@@ -1,4 +1,5 @@
 import { createTheme, Theme } from '@mui/material/styles';
+import { withNowPlaying } from './nowPlaying';
 
 export type ThemeMode = 'dark' | 'blue' | 'white' | 'green' | 'lightBlue';
 
@@ -329,11 +330,11 @@ const lightBlueTheme = createTheme({
 });
 
 export const themes: Record<ThemeMode, Theme> = {
-  dark: darkTheme,
-  blue: blueTheme,
-  white: whiteTheme,
-  green: greenTheme,
-  lightBlue: lightBlueTheme,
+  dark: withNowPlaying(darkTheme),
+  blue: withNowPlaying(blueTheme),
+  white: withNowPlaying(whiteTheme),
+  green: withNowPlaying(greenTheme),
+  lightBlue: withNowPlaying(lightBlueTheme),
 };
 
 export const themeNames: Record<ThemeMode, string> = {
@@ -357,4 +358,4 @@ export const getThemePreference = (): ThemeMode => {
   return (saved as ThemeMode) || 'dark';
 };
 
-export default darkTheme;
+export default themes.dark;

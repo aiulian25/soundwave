@@ -28,6 +28,9 @@ import { localAudioDB, type LocalAudioFile } from '../utils/localAudioDB';
 import { extractMetadata, getAudioDuration } from '../utils/id3Reader';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
+import NowPlayingIndicator from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface LocalFilesPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -35,6 +38,7 @@ interface LocalFilesPageProps {
 
 export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps) {
   const { t } = useTranslation();
+  const isNowPlaying = useIsNowPlaying();
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
@@ -219,6 +223,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
         file_size: localFile.fileSize,
         file_path: audioURL,
         media_url: audioURL,  // THIS is what Player uses for local files
+        local_file_id: localFile.id,
         play_count: localFile.playCount,
         published_date: localFile.addedDate.toISOString(),
         downloaded_date: localFile.addedDate.toISOString(),
@@ -245,6 +250,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
           file_size: file.fileSize,
           file_path: fileURL,
           media_url: fileURL,
+          local_file_id: file.id,
           play_count: file.playCount,
           published_date: file.addedDate.toISOString(),
           downloaded_date: file.addedDate.toISOString(),
@@ -449,11 +455,12 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                     '&:hover': {
                       bgcolor: 'rgba(19, 236, 106, 0.05)',
                     },
+                    ...(isNowPlaying(file.id) && nowPlayingRowSx),
                   }}
                   onClick={() => handlePlay(file)}
                 >
                   <TableCell sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                    {index + 1}
+                    {isNowPlaying(file.id) ? <NowPlayingIndicator /> : index + 1}
                   </TableCell>
                   <TableCell>
                     <Box>
@@ -464,6 +471,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                           fontWeight: 500,
                           fontSize: { xs: '0.75rem', sm: '0.813rem' },
                           lineHeight: 1.3,
+                          ...(isNowPlaying(file.id) && nowPlayingTitleSx),
                         }}
                       >
                         {file.title}

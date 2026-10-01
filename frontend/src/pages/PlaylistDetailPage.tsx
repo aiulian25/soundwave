@@ -45,6 +45,9 @@ import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
+import NowPlayingIndicator from '../components/NowPlayingIndicator';
+import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface PlaylistItem {
   id: number;
@@ -82,6 +85,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   const { t, i18n } = useTranslation();
   const { isOnline, cachePlaylist, removePlaylistCache, cacheSize } = usePWA();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
+  const isNowPlaying = useIsNowPlaying();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -793,6 +797,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                 const playlistQueue = (playlist.items || [])
                   .filter(i => i.audio.file_path)
                   .map(i => i.audio);
+                const isCurrentTrack = isNowPlaying(item.audio.youtube_id);
                 return (
                 <TableRow
                   key={item.id}
@@ -807,11 +812,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                     ...(shouldHighlight(item.audio.youtube_id) && {
                       bgcolor: 'rgba(19, 236, 106, 0.1)',
                     }),
+                    ...(isCurrentTrack && nowPlayingRowSx),
                   }}
                   onClick={() => item.audio.file_path && setCurrentAudio(item.audio, playlistQueue)}
                 >
                   <TableCell sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                    {index + 1}
+                    {isCurrentTrack ? <NowPlayingIndicator /> : index + 1}
                   </TableCell>
                   <TableCell>
                     <Box>
@@ -822,6 +828,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                             maxWidth: { xs: 180, sm: 280, md: 380 },
                             fontWeight: 500,
                             fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                            ...(isCurrentTrack && nowPlayingTitleSx),
                           }}
                         >
                           {item.audio.title}
