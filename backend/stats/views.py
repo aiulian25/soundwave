@@ -1,6 +1,6 @@
 """Stats API views"""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from django.db.models import Sum, Count, F
 from django.db.models.functions import ExtractHour, ExtractWeekDay, TruncDate, TruncMonth, ExtractMonth
 from django.utils import timezone
@@ -575,8 +575,8 @@ class YearlyWrappedView(ApiBaseView):
         user = request.user
         
         # Get all listening history for the year
-        start_date = datetime(year, 1, 1, tzinfo=timezone.utc)
-        end_date = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = datetime(year, 1, 1, tzinfo=UTC)
+        end_date = datetime(year, 12, 31, 23, 59, 59, tzinfo=UTC)
         
         history = ListeningHistory.objects.filter(
             user=user,
