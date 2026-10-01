@@ -19,13 +19,18 @@ from datetime import timedelta
 from audio.models import Audio
 from audio.models_radio import RadioTrackFeedback
 from audio.radio_features import RADIO_FEEDBACK_RETENTION_DAYS
+from download.models import DownloadQueue
+from playlist.models import Playlist
 from task.tasks import (
     COOKIES_FILE,
     COOKIES_FILE_ACCESS_MARKER,
     COOKIES_REFRESH_MARKER,
+    MAX_AUTO_RETRIES,
     backfill_missing_features_task,
+    download_playlist_task,
     mark_cookie_errors,
     prune_radio_feedback_task,
+    retry_failed_downloads,
 )
 from user.models import Account
 
@@ -178,3 +183,52 @@ class CookieErrorMarkerTests(SimpleTestCase):
             with self.subTest(message=message):
                 self.assertEqual(mark_cookie_errors(message), message)
         self.assertEqual(mark_cookie_errors(None), '')
+
+
+class AutoRetryBudgetTests(TestCase):
+    """Both automatic retry paths stop after MAX_AUTO_RETRIES. The count used to live in
+    error_message, which every failed download overwrites, so retry_failed_downloads never
+    hit its cap and playlist syncs re-queued failures on every run."""
+
+    FAILURE = "[cookies_refresh] ERROR: [youtube] VIDEO_ID_01: Sign in to confirm you're not a bot."
+    VIDEO_ID = 'VIDEO_ID_01'
+
+    def setUp(self):
+        self.owner = Account.objects.create_user('retry_owner', 'retry@test.local', 'Retrypw_2026!')
+        self.queue_item = DownloadQueue.objects.create(
+            owner=self.owner, url=f'https://example.invalid/{self.VIDEO_ID}', youtube_id=self.VIDEO_ID,
+            status='failed', error_message=self.FAILURE,
+        )
+        self.playlist = Playlist.objects.create(owner=self.owner, playlist_id='PL_demo', title='Demo playlist')
+
+    def _fail_again(self, queue_id):
+        # What download_audio_task does on failure: back to failed, message overwritten.
+        DownloadQueue.objects.filter(id=queue_id).update(status='failed', error_message=self.FAILURE)
+
+    def _sync_playlist(self, runs, force=False):
+        flat_playlist = {'entries': [{'id': self.VIDEO_ID, 'title': 'Demo track'}]}
+        with mock.patch('task.tasks.yt_dlp.YoutubeDL') as youtube_dl, \
+                mock.patch('task.tasks.download_audio_task.delay', side_effect=self._fail_again) as dispatch:
+            youtube_dl.return_value.__enter__.return_value.extract_info.return_value = flat_playlist
+            for _ in range(runs):
+                download_playlist_task(self.playlist.id, force=force)
+        return dispatch
+
+    def test_retry_failed_downloads_stops_at_the_budget(self):
+        with mock.patch('task.tasks.download_audio_task.delay', side_effect=self._fail_again) as dispatch:
+            for _ in range(MAX_AUTO_RETRIES + 2):
+                retry_failed_downloads()
+        self.assertEqual(dispatch.call_count, MAX_AUTO_RETRIES)
+        self.queue_item.refresh_from_db()
+        self.assertEqual(self.queue_item.retry_count, MAX_AUTO_RETRIES)
+
+    def test_playlist_sync_stops_requeueing_at_the_budget(self):
+        dispatch = self._sync_playlist(runs=MAX_AUTO_RETRIES + 2)
+        self.assertEqual(dispatch.call_count, MAX_AUTO_RETRIES)
+
+    def test_forced_sync_retries_and_starts_a_fresh_budget(self):
+        DownloadQueue.objects.filter(id=self.queue_item.id).update(retry_count=MAX_AUTO_RETRIES)
+        dispatch = self._sync_playlist(runs=1, force=True)
+        self.assertEqual(dispatch.call_count, 1)
+        self.queue_item.refresh_from_db()
+        self.assertEqual(self.queue_item.retry_count, 0)

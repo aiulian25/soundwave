@@ -274,6 +274,10 @@ PERMANENT_ERROR_PATTERNS = [
     'no longer available',
 ]
 
+# Failed downloads are re-queued automatically (retry_failed_downloads, playlist syncs) at
+# most this many times; a manual retry or a forced playlist sync starts a fresh budget.
+MAX_AUTO_RETRIES = 3
+
 
 # Titles that yt-dlp returns in extract_flat mode for deleted/private videos
 DELETED_VIDEO_TITLES = [
@@ -930,6 +934,7 @@ def download_playlist_task(playlist_id, force=False):
         skipped = 0
         skipped_unavailable = 0
         skipped_deleted = 0
+        skipped_retries_exhausted = 0
 
         for idx, entry in enumerate(info['entries']):
             if not entry:
@@ -1014,9 +1019,15 @@ def download_playlist_task(playlist_id, force=False):
                     if not force and is_permanently_unavailable(existing_queue_item.error_message):
                         skipped_unavailable += 1
                         continue
-                    # Update existing failed item (temporary failures only)
+                    retries_used_up = existing_queue_item.retry_count >= MAX_AUTO_RETRIES
+                    if not force and retries_used_up:
+                        skipped_retries_exhausted += 1
+                        continue
+                    # Update existing failed item (temporary failures only). A forced sync is a
+                    # manual retry, so it starts a fresh automatic-retry budget.
                     existing_queue_item.status = 'pending'
                     existing_queue_item.error_message = ''
+                    existing_queue_item.retry_count = 0 if force else existing_queue_item.retry_count + 1
                     existing_queue_item.save()
                     queue_item = existing_queue_item
                     created = True  # Treat as newly created for triggering download
@@ -1104,6 +1115,8 @@ def download_playlist_task(playlist_id, force=False):
                 msg += f", {skipped_deleted} deleted/private skipped"
             if skipped_unavailable > 0:
                 msg += f", {skipped_unavailable} unavailable skipped"
+            if skipped_retries_exhausted > 0:
+                msg += f", {skipped_retries_exhausted} awaiting manual retry"
             msg += ")"
             return msg
 
@@ -1112,6 +1125,8 @@ def download_playlist_task(playlist_id, force=False):
             msg += f", {skipped_deleted} deleted/private skipped"
         if skipped_unavailable > 0:
             msg += f", {skipped_unavailable} unavailable skipped"
+        if skipped_retries_exhausted > 0:
+            msg += f", {skipped_retries_exhausted} awaiting manual retry"
         return msg
     
     except Exception as e:
@@ -1223,19 +1238,19 @@ def reset_stuck_downloads():
 
 
 @shared_task
-def retry_failed_downloads(max_retries=3):
+def retry_failed_downloads():
     """
-    Automatically retry failed downloads that haven't exceeded max retries.
-    This ensures downloads continue even when the app was closed.
+    Automatically retry failed downloads that still have automatic retries left.
+    This ensures downloads continue even when the app was closed. The count lives in
+    DownloadQueue.retry_count because download_audio_task overwrites error_message.
     """
     # Get failed downloads from the last 24 hours
     retry_window = timezone.now() - timedelta(hours=24)
-    
+
     failed_downloads = DownloadQueue.objects.filter(
         status='failed',
         added_date__gte=retry_window,
-    ).exclude(
-        error_message__icontains='max retries exceeded'
+        retry_count__lt=MAX_AUTO_RETRIES,
     ).exclude(
         error_message__icontains='video unavailable'
     ).exclude(
@@ -1243,31 +1258,20 @@ def retry_failed_downloads(max_retries=3):
     ).exclude(
         error_message__icontains='copyright'
     )
-    
+
     retried = 0
-    skipped = 0
-    
+
     for download in failed_downloads[:20]:  # Limit to 20 per cycle
-        # Count retry attempts from error message or default to 0
-        attempts = download.error_message.count('Retry attempt') if download.error_message else 0
-        
-        if attempts >= max_retries:
-            # Mark as permanently failed
-            download.error_message = f'{download.error_message}\nmax retries exceeded'
-            download.save()
-            skipped += 1
-            continue
-        
-        # Reset status and queue for retry
+        download.retry_count += 1
         download.status = 'pending'
-        download.error_message = f'Retry attempt {attempts + 1}: {download.error_message or "Auto-retry"}'
+        download.error_message = f'Retry attempt {download.retry_count}: {download.error_message or "Auto-retry"}'
         download.save()
-        
+
         # Trigger the download task
         download_audio_task.delay(download.id)
         retried += 1
-    
-    return f"Retried {retried} downloads, skipped {skipped}"
+
+    return f"Retried {retried} downloads"
 
 
 @shared_task

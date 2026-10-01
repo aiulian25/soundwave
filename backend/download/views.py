@@ -78,6 +78,7 @@ class RetryFailedView(ApiBaseView):
                 )
                 download.status = 'pending'
                 download.error_message = f'Manual retry: {download.error_message or ""}'
+                download.retry_count = 0
                 download.save()
                 
                 from task.tasks import download_audio_task
@@ -103,6 +104,7 @@ class RetryFailedView(ApiBaseView):
             for download in failed:
                 download.status = 'pending'
                 download.error_message = f'Manual retry: {download.error_message or ""}'
+                download.retry_count = 0
                 download.save()
                 
                 from task.tasks import download_audio_task

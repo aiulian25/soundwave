@@ -28,6 +28,10 @@ class DownloadQueue(models.Model):
     channel_name = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     error_message = models.TextField(blank=True)
+    retry_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Automatic re-queues since the last manual retry"
+    )
     added_date = models.DateTimeField(auto_now_add=True)
     started_date = models.DateTimeField(null=True, blank=True)
     completed_date = models.DateTimeField(null=True, blank=True)
