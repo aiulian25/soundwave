@@ -1,13 +1,15 @@
 # Netscape HTTP Cookie File
 # https://curl.se/docs/http-cookies.html
 #
-# This file is mounted into the container (read-only) and passed to yt-dlp as a
-# cookies file. It is OPTIONAL — leave it as just this header to download public
-# content without authentication.
+# SoundWave downloads with the YouTube session stored in cookies.txt. YouTube blocks most
+# anonymous downloads ("Sign in to confirm you're not a bot"), so downloads and channel
+# syncs need real cookies here. Export them from a private browser window signed in to
+# YouTube with a local exporter ("Get cookies.txt LOCALLY" for Chrome, not the lookalike
+# "Get cookies.txt"); README.md "YouTube Cookies" has the steps. Put the exported lines
+# in `cookies.txt` (NOT this example file).
 #
-# To download age-restricted / members-only / private content, export your YouTube
-# cookies in Netscape format (e.g. a "Get cookies.txt" browser extension) and paste
-# the cookie lines below this header into `cookies.txt` (NOT this example file).
+# The container reads this file and writes YouTube's refreshed session back after each
+# download, so it must be writable: owned by 1000:1000, chmod 600, no ":ro" mount.
 #
-# ⚠️ Treat cookies.txt as a SECRET — it grants access to your Google session. It is
-#    gitignored on purpose; never commit real cookies.
+# ⚠️ Treat cookies.txt as a SECRET — it grants access to the Google account it came from
+#    (use a secondary account). It is gitignored on purpose; never commit real cookies.

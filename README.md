@@ -113,6 +113,7 @@
 - 2-4GB available RAM
 - Dual-core CPU (quad-core recommended)
 - Storage space for your audio library
+- **YouTube cookies** from a signed-in browser session, ideally a secondary Google account. Downloads need them: see [YouTube Cookies](#youtube-cookies-required-for-downloads)
 
 ## Quick Start
 
@@ -134,11 +135,13 @@ wget https://raw.githubusercontent.com/aiulian25/soundwave/main/docker-compose.p
 # Create directories
 mkdir -p ./audio ./cache ./data
 
-# Create an empty cookies.txt (required by the container — add YouTube cookies here if needed)
+# cookies.txt holds the YouTube session that downloads need. An empty file lets
+# SoundWave start; add real cookies before downloading (see "YouTube Cookies" below).
 touch ./cookies.txt
 
-# Set permissions for container user (1000:1000)
-sudo chown -R 1000:1000 ./audio ./cache ./data
+# Set permissions for container user (1000:1000); cookies.txt must stay private and writable
+sudo chown -R 1000:1000 ./audio ./cache ./data ./cookies.txt
+sudo chmod 600 ./cookies.txt
 ```
 
 Or use the setup script:
@@ -210,6 +213,40 @@ grep SW_PASSWORD .env
 
 Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to initialize before SoundWave starts.
 
+## YouTube Cookies (Required for Downloads)
+
+YouTube blocks most anonymous downloads with *"Sign in to confirm you're not a bot"*. SoundWave downloads with the YouTube session stored in `cookies.txt`, so until that file holds real cookies, downloads and channel syncs fail. When YouTube rejects the cookies, the failed item says so and points back here.
+
+> **Treat `cookies.txt` like a password.** It gives access to the Google account it came from. Use a **secondary** Google account (YouTube can restrict accounts used for automated downloads), keep the file `chmod 600`, and never commit or share it.
+
+### Export the cookies
+
+1. **Install a local cookies exporter.** yt-dlp's wiki recommends **Get cookies.txt LOCALLY** for Chrome and **cookies.txt** for Firefox. Check the name: a lookalike called "Get cookies.txt", without "LOCALLY", was removed from the Chrome Web Store for sending cookies to a remote server.
+2. **Allow the extension in private windows.** In Chrome: `chrome://extensions` → **Details** → **Allow in Incognito**.
+3. **Open a private window** and sign in to YouTube with the secondary account. Play a few seconds of any video so the session is fully set up.
+4. **Export the cookies for the current site only**, in Netscape format. Don't export all cookies: that file would carry every login in the browser.
+5. **Close the private window straight away.** YouTube rotates the cookies of a session that stays open, which invalidates the exported copy.
+
+The exported file's first line should be `# Netscape HTTP Cookie File`.
+
+### Install them
+
+Copy the export over the `cookies.txt` next to your `docker-compose.yml` (on the server SoundWave runs on), then keep it private and writable by the container user:
+
+```bash
+cp /path/to/exported-cookies.txt ./cookies.txt
+sudo chown 1000:1000 ./cookies.txt
+sudo chmod 600 ./cookies.txt
+```
+
+No restart is needed: every download reads the file fresh. Replace it with `cp` as above. If you `mv` a new file into place instead, the container keeps reading the old one until `docker compose restart soundwave`.
+
+The file must stay **writable**: yt-dlp saves YouTube's refreshed session back into it after each download, so never mount it with `:ro`.
+
+### When downloads start failing
+
+Cookies expire, and YouTube can invalidate them at any time. When a failed download or channel sync says *YouTube asked to sign in*, repeat **Export** and **Install** above, then retry (the Activity panel has **Retry all failed**). If it says *SoundWave can't access cookies.txt*, fix the file's owner (`1000:1000`) or remove `:ro` from its line in `docker-compose.yml`.
+
 ## Configuration
 
 ### Environment Variables
@@ -253,7 +290,7 @@ Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to
 | `./audio` | Downloaded audio files |
 | `./cache` | Temporary cache files |
 | `./data` | App data (avatars, migration scripts) |
-| `./cookies.txt` | YouTube cookies file (must exist; can be empty) |
+| `./cookies.txt` | YouTube session cookies: required for downloads, must be writable by user 1000 (see [YouTube Cookies](#youtube-cookies-required-for-downloads)) |
 | `pg_data` (Docker volume) | PostgreSQL database — created automatically by Docker Compose |
 | `es_data` (Docker volume) | Elasticsearch index — created automatically by Docker Compose |
 | `redis_data` (Docker volume) | Redis persistence — created automatically by Docker Compose |
