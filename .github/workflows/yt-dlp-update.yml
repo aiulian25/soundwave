@@ -44,7 +44,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          current="$(grep -oP '^yt-dlp==\K\S+' "$REQ_FILE")"
+          # The pin carries the [default] extra (it installs the yt-dlp-ejs challenge solver), so
+          # both the read and the rewrite must allow an optional `[extras]` block.
+          current="$(grep -oP '^yt-dlp(\[[^]]*\])?==\K\S+' "$REQ_FILE")"
           latest="$(curl -fsSL https://pypi.org/pypi/yt-dlp/json | jq -r '.info.version')"
           echo "yt-dlp: pinned=$current latest=$latest"
 
@@ -76,7 +78,7 @@ jobs:
             git config user.name  "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git checkout -b "$branch"
-            sed -i -E "s/^yt-dlp==.*/yt-dlp==${latest}/" "$REQ_FILE"
+            sed -i -E "s/^(yt-dlp(\[[^]]*\])?)==.*/\1==${latest}/" "$REQ_FILE"
             git commit -am "deps(backend): bump yt-dlp ${current} -> ${latest}"
             git push origin "$branch"
           fi
