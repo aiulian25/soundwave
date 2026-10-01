@@ -31,6 +31,14 @@ RUN npm ci
 COPY frontend ./
 RUN npm run build
 
+# JavaScript runtime for yt-dlp's YouTube challenge solver (yt-dlp-ejs). YouTube now makes
+# the player solve an "n" challenge in JavaScript before it serves media; without a runtime
+# yt-dlp fails with "n challenge solving failed". Deno is yt-dlp's recommended runtime: it
+# runs the solver with no filesystem, network or environment permissions by default, which
+# matters because the script it executes comes from YouTube. The `bin` image is the single
+# binary; it is dynamically linked against glibc, so it runs on the Debian base below.
+FROM denoland/deno:bin-2.9.7 AS deno
+
 # Final stage - runtime only
 FROM python:3.11-slim
 
@@ -66,6 +74,11 @@ RUN apt-get update && apt-get upgrade -y \
 # Copy Python packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=deno /deno /usr/local/bin/deno
+# Never phone home for Deno release checks, and never block on a permission prompt — the
+# solver runs unattended inside download jobs.
+ENV DENO_NO_UPDATE_CHECK=1 \
+    DENO_NO_PROMPT=1
 
 # Remove build tools not needed at runtime — eliminates pip/setuptools/wheel CVEs
 # and reduces image size. The app is a Django server; it never installs packages at runtime.

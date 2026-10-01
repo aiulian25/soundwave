@@ -7,7 +7,10 @@ elasticsearch>=8.8.0
 # Pinned deliberately (CNT-02). The daily .github/workflows/yt-dlp-update.yml opens a bump
 # PR when a newer release ships; the CI trivy/grype gate flags known-vulnerable pins. Do
 # not rely on runtime auto-update. (Dependabot ignores yt-dlp — see .github/dependabot.yml.)
-yt-dlp==2026.8.19
+# The [default] extra installs yt-dlp-ejs, YouTube's challenge solver, at the exact version
+# yt-dlp pins for itself — so a yt-dlp bump moves the solver with it. It needs a JS runtime;
+# the image ships Deno (see Dockerfile). Keep the extra when bumping.
+yt-dlp[default]==2026.8.19
 Pillow>=10.0.0
 python-dateutil>=2.8.2
 pytz>=2023.3
