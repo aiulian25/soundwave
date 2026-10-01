@@ -57,17 +57,29 @@ jobs:
           fi
 
           branch="chore/bump-yt-dlp-${latest}"
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-            echo "Branch $branch already exists — a bump PR is already open."
+
+          # Skip only when a PR is actually OPEN. Checking for the branch alone was a trap:
+          # if a run pushed the branch but `gh pr create` then failed, every later run saw
+          # the branch, assumed a PR existed, and exited green forever — which is how the
+          # 2026.8.19 bump sat unshipped for six weeks.
+          open_pr="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$open_pr" ]; then
+            echo "PR #$open_pr is already open for ${latest} — nothing to do."
             exit 0
           fi
 
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          sed -i -E "s/^yt-dlp==.*/yt-dlp==${latest}/" "$REQ_FILE"
-          git commit -am "deps(backend): bump yt-dlp ${current} -> ${latest}"
-          git push origin "$branch"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            # Left behind by an earlier run whose PR creation failed. It already carries the
+            # bump commit, so open the PR from it rather than pushing a second copy.
+            echo "Branch $branch exists with no open PR — opening the PR from it."
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout -b "$branch"
+            sed -i -E "s/^yt-dlp==.*/yt-dlp==${latest}/" "$REQ_FILE"
+            git commit -am "deps(backend): bump yt-dlp ${current} -> ${latest}"
+            git push origin "$branch"
+          fi
 
           gh pr create --base main --head "$branch" \
             --title "deps(backend): bump yt-dlp ${current} -> ${latest}" \
