@@ -30,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read      # gitleaks lists the PR's commits
       security-events: write   # upload SARIF
     steps:
       - name: Checkout
@@ -44,9 +45,12 @@ jobs:
           no-fail: true   # report, do not block PRs on style warnings
 
       - name: Gitleaks (secret scan)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITLEAKS_CONFIG: .gitleaks.toml
+          # On pull_request events gitleaks lists the PR's commits through the API, and
+          # fails before scanning anything without a token.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Trivy config (IaC / Dockerfile misconfig) → SARIF
         uses: aquasecurity/trivy-action@v0.36.0
@@ -144,7 +148,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build image (load locally, amd64)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -201,7 +205,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: 'pip'
