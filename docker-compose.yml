@@ -21,6 +21,11 @@ services:
       - ./audio:/app/audio
       - ./cache:/app/cache
       - ./data:/app/data
+      # YouTube session for yt-dlp (Netscape format). Without it YouTube answers server
+      # requests with "Sign in to confirm you're not a bot". Read-only: the app never
+      # needs to write it. Must exist as a FILE before `up` — Docker creates a directory
+      # in its place otherwise.
+      - ./cookies.txt:/app/cookies.txt:ro
       - ./backend:/app/backend  # Mount backend for development
       - ./backend/staticfiles:/app/backend/staticfiles
       - ./frontend/dist:/app/frontend/dist  # Mount frontend for development
