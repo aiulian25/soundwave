@@ -18,3 +18,22 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  # Deno — the JavaScript runtime yt-dlp's YouTube challenge solver runs in (Dockerfile:
+  # `FROM denoland/deno:bin-<version> AS deno`). It executes YouTube-supplied code, and
+  # Trivy cannot see inside the binary, so staying current is the only way it picks up
+  # security fixes. `allow` scopes this to Deno alone: the python and node base images
+  # in the same Dockerfile are deliberately not tracked here.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: "denoland/deno"
+    ignore:
+      # dependabot-auto-merge.yml merges every Dependabot PR once CI is green, and CI
+      # never runs a real YouTube download. A major Deno release can change the CLI or
+      # permission model yt-dlp relies on, so majors stay a deliberate, tested upgrade;
+      # patch and minor releases (where security fixes land) flow through automatically.
+      - dependency-name: "denoland/deno"
+        update-types: ["version-update:semver-major"]
