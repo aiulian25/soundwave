@@ -145,13 +145,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     setCurrentAudioData(audio);
   }, [audio]);
 
-  // The track-details (i) view needs description / view+like counts / published_date.
-  // Lean sources (the homepage sections build Audio objects without them) would hide the
-  // button, making it appear only for tracks opened from a playlist/library. When those
-  // fields are absent, fetch the full owner-scoped record once and merge it in — so the
-  // details button is available for every track, without fattening list payloads.
+  // Lists hand the player whatever copy of a track they hold: the homepage sections build
+  // lean objects without the details fields (description, counts, published_date) or
+  // chapters, and a list loaded before a track was split carries no chapters. Merging the
+  // owner-scoped record for every new track keeps the details button and chapters current
+  // whichever page started playback, without fattening list payloads.
   useEffect(() => {
-    if (!audio.youtube_id || audio.published_date || !navigator.onLine) {
+    if (!audio.youtube_id || !navigator.onLine) {
       return;
     }
     let cancelled = false;
@@ -162,11 +162,11 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           setCurrentAudioData((previous) => ({ ...previous, ...response.data }));
         }
       })
-      .catch(() => undefined); // non-fatal: the details button simply stays hidden
+      .catch(() => undefined); // non-fatal: the player keeps the list's copy
     return () => {
       cancelled = true;
     };
-  }, [audio.youtube_id, audio.published_date]);
+  }, [audio]);
 
   // Handle initial seek for cross-device resume
   useEffect(() => {
@@ -941,8 +941,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
 
   // --- Chapters (F2) ---------------------------------------------------------
   const chapters: Chapter[] = useMemo(
-    () => (Array.isArray(audio.chapters) ? audio.chapters : []),
-    [audio.chapters],
+    () => (Array.isArray(currentAudioData.chapters) ? currentAudioData.chapters : []),
+    [currentAudioData.chapters],
   );
   const [chaptersOpen, setChaptersOpen] = useState(false);
   // Index of the chapter currently playing (last chapter whose start <= currentTime).
