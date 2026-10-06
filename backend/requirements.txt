@@ -26,7 +26,7 @@ pylast>=5.2.0
 psutil>=7.2.2
 whitenoise>=6.12.0
 gunicorn>=22.0.0
-psycopg[binary]>=3.1.19
+psycopg[binary]>=3.3.6
 # F16 sonic analysis. Pulls numpy/scipy/soundfile/numba/llvmlite transitively and adds
 # ~a few hundred MB to the image. Imported lazily in extract_features_task so non-feature
 # code, the Celery worker, and CI tests all load without it. numpy pinned <2.0 for the
