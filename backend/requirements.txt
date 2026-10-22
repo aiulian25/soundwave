@@ -10,7 +10,7 @@ elasticsearch>=8.8.0
 # The [default] extra installs yt-dlp-ejs, YouTube's challenge solver, at the exact version
 # yt-dlp pins for itself — so a yt-dlp bump moves the solver with it. It needs a JS runtime;
 # the image ships Deno (see Dockerfile). Keep the extra when bumping.
-yt-dlp[default]==2026.8.19
+yt-dlp[default]==2026.10.21
 Pillow>=12.3.0
 python-dateutil>=2.8.2
 pytz>=2023.3
