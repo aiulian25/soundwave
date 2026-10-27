@@ -37,7 +37,7 @@ RUN npm run build
 # runs the solver with no filesystem, network or environment permissions by default, which
 # matters because the script it executes comes from YouTube. The `bin` image is the single
 # binary; it is dynamically linked against glibc, so it runs on the Debian base below.
-FROM denoland/deno:bin-2.9.7 AS deno
+FROM denoland/deno:bin-2.9.8 AS deno
 
 # Final stage - runtime only
 FROM python:3.11-slim
