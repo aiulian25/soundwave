@@ -5,6 +5,8 @@ from rest_framework import status
 from common.views import ApiBaseView
 from audio.models_playback_sync import PlaybackSession
 from audio.models import Audio
+from audio.serializers import AudioSerializer
+from user.models import UserConfig
 from audio.serializers_playback_sync import (
     PlaybackSessionSerializer,
     PlaybackSyncUpdateSerializer,
@@ -18,6 +20,9 @@ class PlaybackSyncView(ApiBaseView):
     GET: Retrieve the user's last playback session
     POST: Update/save the current playback state
     DELETE: Clear the playback session
+
+    One session per user, and the last write wins: devices do not merge, and resuming
+    elsewhere simply takes over when that device next writes.
     """
     
     def get(self, request):
@@ -73,6 +78,14 @@ class PlaybackSyncView(ApiBaseView):
                 )
             
             data = serializer.validated_data
+            
+            # A tab still open from before the owner opted out must not keep writing.
+            opted_out = UserConfig.objects.filter(user=request.user, playback_sync_enabled=False).exists()
+            if opted_out:
+                return Response(
+                    {'error': 'Playback sync is disabled'},
+                    status=status.HTTP_409_CONFLICT
+                )
             
             # Skip sync if no youtube_id (can happen at track end)
             if not data.get('youtube_id'):
@@ -130,6 +143,44 @@ class PlaybackSyncView(ApiBaseView):
             'message': 'Playback session cleared' if deleted else 'No session to clear',
             'deleted': deleted > 0,
         })
+
+
+class PlaybackSyncQueueView(ApiBaseView):
+    """The saved queue as tracks, for resuming on another device."""
+
+    def get(self, request):
+        session = PlaybackSession.objects.filter(user=request.user).first()
+        if session is None:
+            return Response(
+                {'message': 'No active playback session'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        saved_ids = session.queue_youtube_ids
+        tracks_by_id = {
+            audio.youtube_id: audio
+            for audio in Audio.objects.filter(owner=request.user, youtube_id__in=set(saved_ids))
+        }
+        positions_kept = [position for position, youtube_id in enumerate(saved_ids) if youtube_id in tracks_by_id]
+        tracks = [tracks_by_id[saved_ids[position]] for position in positions_kept]
+
+        return Response({
+            'data': AudioSerializer(tracks, many=True).data,
+            'index': self._current_index(session, positions_kept),
+            'missing': len(saved_ids) - len(positions_kept),
+        })
+
+    @staticmethod
+    def _current_index(session, positions_kept):
+        """Where the current track landed, or None if the queue does not contain it."""
+        saved_ids = session.queue_youtube_ids
+        is_at_saved_place = session.queue_index in positions_kept and saved_ids[session.queue_index] == session.youtube_id
+        if is_at_saved_place:
+            return positions_kept.index(session.queue_index)
+        for index, position in enumerate(positions_kept):
+            if saved_ids[position] == session.youtube_id:
+                return index
+        return None
 
 
 class PlaybackSyncStatusView(ApiBaseView):

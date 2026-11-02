@@ -10,12 +10,22 @@ from rest_framework.views import APIView
 from rest_framework.authentication import SessionAuthentication
 
 from common.authentication import CsrfExemptTokenAuthentication
+from common.readiness import readiness_report
 
 
 @require_GET
 def ping(request):
     """Unauthenticated health check endpoint for Docker HEALTHCHECK."""
     return JsonResponse({"status": "ok"})
+
+
+class ReadinessView(APIView):
+    """Whether the whole system works. /api/ping/ only says the web process answers."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        report = readiness_report()
+        return Response(report, status=200 if report['ready'] else 503)
 
 
 class AppVersionView(APIView):

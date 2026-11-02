@@ -90,12 +90,10 @@ class LocalAudioViewSet(viewsets.ModelViewSet):
             # the same pre-upload usage and both pass the check. select_for_update is a
             # no-op on SQLite (no SELECT ... FOR UPDATE), which serializes writers anyway.
             account = get_user_model().objects.select_for_update().get(pk=user.pk)
-            has_unlimited_storage = account.is_admin or account.is_superuser
-            is_over_quota = account.storage_used_gb >= account.storage_quota_gb
-            if not has_unlimited_storage and is_over_quota:
-                raise PermissionDenied(
-                    f"Storage quota exceeded ({account.storage_used_gb:.1f} / {account.storage_quota_gb} GB)"
-                )
+            incoming_bytes = serializer.validated_data['file'].size
+            would_exceed = account.storage_used_bytes() + incoming_bytes > account.storage_quota_bytes
+            if would_exceed and not account.has_unlimited_storage:
+                raise PermissionDenied(f"Storage quota of {account.storage_quota_gb} GB would be exceeded")
 
             local_audio = serializer.save(owner=user)
 

@@ -1,7 +1,30 @@
 """
 DRF Permissions for multi-tenant user isolation
 """
+from urllib.parse import urlsplit
+
+from django.conf import settings
 from rest_framework import permissions
+
+CROSS_SITE_REQUEST_MESSAGE = 'This request came from another website.'
+
+
+class NotFromAnotherSite(permissions.BasePermission):
+    """Refuses browser requests another website started; clients without an Origin pass.
+
+    For views with no session to carry a CSRF check, such as login: SameSite does not stop a
+    cross-site form from setting the session cookie its response returns.
+    """
+
+    message = CROSS_SITE_REQUEST_MESSAGE
+
+    def has_permission(self, request, view):
+        origin = request.META.get('HTTP_ORIGIN')
+        if not origin:
+            return True
+        # Hosts, not schemes: behind a TLS proxy this app can see http while the browser says https.
+        same_host = urlsplit(origin).netloc == request.get_host()
+        return same_host or origin.rstrip('/') in settings.PASSKEY_ALLOWED_ORIGINS
 
 
 class IsOwnerOrAdmin(permissions.BasePermission):
@@ -96,12 +119,12 @@ class WithinQuotaLimits(permissions.BasePermission):
             return False
         
         # Admins bypass quota checks
-        if user.is_admin or user.is_superuser:
+        if user.has_unlimited_storage:
             return True
         
         # Check storage quota
-        if user.storage_used_gb >= user.storage_quota_gb:
-            self.message = f"Storage quota exceeded ({user.storage_used_gb:.1f} / {user.storage_quota_gb} GB)"
+        if user.storage_used_bytes() >= user.storage_quota_bytes:
+            self.message = f"Storage quota of {user.storage_quota_gb} GB is used up"
             return False
         
         return True

@@ -42,8 +42,11 @@ class LocalAudioSerializer(serializers.ModelSerializer):
             'notes',
             'is_favorite',
         ]
+        # `file` too: uploads go through LocalAudioUploadSerializer's checks, and a metadata
+        # update must not be a way to swap the bytes around them.
         read_only_fields = [
             'id',
+            'file',
             'file_size',
             'duration',
             'audio_format',

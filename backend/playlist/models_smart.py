@@ -1,11 +1,17 @@
 """Smart Playlist models - Dynamic auto-updating playlists"""
 
-from django.db import models
+import random
+
+from django.db import models, transaction
+from django.db.models import Case, When
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from datetime import timedelta
+
+from playlist.smart_rules import InvalidRule, rule_is_valid, rules_predicate
 
 User = get_user_model()
+
+RANDOM_ORDER = 'random'
 
 
 class SmartPlaylistRule(models.Model):
@@ -158,136 +164,66 @@ class SmartPlaylist(models.Model):
     def __str__(self):
         return f"{self.owner.username} - {self.name}"
     
-    def get_queryset(self):
-        """Build and return the queryset for this smart playlist"""
+    @property
+    def track_cap(self):
+        """The limit as a usable bound; rows saved before limits were validated may hold nonsense."""
+        return self.limit if self.limit and self.limit > 0 else None
+
+    def invalid_rule_ids(self):
+        return [rule.id for rule in self.rules.all() if not rule_is_valid(rule)]
+
+    def matching_tracks(self, rules=None):
+        """Every matching track, unordered. Pass `rules` to evaluate a draft that is not saved.
+
+        A stored rule that means nothing matches nothing: skipping it would widen the
+        playlist. invalid_rule_ids tells the owner which rule to repair.
+        """
         from audio.models import Audio
-        from django.db.models import Q
-        import random
-        
-        queryset = Audio.objects.filter(owner=self.owner)
-        
-        # Apply rules
-        rules = self.rules.all()
-        if rules.exists():
-            if self.match_mode == 'all':
-                # AND mode - all rules must match
-                for rule in rules:
-                    queryset = self._apply_rule(queryset, rule)
-            else:
-                # OR mode - any rule can match
-                combined_q = Q()
-                for rule in rules:
-                    rule_q = self._build_rule_q(rule)
-                    if rule_q:
-                        combined_q |= rule_q
-                if combined_q:
-                    queryset = queryset.filter(combined_q)
-        
-        # Apply ordering
-        if self.order_by == 'random':
-            # For random, we'll get all IDs and shuffle
-            ids = list(queryset.values_list('id', flat=True))
-            random.shuffle(ids)
-            if self.limit:
-                ids = ids[:self.limit]
-            # Preserve the random order using CASE WHEN
-            from django.db.models import Case, When
-            preserved_order = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(ids)])
-            queryset = Audio.objects.filter(pk__in=ids).order_by(preserved_order)
-        else:
-            queryset = queryset.order_by(self.order_by)
-            
-            # Apply limit
-            if self.limit:
-                queryset = queryset[:self.limit]
-        
-        return queryset
-    
-    def _apply_rule(self, queryset, rule):
-        """Apply a single rule to a queryset (for AND mode)"""
-        rule_q = self._build_rule_q(rule)
-        if rule_q:
-            return queryset.filter(rule_q)
-        return queryset
-    
-    def _build_rule_q(self, rule):
-        """Build a Q object for a rule"""
-        from django.db.models import Q
-        
-        field = rule.field
-        operator = rule.operator
-        value = rule.value
-        value_2 = rule.value_2
-        
-        # Text operators
-        if operator == 'contains':
-            return Q(**{f'{field}__icontains': value})
-        elif operator == 'not_contains':
-            return ~Q(**{f'{field}__icontains': value})
-        elif operator == 'equals':
-            return Q(**{f'{field}__iexact': value})
-        elif operator == 'not_equals':
-            return ~Q(**{f'{field}__iexact': value})
-        elif operator == 'starts_with':
-            return Q(**{f'{field}__istartswith': value})
-        elif operator == 'ends_with':
-            return Q(**{f'{field}__iendswith': value})
-        
-        # Numeric operators
-        elif operator == 'greater_than':
-            return Q(**{f'{field}__gt': int(value)})
-        elif operator == 'less_than':
-            return Q(**{f'{field}__lt': int(value)})
-        elif operator == 'greater_equal':
-            return Q(**{f'{field}__gte': int(value)})
-        elif operator == 'less_equal':
-            return Q(**{f'{field}__lte': int(value)})
-        elif operator == 'between':
-            return Q(**{f'{field}__gte': int(value), f'{field}__lte': int(value_2)})
-        
-        # Date operators
-        elif operator == 'in_last_days':
-            days_ago = timezone.now() - timedelta(days=int(value))
-            return Q(**{f'{field}__gte': days_ago})
-        elif operator == 'not_in_last_days':
-            days_ago = timezone.now() - timedelta(days=int(value))
-            return Q(**{f'{field}__lt': days_ago}) | Q(**{f'{field}__isnull': True})
-        elif operator == 'before_date':
-            return Q(**{f'{field}__lt': value})
-        elif operator == 'after_date':
-            return Q(**{f'{field}__gt': value})
-        
-        # Boolean operators
-        elif operator == 'is_true':
-            return Q(**{field: True})
-        elif operator == 'is_false':
-            return Q(**{field: False})
-        
-        # Null operators
-        elif operator == 'is_set':
-            # Check if field is not null and not empty string
-            return ~Q(**{f'{field}__isnull': True}) & ~Q(**{field: ''})
-        elif operator == 'is_not_set':
-            return Q(**{f'{field}__isnull': True}) | Q(**{field: ''})
-        
-        return None
-    
-    def get_tracks(self):
-        """Get the list of tracks matching this smart playlist"""
-        return list(self.get_queryset())
-    
-    def get_track_count(self):
+
+        evaluated_rules = self.rules.all() if rules is None else rules
+        try:
+            predicate = rules_predicate(evaluated_rules, self.match_mode)
+        except InvalidRule:
+            return Audio.objects.none()
+        return Audio.objects.filter(owner=self.owner).filter(predicate)
+
+    def _shuffled_track_ids(self, shuffle_seed, rules):
+        track_ids = list(self.matching_tracks(rules).order_by('id').values_list('id', flat=True))
+        random.Random(shuffle_seed).shuffle(track_ids)
+        return track_ids[:self.track_cap] if self.track_cap else track_ids
+
+    def tracks_page(self, start, end, shuffle_seed=None, rules=None):
+        """One slice of the playlist. The same seed always gives the same random order."""
+        from audio.models import Audio
+
+        if self.order_by == RANDOM_ORDER:
+            page_ids = self._shuffled_track_ids(shuffle_seed, rules)[start:end]
+            page_order = Case(*[When(pk=track_id, then=index) for index, track_id in enumerate(page_ids)])
+            return Audio.objects.filter(pk__in=page_ids).order_by(page_order)
+        ordered = self.matching_tracks(rules).order_by(self.order_by, 'id')
+        capped = ordered[:self.track_cap] if self.track_cap else ordered
+        return capped[start:end]
+
+    def get_track_count(self, rules=None):
         """Get count of tracks matching this smart playlist"""
-        if self.order_by == 'random':
-            # For random, we need to get all matching tracks first
-            from audio.models import Audio
-            queryset = Audio.objects.filter(owner=self.owner)
-            for rule in self.rules.all():
-                queryset = self._apply_rule(queryset, rule)
-            count = queryset.count()
-            return min(count, self.limit) if self.limit else count
-        return self.get_queryset().count()
-    
+        count = self.matching_tracks(rules).count()
+        return min(count, self.track_cap) if self.track_cap else count
+
+    def forget_cached_count(self):
+        self.cache_updated = None
+        self.save(update_fields=['cache_updated'])
+
+    def replace_rules(self, rules_data):
+        """Swap in already validated rules, all or nothing."""
+        with transaction.atomic():
+            self.rules.all().delete()
+            rules = [
+                SmartPlaylistRule.objects.create(smart_playlist=self, order=position, **rule_data)
+                for position, rule_data in enumerate(rules_data)
+            ]
+            self.forget_cached_count()
+        return rules
+
     def update_cache(self):
         """Update the cached track count"""
         self.cached_count = self.get_track_count()

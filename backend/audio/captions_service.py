@@ -11,7 +11,8 @@ import re
 from urllib.parse import urlparse
 
 import requests
-import yt_dlp
+
+from common.ytdlp_session import youtube_session
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,6 @@ def fetch_captions_lrc(youtube_id, lang_pref=None):
     if not youtube_id:
         return None
     lang_pref = lang_pref or ['en']
-    from task.tasks import get_yt_dlp_cookies_opts
 
     url = f"https://www.youtube.com/watch?v={youtube_id}"
     ydl_opts = {
@@ -115,10 +115,9 @@ def fetch_captions_lrc(youtube_id, lang_pref=None):
         'no_warnings': True,
         'skip_download': True,
         'subtitleslangs': lang_pref,
-        **get_yt_dlp_cookies_opts(),
     }
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with youtube_session(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as exc:  # noqa: BLE001
         logger.info('Captions fetch failed for %s: %s', youtube_id, exc)

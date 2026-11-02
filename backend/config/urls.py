@@ -14,6 +14,7 @@ api_urlpatterns = [
     path("", include("common.urls")),
     path("audio/", include("audio.urls")),
     path("playback-sync/", include("audio.urls_playback_sync")),
+    path("export-jobs/", include("audio.urls_export")),
     path("radio/", include("audio.urls_radio")),
     path("channel/", include("channel.urls")),
     path("playlist/", include("playlist.urls")),

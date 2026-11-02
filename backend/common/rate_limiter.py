@@ -141,6 +141,12 @@ class LoginRateThrottle(AnonRateThrottle):
     scope = 'login'
 
 
+class PasskeyRateThrottle(AnonRateThrottle):
+    """Own bucket: one passkey sign-in takes two requests, which must not eat the login budget."""
+    rate = '20/minute'
+    scope = 'passkey'
+
+
 class BurstRateThrottle(AnonRateThrottle):
     """Prevent burst attacks on anonymous endpoints."""
     rate = '30/minute'

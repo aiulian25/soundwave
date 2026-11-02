@@ -1,9 +1,11 @@
 """Audio API views"""
 
+import json
 import logging
+import subprocess
 from urllib.parse import urlparse
 
-from django.db.models import F
+from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
@@ -13,8 +15,12 @@ from audio.serializers import (
     AudioListSerializer,
     AudioSerializer,
     AudioProgressUpdateSerializer,
+    EXPORT_OPTIONS_ERROR,
+    ExportOptionsSerializer,
     PlayerSerializer,
 )
+from common.search import matching, search_term
+from common.pagination import paginated_response
 from common.authentication import APIKeyAuthentication
 from common.streaming import make_media_ticket, resolve_media_ticket
 from common.views import ApiBaseView, AuthenticatedOwnerAccess
@@ -70,6 +76,9 @@ def is_safe_artwork_url(url: str) -> bool:
     return parsed.scheme.lower() in allowed_schemes
 
 
+AUDIO_SEARCH_FIELDS = ('title', 'artist', 'channel_name')
+
+
 class AudioListView(ApiBaseView):
     """Audio list endpoint
     GET: returns list of audio files
@@ -80,8 +89,13 @@ class AudioListView(ApiBaseView):
         # Get query parameters
         channel_id = request.query_params.get('channel')
         playlist_id = request.query_params.get('playlist')
-        status_filter = request.query_params.get('status')
         favorites = request.query_params.get('favorites')
+
+        if 'status' in request.query_params:
+            return Response(
+                {'error': 'Filtering by status is not supported'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Base queryset - scoped to the requesting user (APP-04 centralized)
         queryset = self.filter_owned(Audio.objects.all())
@@ -90,30 +104,17 @@ class AudioListView(ApiBaseView):
         if channel_id:
             queryset = queryset.filter(channel_id=channel_id)
         if playlist_id:
-            # TODO: Filter by playlist
-            pass
-        if status_filter:
-            # TODO: Filter by play status
-            pass
+            queryset = queryset.filter(
+                playlist_items__playlist__playlist_id=playlist_id,
+                playlist_items__playlist__owner=request.user,
+            )
         if favorites == 'true':
             queryset = queryset.filter(is_favorite=True)
 
-        # Pagination (page_size is fixed; guard `page` against non-numeric input).
-        page_size = 50
-        try:
-            page = max(1, int(request.query_params.get('page', 1)))
-        except (TypeError, ValueError):
-            page = 1
-        start = (page - 1) * page_size
-        end = start + page_size
+        queryset = matching(queryset, search_term(request), AUDIO_SEARCH_FIELDS)
 
-        audio_list = queryset[start:end]
-        serializer = AudioSerializer(audio_list, many=True)
-
-        return Response({
-            'data': serializer.data,
-            'paginate': True
-        })
+        # pk breaks ties: tracks can share a published date.
+        return paginated_response(request, queryset.order_by('-published_date', 'pk'), AudioSerializer)
 
 
 class AudioDetailView(ApiBaseView):
@@ -144,15 +145,16 @@ class AudioDetailView(ApiBaseView):
                 )
             
             # Add to download queue
+            from download.claims import requeue_if_failed
             from download.models import DownloadQueue
             from task.tasks import download_audio_task
             
             # Create download queue item
             queue_item, created = DownloadQueue.objects.get_or_create(
                 owner=request.user,
-                youtube_id=youtube_id,
+                url=f'https://www.youtube.com/watch?v={youtube_id}',
                 defaults={
-                    'url': f'https://www.youtube.com/watch?v={youtube_id}',
+                    'youtube_id': youtube_id,
                     'title': audio.title,
                     'channel_name': audio.channel_name,
                     'auto_start': True,
@@ -161,6 +163,7 @@ class AudioDetailView(ApiBaseView):
             
             # Trigger download task
             if created or queue_item.status == 'failed':
+                requeue_if_failed(queue_item)
                 download_audio_task.delay(queue_item.id)
                 return Response(
                     {'detail': 'Download started', 'status': 'downloading'},
@@ -206,7 +209,7 @@ class AudioPlayerView(ApiBaseView):
         try:
             if not hasattr(audio, 'lyrics') or not audio.lyrics.fetch_attempted:
                 from audio.tasks_lyrics import fetch_lyrics_for_audio
-                fetch_lyrics_for_audio.delay(youtube_id)
+                fetch_lyrics_for_audio.delay(audio.pk, audio.owner_id)
         except Exception as e:
             logger.warning("[Player GET] Lyrics fetch task trigger failed for %s: %s", youtube_id, e)
 
@@ -271,10 +274,6 @@ class AudioProgressView(ApiBaseView):
             progress.position = serializer.validated_data['position']
             progress.completed = serializer.validated_data.get('completed', False)
             progress.save()
-
-        # Update audio play count
-        if created or serializer.validated_data.get('completed'):
-            Audio.objects.filter(pk=audio.pk).update(play_count=F('play_count') + 1)
 
         return Response({
             'position': progress.position,
@@ -373,6 +372,9 @@ class AudioExportView(ApiBaseView):
         format = ''
         
         def render(self, data, accepted_media_type=None, renderer_context=None):
+            # Options and errors are JSON; only the file itself passes through as bytes.
+            if isinstance(data, (dict, list)):
+                return json.dumps(data, cls=DjangoJSONEncoder).encode()
             return data
     
     renderer_classes = [PassthroughRenderer]
@@ -452,11 +454,19 @@ class AudioExportView(ApiBaseView):
     
     def post(self, request, youtube_id):
         """Export audio with specified format and embedded metadata"""
-        import tempfile
-        import shutil
-        from django.http import FileResponse
         from django.conf import settings
         from pathlib import Path
+        from audio.export import AudioConversionError, ExportSourceUnavailable, export_track_to_file
+        from audio.export_limits import (
+            ExportRefused,
+            ScratchFileResponse,
+            estimated_export_bytes,
+            new_scratch_dir,
+            refuse_if_no_room,
+            release_slot,
+            remove_scratch_dir,
+            take_sync_slot,
+        )
         
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
         
@@ -466,18 +476,11 @@ class AudioExportView(ApiBaseView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Get export options
-        target_format = request.data.get('format', 'mp3').lower()
-        embed_lyrics = request.data.get('embed_lyrics', True)
-        embed_artwork = request.data.get('embed_artwork', True)
-        artwork_url = request.data.get('artwork_url', '')  # Custom artwork URL
-        quality = request.data.get('quality', 'high')  # high, medium, low
-        
-        if target_format not in ['mp3', 'flac']:
-            return Response(
-                {'error': 'Invalid format. Supported: mp3, flac'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        options = ExportOptionsSerializer(data=request.data)
+        if not options.is_valid():
+            return Response({'error': EXPORT_OPTIONS_ERROR}, status=status.HTTP_400_BAD_REQUEST)
+        target_format = options.validated_data['format']
+        quality = options.validated_data['quality']
         
         # Build source path
         source_path = Path(settings.MEDIA_ROOT) / audio.file_path
@@ -487,59 +490,49 @@ class AudioExportView(ApiBaseView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Convert + embed metadata into a temp file (shared export core).
-        temp_dir = tempfile.mkdtemp()
         try:
-            from audio.export import (
-                export_track_to_file,
-                AudioConversionError,
-                ExportSourceUnavailable,
+            refuse_if_no_room(estimated_export_bytes([audio], target_format, quality))
+            slot = take_sync_slot()
+        except ExportRefused as refused:
+            return Response({'error': refused.message}, status=refused.status)
+
+        # Convert + embed metadata into scratch (shared export core), then stream it from disk.
+        scratch = new_scratch_dir()
+
+        def tidy_up():
+            remove_scratch_dir(scratch)
+            release_slot(slot)
+
+        try:
+            exported = export_track_to_file(
+                audio,
+                target_format,
+                quality,
+                scratch,
+                embed_lyrics=options.validated_data['embed_lyrics'],
+                embed_artwork=options.validated_data['embed_artwork'],
+                artwork_url=options.validated_data['artwork_url'],
             )
+        except ExportSourceUnavailable:
+            tidy_up()
+            return Response({'error': 'Source audio file not found'}, status=status.HTTP_404_NOT_FOUND)
+        except (AudioConversionError, subprocess.TimeoutExpired):
+            tidy_up()
+            return Response({'error': 'Audio conversion failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            tidy_up()
+            raise
 
-            try:
-                output_path = export_track_to_file(
-                    audio,
-                    target_format,
-                    quality,
-                    temp_dir,
-                    embed_lyrics=embed_lyrics,
-                    embed_artwork=embed_artwork,
-                    artwork_url=artwork_url,
-                )
-            except ExportSourceUnavailable:
-                return Response(
-                    {'error': 'Source audio file not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            except AudioConversionError:
-                return Response(
-                    {'error': 'Audio conversion failed'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
-            output_filename = output_path.name
-            
-            # Determine content type
-            content_type = 'audio/mpeg' if target_format == 'mp3' else 'audio/flac'
-            
-            # Read the file into memory to return it
-            with open(output_path, 'rb') as f:
-                file_data = f.read()
-            
-            # Create response
-            from django.http import HttpResponse
-            response = HttpResponse(file_data, content_type=content_type)
-            response['Content-Disposition'] = f'attachment; filename="{output_filename}"'
-            response['Content-Length'] = len(file_data)
-            
-            return response
-            
-        finally:
-            # Clean up temp directory
-            try:
-                shutil.rmtree(temp_dir)
-            except Exception as e:
-                logger.warning("[Export POST] Failed to clean temp dir %s: %s", temp_dir, e)
+        response = ScratchFileResponse(
+            open(exported.path, 'rb'),
+            as_attachment=True,
+            filename=exported.path.name,
+            content_type='audio/mpeg' if target_format == 'mp3' else 'audio/flac',
+            cleanup=tidy_up,
+        )
+        if exported.warnings:
+            response['X-Export-Warnings'] = ','.join(exported.warnings)
+        return response
 
 
 class MetadataSearchView(ApiBaseView):
@@ -589,6 +582,7 @@ class MetadataApplyView(ApiBaseView):
         """Apply metadata to audio track"""
         from django.utils import timezone
         from audio.metadata_fetcher import metadata_fetcher
+        from audio.storage_service import ensure_private_file
         from audio.tag_writer import write_metadata_to_file
         
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
@@ -612,7 +606,7 @@ class MetadataApplyView(ApiBaseView):
                 audio.save()
                 
                 # Write tags to the actual audio file
-                if audio.file_path:
+                if audio.file_path and ensure_private_file(audio):
                     write_metadata_to_file(
                         file_path=audio.file_path,
                         title=audio.title,
@@ -653,7 +647,7 @@ class MetadataApplyView(ApiBaseView):
         audio.save()
         
         # Write tags to the actual audio file
-        if audio.file_path:
+        if audio.file_path and ensure_private_file(audio):
             write_metadata_to_file(
                 file_path=audio.file_path,
                 title=audio.title,
@@ -680,6 +674,7 @@ class MetadataAutoFetchView(ApiBaseView):
         """Auto-fetch metadata for an audio track"""
         from django.utils import timezone
         from audio.metadata_fetcher import metadata_fetcher
+        from audio.storage_service import ensure_private_file
         from audio.tag_writer import write_metadata_to_file
         
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
@@ -731,7 +726,7 @@ class MetadataAutoFetchView(ApiBaseView):
         audio.save()
         
         # Write tags to the actual audio file
-        if audio.file_path:
+        if audio.file_path and ensure_private_file(audio):
             write_metadata_to_file(
                 file_path=audio.file_path,
                 title=audio.title,
@@ -782,6 +777,7 @@ class ArtworkProxyView(APIView):
         """Proxy artwork for a track"""
         import requests as http_requests
         from django.http import HttpResponse
+        from common.safe_http import FetchRefused, REFUSED_TOO_LARGE, fetch_public_url
 
         user = self._authorized_user(request, youtube_id)
         if user is None:
@@ -807,21 +803,12 @@ class ArtworkProxyView(APIView):
             )
 
         try:
-            with http_requests.get(
-                artwork_url, timeout=ARTWORK_FETCH_TIMEOUT_SECONDS, stream=True
-            ) as upstream:
-                if upstream.status_code != 200:
-                    return Response(
-                        {'error': 'Failed to fetch artwork'},
-                        status=status.HTTP_502_BAD_GATEWAY
-                    )
-                # Read one byte past the cap so an oversized body is rejected without
-                # ever being buffered in full.
-                content = upstream.raw.read(MAX_ARTWORK_BYTES + 1, decode_content=True)
-                upstream_content_type = upstream.headers.get(
-                    'content-type', DEFAULT_ARTWORK_CONTENT_TYPE
-                )
-        except Exception:
+            fetched = fetch_public_url(artwork_url, MAX_ARTWORK_BYTES, ARTWORK_FETCH_TIMEOUT_SECONDS)
+        except FetchRefused as refusal:
+            logger.warning("[Artwork Proxy] Refused fetch for %s: %s", youtube_id, refusal)
+            message = 'Artwork too large' if refusal.code == REFUSED_TOO_LARGE else 'Failed to fetch artwork'
+            return Response({'error': message}, status=status.HTTP_502_BAD_GATEWAY)
+        except http_requests.RequestException:
             # Don't expose exception details in response
             logger.warning("[Artwork Proxy] Error fetching artwork for %s", youtube_id, exc_info=True)
             return Response(
@@ -829,13 +816,8 @@ class ArtworkProxyView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        if len(content) > MAX_ARTWORK_BYTES:
-            return Response(
-                {'error': 'Artwork too large'},
-                status=status.HTTP_502_BAD_GATEWAY
-            )
-
-        content_type = upstream_content_type
+        content = fetched.content
+        content_type = fetched.content_type
         if not content_type.startswith('image/'):
             content_type = DEFAULT_ARTWORK_CONTENT_TYPE
 

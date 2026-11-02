@@ -10,6 +10,10 @@ from pathlib import Path
 from typing import Optional
 from django.conf import settings
 
+from audio.artwork_images import InvalidArtworkImage, MAX_ARTWORK_BYTES, decoded_mime_type
+from audio.lrc import parse_lrc
+from common.safe_http import FetchRefused, fetch_public_url
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +27,8 @@ try:
 except ImportError:
     MUTAGEN_AVAILABLE = False
     logger.warning("mutagen not available, cannot write audio tags")
+
+ARTWORK_FETCH_DEADLINE_SECONDS = 10
 
 # Allowed URL prefixes for artwork download (SSRF protection)
 ALLOWED_ARTWORK_URL_PREFIXES = (
@@ -51,12 +57,11 @@ def download_cover_art(url: str) -> Optional[bytes]:
         return None
     
     try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            return response.content
-    except Exception:
-        pass  # Don't expose error details
-    return None
+        fetched = fetch_public_url(url, MAX_ARTWORK_BYTES, ARTWORK_FETCH_DEADLINE_SECONDS)
+        decoded_mime_type(fetched.content)
+        return fetched.content
+    except (FetchRefused, InvalidArtworkImage, requests.RequestException):
+        return None  # Don't expose error details
 
 
 def parse_lrc_to_synced_lyrics(lrc_text: str) -> list:
@@ -69,33 +74,7 @@ def parse_lrc_to_synced_lyrics(lrc_text: str) -> list:
     Returns:
         List of (text, time_ms) tuples
     """
-    import re
-    synced = []
-    
-    for line in lrc_text.split('\n'):
-        line = line.strip()
-        if not line:
-            continue
-        
-        # Match timestamp [mm:ss.xx] or [mm:ss.xxx]
-        match = re.match(r'\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)', line)
-        if match:
-            minutes = int(match.group(1))
-            seconds = int(match.group(2))
-            centiseconds = match.group(3)
-            # Normalize to milliseconds
-            if len(centiseconds) == 2:
-                ms = int(centiseconds) * 10
-            else:
-                ms = int(centiseconds)
-            
-            time_ms = (minutes * 60 + seconds) * 1000 + ms
-            text = match.group(4).strip()
-            
-            if text:
-                synced.append((text, time_ms))
-    
-    return synced
+    return [(event.text, event.time_ms) for event in parse_lrc(lrc_text)]
 
 
 def write_metadata_to_file(

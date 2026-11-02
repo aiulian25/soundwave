@@ -5,6 +5,7 @@ from django.db.models import Sum, Count
 from django.db.models.functions import TruncDate, ExtractHour, ExtractWeekDay
 from django.utils import timezone
 from stats.models import Achievement, ListeningHistory, ListeningStreak
+from stats.time_ranges import listening_dates, listening_streaks
 from audio.models import Audio
 
 
@@ -117,49 +118,7 @@ class AchievementService:
     
     def _calculate_streaks(self):
         """Calculate current and longest listening streaks"""
-        # Get all dates with listening activity
-        history = ListeningHistory.objects.filter(user=self.user)
-        dates_with_listening = set(
-            history.annotate(date=TruncDate('listened_at'))
-            .values_list('date', flat=True)
-            .distinct()
-        )
-        
-        if not dates_with_listening:
-            return 0, 0
-        
-        today = timezone.localtime().date()
-        
-        # Current streak - count backwards from today
-        current_streak = 0
-        check_date = today
-        while check_date in dates_with_listening:
-            current_streak += 1
-            check_date -= timedelta(days=1)
-        
-        # If no listening today, check if streak continues from yesterday
-        if today not in dates_with_listening:
-            yesterday = today - timedelta(days=1)
-            if yesterday in dates_with_listening:
-                current_streak = 0
-                check_date = yesterday
-                while check_date in dates_with_listening:
-                    current_streak += 1
-                    check_date -= timedelta(days=1)
-        
-        # Longest streak
-        sorted_dates = sorted(dates_with_listening)
-        longest_streak = 1
-        current_run = 1
-        
-        for i in range(1, len(sorted_dates)):
-            if sorted_dates[i] - sorted_dates[i-1] == timedelta(days=1):
-                current_run += 1
-                longest_streak = max(longest_streak, current_run)
-            else:
-                current_run = 1
-        
-        return current_streak, longest_streak
+        return listening_streaks(listening_dates(ListeningHistory.objects.filter(user=self.user)))
     
     def _update_streak_record(self):
         """Update the daily streak record"""

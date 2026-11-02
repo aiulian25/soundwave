@@ -7,43 +7,52 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name="audio.fetch_lyrics_for_audio")
-def fetch_lyrics_for_audio(audio_youtube_id: str, force: bool = False):
+def _owned_audio(audio_id, owner_id):
+    """The track only if it still exists under this active owner; a job never outlives either."""
+    from audio.models import Audio
+
+    return Audio.objects.filter(pk=audio_id, owner_id=owner_id, owner__is_active=True).first()
+
+
+# The names changed with the signatures: a queued job carrying only a YouTube ID is left
+# unregistered and dropped by the worker, never run under its old global lookup.
+@shared_task(name="audio.fetch_lyrics_for_owned_audio")
+def fetch_lyrics_for_audio(audio_id: int, owner_id: int, force: bool = False):
     """
     Fetch lyrics for a single audio track
     
     Args:
-        audio_youtube_id: YouTube ID of the audio
+        audio_id: Primary key of the audio
+        owner_id: Account the request was authorized for
         force: Force fetch even if already attempted
     """
-    from audio.models import Audio
     from audio.lyrics_service import LyricsService
     
+    audio = _owned_audio(audio_id, owner_id)
+    if audio is None:
+        logger.info(f"Skipped lyrics fetch: audio {audio_id} is gone or its owner is inactive")
+        return {"status": "skipped", "audio_id": audio_id}
+    
     try:
-        audio = Audio.objects.get(youtube_id=audio_youtube_id)
-        service = LyricsService()
-        service.fetch_and_store_lyrics(audio, force=force)
+        LyricsService().fetch_and_store_lyrics(audio, force=force)
         logger.info(f"Fetched lyrics for {audio.title}")
-        return {"status": "success", "youtube_id": audio_youtube_id}
-    except Audio.DoesNotExist:
-        logger.error(f"Audio not found: {audio_youtube_id}")
-        return {"status": "error", "error": "Audio not found"}
+        return {"status": "success", "audio_id": audio_id}
     except Exception as e:
-        logger.error(f"Error fetching lyrics for {audio_youtube_id}: {e}")
+        logger.error(f"Error fetching lyrics for audio {audio_id}: {e}")
         return {"status": "error", "error": str(e)}
 
 
-@shared_task(name="audio.fetch_lyrics_batch")
-def fetch_lyrics_batch(audio_ids: list, delay_seconds: int = 2):
+@shared_task(name="audio.fetch_lyrics_batch_for_owner")
+def fetch_lyrics_batch(audio_ids: list, owner_id: int, delay_seconds: int = 2):
     """
     Fetch lyrics for multiple audio tracks with delay between requests
     
     Args:
-        audio_ids: List of YouTube IDs
+        audio_ids: Primary keys of the audio
+        owner_id: Account the request was authorized for
         delay_seconds: Delay between requests to avoid rate limiting
     """
     import time
-    from audio.models import Audio
     from audio.lyrics_service import LyricsService
     
     service = LyricsService()
@@ -53,18 +62,19 @@ def fetch_lyrics_batch(audio_ids: list, delay_seconds: int = 2):
         'skipped': 0,
     }
     
-    for youtube_id in audio_ids:
+    for audio_id in audio_ids:
+        audio = _owned_audio(audio_id, owner_id)
+        if audio is None:
+            results['skipped'] += 1
+            continue
+        
         try:
-            audio = Audio.objects.get(youtube_id=youtube_id)
             service.fetch_and_store_lyrics(audio, force=False)
             results['success'] += 1
             logger.info(f"Fetched lyrics for {audio.title}")
-        except Audio.DoesNotExist:
-            results['skipped'] += 1
-            logger.warning(f"Audio not found: {youtube_id}")
         except Exception as e:
             results['failed'] += 1
-            logger.error(f"Error fetching lyrics for {youtube_id}: {e}")
+            logger.error(f"Error fetching lyrics for audio {audio_id}: {e}")
         
         # Delay to avoid rate limiting
         if delay_seconds > 0:
@@ -73,30 +83,30 @@ def fetch_lyrics_batch(audio_ids: list, delay_seconds: int = 2):
     return results
 
 
-@shared_task(name="audio.auto_fetch_lyrics")
-def auto_fetch_lyrics(limit: int = 50, max_attempts: int = 3):
-    """
-    Automatically fetch lyrics for audio without lyrics
-    
-    This task should be scheduled to run periodically (e.g., every hour)
-    
-    Args:
-        limit: Maximum number of tracks to process
-        max_attempts: Skip tracks that have been attempted this many times
-    """
+def _audio_missing_lyrics(max_attempts):
+    """Active owners' downloaded tracks that still have no lyrics worth keeping."""
     from audio.models import Audio
-    from audio.models_lyrics import Lyrics
-    from audio.lyrics_service import LyricsService
     
-    # Find audio without lyrics or with failed attempts (file_path indicates downloaded)
-    audio_without_lyrics = Audio.objects.exclude(
+    # file_path indicates downloaded
+    return Audio.objects.filter(owner__is_active=True).exclude(
         file_path=''
     ).exclude(
         file_path__isnull=True
     ).exclude(
         lyrics__fetch_attempted=True,
         lyrics__fetch_attempts__gte=max_attempts
-    )[:limit]
+    ).exclude(
+        lyrics__synced_lyrics__gt=''
+    ).exclude(
+        lyrics__plain_lyrics__gt=''
+    ).exclude(
+        lyrics__is_instrumental=True
+    )
+
+
+def _fetch_missing_lyrics(audio_without_lyrics):
+    import time
+    from audio.lyrics_service import LyricsService
     
     if not audio_without_lyrics:
         logger.info("No audio tracks need lyrics fetching")
@@ -124,11 +134,35 @@ def auto_fetch_lyrics(limit: int = 50, max_attempts: int = 3):
             results['failed'] += 1
         
         # Small delay to be nice to the API
-        import time
         time.sleep(1)
     
     logger.info(f"Auto-fetch completed: {results}")
     return results
+
+
+@shared_task(name="audio.auto_fetch_lyrics")
+def auto_fetch_lyrics(limit: int = 50, max_attempts: int = 3):
+    """
+    Scheduled, instance-wide fetch for audio without lyrics; never dispatched by a request
+    
+    Args:
+        limit: Maximum number of tracks to process
+        max_attempts: Skip tracks that have been attempted this many times
+    """
+    return _fetch_missing_lyrics(_audio_missing_lyrics(max_attempts)[:limit])
+
+
+@shared_task(name="audio.fetch_missing_lyrics_for_owner")
+def fetch_missing_lyrics_for_owner(owner_id: int, limit: int = 50, max_attempts: int = 3):
+    """
+    Fetch lyrics for one account's audio without lyrics
+    
+    Args:
+        owner_id: Account the request was authorized for
+        limit: Maximum number of tracks to process
+        max_attempts: Skip tracks that have been attempted this many times
+    """
+    return _fetch_missing_lyrics(_audio_missing_lyrics(max_attempts).filter(owner_id=owner_id)[:limit])
 
 
 @shared_task(name="audio.cleanup_lyrics_cache")
@@ -183,6 +217,7 @@ def refetch_failed_lyrics(days_old: int = 7, limit: int = 20):
     
     # Find tracks that failed but haven't been tried recently
     failed_lyrics = Lyrics.objects.filter(
+        audio__owner__is_active=True,
         fetch_attempted=True,
         synced_lyrics='',
         plain_lyrics='',

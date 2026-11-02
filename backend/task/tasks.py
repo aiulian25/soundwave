@@ -5,9 +5,36 @@ import yt_dlp
 from audio.models import Audio
 from audio.radio_features import RADIO_FEEDBACK_RETENTION_DAYS
 from channel.models import Channel
+from common.ytdlp_session import COOKIES_FILE, youtube_session
+from audio.storage_service import (
+    DOWNLOAD_TOO_LARGE_MARKER,
+    IngestionRefused,
+    absolute_media_path,
+    count_files_on_disk,
+    estimated_download_bytes,
+    finished_download_path,
+    owner_download_template,
+    refuse_if_over_quota,
+    refuse_if_settling_exceeds_quota,
+    refuse_unsuitable_source,
+    remove_after_commit,
+    remove_if_unreferenced,
+    reserve_download,
+    validated_file_size,
+)
+from download.claims import (
+    claim_download,
+    expired_claims,
+    fail_claim,
+    keep_claim_alive,
+    locked_claim,
+)
 from download.models import DownloadQueue
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from django.utils import timezone
+from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
@@ -20,17 +47,6 @@ logger = logging.getLogger(__name__)
 # Auto-disable invalid channel subscriptions after repeated deterministic failures.
 # This does NOT remove local audio files.
 INVALID_CHANNEL_FAILURE_THRESHOLD = int(os.environ.get('INVALID_CHANNEL_FAILURE_THRESHOLD', '3'))
-
-# Path to YouTube cookies file (mounted in Docker)
-COOKIES_FILE = os.environ.get('YT_COOKIES_FILE', '/app/cookies.txt')
-
-
-def get_yt_dlp_cookies_opts():
-    """Return cookiefile option if cookies file exists and is non-empty."""
-    if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
-        return {'cookiefile': COOKIES_FILE}
-    return {}
-
 
 # Cache of each YouTube playlist's ordered video-id list. Written by
 # download_playlist_task during a sync and read by link_audio_to_playlists so a
@@ -157,7 +173,7 @@ def measure_loudness_task(audio_id):
         return f"Audio {audio_id} no longer exists"
     if not audio.file_path:
         return f"Audio {audio_id} has no file"
-    lufs = measure_loudness_lufs(os.path.join('/app/audio', audio.file_path))
+    lufs = measure_loudness_lufs(str(absolute_media_path(audio.file_path)))
     if lufs is None:
         return f"Loudness not measured for {audio_id}"
     audio.loudness_lufs = lufs
@@ -272,7 +288,27 @@ PERMANENT_ERROR_PATTERNS = [
     'age-restricted',
     'not available',
     'no longer available',
+    'unsupported url',
+    'no suitable extractor',
 ]
+
+# yt-dlp words these with phrases from the list above, but they pass: a rate limit lifts, and
+# "format is not available" follows YouTube's bot checks as often as a truly missing format.
+TEMPORARY_ERROR_PATTERNS = [
+    'requested format is not available',
+    'rate-limited',
+    'try again later',
+]
+
+# Without this yt-dlp ends a playlist early with only a warning when YouTube keeps sending
+# incomplete pages, and a short list is indistinguishable from tracks having been removed.
+RAISE_ON_INCOMPLETE_LISTING = {'youtube': {'raise_incomplete_data': ['true']}}
+
+POSITION_UPDATE_BATCH_SIZE = 500
+
+INCOMPLETE_SCAN_MESSAGE = (
+    'YouTube returned an incomplete list; keeping the last complete playlist until a full scan succeeds'
+)
 
 # Failed downloads are re-queued automatically (retry_failed_downloads, playlist syncs) at
 # most this many times; a manual retry or a forced playlist sync starts a fresh budget.
@@ -300,8 +336,8 @@ COOKIES_REFRESH_PATTERNS = [
     'netscape format',
 ]
 
-# yt-dlp reads cookies.txt and writes the refreshed session back after each download;
-# a read-only mount or a file the container user cannot open fails the download.
+# Cookies YouTube rotates during a session are written back to cookies.txt; a read-only
+# mount or a file the container user cannot open then fails the download.
 COOKIES_FILE_ACCESS_PATTERNS = [
     'read-only file system',
     'permission denied',
@@ -318,11 +354,78 @@ def is_deleted_or_private_entry(entry):
     return title in DELETED_VIDEO_TITLES
 
 
+@dataclass(frozen=True)
+class RemoteSnapshot:
+    """What one flat extraction says about a playlist or channel."""
+    entries: list
+    is_complete: bool
+
+    @property
+    def ordered_ids(self):
+        return [entry['id'] for entry in self.entries]
+
+    @property
+    def deleted_or_private_ids(self):
+        return {entry['id'] for entry in self.entries if is_deleted_or_private_entry(entry)}
+
+
+def read_remote_snapshot(info):
+    """Keep one entry per video, at its first occurrence, and judge whether the list is whole.
+
+    A missing entry or fewer entries than YouTube declares means tracks may simply not have
+    been read. More than declared is fine: the declared count leaves out hidden videos.
+    """
+    raw_entries = info['entries']
+    identified = [entry for entry in raw_entries if entry and entry.get('id')]
+    first_occurrences = {}
+    for entry in identified:
+        first_occurrences.setdefault(entry['id'], entry)
+    has_unreadable_entries = len(identified) < len(raw_entries)
+    is_shorter_than_declared = len(identified) < (info.get('playlist_count') or 0)
+    return RemoteSnapshot(
+        entries=list(first_occurrences.values()),
+        is_complete=not has_unreadable_entries and not is_shorter_than_declared,
+    )
+
+
+def apply_complete_snapshot(playlist, snapshot):
+    """Make memberships match a verified scan, all or nothing. Returns how many were detached.
+
+    Only the membership goes: the Audio row and its file stay in the owner's library.
+    """
+    from playlist.models import PlaylistItem
+
+    positions = {video_id: position for position, video_id in enumerate(snapshot.ordered_ids)}
+    deleted_or_private_ids = snapshot.deleted_or_private_ids
+    held_ids = set(
+        Audio.objects.filter(owner=playlist.owner, youtube_id__in=deleted_or_private_ids)
+        .exclude(file_path='')
+        .values_list('youtube_id', flat=True)
+    )
+    with transaction.atomic():
+        memberships = PlaylistItem.objects.filter(playlist=playlist).select_related('audio')
+        current = [item for item in memberships if item.audio.youtube_id in positions]
+        moved = [item for item in current if item.position != positions[item.audio.youtube_id]]
+        for item in moved:
+            item.position = positions[item.audio.youtube_id]
+        PlaylistItem.objects.bulk_update(moved, ['position'], batch_size=POSITION_UPDATE_BATCH_SIZE)
+        detached, _ = PlaylistItem.objects.filter(playlist=playlist).exclude(
+            audio__youtube_id__in=positions
+        ).delete()
+        playlist.remote_video_ids = snapshot.ordered_ids
+        playlist.item_count = len(positions)
+        playlist.remote_unavailable_count = len(deleted_or_private_ids - held_ids)
+        playlist.save(update_fields=['remote_video_ids', 'item_count', 'remote_unavailable_count'])
+    return detached
+
+
 def is_permanently_unavailable(error_message):
     """Check if an error message indicates a permanently unavailable video."""
     if not error_message:
         return False
     error_lower = error_message.lower()
+    if any(pattern in error_lower for pattern in TEMPORARY_ERROR_PATTERNS):
+        return False
     return any(pattern in error_lower for pattern in PERMANENT_ERROR_PATTERNS)
 
 
@@ -402,31 +505,107 @@ def register_channel_sync_failure(channel, error_message):
     )
 
 
-def get_permanently_unavailable_ids(owner):
-    """Get set of youtube_ids that are permanently unavailable for an owner."""
-    # Build query for all permanent error patterns
+def permanent_failure_query():
+    """Database form of is_permanently_unavailable."""
     error_query = Q()
     for pattern in PERMANENT_ERROR_PATTERNS:
         error_query |= Q(error_message__icontains=pattern)
-    
+    for pattern in TEMPORARY_ERROR_PATTERNS:
+        error_query &= ~Q(error_message__icontains=pattern)
+    return error_query
+
+
+def get_permanently_unavailable_ids(owner):
+    """Get set of youtube_ids that are permanently unavailable for an owner."""
     return set(DownloadQueue.objects.filter(
         owner=owner,
         status='failed',
-    ).filter(error_query).values_list('youtube_id', flat=True))
+    ).filter(permanent_failure_query()).values_list('youtube_id', flat=True))
+
+
+def _publish_download(queue_id, claim_token, info, file_path, out_ext, file_size):
+    """Create or repair the Audio row and finish the queue row, all or nothing.
+
+    Returns False without publishing when this worker's claim is gone: the row was cleared,
+    cancelled, or its lease expired and someone else took over.
+    """
+    with transaction.atomic():
+        queue_item = locked_claim(queue_id, claim_token)
+        if queue_item is None:
+            return False
+
+        existing_audio = Audio.objects.filter(owner_id=queue_item.owner_id, youtube_id=info['id']).first()
+        replaced_bytes = existing_audio.file_size if existing_audio else 0
+        refuse_if_settling_exceeds_quota(queue_item.owner, queue_item, replaced_bytes, file_size)
+
+        # Create Audio object, or repair an existing one in place (a re-download can land
+        # on a new path), so its lyrics, history, progress and memberships survive.
+        audio, created = Audio.objects.get_or_create(
+            owner=queue_item.owner,
+            youtube_id=info['id'],
+            defaults={
+                'title': info.get('title', 'Unknown'),
+                'description': info.get('description', ''),
+                'channel_id': info.get('channel_id', ''),
+                'channel_name': info.get('channel', 'Unknown'),
+                'duration': info.get('duration', 0),
+                'file_path': file_path,
+                'file_size': file_size,
+                'audio_format': out_ext,
+                # Capture chapter markers (F2) — empty list when the video has none.
+                'chapters': [
+                    {'title': c.get('title', ''), 'start': c.get('start_time'), 'end': c.get('end_time')}
+                    for c in (info.get('chapters') or [])
+                ],
+                'thumbnail_url': info.get('thumbnail', ''),
+                'published_date': datetime.strptime(info.get('upload_date', '20230101'), '%Y%m%d'),
+                'view_count': info.get('view_count', 0) or 0,
+                'like_count': info.get('like_count', 0) or 0,
+            }
+        )
+
+        if not created:
+            if audio.file_path and audio.file_path != file_path:
+                remove_after_commit(audio.file_path)
+            audio.file_path = file_path
+            audio.file_size = file_size
+            audio.audio_format = out_ext
+            audio.save(update_fields=['file_path', 'file_size', 'audio_format'])
+
+        queue_item.status = 'completed'
+        queue_item.completed_date = timezone.now()
+        queue_item.youtube_id = info['id']
+        queue_item.title = info.get('title', '')
+        queue_item.claim_token = None
+        queue_item.lease_expires_at = None
+        queue_item.save()
+
+    # Queue a task to link this audio to playlists (optimized - runs after download)
+    # This prevents blocking the download task with expensive playlist lookups
+    link_audio_to_playlists.delay(audio.id, queue_item.owner_id)
+
+    # Measure loudness asynchronously (F9) so the download task stays fast.
+    if created:
+        measure_loudness_task.delay(audio.id)
+        extract_features_task.delay(audio.id)  # F16 sonic features, async, never blocks
+
+    return True
 
 
 @shared_task
 def download_audio_task(queue_id):
     """Download audio from YouTube - AUDIO ONLY, no video"""
-    try:
-        queue_item = DownloadQueue.objects.get(id=queue_id)
-    except DownloadQueue.DoesNotExist:
-        # Row was deleted (e.g. the queue was cleared) between enqueue and execution.
-        # Return quietly instead of letting the broad `except` below run with
-        # `queue_item` unbound (UnboundLocalError, which would mask the real cause).
-        logger.warning("download_audio_task: queue item %s no longer exists", queue_id)
+    claim_token = claim_download(queue_id)
+    if claim_token is None:
+        # Duplicate delivery, or the row was finished, cleared or is being worked on.
+        logger.info("download_audio_task: queue item %s is not claimable", queue_id)
         return
 
+    queue_item = DownloadQueue.objects.filter(pk=queue_id).first()
+    if queue_item is None:
+        return
+
+    file_path = None
     try:
         # SSRF guard (APP-02), defence-in-depth: re-validate immediately before the
         # fetch so auto-started/retried items, and anything queued before this check
@@ -434,101 +613,66 @@ def download_audio_task(queue_id):
         from common.url_security import check_public_http_url, message_for
         ok, code = check_public_http_url(queue_item.url)
         if not ok:
-            queue_item.status = 'failed'
             # Stable '[blocked_url]' marker lets the SPA render a localized message.
-            queue_item.error_message = f'[blocked_url] {message_for(code)}'
-            queue_item.save()
+            fail_claim(queue_id, claim_token, f'[blocked_url] {message_for(code)}')
             logger.warning("Blocked SSRF download attempt for queue %s: %s", queue_id, queue_item.url)
             return
-
-        queue_item.status = 'downloading'
-        queue_item.started_date = timezone.now()
-        queue_item.save()
 
         # Honor the owner's (and originating channel's) audio-quality setting (F1)
         # instead of always producing m4a/192.
         quality = _resolve_download_quality(queue_item)
         out_ext = _ext_for_quality(quality)
 
-        # yt-dlp options for AUDIO ONLY (no video)
-        ydl_opts = {
-            'format': 'bestaudio/best',  # Best available source; postprocessor sets the codec
-            'postprocessors': [{'key': 'FFmpegExtractAudio', **_postprocessor_for_quality(quality)}],
-            'outtmpl': '/app/audio/%(channel)s/%(title)s-%(id)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
-            'extract_audio': True,  # Ensure audio extraction
-            **get_yt_dlp_cookies_opts(),
-        }
+        refuse_if_over_quota(queue_item.owner)
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(queue_item.url, download=True)
-            
-            # Get the actual downloaded filename from yt-dlp
-            # After post-processing with FFmpegExtractAudio, the extension will be .m4a
-            # We need to use prepare_filename and replace the extension
-            actual_filename = ydl.prepare_filename(info)
-            
-            # Replace the source extension with the extracted-audio extension chosen by
-            # the resolved quality (flac / m4a / opus).
-            import os as os_module
-            base_filename = os_module.path.splitext(actual_filename)[0]
-            actual_filename = base_filename + '.' + out_ext
+        with keep_claim_alive(queue_id, claim_token) as claim_lost:
+            def watch_progress(progress):
+                if claim_lost.is_set():
+                    raise yt_dlp.utils.DownloadCancelled('Download was cancelled')
+                if (progress.get('downloaded_bytes') or 0) > settings.MAX_DOWNLOAD_BYTES:
+                    raise IngestionRefused(f'{DOWNLOAD_TOO_LARGE_MARKER} The download is larger than allowed.')
 
-            # Remove /app/audio/ prefix to get relative path
-            if actual_filename.startswith('/app/audio/'):
-                file_path = actual_filename[11:]  # Remove '/app/audio/' prefix
-            else:
-                # Fallback to constructed path if prepare_filename doesn't work as expected
-                file_path = f"{info.get('channel', 'unknown')}/{info.get('title', 'unknown')}-{info['id']}.{out_ext}"
+            # yt-dlp options for AUDIO ONLY (no video)
+            ydl_opts = {
+                'format': 'bestaudio/best',  # Best available source; postprocessor sets the codec
+                'postprocessors': [{'key': 'FFmpegExtractAudio', **_postprocessor_for_quality(quality)}],
+                'outtmpl': owner_download_template(queue_item.owner_id),
+                'quiet': True,
+                'no_warnings': True,
+                'extract_audio': True,  # Ensure audio extraction
+                'noplaylist': True,
+                'progress_hooks': [watch_progress],
+            }
 
-            # Create Audio object
-            audio, created = Audio.objects.get_or_create(
-                owner=queue_item.owner,
-                youtube_id=info['id'],
-                defaults={
-                    'title': info.get('title', 'Unknown'),
-                    'description': info.get('description', ''),
-                    'channel_id': info.get('channel_id', ''),
-                    'channel_name': info.get('channel', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'file_path': file_path,
-                    'file_size': info.get('filesize', 0) or 0,
-                    'audio_format': out_ext,
-                    # Capture chapter markers (F2) — empty list when the video has none.
-                    'chapters': [
-                        {'title': c.get('title', ''), 'start': c.get('start_time'), 'end': c.get('end_time')}
-                        for c in (info.get('chapters') or [])
-                    ],
-                    'thumbnail_url': info.get('thumbnail', ''),
-                    'published_date': datetime.strptime(info.get('upload_date', '20230101'), '%Y%m%d'),
-                    'view_count': info.get('view_count', 0) or 0,
-                    'like_count': info.get('like_count', 0) or 0,
-                }
-            )
-            
-            # Queue a task to link this audio to playlists (optimized - runs after download)
-            # This prevents blocking the download task with expensive playlist lookups
-            link_audio_to_playlists.delay(audio.id, queue_item.owner.id)
+            with youtube_session(ydl_opts) as ydl:
+                # Metadata first, so nothing is transferred for a source that would be refused.
+                source = ydl.extract_info(queue_item.url, download=False)
+                refuse_unsuitable_source(source)
+                reserve_download(queue_id, queue_item.owner_id, estimated_download_bytes(source))
+                info = ydl.process_ie_result(source, download=True)
 
-            # Measure loudness asynchronously (F9) so the download task stays fast.
-            if created:
-                measure_loudness_task.delay(audio.id)
-                extract_features_task.delay(audio.id)  # F16 sonic features, async, never blocks
+        file_path = finished_download_path(info)
+        file_size = validated_file_size(file_path)
 
-        queue_item.status = 'completed'
-        queue_item.completed_date = timezone.now()
-        queue_item.youtube_id = info['id']
-        queue_item.title = info.get('title', '')
-        queue_item.save()
+        if not _publish_download(queue_id, claim_token, info, file_path, out_ext, file_size):
+            logger.info("download_audio_task: claim on %s was lost; not publishing", queue_id)
+            # Cancelled rather than taken over: nobody is coming for these bytes.
+            if not DownloadQueue.objects.filter(pk=queue_id).exists():
+                remove_if_unreferenced(file_path)
+            return
 
         return f"Downloaded: {info.get('title', 'Unknown')}"
 
+    except IngestionRefused as refusal:
+        fail_claim(queue_id, claim_token, str(refusal))
+        logger.info("download_audio_task: refused queue item %s: %s", queue_id, refusal)
+        if file_path:
+            remove_if_unreferenced(file_path)
+
     except Exception as e:
-        queue_item.status = 'failed'
-        queue_item.error_message = mark_cookie_errors(str(e))
-        queue_item.save()
-        raise
+        if fail_claim(queue_id, claim_token, mark_cookie_errors(str(e))):
+            raise
+        logger.info("download_audio_task: claim on %s was lost during: %s", queue_id, e)
 
 
 @shared_task
@@ -550,7 +694,6 @@ def download_channel_task(channel_id):
             'no_warnings': True,
             'extract_flat': True,
             'socket_timeout': 30,
-            **get_yt_dlp_cookies_opts(),
         }
         if channel.sync_depth and channel.sync_depth > 0:
             ydl_opts['playlistend'] = channel.sync_depth
@@ -560,7 +703,7 @@ def download_channel_task(channel_id):
             sync_depth_label, channel.channel_name, channel.channel_id,
         )
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with youtube_session(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
         except Exception as yt_error:
             register_channel_sync_failure(channel, str(yt_error))
@@ -629,10 +772,17 @@ def download_channel_task(channel_id):
             
         # Update channel status
         channel.sync_status = 'success'
-        channel.downloaded_count = len(existing_ids)
+        channel.downloaded_count = count_files_on_disk(
+            Audio.objects.filter(owner=channel.owner, channel_id=channel.channel_id)
+        )
         channel.error_message = ''
         channel.consecutive_sync_failures = 0
-        channel.save(update_fields=['sync_status', 'downloaded_count', 'error_message', 'consecutive_sync_failures'])
+        changed_fields = ['sync_status', 'downloaded_count', 'error_message', 'consecutive_sync_failures']
+        snapshot = read_remote_snapshot(info)
+        if not channel.sync_depth and snapshot.is_complete:
+            channel.video_count = len(snapshot.entries)
+            changed_fields.append('video_count')
+        channel.save(update_fields=changed_fields)
             
         if new_videos == 0:
             msg = f"Channel '{channel.channel_name}' up to date ({skipped} already downloaded"
@@ -694,21 +844,29 @@ def subscribe_to_playlist(self, user_id, playlist_url):
     if not metadata:
         raise ValueError("Failed to fetch playlist metadata")
     
-    # Create subscription
-    playlist = Playlist.objects.create(
-        owner=user,
-        playlist_id=playlist_id,
-        title=metadata['title'],
-        description=metadata['description'],
-        channel_name=metadata['channel_name'],
-        channel_id=metadata['channel_id'],
-        thumbnail_url=metadata['thumbnail_url'],
-        item_count=metadata['item_count'],
-        playlist_type='youtube',
-        subscribed=True,
-        auto_download=True,
-        sync_status='pending',
-    )
+    # Create subscription. The lock makes the limit and duplicate checks hold against
+    # concurrent requests, which the view's early check cannot do.
+    with transaction.atomic():
+        account = User.objects.select_for_update().get(id=user_id)
+        if Playlist.objects.filter(owner=account, playlist_id=playlist_id).exists():
+            return f"Already subscribed to playlist {playlist_id}"
+        if not account.can_add_playlist:
+            logger.warning('Playlist limit reached for user %s', user_id)
+            return f"Playlist limit reached ({account.max_playlists})"
+        playlist = Playlist.objects.create(
+            owner=account,
+            playlist_id=playlist_id,
+            title=metadata['title'],
+            description=metadata['description'],
+            channel_name=metadata['channel_name'],
+            channel_id=metadata['channel_id'],
+            thumbnail_url=metadata['thumbnail_url'],
+            item_count=metadata['item_count'],
+            playlist_type='youtube',
+            subscribed=True,
+            auto_download=True,
+            sync_status='pending',
+        )
     
     # Trigger audio download task
     download_playlist_task.delay(playlist.id)
@@ -758,23 +916,27 @@ def subscribe_to_channel(self, user_id, channel_url):
     
     actual_channel_id = metadata['channel_id']
     
-    # Check if already subscribed
-    if Channel.objects.filter(owner=user, channel_id=actual_channel_id).exists():
-        return f"Already subscribed to channel {actual_channel_id}"
-    
-    # Create subscription
-    channel = Channel.objects.create(
-        owner=user,
-        channel_id=actual_channel_id,
-        channel_name=metadata['channel_name'],
-        channel_description=metadata['channel_description'],
-        channel_thumbnail=metadata['channel_thumbnail'],
-        subscriber_count=metadata['subscriber_count'],
-        video_count=metadata['video_count'],
-        subscribed=True,
-        auto_download=True,
-        sync_status='pending',
-    )
+    # Create subscription. The lock makes the limit and duplicate checks hold against
+    # concurrent requests, which the view's early check cannot do.
+    with transaction.atomic():
+        account = User.objects.select_for_update().get(id=user_id)
+        if Channel.objects.filter(owner=account, channel_id=actual_channel_id).exists():
+            return f"Already subscribed to channel {actual_channel_id}"
+        if not account.can_add_channel:
+            logger.warning('Channel limit reached for user %s', user_id)
+            return f"Channel limit reached ({account.max_channels})"
+        channel = Channel.objects.create(
+            owner=account,
+            channel_id=actual_channel_id,
+            channel_name=metadata['channel_name'],
+            channel_description=metadata['channel_description'],
+            channel_thumbnail=metadata['channel_thumbnail'],
+            subscriber_count=metadata['subscriber_count'],
+            video_count=metadata['video_count'],
+            subscribed=True,
+            auto_download=True,
+            sync_status='pending',
+        )
     
     # Trigger audio download task
     download_channel_task.delay(channel.id)
@@ -864,6 +1026,11 @@ def download_playlist_task(playlist_id, force=False):
     
     try:
         playlist = Playlist.objects.get(id=playlist_id)
+    except Playlist.DoesNotExist:
+        logger.info('[PlaylistSync] Playlist %s no longer exists', playlist_id)
+        return f"Playlist {playlist_id} no longer exists"
+
+    try:
         logger.info('[PlaylistSync] Starting sync for "%s" (owner: %s, force: %s)', 
                     playlist.title, playlist.owner.username, force)
         
@@ -879,11 +1046,11 @@ def download_playlist_task(playlist_id, force=False):
             'no_warnings': True,
             'extract_flat': True,
             'socket_timeout': 30,  # Timeout after 30s for YouTube latency
-            **get_yt_dlp_cookies_opts(),
+            'extractor_args': RAISE_ON_INCOMPLETE_LISTING,
         }
         
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with youtube_session(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
         except Exception as yt_error:
             # YouTube may be rate-limiting, down, or blocking our IP/region
@@ -915,15 +1082,12 @@ def download_playlist_task(playlist_id, force=False):
             playlist.thumbnail_url = new_thumbnail
             logger.info('[PlaylistSync] Refreshed thumbnail for "%s"', playlist.title)
 
-        # Update item count
-        total_items = len([e for e in info['entries'] if e])
-        playlist.item_count = total_items
+        snapshot = read_remote_snapshot(info)
 
         # Cache this playlist's ordered video-id list up front (before any download is
         # queued) so post-download linkage (link_audio_to_playlists) can attach the new
-        # tracks with NO extra yt-dlp calls. Reused for the stale-item cleanup below.
-        yt_video_ids_ordered = [e.get('id') for e in info['entries'] if e and e.get('id')]
-        _cache_playlist_video_ids(playlist.playlist_id, yt_video_ids_ordered)
+        # tracks with NO extra yt-dlp calls.
+        _cache_playlist_video_ids(playlist.playlist_id, snapshot.ordered_ids)
 
         # Get list of permanently unavailable videos (copyright, private, etc.)
         # When force=True, retry everything including previously unavailable
@@ -936,13 +1100,8 @@ def download_playlist_task(playlist_id, force=False):
         skipped_deleted = 0
         skipped_retries_exhausted = 0
 
-        for idx, entry in enumerate(info['entries']):
-            if not entry:
-                continue
-
-            video_id = entry.get('id')
-            if not video_id:
-                continue
+        for idx, entry in enumerate(snapshot.entries):
+            video_id = entry['id']
 
             # Detect deleted/private videos from YouTube
             # yt-dlp extract_flat returns these with title '[Deleted video]' or '[Private video]'
@@ -954,6 +1113,8 @@ def download_playlist_task(playlist_id, force=False):
                 youtube_id=video_id
             ).first()
 
+            file_needs_repair = False
+
             # Create PlaylistItem if audio exists but not in playlist yet
             if audio_obj:
                 PlaylistItem.objects.get_or_create(
@@ -964,11 +1125,12 @@ def download_playlist_task(playlist_id, force=False):
                 # When force=True, verify the file actually exists on disk
                 # But NEVER delete local files for deleted/private YouTube videos
                 if force and not entry_is_deleted and audio_obj.file_path:
-                    full_path = os.path.join('/app/audio', audio_obj.file_path)
+                    full_path = str(absolute_media_path(audio_obj.file_path))
                     if not os.path.isfile(full_path):
                         logger.warning('Force recheck: file missing for %s (%s), re-downloading',
                                        audio_obj.youtube_id, audio_obj.file_path)
-                        audio_obj.delete()
+                        # Keep the row: deleting it would cascade lyrics, history and progress.
+                        file_needs_repair = True
                         # Fall through to queue a new download below
                     else:
                         skipped += 1
@@ -1001,16 +1163,10 @@ def download_playlist_task(playlist_id, force=False):
             ).first()
             created = False
 
-            # Check if item is stuck in downloading state (> 30 minutes)
-            if existing_queue_item and existing_queue_item.status == 'downloading':
-                if existing_queue_item.started_date:
-                    stuck_threshold = timezone.now() - timedelta(minutes=30)
-                    if existing_queue_item.started_date < stuck_threshold:
-                        # Reset stuck download
-                        existing_queue_item.status = 'failed'
-                        existing_queue_item.error_message = 'Download stuck, resetting for retry'
-                        existing_queue_item.save()
-                        existing_queue_item = None  # Allow recreation
+            # The user dismissed this one; only an explicit force recheck brings it back.
+            if existing_queue_item and existing_queue_item.status == 'ignored' and not force:
+                skipped_unavailable += 1
+                continue
 
             # Create or get queue item - but skip permanently unavailable videos
             if not existing_queue_item or existing_queue_item.status in ['failed', 'ignored']:
@@ -1040,7 +1196,8 @@ def download_playlist_task(playlist_id, force=False):
                             'youtube_id': video_id,
                             'title': entry.get('title', 'Unknown'),
                             'status': 'pending',
-                            'auto_start': True
+                            'auto_start': True,
+                            'source_playlist_id': playlist.playlist_id,
                         }
                     )
                     if not created:
@@ -1060,10 +1217,10 @@ def download_playlist_task(playlist_id, force=False):
                         youtube_id=video_id
                     ).exists()
 
-                    if audio_exists:
+                    if audio_exists and not file_needs_repair:
                         skipped += 1
                     else:
-                        # Queue shows completed but audio doesn't exist - reset and redownload
+                        # Queue shows completed but audio or its file doesn't exist - reset and redownload
                         existing_queue_item.status = 'pending'
                         existing_queue_item.error_message = 'Audio missing, re-downloading'
                         existing_queue_item.save()
@@ -1080,31 +1237,20 @@ def download_playlist_task(playlist_id, force=False):
             # Create PlaylistItem for the downloaded audio (will be created after download completes)
             # Note: Audio object might not exist yet, so we'll add a post-download hook
 
-        # Remove PlaylistItems for tracks that are NOT in this YouTube playlist
-        # (fixes incorrectly linked tracks from the old link_audio_to_playlists bug)
-        # Note: yt-dlp extract_flat includes [Deleted video] and [Private video] entries,
-        # so yt_video_ids covers all current AND deleted/private tracks.
-        # Any PlaylistItem whose audio youtube_id is NOT in yt_video_ids was never
-        # actually part of this YouTube playlist — only the playlist link is removed,
-        # the audio file itself is preserved.
-        yt_video_ids = set(yt_video_ids_ordered)
-        stale_items = PlaylistItem.objects.filter(playlist=playlist).exclude(
-            audio__youtube_id__in=yt_video_ids
-        )
-        removed = stale_items.count()
-        if removed:
-            stale_items.delete()
-            logger.info('Removed %d incorrectly linked items from playlist %s', removed, playlist.title)
+        # yt-dlp extract_flat includes [Deleted video] and [Private video] entries, so a
+        # complete snapshot keeps locally archived copies of those in the playlist.
+        if snapshot.is_complete:
+            detached = apply_complete_snapshot(playlist, snapshot)
+            if detached:
+                logger.info('Detached %d tracks no longer in playlist %s', detached, playlist.title)
+            playlist.sync_status = 'success'
+        else:
+            logger.warning('[PlaylistSync] Incomplete listing for "%s"; not reconciling', playlist.title)
+            playlist.sync_status = 'stale'
+            playlist.error_message = INCOMPLETE_SCAN_MESSAGE
 
-        # Update playlist status
-        playlist.sync_status = 'success'
         playlist.last_refresh = timezone.now()
-        # Count downloaded tracks: include all tracks in PlaylistItems
-        # (covers both current YouTube entries AND locally-kept deleted videos)
-        playlist.downloaded_count = PlaylistItem.objects.filter(
-            playlist=playlist,
-            audio__file_path__isnull=False,
-        ).exclude(audio__file_path='').count()
+        playlist.refresh_local_counts()
         playlist.save()
 
         mode = 'Force recheck' if force else 'Sync'
@@ -1186,12 +1332,7 @@ def link_audio_to_playlists(audio_id, user_id):
                 defaults={'position': position},
             )
 
-            # Keep the playlist's downloaded_count accurate.
-            playlist.downloaded_count = PlaylistItem.objects.filter(
-                playlist=playlist,
-                audio__file_path__isnull=False,
-            ).exclude(audio__file_path='').count()
-            playlist.save(update_fields=['downloaded_count'])
+            playlist.refresh_local_counts()
             linked += 1
 
         return f"Linked audio {audio.youtube_id} to {linked} playlist(s)"
@@ -1216,25 +1357,18 @@ def cleanup_task():
 
 @shared_task
 def reset_stuck_downloads():
-    """Reset downloads that have been stuck in 'downloading' status for more than 30 minutes"""
-    stuck_threshold = timezone.now() - timedelta(minutes=30)
-    
-    stuck_downloads = DownloadQueue.objects.filter(
-        status='downloading',
-        started_date__lt=stuck_threshold
+    """Fail downloads whose worker stopped renewing its lease; the retry job takes them from there.
+
+    Active work keeps renewing, however long it runs, so it is never touched.
+    """
+    count = expired_claims().update(
+        status='failed',
+        error_message='Download stuck, reset for retry',
+        claim_token=None,
+        lease_expires_at=None,
     )
-    
-    count = stuck_downloads.count()
-    
-    if count > 0:
-        stuck_downloads.update(
-            status='failed',
-            error_message='Download stuck, reset for retry'
-        )
-        
-        return f"Reset {count} stuck downloads"
-    else:
-        return "No stuck downloads found"
+
+    return f"Reset {count} stuck downloads" if count else "No stuck downloads found"
 
 
 @shared_task
@@ -1251,13 +1385,7 @@ def retry_failed_downloads():
         status='failed',
         added_date__gte=retry_window,
         retry_count__lt=MAX_AUTO_RETRIES,
-    ).exclude(
-        error_message__icontains='video unavailable'
-    ).exclude(
-        error_message__icontains='private video'
-    ).exclude(
-        error_message__icontains='copyright'
-    )
+    ).exclude(permanent_failure_query())
 
     retried = 0
 

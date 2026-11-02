@@ -11,6 +11,8 @@ import time
 
 from django.core.management.base import BaseCommand
 
+from common.ytdlp_session import youtube_session
+
 from audio.models import Audio
 
 
@@ -28,9 +30,6 @@ class Command(BaseCommand):
                             help='Seconds to sleep between fetches (rate-limit friendliness).')
 
     def handle(self, *args, **options):
-        import yt_dlp
-        # Reuse the same cookies handling as the downloader.
-        from task.tasks import get_yt_dlp_cookies_opts
 
         qs = Audio.objects.exclude(youtube_id='').exclude(youtube_id__isnull=True)
         if not options['force']:
@@ -48,7 +47,6 @@ class Command(BaseCommand):
             'no_warnings': True,
             'skip_download': True,
             'extract_flat': False,
-            **get_yt_dlp_cookies_opts(),
         }
 
         updated = 0
@@ -57,7 +55,7 @@ class Command(BaseCommand):
         for audio in qs:
             url = f"https://www.youtube.com/watch?v={audio.youtube_id}"
             try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                with youtube_session(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                 chapters = [
                     {'title': c.get('title', ''), 'start': c.get('start_time'), 'end': c.get('end_time')}

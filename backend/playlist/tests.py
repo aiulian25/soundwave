@@ -17,6 +17,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from user.models import Account
+from audio.export import ExportedTrack
 from audio.models import Audio
 from playlist.models import Playlist, PlaylistItem
 
@@ -33,7 +34,7 @@ def _fake_export(audio, target_format, quality, output_dir, *,
                  embed_lyrics=True, embed_artwork=True, artwork_url='', filename=None):
     written = Path(output_dir) / filename
     written.write_bytes(b'FAKE_AUDIO_' + (audio.youtube_id or '').encode())
-    return written
+    return ExportedTrack(written)
 
 
 class PlaylistExportTests(TestCase):
@@ -110,3 +111,34 @@ class PlaylistExportTests(TestCase):
         with mock.patch('audio.export.export_track_to_file', side_effect=_fake_export):
             resp = self.client.post(self._url(), {'format': 'mp3'}, format='json')
         self.assertEqual(resp.status_code, 429)
+
+
+class PlaylistDeleteKeepsMediaTests(TestCase):
+    """SW-002: removing a list is not removing its tracks."""
+
+    def setUp(self):
+        self.alice = Account.objects.create_user('alice_keep', 'alice_keep@test.local', 'Alicepw_2026!')
+        self.audio = _make_audio(self.alice, 'KEEP_YT_0001', 'Shared Track')
+        self.first = Playlist.objects.create(owner=self.alice, playlist_id='PL_first', title='First')
+        self.second = Playlist.objects.create(owner=self.alice, playlist_id='PL_second', title='Second')
+        PlaylistItem.objects.create(playlist=self.first, audio=self.audio, position=0)
+        PlaylistItem.objects.create(playlist=self.second, audio=self.audio, position=0)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.alice)
+
+    def test_common_track_survives_in_library_and_other_list(self):
+        with mock.patch('pathlib.Path.unlink') as unlink, self.captureOnCommitCallbacks(execute=True):
+            response = self.client.delete('/api/playlist/PL_first/')
+        self.assertEqual(response.status_code, 200)
+        unlink.assert_not_called()
+        self.assertFalse(Playlist.objects.filter(pk=self.first.pk).exists())
+        self.assertFalse(PlaylistItem.objects.filter(playlist_id=self.first.pk).exists())
+        self.assertTrue(Audio.objects.filter(pk=self.audio.pk).exists())
+        self.assertTrue(PlaylistItem.objects.filter(playlist=self.second, audio=self.audio).exists())
+
+    def test_other_owner_cannot_delete(self):
+        bob = Account.objects.create_user('bob_keep', 'bob_keep@test.local', 'Bobpw_2026!')
+        client = APIClient()
+        client.force_authenticate(user=bob)
+        self.assertEqual(client.delete('/api/playlist/PL_first/').status_code, 404)
+        self.assertTrue(Playlist.objects.filter(pk=self.first.pk).exists())

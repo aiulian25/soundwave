@@ -10,7 +10,9 @@ and widget/API clients send the header with no cookie. The two modes never overl
 
 Run: python manage.py test common.tests --settings=config.settings_test
 """
-from django.test import TestCase, Client
+from django.conf import settings
+from django.core.cache import cache
+from django.test import Client, TestCase, override_settings
 from rest_framework.authtoken.models import Token
 
 from user.models import Account
@@ -89,3 +91,50 @@ class TokenAuthCsrfTests(TestCase):
         response = Client().post(CSRF_PROTECTED_ENDPOINT, {}, content_type='application/json')
 
         self.assertIn(response.status_code, (401, 403))
+
+
+class LoginFromAnotherSiteTests(TestCase):
+    """A hostile page's form could otherwise log the browser into the attacker's account."""
+
+    LOGIN_ENDPOINT = '/api/user/login/'
+    USERNAME = 'origin_u'
+    PASSWORD = 'Originpw_2026!'
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        Account.objects.create_user(self.USERNAME, 'origin@test.local', self.PASSWORD)
+
+    def _login(self, **headers):
+        client = Client()
+        response = client.post(
+            self.LOGIN_ENDPOINT, {'username': self.USERNAME, 'password': self.PASSWORD}, **headers,
+        )
+        return response, client
+
+    def test_another_sites_form_is_refused_and_sets_no_session(self):
+        for origin in ('https://evil.example', 'null', 'http://testserver.evil.example'):
+            with self.subTest(origin):
+                response, client = self._login(HTTP_ORIGIN=origin)
+
+                self.assertEqual(response.status_code, 403)
+                self.assertNotIn(settings.SESSION_COOKIE_NAME, client.cookies)
+
+    def test_the_app_itself_can_log_in_over_either_scheme(self):
+        for origin in ('http://testserver', 'https://testserver'):
+            with self.subTest(origin):
+                response, client = self._login(HTTP_ORIGIN=origin)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(settings.SESSION_COOKIE_NAME, client.cookies)
+
+    @override_settings(PASSKEY_ALLOWED_ORIGINS=['https://music.example'])
+    def test_a_configured_public_address_can_log_in(self):
+        response, _client = self._login(HTTP_ORIGIN='https://music.example')
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_clients_that_send_no_origin_are_unaffected(self):
+        response, _client = self._login()
+
+        self.assertEqual(response.status_code, 200)

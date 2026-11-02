@@ -1,7 +1,8 @@
 """Stats API views"""
 
-from datetime import UTC, datetime, timedelta
-from django.db.models import Sum, Count, F
+from datetime import datetime, timedelta
+from django.db import transaction
+from django.db.models import Sum, Count, F, Q
 from django.db.models.functions import ExtractHour, ExtractWeekDay, TruncDate, TruncMonth, ExtractMonth
 from django.utils import timezone
 from rest_framework.response import Response
@@ -12,12 +13,21 @@ from channel.models import Channel
 from download.models import DownloadQueue
 from stats.models import ListeningHistory, Achievement
 from stats.achievements import AchievementService
+from stats.time_ranges import (
+    listening_dates,
+    listening_streaks,
+    local_today,
+    requested_days,
+    requested_year,
+    year_range,
+)
 from stats.serializers import (
     AudioStatsSerializer,
     ChannelStatsSerializer,
     DownloadStatsSerializer,
     ListeningInsightsSerializer,
     ListeningHistorySerializer,
+    ListeningEventSerializer,
     AchievementSerializer,
     AchievementProgressSerializer,
     YearlyWrappedSerializer,
@@ -29,6 +39,9 @@ from common.authentication import APIKeyAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from playlist.models import Playlist
+
+
+DEFAULT_INSIGHT_DAYS = 30
 
 
 class AudioStatsView(ApiBaseView):
@@ -87,7 +100,7 @@ class ListeningInsightsView(ApiBaseView):
         user = request.user
         
         # Time range - default to last 30 days, can be customized
-        days = int(request.query_params.get('days', 30))
+        days = requested_days(request, default=DEFAULT_INSIGHT_DAYS)
         start_date = timezone.now() - timedelta(days=days)
         
         history = ListeningHistory.objects.filter(
@@ -192,29 +205,10 @@ class ListeningInsightsView(ApiBaseView):
             total_duration=Sum('duration_listened')
         ).order_by('date')
         
-        # Calculate streaks
-        dates_with_listening = set(d['date'] for d in daily_listening)
-        today = timezone.now().date()
-        
-        # Current streak
-        current_streak = 0
-        check_date = today
-        while check_date in dates_with_listening:
-            current_streak += 1
-            check_date -= timedelta(days=1)
-        
-        # Longest streak
-        longest_streak = 0
-        if dates_with_listening:
-            sorted_dates = sorted(dates_with_listening)
-            streak = 1
-            for i in range(1, len(sorted_dates)):
-                if sorted_dates[i] - sorted_dates[i-1] == timedelta(days=1):
-                    streak += 1
-                else:
-                    longest_streak = max(longest_streak, streak)
-                    streak = 1
-            longest_streak = max(longest_streak, streak)
+        # Streaks span everything, not just this window, so every page agrees.
+        current_streak, longest_streak = listening_streaks(
+            listening_dates(ListeningHistory.objects.filter(user=user))
+        )
         
         # Genre distribution
         genre_distribution = history.exclude(genre='').values('genre').annotate(
@@ -248,37 +242,30 @@ class ListeningInsightsView(ApiBaseView):
         return Response(serializer.data)
 
 
+def _store_listening_event(user, event_id, details):
+    """(entry, created). A repeated event id finds the first delivery, even if it is in flight."""
+    if event_id is None:
+        return ListeningHistory.objects.create(user=user, **details), True
+    return ListeningHistory.objects.get_or_create(user=user, event_id=event_id, defaults=details)
+
+
 class RecordListeningView(ApiBaseView):
     """Record a listening event"""
     
     def post(self, request):
         """Record when a user plays/listens to a track"""
-        youtube_id = request.data.get('youtube_id')
-        # Defensive parse: non-numeric input returns 400 (not a 500), and a negative
-        # duration is clamped to 0 so it can't corrupt listening analytics.
+        event = ListeningEventSerializer(data=request.data)
+        event.is_valid(raise_exception=True)
+        fields = event.validated_data
+
         try:
-            duration_listened = max(0, int(request.data.get('duration_listened', 0)))
-        except (TypeError, ValueError):
-            return Response(
-                {'error': 'duration_listened must be a valid integer'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        completed = request.data.get('completed', False)
-        
-        if not youtube_id:
-            return Response(
-                {'error': 'youtube_id is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            audio = Audio.objects.get(owner=request.user, youtube_id=youtube_id)
+            audio = Audio.objects.get(owner=request.user, youtube_id=fields['youtube_id'])
         except Audio.DoesNotExist:
             return Response(
                 {'error': 'Audio not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         # Extract artist from channel name or title
         artist = audio.artist if audio.artist else audio.channel_name
         # Try to parse artist from title if it contains " - "
@@ -287,23 +274,31 @@ class RecordListeningView(ApiBaseView):
             if len(parts) == 2:
                 artist = parts[0].strip()
         
-        # Create listening history entry
-        entry = ListeningHistory.objects.create(
-            user=request.user,
-            audio=audio,
-            title=audio.title,
-            artist=artist,
-            channel_name=audio.channel_name,
-            genre=audio.genre or '',
-            duration_listened=duration_listened,
-            completed=completed,
-        )
-        
-        # Also update play count on the audio
-        audio.play_count += 1
-        audio.last_played = timezone.now()
-        audio.save(update_fields=['play_count', 'last_played'])
-        
+        now = timezone.now()
+        listened_at = min(fields.get('occurred_at', now), now)
+        details = {
+            'audio': audio,
+            'title': audio.title,
+            'artist': artist,
+            'channel_name': audio.channel_name,
+            'genre': audio.genre or '',
+            'duration_listened': fields['duration_listened'],
+            'completed': fields['completed'],
+            'listened_at': listened_at,
+        }
+
+        with transaction.atomic():
+            entry, created = _store_listening_event(request.user, fields.get('event_id'), details)
+            if created:
+                Audio.objects.filter(pk=audio.pk).update(play_count=F('play_count') + 1)
+                # An event delivered late must not move "last played" backwards.
+                Audio.objects.filter(
+                    Q(last_played__isnull=True) | Q(last_played__lt=listened_at), pk=audio.pk,
+                ).update(last_played=listened_at)
+
+        if not created:
+            return Response(ListeningHistorySerializer(entry).data, status=status.HTTP_200_OK)
+
         # Check for new achievements
         service = AchievementService(request.user)
         new_achievements = service.check_after_listen(audio)
@@ -363,12 +358,12 @@ class ListeningHistoryView(ApiBaseView):
     
     def delete(self, request):
         """Clear listening history"""
-        days = request.query_params.get('days')
+        has_cutoff = 'days' in request.query_params
         
         qs = ListeningHistory.objects.filter(user=request.user)
         
-        if days:
-            cutoff = timezone.now() - timedelta(days=int(days))
+        if has_cutoff:
+            cutoff = timezone.now() - timedelta(days=requested_days(request, default=0))
             qs = qs.filter(listened_at__lt=cutoff)
         
         count, _ = qs.delete()
@@ -382,7 +377,7 @@ class OnThisDayView(ApiBaseView):
     def get(self, request):
         """Get tracks listened to on this day in the past"""
         user = request.user
-        today = timezone.now()
+        today = timezone.localtime()
         
         # Get dates to check
         periods = []
@@ -495,45 +490,10 @@ class StreakView(ApiBaseView):
         
         # Get all dates with listening activity
         history = ListeningHistory.objects.filter(user=user)
-        dates_with_listening = set(
-            history.annotate(date=TruncDate('listened_at'))
-            .values_list('date', flat=True)
-            .distinct()
-        )
-        
-        today = timezone.localtime().date()
-        
-        # Current streak
-        current_streak = 0
-        check_date = today
-        while check_date in dates_with_listening:
-            current_streak += 1
-            check_date -= timedelta(days=1)
-        
-        # If no listening today, check yesterday
+        dates_with_listening = listening_dates(history)
+        today = local_today()
+        current_streak, longest_streak = listening_streaks(dates_with_listening, today)
         listened_today = today in dates_with_listening
-        if not listened_today:
-            yesterday = today - timedelta(days=1)
-            if yesterday in dates_with_listening:
-                # Streak is at risk!
-                current_streak = 0
-                check_date = yesterday
-                while check_date in dates_with_listening:
-                    current_streak += 1
-                    check_date -= timedelta(days=1)
-        
-        # Longest streak
-        longest_streak = 0
-        if dates_with_listening:
-            sorted_dates = sorted(dates_with_listening)
-            streak = 1
-            for i in range(1, len(sorted_dates)):
-                if sorted_dates[i] - sorted_dates[i-1] == timedelta(days=1):
-                    streak += 1
-                    longest_streak = max(longest_streak, streak)
-                else:
-                    streak = 1
-            longest_streak = max(longest_streak, streak)
         
         # Recent 7 days activity
         recent_days = []
@@ -571,17 +531,16 @@ class YearlyWrappedView(ApiBaseView):
     
     def get(self, request):
         """Get yearly wrapped summary"""
-        year = int(request.query_params.get('year', timezone.now().year))
+        year = requested_year(request)
         user = request.user
         
         # Get all listening history for the year
-        start_date = datetime(year, 1, 1, tzinfo=UTC)
-        end_date = datetime(year, 12, 31, 23, 59, 59, tzinfo=UTC)
+        start_date, next_year_start = year_range(year)
         
         history = ListeningHistory.objects.filter(
             user=user,
             listened_at__gte=start_date,
-            listened_at__lte=end_date
+            listened_at__lt=next_year_start
         )
         
         if not history.exists():
@@ -599,25 +558,9 @@ class YearlyWrappedView(ApiBaseView):
         unique_channels = history.values('channel_name').distinct().count()
         
         # Streaks for the year
-        dates_with_listening = set(
-            history.annotate(date=TruncDate('listened_at'))
-            .values_list('date', flat=True)
-            .distinct()
-        )
+        dates_with_listening = listening_dates(history)
         total_listening_days = len(dates_with_listening)
-        
-        # Calculate longest streak for the year
-        longest_streak = 0
-        if dates_with_listening:
-            sorted_dates = sorted(dates_with_listening)
-            streak = 1
-            for i in range(1, len(sorted_dates)):
-                if sorted_dates[i] - sorted_dates[i-1] == timedelta(days=1):
-                    streak += 1
-                    longest_streak = max(longest_streak, streak)
-                else:
-                    streak = 1
-            longest_streak = max(longest_streak, streak)
+        _, longest_streak = listening_streaks(dates_with_listening)
         
         # Top artist
         top_artists = history.exclude(artist='').values('artist').annotate(
@@ -745,7 +688,7 @@ class YearlyWrappedView(ApiBaseView):
         achievements_unlocked = Achievement.objects.filter(
             user=user,
             unlocked_at__gte=start_date,
-            unlocked_at__lte=end_date
+            unlocked_at__lt=next_year_start
         ).count()
         
         data = {

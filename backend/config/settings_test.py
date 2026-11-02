@@ -12,6 +12,7 @@ os.environ.setdefault('DJANGO_DEBUG', 'True')
 os.environ.setdefault('DJANGO_SECRET_KEY', 'test-only-secret-key-not-for-production')
 os.environ.setdefault('DATA_DIR', '/tmp/sw_test_data')
 os.environ.setdefault('MEDIA_ROOT', '/tmp/sw_test_media')
+os.environ.setdefault('EXPORT_SCRATCH_DIR', '/tmp/sw_test_exports')
 
 from config.settings import *  # noqa: F401,F403,E402
 

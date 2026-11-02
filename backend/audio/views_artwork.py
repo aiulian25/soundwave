@@ -3,12 +3,13 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
+from rest_framework.generics import get_object_or_404
 from django.db.models import Prefetch, Q
 
 from audio.models import Audio
 from channel.models import Channel
 from audio.models_artwork import Artwork, MusicMetadata, ArtistInfo
+from audio.artwork_images import InvalidArtworkImage, load_artwork_image
 from audio.serializers_artwork import (
     ArtworkSerializer,
     MusicMetadataSerializer,
@@ -219,11 +220,23 @@ class AudioArtworkViewSet(viewsets.ViewSet):
         audio = get_object_or_404(Audio, pk=pk, owner=request.user)
         artwork_id = request.data.get('artwork_id')
         
-        if artwork_id:
-            embed_artwork_in_audio.delay(audio.id, artwork_id)
-        else:
+        if not artwork_id:
             embed_artwork_in_audio.delay(audio.id)
+            return Response({
+                'message': 'Artwork embed queued',
+                'audio_id': audio.id
+            })
         
+        artwork = get_object_or_404(Artwork.embeddable_in(audio), pk=artwork_id)
+        try:
+            load_artwork_image(artwork)
+        except InvalidArtworkImage:
+            return Response(
+                {'error': 'Artwork has no usable image'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        embed_artwork_in_audio.delay(audio.id, artwork.id)
         return Response({
             'message': 'Artwork embed queued',
             'audio_id': audio.id

@@ -57,6 +57,14 @@ app.conf.beat_schedule = {
         'kwargs': {'limit': 50},
     },
     # Prune radio feedback weekly, Sunday 5 AM (after the 3 AM / 4 AM lyrics jobs).
+    'system-heartbeat': {
+        'task': 'common.record_heartbeat',
+        'schedule': crontab(),  # Every minute
+    },
+    'sweep-export-scratch': {
+        'task': 'audio.sweep_export_scratch',
+        'schedule': crontab(minute='*/15'),
+    },
     'prune-radio-feedback': {
         'task': 'task.tasks.prune_radio_feedback_task',
         'schedule': crontab(hour=5, minute=0, day_of_week=0),

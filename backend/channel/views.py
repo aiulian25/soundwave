@@ -5,7 +5,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from channel.models import Channel
 from channel.serializers import ChannelSerializer, ChannelSyncDepthSerializer
+from download.claims import cancel_unfinished_downloads
+from common.pagination import paginated_response
+from common.search import matching, search_term
 from common.views import ApiBaseView, AuthenticatedOwnerAccess
+
+
+CHANNEL_SEARCH_FIELDS = ('channel_name',)
 
 
 class ChannelListView(ApiBaseView):
@@ -18,9 +24,9 @@ class ChannelListView(ApiBaseView):
         logger = logging.getLogger(__name__)
         logger.info(f"GET channel list - User: {request.user}, Auth: {request.user.is_authenticated}")
         
-        channels = self.filter_owned(Channel.objects.filter(subscribed=True))
-        serializer = ChannelSerializer(channels, many=True)
-        return Response({'data': serializer.data, 'paginate': True})
+        channels = self.filter_owned(Channel.objects.filter(subscribed=True)).order_by('channel_name', 'pk')
+        channels = matching(channels, search_term(request), CHANNEL_SEARCH_FIELDS)
+        return paginated_response(request, channels, ChannelSerializer)
 
     def post(self, request):
         """Subscribe to channel - TubeArchivist pattern with Celery task"""
@@ -96,27 +102,13 @@ class ChannelDetailView(ApiBaseView):
         return Response(ChannelSerializer(channel).data)
 
     def delete(self, request, channel_id):
-        """Delete channel and all associated audio files"""
-        from audio.models import Audio
-        
+        """Unsubscribe: stops syncing and cancels unfinished work; its tracks stay in the library"""
         channel = get_object_or_404(Channel, channel_id=channel_id, owner=request.user)
-        
-        # Find and delete all audio files associated with this channel
-        audio_files = Audio.objects.filter(
-            owner=request.user,
-            channel_id=channel_id
-        )
-        
-        deleted_count = 0
-        for audio in audio_files:
-            audio.delete()  # This will trigger our custom delete method
-            deleted_count += 1
-        
-        # Delete the channel itself
+        cancel_unfinished_downloads(request.user, channel_name=channel.channel_name)
         channel.delete()
         
         return Response({
-            'message': f'Channel deleted successfully. Removed {deleted_count} audio files.'
+            'message': 'Unsubscribed from channel. Its tracks were kept.'
         }, status=status.HTTP_200_OK)
 
 

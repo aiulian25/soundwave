@@ -8,10 +8,17 @@ from rest_framework import status
 from rest_framework.response import Response
 from playlist.models import Playlist, PlaylistItem
 from playlist.serializers import PlaylistSerializer, PlaylistItemSerializer
+from common.search import matching, search_term
 from common.views import ApiBaseView, AuthenticatedOwnerAccess
 from audio.models import Audio
+from download.claims import cancel_unfinished_downloads
 
 logger = logging.getLogger(__name__)
+
+
+PLAYLIST_SEARCH_FIELDS = ('title', 'channel_name')
+# This list has no pages, so a search bounds it instead.
+PLAYLIST_SEARCH_LIMIT = 50
 
 
 class PlaylistListView(ApiBaseView):
@@ -21,6 +28,9 @@ class PlaylistListView(ApiBaseView):
     def get(self, request):
         """Get playlist list"""
         playlists = self.filter_owned(Playlist.objects.all())
+        term = search_term(request)
+        if term:
+            playlists = matching(playlists, term, PLAYLIST_SEARCH_FIELDS)[:PLAYLIST_SEARCH_LIMIT]
         serializer = PlaylistSerializer(playlists, many=True)
         return Response({'data': serializer.data})
 
@@ -66,7 +76,14 @@ class PlaylistListView(ApiBaseView):
             
         serializer = PlaylistSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(owner=request.user)
+        with transaction.atomic():
+            account = type(request.user).objects.select_for_update().get(pk=request.user.pk)
+            if not account.can_add_playlist:
+                return Response(
+                    {'error': f'Playlist limit reached. Maximum {account.max_playlists} playlists allowed.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            serializer.save(owner=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -115,30 +132,14 @@ class PlaylistDetailView(ApiBaseView):
         return Response({'detail': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, playlist_id):
-        """Delete playlist and all associated audio files"""
+        """Delete the playlist and its memberships and cancel unfinished work; its tracks stay in the library"""
         playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
         playlist_title = playlist.title
-
-        # Delete all audio entries linked to this playlist. Audio.delete() also removes
-        # local files from disk, and dependent playlist items are removed via cascade.
-        audio_files = Audio.objects.filter(
-            owner=request.user,
-            playlist_items__playlist=playlist,
-        ).distinct()
-
-        deleted_audio_count = 0
-        with transaction.atomic():
-            for audio in audio_files.iterator():
-                audio.delete()
-                deleted_audio_count += 1
-
-            playlist.delete()
+        cancel_unfinished_downloads(request.user, source_playlist_id=playlist.playlist_id)
+        playlist.delete()
 
         return Response({
-            'message': (
-                f'Playlist "{playlist_title}" deleted successfully. '
-                f'Removed {deleted_audio_count} audio files.'
-            )
+            'message': f'Playlist "{playlist_title}" deleted successfully. Its tracks were kept.'
         }, status=status.HTTP_200_OK)
 
 
@@ -185,10 +186,7 @@ class PlaylistItemsView(ApiBaseView):
                 position=next_position
             )
             
-            # Update playlist item count
-            playlist.item_count = PlaylistItem.objects.filter(playlist=playlist).count()
-            playlist.downloaded_count = PlaylistItem.objects.filter(playlist=playlist, audio__file_path__isnull=False).exclude(audio__file_path='').count()
-            playlist.save(update_fields=['item_count', 'downloaded_count'])
+            playlist.refresh_local_counts()
             
             from audio.serializers import AudioSerializer
             return Response({
@@ -218,10 +216,7 @@ class PlaylistItemsView(ApiBaseView):
         if deleted == 0:
             return Response({'error': 'Track not in playlist'}, status=status.HTTP_404_NOT_FOUND)
         
-        # Update playlist item count
-        playlist.item_count = PlaylistItem.objects.filter(playlist=playlist).count()
-        playlist.downloaded_count = PlaylistItem.objects.filter(playlist=playlist, audio__file_path__isnull=False).exclude(audio__file_path='').count()
-        playlist.save(update_fields=['item_count', 'downloaded_count'])
+        playlist.refresh_local_counts()
         
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -268,19 +263,8 @@ MAX_EXPORT_TRACKS = 50
 _EXPORT_LOCK_TIMEOUT_SECONDS = 900
 
 _ZIP_CONTENT_TYPE = 'application/zip'
-
-
-def _unique_zip_arcname(audio, target_format, used_names):
-    """Build a collision-free, path-safe archive name for a track."""
-    from audio.export import sanitize_export_filename
-    base = sanitize_export_filename(audio.title, f"audio_{audio.youtube_id or audio.id}")
-    arcname = f"{base}.{target_format}"
-    index = 2
-    while arcname in used_names:
-        arcname = f"{base} ({index}).{target_format}"
-        index += 1
-    used_names.add(arcname)
-    return arcname
+_OMITTED_COUNT_HEADER = 'X-Export-Omitted'
+_WARNED_COUNT_HEADER = 'X-Export-Warned'
 
 
 class PlaylistExportView(ApiBaseView):
@@ -289,40 +273,31 @@ class PlaylistExportView(ApiBaseView):
 
     def post(self, request, playlist_id):
         """Convert each downloaded track to the requested format and stream a ZIP."""
-        import shutil
-        import tempfile
-        import zipfile
-        from pathlib import Path
+        from django.conf import settings
         from django.core.cache import cache
-        from django.http import FileResponse
-        from audio.export import (
-            export_track_to_file,
-            sanitize_export_filename,
-            AudioConversionError,
-            ExportSourceUnavailable,
-            SUPPORTED_EXPORT_FORMATS,
+        from audio.export import exportable_playlist_tracks, sanitize_export_filename, write_playlist_zip
+        from audio.export_limits import (
+            ExportRefused,
+            ScratchFileResponse,
+            estimated_export_bytes,
+            new_scratch_dir,
+            refuse_if_no_room,
+            release_slot,
+            remove_scratch_dir,
+            take_sync_slot,
         )
+        from audio.models_export import ACTIVE_STATUSES, ExportJob
+        from audio.serializers import EXPORT_OPTIONS_ERROR, ExportOptionsSerializer
+        from audio.tasks import build_playlist_export
 
         playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
 
-        target_format = str(request.data.get('format', 'mp3')).lower()
-        quality = request.data.get('quality', 'high')
-        embed_lyrics = request.data.get('embed_lyrics', True)
-        embed_artwork = request.data.get('embed_artwork', True)
+        options = ExportOptionsSerializer(data=request.data)
+        if not options.is_valid():
+            return Response({'error': EXPORT_OPTIONS_ERROR}, status=status.HTTP_400_BAD_REQUEST)
+        target_format = options.validated_data['format']
 
-        if target_format not in SUPPORTED_EXPORT_FORMATS:
-            return Response(
-                {'error': 'Invalid format. Supported: mp3, flac'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        items = (
-            PlaylistItem.objects
-            .filter(playlist=playlist)
-            .select_related('audio')
-            .order_by('position')
-        )
-        exportable = [item.audio for item in items if item.audio and item.audio.file_path]
+        exportable = exportable_playlist_tracks(playlist)
 
         if not exportable:
             return Response(
@@ -336,61 +311,69 @@ class PlaylistExportView(ApiBaseView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        estimated_bytes = estimated_export_bytes(exportable, options.validated_data['format'], options.validated_data['quality'])
+        try:
+            refuse_if_no_room(estimated_bytes)
+        except ExportRefused as refused:
+            return Response({'error': refused.message}, status=refused.status)
+
+        busy_message = 'An export is already in progress. Please wait for it to finish.'
+        if ExportJob.objects.filter(owner=request.user, status__in=ACTIVE_STATUSES).exists():
+            return Response({'error': busy_message}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        if estimated_bytes > settings.EXPORT_SYNC_MAX_BYTES:
+            job = ExportJob.objects.create(
+                owner=request.user,
+                playlist=playlist,
+                options=options.validated_data,
+                tracks_total=len(exportable),
+            )
+            transaction.on_commit(lambda: build_playlist_export.delay(str(job.pk)))
+            return Response({'job_id': str(job.pk), 'status': job.status}, status=status.HTTP_202_ACCEPTED)
+
         # Best-effort guard: one synchronous export per user at a time, so a single user
         # cannot tie up multiple workers with concurrent multi-track ffmpeg runs.
         lock_key = f'playlist_export_lock:{request.user.id}'
         if not cache.add(lock_key, True, timeout=_EXPORT_LOCK_TIMEOUT_SECONDS):
-            return Response(
-                {'error': 'An export is already in progress. Please wait for it to finish.'},
-                status=status.HTTP_429_TOO_MANY_REQUESTS
-            )
-
-        temp_dir = tempfile.mkdtemp()
+            return Response({'error': busy_message}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         try:
-            work_dir = Path(temp_dir) / 'tracks'
-            work_dir.mkdir()
-            zip_base = sanitize_export_filename(playlist.title, playlist.playlist_id)
-            zip_path = Path(temp_dir) / f"{zip_base}.zip"
-
-            used_names = set()
-            exported_count = 0
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as archive:
-                for audio in exportable:
-                    arcname = _unique_zip_arcname(audio, target_format, used_names)
-                    try:
-                        written = export_track_to_file(
-                            audio,
-                            target_format,
-                            quality,
-                            work_dir,
-                            embed_lyrics=embed_lyrics,
-                            embed_artwork=embed_artwork,
-                            filename=arcname,
-                        )
-                    except (AudioConversionError, ExportSourceUnavailable) as exc:
-                        logger.warning("[PlaylistExport] Skipping '%s': %s", audio.title, exc)
-                        continue
-                    archive.write(written, arcname=arcname)
-                    written.unlink(missing_ok=True)  # free disk as the ZIP grows
-                    exported_count += 1
-
-            if exported_count == 0:
-                return Response(
-                    {'error': 'No tracks could be exported'},
-                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
-                )
-
-            zip_handle = open(zip_path, 'rb')
-            response = FileResponse(
-                zip_handle,
-                as_attachment=True,
-                filename=f"{zip_base}.zip",
-                content_type=_ZIP_CONTENT_TYPE,
-            )
-            return response
-        finally:
-            # Runs on every path (success, 422, error). On success the ZIP fd is already
-            # open, so removing the temp dir is safe — the inode stays alive on Linux
-            # until the response finishes streaming.
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            slot = take_sync_slot()
+        except ExportRefused as refused:
             cache.delete(lock_key)
+            return Response({'error': refused.message}, status=refused.status)
+
+        scratch = new_scratch_dir()
+
+        def tidy_up():
+            remove_scratch_dir(scratch)
+            release_slot(slot)
+            cache.delete(lock_key)
+
+        try:
+            outcome = write_playlist_zip(
+                exportable,
+                options.validated_data,
+                scratch,
+                sanitize_export_filename(playlist.title, playlist.playlist_id),
+            )
+        except Exception:
+            tidy_up()
+            raise
+
+        if outcome.exported_count == 0:
+            tidy_up()
+            return Response(
+                {'error': 'No tracks could be exported'},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+
+        response = ScratchFileResponse(
+            open(outcome.path, 'rb'),
+            as_attachment=True,
+            filename=outcome.path.name,
+            content_type=_ZIP_CONTENT_TYPE,
+            cleanup=tidy_up,
+        )
+        response[_OMITTED_COUNT_HEADER] = str(len(outcome.omitted))
+        response[_WARNED_COUNT_HEADER] = str(len(outcome.warnings))
+        return response

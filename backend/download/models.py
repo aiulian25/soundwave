@@ -6,6 +6,15 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
+def outstanding_counts(queue_rows):
+    """Split queue rows into work still running and work that failed."""
+    by_status = dict(queue_rows.order_by().values_list('status').annotate(models.Count('id')))
+    return {
+        'pending': by_status.get('pending', 0) + by_status.get('downloading', 0),
+        'failed': by_status.get('failed', 0),
+    }
+
+
 class DownloadQueue(models.Model):
     """Download queue model"""
     STATUS_CHOICES = [
@@ -36,9 +45,29 @@ class DownloadQueue(models.Model):
     started_date = models.DateTimeField(null=True, blank=True)
     completed_date = models.DateTimeField(null=True, blank=True)
     auto_start = models.BooleanField(default=False)
+    claim_token = models.UUIDField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Held by the worker allowed to finish this row"
+    )
+    lease_expires_at = models.DateTimeField(null=True, blank=True, editable=False)
+    reserved_bytes = models.BigIntegerField(
+        default=0,
+        editable=False,
+        help_text="Quota held while downloading"
+    )
+    source_playlist_id = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Playlist sync that queued this row"
+    )
 
     class Meta:
         ordering = ['-auto_start', 'added_date']
+        constraints = [
+            models.UniqueConstraint(fields=['owner', 'url'], name='download_queue_unique_owner_url'),
+        ]
 
     def __str__(self):
         return f"{self.title or self.url} - {self.status}"

@@ -4,6 +4,9 @@ from rest_framework import serializers
 from stats.models import ListeningHistory, Achievement
 
 
+MAX_LISTEN_SECONDS = 24 * 60 * 60
+
+
 class AudioStatsSerializer(serializers.Serializer):
     """Audio statistics"""
     total_count = serializers.IntegerField()
@@ -58,6 +61,15 @@ class AchievementProgressSerializer(serializers.Serializer):
     current = serializers.FloatField()
     progress = serializers.IntegerField()
     unlocked = serializers.BooleanField()
+
+
+class ListeningEventSerializer(serializers.Serializer):
+    """One play attempt reported by a client. Older clients send no identity or time."""
+    youtube_id = serializers.CharField()
+    duration_listened = serializers.IntegerField(min_value=0, max_value=MAX_LISTEN_SECONDS)
+    completed = serializers.BooleanField(default=False)
+    event_id = serializers.UUIDField(required=False)
+    occurred_at = serializers.DateTimeField(required=False)
 
 
 class ListeningHistorySerializer(serializers.ModelSerializer):

@@ -1,0 +1,21 @@
+[
+  {"name": "canonical", "lrc": "[01:02.50]alpha", "events": [[62500, "alpha"]]},
+  {"name": "no fraction", "lrc": "[01:02]alpha", "events": [[62000, "alpha"]]},
+  {"name": "one digit minute and fraction", "lrc": "[1:02.5]alpha", "events": [[62500, "alpha"]]},
+  {"name": "milliseconds kept", "lrc": "[00:01.125]alpha", "events": [[1125, "alpha"]]},
+  {"name": "long mix", "lrc": "[100:00.00]alpha", "events": [[6000000, "alpha"]]},
+  {"name": "repeated stamps expand", "lrc": "[00:10.00][00:30.00]chorus\n[00:20.00]verse", "events": [[10000, "chorus"], [20000, "verse"], [30000, "chorus"]]},
+  {"name": "spaces between stamps", "lrc": "[00:10.00] [00:30.00] chorus", "events": [[10000, "chorus"], [30000, "chorus"]]},
+  {"name": "out of order sorted", "lrc": "[00:20.00]two\n[00:10.00]one", "events": [[10000, "one"], [20000, "two"]]},
+  {"name": "equal times keep source order", "lrc": "[00:10.00]first\n[00:10.00]second", "events": [[10000, "first"], [10000, "second"]]},
+  {"name": "positive offset is earlier", "lrc": "[offset:+500]\n[00:10.00]alpha", "events": [[9500, "alpha"]]},
+  {"name": "negative offset is later", "lrc": "[offset:-500]\n[00:10.00]alpha", "events": [[10500, "alpha"]]},
+  {"name": "offset cannot go below zero", "lrc": "[offset:5000]\n[00:01.00]alpha", "events": [[0, "alpha"]]},
+  {"name": "offset after the lyrics still applies", "lrc": "[00:10.00]alpha\n[OFFSET: 100]", "events": [[9900, "alpha"]]},
+  {"name": "metadata and untimed lines ignored", "lrc": "[ar:Someone]\n[ti:Song]\nplain line\n[00:01.00]alpha", "events": [[1000, "alpha"]]},
+  {"name": "empty text ignored", "lrc": "[00:01.00]\n[00:02.00]   \n[00:03.00]alpha", "events": [[3000, "alpha"]]},
+  {"name": "stamp inside text is not a stamp", "lrc": "words [00:01.00] more", "events": []},
+  {"name": "unicode kept", "lrc": "[00:01.00]Îți mulțumesc 日本語", "events": [[1000, "Îți mulțumesc 日本語"]]},
+  {"name": "windows line endings", "lrc": "[00:01.00]one\r\n[00:02.00]two\r\n", "events": [[1000, "one"], [2000, "two"]]},
+  {"name": "nothing", "lrc": "", "events": []}
+]

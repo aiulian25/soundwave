@@ -21,6 +21,8 @@ from user.models import Account
 
 E2E_USERNAME = os.environ.get('E2E_USERNAME', 'e2e_user')
 E2E_PASSWORD = os.environ.get('E2E_PASSWORD', 'E2e-Test_2026!')
+# A second account for browser-isolation tests; owns nothing.
+E2E_SECOND_USERNAME = os.environ.get('E2E_SECOND_USERNAME', 'e2e_user_two')
 E2E_YOUTUBE_ID = 'e2e-sample-0001'
 SAMPLE_REL_PATH = 'e2e/sample.wav'
 
@@ -29,16 +31,8 @@ class Command(BaseCommand):
     help = 'Seed a deterministic user + one playable track for end-to-end tests.'
 
     def handle(self, *args, **options):
-        # --- user (forced-password-change off so login goes straight through) ---
-        user, _ = Account.objects.get_or_create(
-            username=E2E_USERNAME,
-            defaults={'email': 'e2e@example.local'},
-        )
-        user.set_password(E2E_PASSWORD)
-        user.is_active = True
-        if hasattr(user, 'password_change_required'):
-            user.password_change_required = False
-        user.save()
+        user = self._seed_account(E2E_USERNAME, 'e2e@example.local')
+        self._seed_account(E2E_SECOND_USERNAME, 'e2e-two@example.local')
 
         # --- tiny silent WAV the browser can actually play ---
         media_root = Path(settings.MEDIA_ROOT)
@@ -65,6 +59,17 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Seeded e2e user "{E2E_USERNAME}" + playable track "{SAMPLE_REL_PATH}".'
         ))
+
+    @staticmethod
+    def _seed_account(username: str, email: str) -> Account:
+        # Forced-password-change off so login goes straight through.
+        user, _ = Account.objects.get_or_create(username=username, defaults={'email': email})
+        user.set_password(E2E_PASSWORD)
+        user.is_active = True
+        if hasattr(user, 'password_change_required'):
+            user.password_change_required = False
+        user.save()
+        return user
 
     @staticmethod
     def _write_silent_wav(path: Path, seconds: int = 2, rate: int = 8000) -> None:

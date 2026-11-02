@@ -1,5 +1,6 @@
 """Models for artwork and metadata"""
 from django.db import models
+from django.db.models import Q
 from audio.models import Audio
 from channel.models import Channel
 
@@ -64,6 +65,14 @@ class Artwork(models.Model):
             models.Index(fields=['channel', 'artwork_type']),
             models.Index(fields=['is_primary']),
         ]
+    
+    @classmethod
+    def embeddable_in(cls, audio):
+        """Artwork of this track, or of its owner's subscription to the track's channel."""
+        return cls.objects.filter(
+            Q(audio=audio)
+            | Q(audio__isnull=True, channel__owner_id=audio.owner_id, channel__channel_id=audio.channel_id)
+        )
     
     def __str__(self):
         if self.audio:

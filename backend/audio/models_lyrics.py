@@ -1,6 +1,11 @@
 """Lyrics models for audio tracks"""
+import hashlib
+
 from django.db import models
 from audio.models import Audio
+
+
+REVISION_LENGTH = 16
 
 
 class Lyrics(models.Model):
@@ -15,6 +20,9 @@ class Lyrics(models.Model):
     
     # Synced lyrics in LRC format [mm:ss.xx]text
     synced_lyrics = models.TextField(blank=True, default='')
+    
+    # The timed lyrics as they were before the first timing edit, so that edit can be undone
+    original_synced_lyrics = models.TextField(blank=True, default='')
     
     # Plain text lyrics without timestamps
     plain_lyrics = models.TextField(blank=True, default='')
@@ -59,6 +67,11 @@ class Lyrics(models.Model):
     def is_synced(self):
         """Check if lyrics are synchronized"""
         return bool(self.synced_lyrics)
+    
+    @property
+    def revision(self):
+        """Identifies these timed lyrics, whichever of the many writers last changed them."""
+        return hashlib.sha256(self.synced_lyrics.encode()).hexdigest()[:REVISION_LENGTH]
     
     def get_display_lyrics(self):
         """Get lyrics for display (prefer synced over plain)"""

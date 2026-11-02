@@ -3,8 +3,10 @@
 from celery.result import AsyncResult
 from rest_framework import status
 from rest_framework.response import Response
-from task.serializers import TaskSerializer, TaskCreateSerializer
+from task.serializers import TaskSerializer
 from common.views import ApiBaseView, AdminOnly
+
+NOT_SUPPORTED_MESSAGE = 'Listing and starting tasks through this API is not supported.'
 
 
 class TaskListView(ApiBaseView):
@@ -12,9 +14,8 @@ class TaskListView(ApiBaseView):
     permission_classes = [AdminOnly]
 
     def get(self, request):
-        """Get list of tasks"""
-        # TODO: Implement task listing from Celery
-        return Response({'data': []})
+        """Listing is not supported; an empty list would wrongly mean nothing is running."""
+        return Response({'error': NOT_SUPPORTED_MESSAGE}, status=status.HTTP_501_NOT_IMPLEMENTED)
 
 
 class TaskCreateView(ApiBaseView):
@@ -22,20 +23,8 @@ class TaskCreateView(ApiBaseView):
     permission_classes = [AdminOnly]
 
     def post(self, request):
-        """Create and run a task"""
-        serializer = TaskCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        task_name = serializer.validated_data['task_name']
-        params = serializer.validated_data.get('params', {})
-
-        # Map task names to Celery tasks
-        # TODO: Implement task dispatch
-
-        return Response({
-            'message': 'Task created',
-            'task_name': task_name
-        }, status=status.HTTP_202_ACCEPTED)
+        """Starting tasks by name is not supported, and must not claim that one was created."""
+        return Response({'error': NOT_SUPPORTED_MESSAGE}, status=status.HTTP_501_NOT_IMPLEMENTED)
 
 
 class TaskDetailView(ApiBaseView):

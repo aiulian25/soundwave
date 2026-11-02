@@ -20,8 +20,8 @@ from django.core.cache import cache
 from django.http import StreamingHttpResponse, HttpResponse, Http404, HttpResponseForbidden
 from django.utils.http import http_date
 from pathlib import Path
-from rest_framework.authtoken.models import Token
-from common.expiring_token import is_token_expired
+from rest_framework.exceptions import AuthenticationFailed
+from common.expiring_token import ExpiringTokenAuthentication
 from common.rate_limiter import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -97,14 +97,12 @@ def authenticate_media_request(request, path=None):
     auth_header = request.META.get('HTTP_AUTHORIZATION', '')
     if auth_header.startswith('Token '):
         token_key = auth_header[6:]
+        # The same check as the API, so a token refused there cannot still stream here.
         try:
-            token = Token.objects.select_related('user').get(key=token_key)
-            if not is_token_expired(token):
-                return (token.user, None)
-            else:
-                return (None, "Token expired")
-        except Token.DoesNotExist:
-            return (None, "Invalid token")
+            user, _ = ExpiringTokenAuthentication().authenticate_credentials(token_key)
+        except AuthenticationFailed as error:
+            return (None, str(error.detail))
+        return (user, None)
 
     # Method 3: Short-lived signed media ticket (?t=...), bound to this exact path.
     ticket = request.GET.get('t', '')

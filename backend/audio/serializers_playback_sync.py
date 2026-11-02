@@ -4,6 +4,10 @@ from rest_framework import serializers
 from audio.models_playback_sync import PlaybackSession
 from audio.models import Audio
 
+# Generous for a queue, but the row is rewritten on every sync. Clients send a window around
+# the current track when theirs is longer.
+MAX_QUEUE_IDS = 5000
+
 
 class PlaybackSessionSerializer(serializers.ModelSerializer):
     """Serializer for playback session data"""
@@ -63,7 +67,8 @@ class PlaybackSyncUpdateSerializer(serializers.Serializer):
     queue_youtube_ids = serializers.ListField(
         child=serializers.CharField(max_length=50),
         required=False,
-        default=list
+        default=list,
+        max_length=MAX_QUEUE_IDS,
     )
     queue_index = serializers.IntegerField(min_value=0, required=False, default=0)
     device_id = serializers.CharField(max_length=100, required=False, allow_blank=True)

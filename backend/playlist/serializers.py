@@ -1,6 +1,7 @@
 """Playlist serializers"""
 
 from rest_framework import serializers
+from download.models import DownloadQueue, outstanding_counts
 from playlist.models import Playlist, PlaylistItem
 import re
 
@@ -32,22 +33,29 @@ class PlaylistSubscribeSerializer(serializers.Serializer):
 class PlaylistSerializer(serializers.ModelSerializer):
     """Playlist serializer"""
     item_count = serializers.SerializerMethodField()
+    remote_total = serializers.IntegerField(read_only=True)
+    local_available = serializers.IntegerField(source='downloaded_count', read_only=True)
     progress_percent = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_sync_status_display', read_only=True)
 
     class Meta:
         model = Playlist
-        fields = '__all__'
-        read_only_fields = ['owner', 'created_date', 'last_updated', 'last_refresh']
+        exclude = ['remote_video_ids']
+        read_only_fields = ['owner', 'created_date', 'last_updated', 'last_refresh', 'remote_unavailable_count']
 
     def get_item_count(self, obj):
         return obj.items.count()
     
     def get_progress_percent(self, obj):
-        """Calculate download progress percentage"""
-        if obj.item_count == 0:
+        """Share of the tracks that can still be fetched that are playable locally"""
+        obtainable = obj.item_count - obj.remote_unavailable_count
+        if obtainable <= 0:
             return 0
-        return int((obj.downloaded_count / obj.item_count) * 100)
+        return min(100, int((obj.downloaded_count / obtainable) * 100))
+
+    def to_representation(self, instance):
+        queue_rows = DownloadQueue.objects.filter(owner_id=instance.owner_id, youtube_id__in=instance.remote_video_ids)
+        return {**super().to_representation(instance), **outstanding_counts(queue_rows)}
 
 
 class PlaylistItemSerializer(serializers.ModelSerializer):

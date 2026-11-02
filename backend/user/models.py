@@ -7,6 +7,9 @@ import secrets
 import hashlib
 
 
+BYTES_PER_GB = 1024 ** 3
+
+
 class AccountManager(BaseUserManager):
     """Custom user manager"""
 
@@ -118,17 +121,38 @@ class Account(AbstractUser):
         current_count = Playlist.objects.filter(owner=self).count()
         return current_count < self.max_playlists
     
-    def calculate_storage_usage(self):
-        """Calculate and update actual storage usage from audio files"""
+    @property
+    def has_unlimited_storage(self):
+        return self.is_admin or self.is_superuser
+
+    @property
+    def storage_quota_bytes(self):
+        return self.storage_quota_gb * BYTES_PER_GB
+
+    def stored_bytes(self):
+        """Bytes of finished media, from the rows themselves so no counter can drift."""
         from audio.models import Audio
+        from audio.models_local import LocalAudio
         from django.db.models import Sum
-        
-        total_bytes = Audio.objects.filter(owner=self).aggregate(
-            total=Sum('file_size')
+
+        audio_bytes = Audio.objects.filter(owner=self).aggregate(total=Sum('file_size'))['total'] or 0
+        local_bytes = LocalAudio.objects.filter(owner=self).aggregate(total=Sum('file_size'))['total'] or 0
+        return audio_bytes + local_bytes
+
+    def storage_used_bytes(self):
+        """What counts against the quota: finished media plus downloads in progress."""
+        from download.models import DownloadQueue
+        from django.db.models import Sum
+
+        reserved = DownloadQueue.objects.filter(owner=self, status='downloading').aggregate(
+            total=Sum('reserved_bytes')
         )['total'] or 0
-        
+        return self.stored_bytes() + reserved
+
+    def calculate_storage_usage(self):
+        """Calculate and update actual storage usage from all of this account's media"""
         # Convert bytes to GB
-        self.storage_used_gb = round(total_bytes / (1024 ** 3), 2)
+        self.storage_used_gb = round(self.stored_bytes() / BYTES_PER_GB, 2)
         self.save(update_fields=['storage_used_gb'])
         return self.storage_used_gb
 
@@ -207,6 +231,10 @@ class UserConfig(models.Model):
     items_per_page = models.IntegerField(default=50, help_text="Items per page in lists")
     
     # Prefetch/Caching Settings
+    playback_sync_enabled = models.BooleanField(
+        default=True,
+        help_text="Share playback position and queue across devices"
+    )
     prefetch_enabled = models.BooleanField(default=True, help_text="Enable automatic prefetching of upcoming tracks")
     
     # Additional settings stored as JSON
@@ -310,7 +338,8 @@ class APIKey(models.Model):
         try:
             api_key = cls.objects.select_related('user').get(
                 key_hash=key_hash,
-                is_active=True
+                is_active=True,
+                user__is_active=True
             )
             # Check expiry
             from django.utils import timezone
@@ -322,3 +351,27 @@ class APIKey(models.Model):
             return api_key
         except cls.DoesNotExist:
             return None
+
+
+class Passkey(models.Model):
+    """WebAuthn credential that signs its owner in without a password"""
+
+    NAME_MAX_LENGTH = 100
+    # WebAuthn allows credential ids up to 1023 bytes, which is 1364 characters of base64url.
+    CREDENTIAL_ID_MAX_LENGTH = 1364
+
+    user = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='passkeys')
+    name = models.CharField(max_length=NAME_MAX_LENGTH)
+    # Authenticators only offer a passkey on the hostname it was made for.
+    rp_id = models.CharField(max_length=253, db_index=True)
+    credential_id = models.CharField(max_length=CREDENTIAL_ID_MAX_LENGTH, unique=True)
+    public_key = models.TextField()
+    sign_count = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.name}"

@@ -17,8 +17,10 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
+from audio.models import Audio
 from audio.views_local import BYTES_PER_GB, LocalAudioViewSet
 
 User = get_user_model()
@@ -39,7 +41,9 @@ class StorageQuotaAccountingTests(TestCase):
 
     def _serializer(self, gb):
         serializer = mock.Mock()
-        serializer.save.return_value = SimpleNamespace(file_size=int(gb * BYTES_PER_GB))
+        size = int(gb * BYTES_PER_GB)
+        serializer.validated_data = {'file': SimpleNamespace(size=size)}
+        serializer.save.return_value = SimpleNamespace(file_size=size)
         return serializer
 
     def _used(self):
@@ -50,7 +54,10 @@ class StorageQuotaAccountingTests(TestCase):
 
     # --- quota enforcement ---------------------------------------------------
     def test_upload_is_rejected_when_over_quota(self):
-        self._set(storage_used_gb=50.0)
+        Audio.objects.create(
+            owner=self.user, youtube_id='QUOTA_FULL', title='T', channel_id='UC', channel_name='C', duration=1,
+            file_path='x.m4a', file_size=50 * BYTES_PER_GB, published_date=timezone.now(),
+        )
         serializer = self._serializer(gb=1)
         with self.assertRaises(PermissionDenied):
             self._view(User.objects.get(pk=self.user.pk)).perform_create(serializer)

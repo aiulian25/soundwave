@@ -1,7 +1,7 @@
 """User serializers"""
 
 from rest_framework import serializers
-from user.models import Account, UserConfig, APIKey
+from user.models import Account, UserConfig, APIKey, Passkey
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -53,7 +53,7 @@ class UserConfigSerializer(serializers.ModelSerializer):
             'smart_shuffle_enabled', 'smart_shuffle_history_size',
             'visualizer_theme', 'visualizer_enabled', 'visualizer_glow',
             'seek_duration',
-            'audio_quality', 'items_per_page', 'prefetch_enabled',
+            'audio_quality', 'items_per_page', 'prefetch_enabled', 'playback_sync_enabled',
             'extra_settings', 'updated_at'
         ]
         read_only_fields = ['updated_at']
@@ -116,3 +116,24 @@ class APIKeyCreatedSerializer(serializers.Serializer):
     key_prefix = serializers.CharField()
     permission = serializers.CharField()
     created_at = serializers.DateTimeField()
+
+
+class PasskeySerializer(serializers.ModelSerializer):
+    """A passkey as its owner sees it; key material stays on the server"""
+
+    class Meta:
+        model = Passkey
+        fields = ['id', 'name', 'rp_id', 'created_at', 'last_used_at']
+        read_only_fields = fields
+
+
+class PasskeyStepUpSerializer(serializers.Serializer):
+    """Proof of identity required before a passkey can be added"""
+    password = serializers.CharField(trim_whitespace=False)
+    two_factor_code = serializers.CharField(required=False, allow_blank=True)
+
+
+class PasskeyCredentialSerializer(serializers.Serializer):
+    """The browser's answer to a passkey ceremony"""
+    credential = serializers.DictField()
+    name = serializers.CharField(required=False, allow_blank=True, max_length=Passkey.NAME_MAX_LENGTH)

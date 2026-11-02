@@ -2,10 +2,9 @@
 
 import os
 import logging
-from pathlib import Path
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.conf import settings
+from audio.storage_service import absolute_media_path, remove_after_commit
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -82,8 +81,8 @@ class Audio(models.Model):
     
     @property
     def downloaded(self):
-        """Check if audio file has been downloaded"""
-        return bool(self.file_path)
+        """Check if audio file is present on disk"""
+        return bool(self.file_path) and absolute_media_path(self.file_path).is_file()
     
     @property
     def has_lyrics(self):
@@ -91,17 +90,14 @@ class Audio(models.Model):
         return hasattr(self, 'lyrics') and self.lyrics.has_lyrics
     
     def delete(self, *args, **kwargs):
-        """Override delete to remove audio file from filesystem"""
-        file_to_delete = Path(settings.MEDIA_ROOT) / self.file_path if self.file_path else None
+        """Override delete to remove the audio file once nothing references it"""
+        file_path = self.file_path
 
-        # Delete from database first so we don't orphan records if DB deletion fails.
-        super().delete(*args, **kwargs)
+        result = super().delete(*args, **kwargs)
 
-        if file_to_delete:
-            try:
-                file_to_delete.unlink(missing_ok=True)
-            except OSError as e:
-                logger.warning("Could not delete audio file %s: %s", file_to_delete, e)
+        if file_path:
+            remove_after_commit(file_path)
+        return result
 
 
 class AudioProgress(models.Model):
@@ -120,3 +116,4 @@ class AudioProgress(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.audio.title}"
+from audio.models_export import ExportJob  # noqa: E402,F401  (registers the model)

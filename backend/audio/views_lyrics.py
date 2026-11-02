@@ -3,6 +3,7 @@ import logging
 import re
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import MethodNotAllowed
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -14,13 +15,24 @@ from audio.models_lyrics import Lyrics, LyricsCache
 from audio.serializers_lyrics import (
     LyricsSerializer,
     LyricsUpdateSerializer,
+    LyricsTimingSerializer,
     LyricsFetchSerializer,
     LyricsCacheSerializer,
     LRCUploadSerializer,
+    LyricsBatchSerializer,
+    LyricsMissingFetchSerializer,
+    LyricsCacheCleanupSerializer,
 )
+from audio.lrc import offset_tag_line, text_without_timing
+from audio.lyrics_timing import InvalidLyricsTiming, LyricsChanged, save_lyrics_timing
 from audio.lyrics_service import LyricsService, LRCLIBClient, clean_title_for_lyrics, LRC_TIMESTAMP_PATTERN
-from audio.tasks_lyrics import fetch_lyrics_for_audio, fetch_lyrics_batch
-from common.views import ApiBaseView
+from audio.tasks_lyrics import (
+    cleanup_lyrics_cache,
+    fetch_lyrics_batch,
+    fetch_lyrics_for_audio,
+    fetch_missing_lyrics_for_owner,
+)
+from common.views import AdminOnly, ApiBaseView
 
 
 logger = logging.getLogger(__name__)
@@ -55,8 +67,9 @@ def parse_lrc_content(lrc_content: str) -> tuple[str, str, str]:
         if timestamp_match:
             synced_lines.append(line)
     
-    # Build synced lyrics string
-    synced_lyrics = '\n'.join(synced_lines)
+    # The offset tag is kept with the timed lines because it changes what their times mean.
+    offset_line = offset_tag_line(lrc_content)
+    synced_lyrics = '\n'.join([offset_line, *synced_lines] if offset_line else synced_lines)
     
     # Generate plain lyrics by stripping timestamps
     plain_lines = []
@@ -191,7 +204,7 @@ class LyricsDownloadView(ApiBaseView):
                 txt_content = lyrics.plain_lyrics
             else:
                 # Strip timestamps from synced lyrics
-                txt_content = re.sub(LRC_TIMESTAMP_PATTERN, '', lyrics.synced_lyrics)
+                txt_content = text_without_timing(lyrics.synced_lyrics)
                 txt_content = '\n'.join(line.strip() for line in txt_content.split('\n') if line.strip())
             
             # Add header
@@ -220,6 +233,10 @@ class LyricsViewSet(viewsets.ModelViewSet):
         """
         return Lyrics.objects.filter(audio__owner=self.request.user).select_related('audio')
     
+    def create(self, request, *args, **kwargs):
+        """A lyrics row belongs to one track, so it is made through `<youtube_id>/lyrics/`."""
+        raise MethodNotAllowed(request.method)
+    
     def retrieve(self, request, youtube_id=None):
         """Get lyrics for a specific audio track"""
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
@@ -230,7 +247,7 @@ class LyricsViewSet(viewsets.ModelViewSet):
         # If no lyrics and not attempted, trigger fetch
         if not lyrics.fetch_attempted:
             # Trigger async fetch
-            fetch_lyrics_for_audio.delay(youtube_id)
+            fetch_lyrics_for_audio.delay(audio.pk, audio.owner_id)
             
         serializer = self.get_serializer(lyrics)
         return Response(serializer.data)
@@ -279,6 +296,26 @@ class LyricsViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(lyrics)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def timing(self, request, youtube_id=None):
+        """Save new timing for existing lyrics; an edit of an older revision is refused"""
+        audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        timing_serializer = LyricsTimingSerializer(data=request.data)
+        timing_serializer.is_valid(raise_exception=True)
+        
+        try:
+            lyrics = save_lyrics_timing(audio, **timing_serializer.validated_data)
+        except InvalidLyricsTiming as error:
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        except LyricsChanged as conflict:
+            return Response(
+                {'error': str(conflict), 'current': self.get_serializer(conflict.current).data},
+                status=status.HTTP_409_CONFLICT,
+            )
+        
+        return Response(self.get_serializer(lyrics).data)
     
     @action(detail=True, methods=['get'])
     def suggestions(self, request, youtube_id=None):
@@ -353,16 +390,19 @@ class LyricsViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def fetch_batch(self, request):
         """Fetch lyrics for multiple audio tracks"""
-        youtube_ids = request.data.get('youtube_ids', [])
+        batch_serializer = LyricsBatchSerializer(data=request.data)
+        batch_serializer.is_valid(raise_exception=True)
         
-        if not youtube_ids:
-            return Response(
-                {'error': 'youtube_ids is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Only the requester's tracks go further; a foreign id looks like an unknown one.
+        owned_tracks = Audio.objects.filter(
+            owner=request.user,
+            youtube_id__in=batch_serializer.validated_data['youtube_ids'],
+        ).values_list('pk', 'youtube_id')
+        audio_ids = [audio_id for audio_id, _ in owned_tracks]
+        youtube_ids = [youtube_id for _, youtube_id in owned_tracks]
         
         # Trigger async batch fetch
-        fetch_lyrics_batch.delay(youtube_ids)
+        fetch_lyrics_batch.delay(audio_ids, request.user.pk)
         
         return Response({
             'message': f'Fetching lyrics for {len(youtube_ids)} tracks',
@@ -371,13 +411,13 @@ class LyricsViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def fetch_all_missing(self, request):
-        """Fetch lyrics for all audio without lyrics"""
-        from audio.tasks_lyrics import auto_fetch_lyrics
-        
-        limit = request.data.get('limit', 50)
+        """Fetch lyrics for the requester's audio without lyrics"""
+        limit_serializer = LyricsMissingFetchSerializer(data=request.data)
+        limit_serializer.is_valid(raise_exception=True)
+        limit = limit_serializer.validated_data['limit']
         
         # Trigger async task
-        result = auto_fetch_lyrics.delay(limit=limit)
+        result = fetch_missing_lyrics_for_owner.delay(request.user.pk, limit=limit)
         
         return Response({
             'message': f'Fetching lyrics for up to {limit} tracks without lyrics',
@@ -424,12 +464,13 @@ class LyricsCacheViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = LyricsCacheSerializer
     queryset = LyricsCache.objects.all()
     
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], permission_classes=[AdminOnly])
     def cleanup(self, request):
-        """Clean up old cache entries"""
-        from audio.tasks_lyrics import cleanup_lyrics_cache
+        """Clean up old cache entries; the cache is shared, so this is instance maintenance"""
+        cleanup_serializer = LyricsCacheCleanupSerializer(data=request.data)
+        cleanup_serializer.is_valid(raise_exception=True)
+        days_old = cleanup_serializer.validated_data['days_old']
         
-        days_old = request.data.get('days_old', 30)
         result = cleanup_lyrics_cache.delay(days_old=days_old)
         
         return Response({

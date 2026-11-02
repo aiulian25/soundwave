@@ -23,6 +23,14 @@ from user.views import (
     APIKeyListCreateView,
     APIKeyDetailView,
 )
+from user.views_passkey import (
+    PasskeyAvailabilityView,
+    PasskeyLoginOptionsView,
+    PasskeyLoginView,
+    PasskeyListView,
+    PasskeyEnrolOptionsView,
+    PasskeyDetailView,
+)
 
 urlpatterns = [
     path('csrf/', CsrfTokenView.as_view(), name='user-csrf'),
@@ -40,6 +48,13 @@ urlpatterns = [
     path('2fa/disable/', TwoFactorDisableView.as_view(), name='2fa-disable'),
     path('2fa/regenerate-codes/', TwoFactorRegenerateCodesView.as_view(), name='2fa-regenerate'),
     path('2fa/download-codes/', TwoFactorDownloadCodesView.as_view(), name='2fa-download'),
+    # Passkeys
+    path('passkeys/availability/', PasskeyAvailabilityView.as_view(), name='passkey-availability'),
+    path('passkeys/login/options/', PasskeyLoginOptionsView.as_view(), name='passkey-login-options'),
+    path('passkeys/login/', PasskeyLoginView.as_view(), name='passkey-login'),
+    path('passkeys/', PasskeyListView.as_view(), name='passkey-list'),
+    path('passkeys/options/', PasskeyEnrolOptionsView.as_view(), name='passkey-enrol-options'),
+    path('passkeys/<int:passkey_id>/', PasskeyDetailView.as_view(), name='passkey-detail'),
     # Avatar management
     path('avatar/upload/', AvatarUploadView.as_view(), name='avatar-upload'),
     path('avatar/preset/', AvatarPresetView.as_view(), name='avatar-preset'),

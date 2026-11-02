@@ -1,3 +1,5 @@
+// LEGACY COPY, not the worker the app runs. /service-worker.js is served from the frontend
+// build (backend/config/urls.py); edit frontend/public/service-worker.js instead.
 /* eslint-disable no-restricted-globals */
 const CACHE_NAME = 'soundwave-v17';
 const API_CACHE_NAME = 'soundwave-api-v3';

@@ -12,43 +12,24 @@ Run: python manage.py test audio --settings=config.settings_test
 """
 from unittest import mock
 
+import requests
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from audio.models import Audio
-from audio.views import MAX_ARTWORK_BYTES, artwork_ticket_path
+from audio.views import artwork_ticket_path
+from common.safe_http import FetchedResponse, FetchRefused, REFUSED_TOO_LARGE
 from common.streaming import make_media_ticket
 from user.models import Account
 
 ARTWORK_URL = 'https://i.ytimg.com/vi/ART_TEST_ID/hqdefault.jpg'
 ARTWORK_PATH = '/api/audio/{youtube_id}/artwork/'
+FETCH = 'common.safe_http.fetch_public_url'
 
 
-class _FakeRawStream:
-    """Minimal urllib3-style raw stream supporting `.read(amt, decode_content=...)`."""
-
-    def __init__(self, content):
-        self._content = content
-
-    def read(self, amt=None, decode_content=True):
-        return self._content if amt is None else self._content[:amt]
-
-
-class _FakeUpstream:
-    """Stands in for the `requests` streaming response used as a context manager."""
-
-    def __init__(self, content=b'\xff\xd8\xff-image-bytes', status_code=200,
-                 content_type='image/jpeg'):
-        self.status_code = status_code
-        self.headers = {'content-type': content_type}
-        self.raw = _FakeRawStream(content)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        return False
+def _fetched(content_type='image/jpeg'):
+    return FetchedResponse(b'\xff\xd8\xff-image-bytes', content_type)
 
 
 def _make_audio(owner, youtube_id):
@@ -101,9 +82,9 @@ class ArtworkProxyAuthTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
     # --- the legitimate paths still work --------------------------------------
-    @mock.patch('requests.get')
+    @mock.patch(FETCH)
     def test_valid_ticket_without_session_serves_image(self, fake_get):
-        fake_get.return_value = _FakeUpstream()
+        fake_get.return_value = _fetched()
         resp = self.client.get(
             self.url_for('ART_ALICE_1'), {'t': self.ticket_for(self.alice, 'ART_ALICE_1')}
         )
@@ -111,44 +92,60 @@ class ArtworkProxyAuthTests(TestCase):
         self.assertEqual(resp['Content-Type'], 'image/jpeg')
         self.assertTrue(resp['Cache-Control'].startswith('private'))
 
-    @mock.patch('requests.get')
+    @mock.patch(FETCH)
     def test_owner_session_serves_image(self, fake_get):
-        fake_get.return_value = _FakeUpstream()
+        fake_get.return_value = _fetched()
         self.client.force_authenticate(user=self.alice)
         resp = self.client.get(self.url_for('ART_ALICE_1'))
         self.assertEqual(resp.status_code, 200)
 
     # --- the ticket is bound to one track -------------------------------------
-    @mock.patch('requests.get')
+    @mock.patch(FETCH)
     def test_ticket_for_another_track_is_rejected(self, fake_get):
-        fake_get.return_value = _FakeUpstream()
+        fake_get.return_value = _fetched()
         resp = self.client.get(
             self.url_for('ART_ALICE_1'), {'t': self.ticket_for(self.alice, 'ART_ALICE_2')}
         )
         self.assertEqual(resp.status_code, 401)
         fake_get.assert_not_called()
 
-    @mock.patch('requests.get')
+    @mock.patch(FETCH)
     def test_stream_ticket_cannot_be_replayed_as_artwork_ticket(self, fake_get):
         """A ticket minted for the media path must not unlock the artwork endpoint."""
-        fake_get.return_value = _FakeUpstream()
+        fake_get.return_value = _fetched()
         stream_ticket = make_media_ticket(self.alice, self.alice_audio.file_path)
         resp = self.client.get(self.url_for('ART_ALICE_1'), {'t': stream_ticket})
         self.assertEqual(resp.status_code, 401)
         fake_get.assert_not_called()
 
     # --- upstream response hardening ------------------------------------------
-    @mock.patch('requests.get')
+    @mock.patch(FETCH)
     def test_oversized_artwork_is_rejected(self, fake_get):
-        fake_get.return_value = _FakeUpstream(content=b'x' * (MAX_ARTWORK_BYTES + 1))
+        fake_get.side_effect = FetchRefused(REFUSED_TOO_LARGE)
         self.client.force_authenticate(user=self.alice)
         resp = self.client.get(self.url_for('ART_ALICE_1'))
         self.assertEqual(resp.status_code, 502)
 
-    @mock.patch('requests.get')
+    @mock.patch(FETCH)
     def test_non_image_content_type_is_coerced(self, fake_get):
-        fake_get.return_value = _FakeUpstream(content_type='text/html')
+        fake_get.return_value = _fetched(content_type='text/html')
         self.client.force_authenticate(user=self.alice)
         resp = self.client.get(self.url_for('ART_ALICE_1'))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp['Content-Type'], 'image/jpeg')
+
+    @mock.patch(FETCH)
+    def test_refused_fetch_is_a_bad_gateway_without_details(self, fake_get):
+        fake_get.side_effect = FetchRefused('internal_address')
+        self.client.force_authenticate(user=self.alice)
+        resp = self.client.get(self.url_for('ART_ALICE_1'))
+        self.assertEqual(resp.status_code, 502)
+        self.assertEqual(resp.json(), {'error': 'Failed to fetch artwork'})
+
+    @mock.patch(FETCH)
+    def test_network_failure_stays_a_server_error(self, fake_get):
+        fake_get.side_effect = requests.ConnectionError('synthetic')
+        self.client.force_authenticate(user=self.alice)
+        resp = self.client.get(self.url_for('ART_ALICE_1'))
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp.json(), {'error': 'Error fetching artwork'})

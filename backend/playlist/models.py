@@ -3,6 +3,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from audio.models import Audio
+from audio.storage_service import count_files_on_disk
 
 User = get_user_model()
 
@@ -49,8 +50,20 @@ class Playlist(models.Model):
         help_text="Current sync status"
     )
     error_message = models.TextField(blank=True, help_text="Last error message if sync failed")
-    item_count = models.IntegerField(default=0, help_text="Total items in playlist")
-    downloaded_count = models.IntegerField(default=0, help_text="Downloaded items count")
+    item_count = models.IntegerField(
+        default=0,
+        help_text="YouTube: tracks in the last complete scan. Custom: tracks added",
+    )
+    downloaded_count = models.IntegerField(default=0, help_text="Member tracks whose file is on disk")
+    remote_video_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Video ids of the last complete YouTube scan, in playlist order",
+    )
+    remote_unavailable_count = models.IntegerField(
+        default=0,
+        help_text="Deleted or private entries of the last complete scan with no local copy",
+    )
     
     # Download settings
     auto_download = models.BooleanField(default=False, help_text="Auto-download new items in this playlist")
@@ -65,6 +78,22 @@ class Playlist(models.Model):
 
     def __str__(self):
         return f"{self.owner.username} - {self.title}"
+
+    @property
+    def remote_total(self):
+        """Tracks YouTube lists for this playlist; custom playlists have no remote side."""
+        if self.playlist_type == 'custom':
+            return None
+        return self.item_count
+
+    def refresh_local_counts(self):
+        tracks = Audio.objects.filter(playlist_items__playlist=self)
+        self.downloaded_count = count_files_on_disk(tracks)
+        changed_fields = ['downloaded_count']
+        if self.playlist_type == 'custom':
+            self.item_count = tracks.count()
+            changed_fields.append('item_count')
+        self.save(update_fields=changed_fields)
 
 
 class PlaylistItem(models.Model):

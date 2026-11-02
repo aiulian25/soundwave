@@ -2,6 +2,7 @@
 
 from django.core.management.base import BaseCommand
 from audio.models import Audio
+from audio.storage_service import absolute_media_path
 import os
 
 
@@ -32,7 +33,7 @@ class Command(BaseCommand):
                 if old_path.endswith(ext):
                     # Try .m4a version (our post-processor creates .m4a files)
                     new_path = old_path[:-len(ext)] + '.m4a'
-                    full_path = f"/app/audio/{new_path}"
+                    full_path = str(absolute_media_path(new_path))
                     
                     if os.path.exists(full_path):
                         audio.file_path = new_path
@@ -46,7 +47,7 @@ class Command(BaseCommand):
                         fixed_count += 1
                     else:
                         # Check if original file exists
-                        old_full_path = f"/app/audio/{old_path}"
+                        old_full_path = str(absolute_media_path(old_path))
                         if os.path.exists(old_full_path):
                             self.stdout.write(
                                 self.style.WARNING(

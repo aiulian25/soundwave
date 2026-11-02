@@ -19,7 +19,15 @@ class ListeningHistory(models.Model):
     genre = models.CharField(max_length=100, blank=True, default='')
     
     # Listening details
-    listened_at = models.DateTimeField(auto_now_add=True)
+    event_id = models.UUIDField(
+        null=True, blank=True,
+        help_text="Client-chosen identity of one play, so a retry counts once. Empty on older rows",
+    )
+    listened_at = models.DateTimeField(default=timezone.now, help_text="When the listening happened")
+    received_at = models.DateTimeField(
+        auto_now_add=True, null=True,
+        help_text="When the server learned of it. Empty on older rows",
+    )
     duration_listened = models.IntegerField(default=0, help_text="Duration listened in seconds")
     completed = models.BooleanField(default=False, help_text="Whether the track was fully played")
     
@@ -30,6 +38,9 @@ class ListeningHistory(models.Model):
             models.Index(fields=['user', 'artist']),
             models.Index(fields=['user', 'channel_name']),
             models.Index(fields=['user', 'genre']),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'event_id'], name='unique_listening_event_per_user'),
         ]
         verbose_name_plural = 'Listening history'
     

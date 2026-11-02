@@ -4,17 +4,31 @@ from celery.utils.log import get_task_logger
 from django.core.files.base import ContentFile
 from django.db.models import Q
 import os
-import requests
 from pathlib import Path
 
 from audio.models import Audio
 from audio.models_artwork import Artwork, MusicMetadata, ArtistInfo
+from audio.artwork_images import (
+    InvalidArtworkImage,
+    MAX_ARTWORK_BYTES,
+    decoded_mime_type,
+    load_artwork_image,
+)
+from common.safe_http import FetchRefused, fetch_public_url
 from channel.models import Channel
 from audio.lastfm_client import LastFMClient
 from audio.fanart_client import FanartClient
 from audio.id3_service import ID3TagService
+from audio.storage_service import ensure_private_file
 
 logger = get_task_logger(__name__)
+
+ARTWORK_FETCH_DEADLINE_SECONDS = 60
+EXTENSION_BY_MIME_TYPE = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+}
 
 
 @shared_task(bind=True, max_retries=3)
@@ -333,33 +347,14 @@ def download_artwork(self, artwork_id: int):
             logger.warning(f"No URL for artwork {artwork_id}")
             return
 
-        # SSRF guard (report Step 6): Artwork.url can be user-supplied via the
-        # ArtworkViewSet create endpoint, so validate it resolves to a PUBLIC http(s)
-        # host before the worker fetches it — the same control the download queue uses
-        # (task/tasks.py). Blocks loopback/private/link-local/reserved/metadata targets
-        # (e.g. 169.254.169.254). NB (per common.url_security): DNS can re-resolve
-        # between this check and the fetch, so pair with egress-restricted networking
-        # for full defence in depth.
-        from common.url_security import check_public_http_url
-        ok, _code = check_public_http_url(artwork.url)
-        if not ok:
-            logger.warning("Blocked SSRF artwork fetch for artwork %s: %s", artwork_id, artwork.url)
+        # Artwork.url can be user-supplied through ArtworkViewSet, so the fetch is bounded and
+        # every hop validated, and only a decoded image ever reaches the disk.
+        try:
+            fetched = fetch_public_url(artwork.url, MAX_ARTWORK_BYTES, ARTWORK_FETCH_DEADLINE_SECONDS)
+            ext = EXTENSION_BY_MIME_TYPE[decoded_mime_type(fetched.content)]
+        except (FetchRefused, InvalidArtworkImage) as refusal:
+            logger.warning("Refused artwork fetch for artwork %s: %s", artwork_id, refusal)
             return
-
-        # Download image
-        response = requests.get(artwork.url, timeout=30, stream=True)
-        response.raise_for_status()
-        
-        # Get file extension from content type
-        content_type = response.headers.get('content-type', '')
-        if 'jpeg' in content_type or 'jpg' in content_type:
-            ext = 'jpg'
-        elif 'png' in content_type:
-            ext = 'png'
-        elif 'webp' in content_type:
-            ext = 'webp'
-        else:
-            ext = 'jpg'  # Default
         
         # Generate filename
         if artwork.audio:
@@ -377,8 +372,7 @@ def download_artwork(self, artwork_id: int):
         filepath = artwork_dir / filename
         
         with open(filepath, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+            f.write(fetched.content)
         
         # Update artwork record
         artwork.local_path = str(filepath.relative_to(settings.MEDIA_ROOT))
@@ -415,7 +409,8 @@ def embed_artwork_in_audio(self, audio_id: int, artwork_id: int = None):
         
         # Get artwork
         if artwork_id:
-            artwork = Artwork.objects.get(id=artwork_id)
+            # Re-checked here: queued ids and stored rows may predate or bypass the API checks.
+            artwork = Artwork.embeddable_in(audio).filter(id=artwork_id).first()
         else:
             # Get best artwork (highest priority)
             artwork = Artwork.objects.filter(
@@ -428,26 +423,18 @@ def embed_artwork_in_audio(self, audio_id: int, artwork_id: int = None):
             return
         
         # Read image data
-        from django.conf import settings
-        image_path = Path(settings.MEDIA_ROOT) / artwork.local_path
-        
-        if not image_path.exists():
-            logger.error(f"Artwork file not found: {image_path}")
+        try:
+            image_data, mime_type = load_artwork_image(artwork)
+        except InvalidArtworkImage as e:
+            logger.warning(f"Refused artwork {artwork.id} for audio {audio_id}: {e}")
             return
         
-        with open(image_path, 'rb') as f:
-            image_data = f.read()
-        
-        # Determine MIME type
-        if image_path.suffix.lower() in ['.jpg', '.jpeg']:
-            mime_type = 'image/jpeg'
-        elif image_path.suffix.lower() == '.png':
-            mime_type = 'image/png'
-        else:
-            mime_type = 'image/jpeg'
-        
         # Embed in audio file
+        from django.conf import settings
         service = ID3TagService()
+        if not ensure_private_file(audio):
+            logger.error(f"Could not make a private copy of audio {audio_id}")
+            return
         audio_path = Path(settings.MEDIA_ROOT) / audio.file_path
         
         if audio_path.exists():
@@ -461,8 +448,6 @@ def embed_artwork_in_audio(self, audio_id: int, artwork_id: int = None):
         
     except Audio.DoesNotExist:
         logger.error(f"Audio {audio_id} not found")
-    except Artwork.DoesNotExist:
-        logger.error(f"Artwork {artwork_id} not found")
     except Exception as e:
         logger.error(f"Error embedding artwork for audio {audio_id}: {e}")
 
@@ -525,6 +510,9 @@ def update_id3_tags_from_metadata(audio_id: int):
             return
         
         from django.conf import settings
+        if not ensure_private_file(audio):
+            logger.error(f"Could not make a private copy of audio {audio_id}")
+            return
         audio_path = Path(settings.MEDIA_ROOT) / audio.file_path
         
         if not audio_path.exists():

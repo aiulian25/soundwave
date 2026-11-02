@@ -1,15 +1,21 @@
 """F16 — sonic-similarity radio / Auto-DJ.
 
-All coverage runs WITHOUT librosa: the pure similarity/energy math is tested directly, the
-acceptance criteria use hand-set feature_vectors, and the extract task's guard branches return
-before the lazy librosa import. No test invokes librosa.load.
+The pure similarity/energy math is tested directly, the acceptance criteria use hand-set
+feature_vectors, and the extract task's guard branches return before the lazy librosa import.
+RealExtractionTests alone runs librosa, on a generated file.
 
 Run: python manage.py test audio.tests.test_radio_features --settings=config.settings_test
 """
+import shutil
+import subprocess
+import tempfile
 from datetime import timedelta
+from importlib.util import find_spec
+from pathlib import Path
 from types import SimpleNamespace
+from unittest import skipUnless
 
-from django.test import TestCase, SimpleTestCase
+from django.test import TestCase, SimpleTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -168,6 +174,37 @@ class ExtractFeaturesGuardTests(TestCase):
             duration=1, file_path='', file_size=0, published_date=timezone.now(),
         )
         self.assertIn('has no file', extract_features_task(audio.id))
+
+
+@skipUnless(find_spec('librosa') and shutil.which('ffmpeg'), 'needs the sonic analysis stack')
+class RealExtractionTests(TestCase):
+    """Inside the production image this also proves librosa can run on its read-only filesystem."""
+
+    SAMPLE_SECONDS = 5
+
+    def test_a_generated_file_gets_a_feature_vector(self):
+        from task.tasks import extract_features_task
+
+        media_root = tempfile.TemporaryDirectory()
+        self.addCleanup(media_root.cleanup)
+        subprocess.run(
+            ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'lavfi',
+             '-i', f'anoisesrc=d={self.SAMPLE_SECONDS}:c=pink:r=22050:a=0.3',
+             str(Path(media_root.name) / 'noise.wav')],
+            check=True,
+        )
+        user = Account.objects.create_user('real_feat_u', 'real_feat@test.local', 'Featpw_2026!')
+        audio = Audio.objects.create(
+            owner=user, youtube_id='REALFILE', title='x', channel_id='c', channel_name='C',
+            duration=self.SAMPLE_SECONDS, file_path='noise.wav', file_size=1, published_date=timezone.now(),
+        )
+
+        with override_settings(MEDIA_ROOT=media_root.name):
+            outcome = extract_features_task(audio.id)
+
+        audio.refresh_from_db()
+        self.assertIn('Extracted features', outcome)
+        self.assertTrue(audio.feature_vector)
 
 
 class TitleSimilarityBoundTests(TestCase):

@@ -14,7 +14,7 @@ Security invariants:
 import logging
 import re
 
-from django.db import transaction
+from django.db import DataError, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -61,6 +61,9 @@ _RULE_FIELDS = ['field', 'operator', 'value', 'value_2']
 _ALLOWED_SYNC_DEPTHS = (0, 25, 50, 100, 200)
 
 
+UNSTORABLE_VALUE_MESSAGE = 'Invalid backup: a value is too long or out of range. Nothing was restored.'
+
+
 class BackupValidationError(Exception):
     """Raised when a restore payload is malformed, wrong-version, or over a cap."""
 
@@ -87,7 +90,12 @@ def _as_optional_int(value):
 
 
 def _as_datetime(value):
-    return parse_datetime(value) if isinstance(value, str) else None
+    if not isinstance(value, str):
+        return None
+    try:
+        return parse_datetime(value)
+    except ValueError:
+        return None
 
 
 def _valid_natural_key(value):
@@ -331,12 +339,15 @@ def _apply(request, audio_list, playlist_list, smart_list, channel_list, user_co
         'downloads_enqueued': 0,
     }
 
-    with transaction.atomic():
-        _restore_user_config(user, user_config)
-        _restore_channels(user, channel_list, summary)
-        audio_map = _restore_audio(user, audio_list, summary)
-        _restore_playlists(user, playlist_list, audio_map, summary)
-        _restore_smart_playlists(request, smart_list, summary)
+    try:
+        with transaction.atomic():
+            _restore_user_config(user, user_config)
+            _restore_channels(user, channel_list, summary)
+            audio_map = _restore_audio(user, audio_list, summary)
+            _restore_playlists(user, playlist_list, audio_map, summary)
+            _restore_smart_playlists(request, smart_list, summary)
+    except (DataError, OverflowError, UnicodeEncodeError) as error:
+        raise BackupValidationError(UNSTORABLE_VALUE_MESSAGE) from error
 
     # Enqueue AFTER commit so the worker sees the committed placeholder rows.
     _enqueue_downloads(user, audio_list, summary)
@@ -538,6 +549,7 @@ def _restore_smart_playlists(request, smart_list, summary):
 
 def _enqueue_downloads(user, audio_list, summary):
     from audio.models import Audio
+    from download.claims import requeue_if_failed
     from download.models import DownloadQueue
     from task.tasks import download_audio_task
 
@@ -553,15 +565,16 @@ def _enqueue_downloads(user, audio_list, summary):
             continue
         queue_item, created = DownloadQueue.objects.get_or_create(
             owner=user,
-            youtube_id=youtube_id,
+            url=f'https://www.youtube.com/watch?v={youtube_id}',
             defaults={
-                'url': f'https://www.youtube.com/watch?v={youtube_id}',
+                'youtube_id': youtube_id,
                 'title': _as_str(entry.get('title')),
                 'channel_name': _as_str(entry.get('channel_name')),
                 'auto_start': True,
             },
         )
         if created or queue_item.status == 'failed':
+            requeue_if_failed(queue_item)
             download_audio_task.delay(queue_item.id)
             enqueued += 1
     summary['downloads_enqueued'] = enqueued

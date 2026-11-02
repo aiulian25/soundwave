@@ -67,11 +67,11 @@ class ArtworkIsolationTests(TestCase):
         return client
 
     # --- ArtworkViewSet: cross-tenant detail/delete must 404; owner can read -----
-    # NOTE: the ArtworkViewSet *list* (/api/audio/api/artwork/) is deliberately not
-    # tested — that exact path is shadowed by the `<youtube_id>/artwork/`
-    # ArtworkProxyView route (resolves with youtube_id='api'), so the list is
-    # unreachable and cannot leak. The reachable detail/delete routes are what Step 5's
-    # owner-scoping actually protects.
+    def test_artwork_list_is_owner_scoped(self):
+        alice_ids = [row['id'] for row in self.client_for(self.alice).get('/api/audio/api/artwork/').json()['results']]
+        self.assertEqual(alice_ids, [self.alice_artwork.id])
+        self.assertEqual(self.client_for(self.bob).get('/api/audio/api/artwork/').json()['results'], [])
+
     def test_bob_cannot_read_alice_artwork_detail(self):
         resp = self.client_for(self.bob).get(f'/api/audio/api/artwork/{self.alice_artwork.id}/')
         self.assertEqual(resp.status_code, 404)

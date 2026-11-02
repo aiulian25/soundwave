@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from playlist.models import Playlist
 from channel.models import Channel
+from download.claims import expired_claims
 from download.models import DownloadQueue
 from audio.models import Audio
 from django.db.models import Count, Q
@@ -16,6 +17,9 @@ from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+REDIS_TIMEOUT_SECONDS = 5
 
 
 class Command(BaseCommand):
@@ -110,19 +114,9 @@ class Command(BaseCommand):
         self.stdout.write('-' * 70)
         
         try:
-            redis_url = settings.CELERY_BROKER_URL
-            # Parse connection info from URL
-            if '@' in redis_url:
-                auth_part, host_part = redis_url.rsplit('@', 1)
-                password = auth_part.split(':')[-1]
-                host = host_part.split(':')[0]
-                port = int(host_part.split(':')[1])
-            else:
-                password = settings.REDIS_PASSWORD if hasattr(settings, 'REDIS_PASSWORD') else None
-                host = settings.REDIS_HOST
-                port = 6379
-            
-            r = redis.Redis(host=host, port=port, password=password, db=0, socket_timeout=5)
+            r = redis.Redis.from_url(settings.CELERY_BROKER_URL, socket_timeout=REDIS_TIMEOUT_SECONDS)
+            connection_kwargs = r.connection_pool.connection_kwargs
+            host, port = connection_kwargs.get('host'), connection_kwargs.get('port')
             ping_response = r.ping()
             
             if ping_response:
@@ -237,12 +231,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.HTTP_INFO('\n⚠️  STUCK DOWNLOADS CHECK'))
         self.stdout.write('-' * 70)
         
-        thirty_min_ago = timezone.now() - timedelta(minutes=30)
-        
-        stuck = DownloadQueue.objects.filter(
-            status='downloading',
-            started_date__lt=thirty_min_ago
-        )
+        stuck = expired_claims()
         
         if not stuck.exists():
             self.stdout.write('   ✅ No stuck downloads detected')
@@ -262,17 +251,14 @@ class Command(BaseCommand):
         self.stdout.write(self.style.HTTP_INFO('\n🔧 FIXING STUCK DOWNLOADS'))
         self.stdout.write('-' * 70)
         
-        thirty_min_ago = timezone.now() - timedelta(minutes=30)
-        
-        stuck = DownloadQueue.objects.filter(
-            status='downloading',
-            started_date__lt=thirty_min_ago
-        )
+        stuck = expired_claims()
         
         count = stuck.update(
             status='pending',
-            error_message='Reset by diagnostics after being stuck for > 30min',
-            started_date=None
+            error_message='Reset by diagnostics after its worker stopped responding',
+            started_date=None,
+            claim_token=None,
+            lease_expires_at=None,
         )
         
         self.stdout.write(self.style.SUCCESS(f'   ✅ Fixed {count} stuck download(s)'))

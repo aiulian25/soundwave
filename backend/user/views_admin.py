@@ -26,6 +26,7 @@ from user.serializers_admin import (
 from channel.models import Channel
 from playlist.models import Playlist
 from audio.models import Audio
+from audio.storage_service import absolute_media_path, remove_if_unreferenced
 from audio.models_local import LocalAudio
 
 User = get_user_model()
@@ -111,11 +112,18 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         user.two_factor_secret = ''
         user.backup_codes = []
         user.save()
+        # A passkey satisfies both factors, so a reset that kept them could leave a planted one.
+        user.passkeys.all().delete()
         return Response({'message': '2FA reset successfully'})
     
     @action(detail=True, methods=['post'])
     def toggle_active(self, request, pk=None):
-        """Toggle user active status"""
+        """Suspend or reactivate a user.
+
+        Suspension is a pause enforced when each credential is checked: sessions, tokens,
+        tickets, passkeys and API keys are refused but not revoked, and work again on
+        reactivation. Revoking here would also miss the edit form, which sets is_active too.
+        """
         user = self.get_object()
         user.is_active = not user.is_active
         user.save()
@@ -157,31 +165,9 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         files_deleted = 0
         errors = []
 
-        # 1. Delete audio files from filesystem (CASCADE won't call Audio.delete())
-        audio_files = Audio.objects.filter(owner=user)
-        media_root = Path(settings.MEDIA_ROOT)
-        channel_dirs = set()
-
-        for audio in audio_files.iterator():
-            if audio.file_path:
-                full_path = media_root / audio.file_path
-                try:
-                    if full_path.exists():
-                        full_path.unlink()
-                        files_deleted += 1
-                        # Track parent dirs for cleanup
-                        if full_path.parent != media_root:
-                            channel_dirs.add(full_path.parent)
-                except (OSError, IOError) as e:
-                    errors.append(f'Could not delete {audio.file_path}: {e}')
-
-        # 2. Clean up empty channel directories
-        for channel_dir in channel_dirs:
-            try:
-                if channel_dir.exists() and not any(channel_dir.iterdir()):
-                    channel_dir.rmdir()
-            except (OSError, IOError):
-                pass
+        # 1. Remember audio files; they go after the rows, once nothing references them
+        # (CASCADE won't call Audio.delete()).
+        audio_paths = set(Audio.objects.filter(owner=user).exclude(file_path='').values_list('file_path', flat=True))
 
         # 2b. Delete user-uploaded local audio files + cover art (CASCADE won't
         # call LocalAudio.delete(), so the files on disk must be removed here).
@@ -208,6 +194,25 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         # 4. Delete user (CASCADE handles all DB relationships)
         user.delete()
+
+        # 5. Remove the audio files no other owner still uses, then any folders left empty
+        media_root = Path(settings.MEDIA_ROOT)
+        emptied_dirs = set()
+        for file_path in audio_paths:
+            try:
+                if remove_if_unreferenced(file_path):
+                    files_deleted += 1
+                    if absolute_media_path(file_path).parent != media_root:
+                        emptied_dirs.add(absolute_media_path(file_path).parent)
+            except OSError as e:
+                errors.append(f'Could not delete {file_path}: {e}')
+
+        for media_dir in emptied_dirs:
+            try:
+                if media_dir.exists() and not any(media_dir.iterdir()):
+                    media_dir.rmdir()
+            except OSError:
+                pass
 
         logger.info('User %s (id=%s) permanently deleted by %s. %d audio files removed.',
                      username, pk, request.user.username, files_deleted)

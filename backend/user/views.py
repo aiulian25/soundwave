@@ -14,6 +14,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from common.permissions import NotFromAnotherSite
 from common.views import ApiBaseView
 from common.rate_limiter import get_client_ip
 from user.models import Account, APIKey
@@ -379,7 +380,7 @@ class ChangePasswordView(ApiBaseView):
 
 class LoginView(APIView):
     """Login endpoint with rate limiting and lockout protection"""
-    permission_classes = [AllowAny]
+    permission_classes = [NotFromAnotherSite]
     authentication_classes = []  # No auth required, exempt from CSRF
     
     # Apply stricter throttling to login endpoint

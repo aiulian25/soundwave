@@ -3,8 +3,10 @@
 from django.db.models import Count
 from rest_framework import status
 from rest_framework.response import Response
+from download.claims import canonical_download_url
 from download.models import DownloadQueue
 from download.serializers import DownloadQueueSerializer, AddToDownloadSerializer
+from common.permissions import WithinQuotaLimits
 from common.views import ApiBaseView, AuthenticatedOwnerAccess
 
 # The activity centre polls filter=all every few seconds and never renders 'ignored'
@@ -14,7 +16,7 @@ ACTIVITY_FEED_LIMIT = 200
 
 class DownloadListView(ApiBaseView):
     """Download queue list endpoint"""
-    permission_classes = [AuthenticatedOwnerAccess]
+    permission_classes = [AuthenticatedOwnerAccess, WithinQuotaLimits]
 
     def get(self, request):
         """Get download queue. filter=<status> narrows by status; filter=all returns every row."""
@@ -38,7 +40,7 @@ class DownloadListView(ApiBaseView):
         for url in serializer.validated_data['urls']:
             item, created = DownloadQueue.objects.get_or_create(
                 owner=request.user,
-                url=url,
+                url=canonical_download_url(url),
                 defaults={'auto_start': auto_start}
             )
             created_items.append(item)
@@ -52,7 +54,7 @@ class DownloadListView(ApiBaseView):
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request):
-        """Clear download queue"""
+        """Clear download queue. Removing a row also cancels any worker running it."""
         status_filter = request.query_params.get('filter', 'pending')
         queryset = DownloadQueue.objects.filter(owner=request.user)
         if status_filter != 'all':

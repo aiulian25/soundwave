@@ -1,7 +1,25 @@
 """Audio serializers"""
 
 from rest_framework import serializers
+from audio.export import EXPORT_QUALITIES, SUPPORTED_EXPORT_FORMATS
 from audio.models import Audio, AudioProgress
+
+EXPORT_OPTIONS_ERROR = 'Invalid export options. Formats: mp3, flac. Qualities: high, medium, low, original.'
+
+
+class ExportOptionsSerializer(serializers.Serializer):
+    """What one export was asked to produce."""
+    format = serializers.CharField(default='mp3')
+    quality = serializers.ChoiceField(choices=EXPORT_QUALITIES, default='high')
+    embed_lyrics = serializers.BooleanField(default=True)
+    embed_artwork = serializers.BooleanField(default=True)
+    artwork_url = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate_format(self, value):
+        normalized = value.lower()
+        if normalized not in SUPPORTED_EXPORT_FORMATS:
+            raise serializers.ValidationError(EXPORT_OPTIONS_ERROR)
+        return normalized
 
 
 class AudioSerializer(serializers.ModelSerializer):

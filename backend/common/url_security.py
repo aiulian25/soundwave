@@ -4,13 +4,14 @@ SSRF protection for user-supplied URLs (APP-02).
 Validates that a URL is a public http(s) resource before the application fetches
 it (e.g. handing a download URL to yt-dlp). Blocks non-http(s) schemes and any
 host that resolves to a loopback/private/link-local/reserved address, which would
-otherwise let an authenticated user reach internal services (Elasticsearch,
+otherwise let an authenticated user reach internal services (
 Postgres, the cloud metadata endpoint, etc.).
 
 This is the application-layer control. The durable, defence-in-depth control is to
 run the download worker on an egress-restricted network — see SECURITY_ASSESSMENT.md
 APP-02. Note the TOCTOU caveat: DNS may re-resolve between this check and the actual
-fetch, so this is necessary but not by itself sufficient.
+fetch, so this is necessary but not by itself sufficient. common.safe_http pairs it with
+a check of the connected peer for fetches this application makes itself.
 """
 
 import ipaddress
@@ -42,6 +43,14 @@ def _ip_is_blocked(ip: ipaddress._BaseAddress) -> bool:
         or ip.is_multicast
         or ip.is_unspecified  # 0.0.0.0, ::
     )
+
+
+def is_public_ip(address: str) -> bool:
+    """Whether a textual address, such as a connected socket's peer, may be fetched from."""
+    try:
+        return not _ip_is_blocked(ipaddress.ip_address(address))
+    except ValueError:
+        return False
 
 
 def check_public_http_url(value: str):

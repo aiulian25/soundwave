@@ -10,9 +10,3 @@ class TaskSerializer(serializers.Serializer):
     status = serializers.CharField()
     result = serializers.JSONField(required=False)
     date_done = serializers.DateTimeField(required=False)
-
-
-class TaskCreateSerializer(serializers.Serializer):
-    """Create task serializer"""
-    task_name = serializers.CharField()
-    params = serializers.DictField(required=False, default=dict)

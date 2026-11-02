@@ -1,68 +1,63 @@
-"""LRC timestamp handling (CODE_REVIEW_REPORT Step 11).
+"""SW-017: upload, tag writing and the player mean the same thing by the same LRC text.
 
-Six copies of `\\[\\d{2}:\\d{2}\\.\\d{2,3}\\]` required a two-digit minute AND a mandatory
-fractional part, so files using the equally-valid `[mm:ss]` or `[m:ss.x]` forms were
-REJECTED at upload validation, and any such lines that got through were dropped at parse
-time. All six now share LRC_TIMESTAMP_PATTERN.
-
-Run: python manage.py test audio --settings=config.settings_test
+The cases live in a fixture so frontend/src/utils/lrc.test.ts runs the very same ones.
+Run: python manage.py test audio.tests.test_lrc_parsing --settings=config.settings_test
 """
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+import json
+from pathlib import Path
 
-from audio.serializers_lyrics import LRCUploadSerializer
+from django.test import SimpleTestCase
+
+from audio.lrc import LyricEvent, format_lrc, parse_lrc, text_without_timing
+from audio.tag_writer import parse_lrc_to_synced_lyrics
 from audio.views_lyrics import parse_lrc_content
 
-
-def _lrc(*lines):
-    return '\n'.join(lines)
+CONTRACT = json.loads((Path(__file__).parent / 'fixtures' / 'lrc_contract.json').read_text(encoding='utf-8'))
 
 
-class ParseLrcContentTests(TestCase):
-    def synced(self, content):
-        synced_lyrics, _plain, _language = parse_lrc_content(content)
-        return synced_lyrics
+class LrcContractTests(SimpleTestCase):
+    def test_every_case(self):
+        for case in CONTRACT:
+            with self.subTest(case['name']):
+                self.assertEqual([list(event) for event in parse_lrc(case['lrc'])], case['events'])
 
-    def test_keeps_canonical_timestamps(self):
-        self.assertIn('alpha', self.synced(_lrc('[00:01.50]alpha')))
-
-    def test_keeps_bare_mm_ss_lines(self):
-        """Previously dropped: the fractional part was mandatory."""
-        self.assertIn('alpha', self.synced(_lrc('[00:01]alpha')))
-
-    def test_keeps_single_digit_minute_lines(self):
-        self.assertIn('alpha', self.synced(_lrc('[1:01.5]alpha')))
-
-    def test_keeps_long_mix_timestamps_past_99_minutes(self):
-        self.assertIn('alpha', self.synced(_lrc('[100:00.00]alpha')))
-
-    def test_metadata_tags_are_not_treated_as_timestamps(self):
-        self.assertNotIn('Some Artist', self.synced(_lrc('[ar:Some Artist]', '[00:01]alpha')))
-
-    def test_plain_text_has_timestamps_stripped(self):
-        _synced, plain, _language = parse_lrc_content(_lrc('[00:01]alpha', '[00:02.5]beta'))
-        self.assertNotIn('[', plain)
-        self.assertIn('alpha', plain)
-        self.assertIn('beta', plain)
+    def test_tag_writer_uses_the_same_times(self):
+        for case in CONTRACT:
+            with self.subTest(case['name']):
+                expected = [(text, time_ms) for time_ms, text in case['events']]
+                self.assertEqual(parse_lrc_to_synced_lyrics(case['lrc']), expected)
 
 
-class LrcUploadValidationTests(TestCase):
-    """The validator rejected the whole file, with a message claiming it was malformed."""
+class UploadTests(SimpleTestCase):
+    def test_upload_keeps_what_later_parsers_need(self):
+        source = '[ar:Someone]\n[offset:+500]\n[00:10.00][00:30.00]chorus\n[00:20.00]verse'
 
-    def _is_valid(self, body):
-        """Drive the whole serializer: `validate_lrc_file` is a serializer-level hook and is
-        NOT run by `fields['lrc_file'].run_validation()`."""
-        upload = SimpleUploadedFile('test.lrc', body.encode('utf-8'), content_type='text/plain')
-        return LRCUploadSerializer(data={'lrc_file': upload}).is_valid()
+        synced, plain, _language = parse_lrc_content(source)
 
-    def test_accepts_a_file_using_only_bare_mm_ss(self):
-        self.assertTrue(self._is_valid(_lrc('[00:01]alpha', '[00:05]beta')))
+        self.assertEqual(parse_lrc(synced), parse_lrc(source))
+        self.assertEqual(plain, 'chorus\nverse')
+        self.assertNotIn('[ar:', synced)
 
-    def test_accepts_a_file_using_single_digit_minutes(self):
-        self.assertTrue(self._is_valid(_lrc('[1:01.5]alpha')))
+    def test_upload_without_an_offset_adds_nothing(self):
+        synced, _plain, _language = parse_lrc_content('[00:10.00]alpha')
 
-    def test_accepts_long_mix_timestamps(self):
-        self.assertTrue(self._is_valid(_lrc('[100:00.00]alpha')))
+        self.assertEqual(synced, '[00:10.00]alpha')
 
-    def test_still_rejects_a_file_with_no_timestamps_at_all(self):
-        self.assertFalse(self._is_valid(_lrc('alpha', 'beta')))
+    def test_plain_download_shows_no_timing(self):
+        self.assertEqual(
+            text_without_timing('[offset:+500]\n[00:10.00][00:30.00]chorus').strip(),
+            'chorus',
+        )
+
+
+class CanonicalFormTests(SimpleTestCase):
+    def test_writes_the_form_the_frontend_also_writes(self):
+        events = [LyricEvent(62505, 'alpha'), LyricEvent(6000000, 'beta')]
+
+        self.assertEqual(format_lrc(events), '[01:02.505]alpha\n[100:00.000]beta')
+
+    def test_every_contract_case_keeps_its_times_through_a_round_trip(self):
+        for case in CONTRACT:
+            with self.subTest(case['name']):
+                events = parse_lrc(case['lrc'])
+                self.assertEqual(parse_lrc(format_lrc(events)), events)

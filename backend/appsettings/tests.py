@@ -8,8 +8,9 @@ counts are capped, dry-run writes nothing, and it is per-user (not admin-only).
 download_audio_task.delay is mocked so tests don't hit the network.
 Run: python manage.py test appsettings --settings=config.settings_test
 """
-from unittest import mock
+from unittest import mock, skipUnless
 
+from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -225,3 +226,50 @@ class BackupRestoreTests(TestCase):
             resp = self._client(self.bob).post('/api/appsettings/restore/', backup, format='json')
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(Channel.objects.filter(owner=self.bob).exists())  # newline-suffixed key rejected
+
+
+class MalformedRestoreTests(TestCase):
+    """Values no export can produce get a clean refusal, with nothing half restored."""
+
+    VALID_TRACK = {'youtube_id': 'abcdefghij1', 'title': 'Track'}
+
+    def setUp(self):
+        self.user = Account.objects.create_user('malformed_u', 'malformed@test.local', 'Malformedpw_2026!')
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def _restore(self, **sections):
+        envelope = {'schema_version': 1, 'app': 'soundwave', 'channels': [], 'playlists': [], 'smart_playlists': []}
+        with mock.patch('task.tasks.download_audio_task.delay'):
+            return self.client.post('/api/appsettings/restore/', {**envelope, **sections}, format='json')
+
+    def _assert_refused_with_nothing_restored(self, response):
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(Audio.objects.filter(owner=self.user).count(), 0)
+        self.assertEqual(Playlist.objects.filter(owner=self.user).count(), 0)
+
+    def test_an_impossible_date_falls_back_like_any_other_unusable_date(self):
+        impossible = {**self.VALID_TRACK, 'published_date': '2026-13-45T00:00:00', 'last_played': '2026-02-31T25:61:00'}
+
+        response = self._restore(audio=[impossible])
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertIsNone(Audio.objects.get(owner=self.user).last_played)
+
+    def test_out_of_range_numbers_are_refused(self):
+        for field in ('year', 'duration', 'play_count'):
+            with self.subTest(field):
+                self._assert_refused_with_nothing_restored(
+                    self._restore(audio=[self.VALID_TRACK, {'youtube_id': 'abcdefghij2', field: 10 ** 30}])
+                )
+
+    @skipUnless(connection.vendor == 'postgresql', 'SQLite stores these without complaint')
+    def test_text_postgresql_cannot_store_is_refused(self):
+        cases = {
+            'too long': {'audio': [{**self.VALID_TRACK, 'title': 'x' * 5000}]},
+            'NUL byte': {'audio': [{**self.VALID_TRACK, 'title': 'a\u0000b'}]},
+            'playlist title': {'playlists': [{'playlist_id': 'PLaaaaaaaa', 'title': 't' * 5000}]},
+        }
+        for label, sections in cases.items():
+            with self.subTest(label):
+                self._assert_refused_with_nothing_restored(self._restore(**sections))

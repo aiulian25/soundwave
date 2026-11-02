@@ -325,9 +325,19 @@ def _env_int_or_none(name):
 
 
 NUM_PROXIES = _env_int_or_none('NUM_PROXIES')
+if NUM_PROXIES is None and not DEBUG:
+    logger.warning(
+        '[Security] NUM_PROXIES is not set, so login lockout and rate limits trust the '
+        'client-supplied X-Forwarded-For and can be evaded. Set it to the number of reverse '
+        'proxies in front of this app, or 0 if there are none.'
+    )
 
 # Token expiry settings
 TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY_HOURS', 24 * 7))  # Default: 7 days
+# Limits on one download. Generous: long mixes are normal, and FLAC of one can reach gigabytes.
+MAX_DOWNLOAD_BYTES = int(os.environ.get('MAX_DOWNLOAD_BYTES', 4 * 1024 ** 3))
+MAX_DOWNLOAD_DURATION_SECONDS = int(os.environ.get('MAX_DOWNLOAD_DURATION_SECONDS', 24 * 60 * 60))
+MIN_FREE_DISK_BYTES = int(os.environ.get('MIN_FREE_DISK_BYTES', 1024 ** 3))
 TOKEN_EXPIRY_HOURS_EXTENDED = int(os.environ.get('TOKEN_EXPIRY_HOURS_EXTENDED', 24 * 30))  # Default: 30 days (for "remember me")
 # REST Framework
 RATELIMIT_ENABLED = _env_bool('RATELIMIT_ENABLED', True)
@@ -375,6 +385,14 @@ else:
         "http://localhost:8889",
         "http://127.0.0.1:8889",
     ]
+
+# Origins a passkey ceremony may run from; the relying party is derived per request from
+# the one the browser reports, so one install can serve several public addresses.
+PASSKEY_ALLOWED_ORIGINS = [
+    origin.rstrip('/')
+    for origin in [*CSRF_TRUSTED_ORIGINS, os.environ.get('SW_HOST', '')]
+    if origin
+]
 
 # Compatibility flag for deployment templates that expect a CSRF toggle.
 # Django's CSRF protection remains enabled via middleware.
@@ -464,6 +482,9 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Email settings (APP-10: email-change verification)
+# Encrypts two-factor secrets; empty means DJANGO_SECRET_KEY is used (see user/two_factor.py).
+TOTP_ENC_KEY = os.environ.get('TOTP_ENC_KEY', '')
+
 EMAIL_HOST = os.environ.get('EMAIL_HOST', '').strip()
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
@@ -495,10 +516,15 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_RESULT_EXPIRES = int(os.environ.get('CELERY_RESULT_EXPIRES', str(60 * 60)))
 
-# ElasticSearch settings
-ES_URL = os.environ.get('ES_URL', 'http://localhost:92000')
-ES_USER = os.environ.get('ELASTIC_USER', 'elastic')
-ES_PASSWORD = os.environ.get('ELASTIC_PASSWORD', 'soundwave')
+# Exports. Scratch lives on the cache volume because /tmp is a small tmpfs in production.
+EXPORT_SCRATCH_DIR = os.environ.get('EXPORT_SCRATCH_DIR', '/app/cache/export-scratch')
+EXPORT_MAX_BYTES = int(os.environ.get('EXPORT_MAX_BYTES', str(2 * 1024 ** 3)))
+EXPORT_MIN_FREE_BYTES = int(os.environ.get('EXPORT_MIN_FREE_BYTES', str(1024 ** 3)))
+# Above this a playlist export becomes a background job instead of holding a web thread.
+EXPORT_SYNC_MAX_BYTES = int(os.environ.get('EXPORT_SYNC_MAX_BYTES', str(200 * 1024 ** 2)))
+EXPORT_MAX_SYNC = int(os.environ.get('EXPORT_MAX_SYNC', '2'))
+EXPORT_SLOT_LIFETIME_SECONDS = 900
+EXPORT_JOB_SOFT_LIMIT_SECONDS = 1800
 
 # SoundWave settings
 SW_HOST = os.environ.get('SW_HOST', 'http://localhost:123456')

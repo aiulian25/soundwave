@@ -7,13 +7,10 @@ from datetime import timedelta
 from django.utils import timezone
 from django.core.cache import cache
 
+from audio.lrc import LRC_TIMESTAMP_PATTERN  # noqa: F401  (importers expect it here)
+
 logger = logging.getLogger(__name__)
 
-# LRC timestamps in the wild: [mm:ss], [m:ss.x], [mm:ss.xx], [mm:ss.xxx]. The fractional
-# part is OPTIONAL and minutes are unbounded (long mixes run past 99 min). The previous
-# pattern demanded [dd:dd.dd+], so bare [mm:ss] files were rejected at upload validation and
-# their lines dropped at parse time. Kept in sync with frontend/src/utils/lrc.ts.
-LRC_TIMESTAMP_PATTERN = r'\[\d+:\d{2}(?:\.\d{1,3})?\]'
 
 
 def clean_title_for_lyrics(title: str, channel_name: str = "") -> Tuple[str, str]:
@@ -576,6 +573,10 @@ class LyricsService:
         
         # Check if already attempted
         existing, created = Lyrics.objects.get_or_create(audio=audio_obj)
+        
+        # Lyrics already here, possibly set by hand, are only replaced on an explicit request.
+        if not force and (existing.has_lyrics or existing.is_instrumental):
+            return existing
         
         if not force and existing.fetch_attempted and existing.fetch_attempts >= 3:
             logger.debug(f"Skipping {audio_obj.title} - already attempted {existing.fetch_attempts} times")

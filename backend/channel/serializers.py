@@ -2,6 +2,7 @@
 
 from rest_framework import serializers
 from channel.models import Channel
+from download.models import DownloadQueue, outstanding_counts
 import re
 
 
@@ -51,6 +52,8 @@ class ChannelSyncDepthSerializer(serializers.Serializer):
 class ChannelSerializer(serializers.ModelSerializer):
     """Channel serializer"""
     status_display = serializers.CharField(source='get_sync_status_display', read_only=True)
+    remote_total = serializers.IntegerField(source='video_count', read_only=True)
+    local_available = serializers.IntegerField(source='downloaded_count', read_only=True)
     progress_percent = serializers.SerializerMethodField()
 
     class Meta:
@@ -59,10 +62,15 @@ class ChannelSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_date', 'last_refreshed']
     
     def get_progress_percent(self, obj):
-        """Calculate download progress percentage"""
-        if obj.video_count == 0:
+        """Share of the videos this channel's sync depth reaches that are playable locally"""
+        reachable = min(obj.video_count, obj.sync_depth) if obj.sync_depth else obj.video_count
+        if reachable <= 0:
             return 0
-        return int((obj.downloaded_count / obj.video_count) * 100)
+        return min(100, int((obj.downloaded_count / reachable) * 100))
+
+    def to_representation(self, instance):
+        queue_rows = DownloadQueue.objects.filter(owner_id=instance.owner_id, channel_name=instance.channel_name)
+        return {**super().to_representation(instance), **outstanding_counts(queue_rows)}
 
 
 class ChannelListSerializer(serializers.Serializer):

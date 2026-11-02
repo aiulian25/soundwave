@@ -1,6 +1,10 @@
 """Serializers for artwork and metadata"""
 from rest_framework import serializers
+from audio.models import Audio
 from audio.models_artwork import Artwork, MusicMetadata, ArtistInfo
+from channel.models import Channel
+
+ASSOCIATION_FIELDS = ('audio', 'channel')
 
 
 class ArtworkSerializer(serializers.ModelSerializer):
@@ -23,7 +27,30 @@ class ArtworkSerializer(serializers.ModelSerializer):
             'is_primary',
             'fetched_date',
         ]
-        read_only_fields = ['id', 'fetched_date']
+        # local_path is only ever set by the download task; width/height describe that file.
+        read_only_fields = ['id', 'fetched_date', 'local_path', 'width', 'height']
+
+    def get_fields(self):
+        """Scope related objects to the requester, so a foreign id is simply "does not exist"."""
+        fields = super().get_fields()
+        request = self.context.get('request')
+        owner = request.user if request else None
+        fields['audio'].queryset = Audio.objects.filter(owner=owner)
+        fields['channel'].queryset = Channel.objects.filter(owner=owner)
+        return fields
+
+    def validate(self, attrs):
+        if self.instance is not None:
+            self._reject_reparenting(attrs)
+            return attrs
+        if bool(attrs.get('audio')) == bool(attrs.get('channel')):
+            raise serializers.ValidationError('Artwork must belong to exactly one of audio or channel.')
+        return attrs
+
+    def _reject_reparenting(self, attrs):
+        for field in ASSOCIATION_FIELDS:
+            if field in attrs and attrs[field] != getattr(self.instance, field):
+                raise serializers.ValidationError({field: 'Artwork cannot be moved to another owner object.'})
 
 
 class MusicMetadataSerializer(serializers.ModelSerializer):

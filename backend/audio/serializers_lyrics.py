@@ -1,6 +1,15 @@
 """Serializers for lyrics"""
 from rest_framework import serializers
-from audio.models_lyrics import Lyrics, LyricsCache
+from audio.models_lyrics import Lyrics, LyricsCache, REVISION_LENGTH
+
+
+YOUTUBE_ID_MAX_LENGTH = 50
+MAX_LYRICS_BATCH_SIZE = 100
+MAX_LRC_CHARACTERS = 1024 * 1024
+MAX_MISSING_LYRICS_LIMIT = 200
+DEFAULT_MISSING_LYRICS_LIMIT = 50
+MAX_CACHE_RETENTION_DAYS = 3650
+DEFAULT_CACHE_RETENTION_DAYS = 30
 
 
 class LyricsSerializer(serializers.ModelSerializer):
@@ -8,6 +17,7 @@ class LyricsSerializer(serializers.ModelSerializer):
     
     audio_id = serializers.CharField(source='audio.youtube_id', read_only=True)
     audio_title = serializers.CharField(source='audio.title', read_only=True)
+    revision = serializers.CharField(read_only=True)
     has_lyrics = serializers.BooleanField(read_only=True)
     is_synced = serializers.BooleanField(read_only=True)
     display_lyrics = serializers.CharField(source='get_display_lyrics', read_only=True)
@@ -18,6 +28,8 @@ class LyricsSerializer(serializers.ModelSerializer):
             'audio_id',
             'audio_title',
             'synced_lyrics',
+            'original_synced_lyrics',
+            'revision',
             'plain_lyrics',
             'is_instrumental',
             'source',
@@ -34,6 +46,8 @@ class LyricsSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'audio_id',
             'audio_title',
+            'original_synced_lyrics',
+            'revision',
             'fetched_date',
             'fetch_attempted',
             'fetch_attempts',
@@ -51,6 +65,13 @@ class LyricsUpdateSerializer(serializers.Serializer):
     plain_lyrics = serializers.CharField(required=False, allow_blank=True)
     is_instrumental = serializers.BooleanField(required=False, default=False)
     language = serializers.CharField(required=False, allow_blank=True, max_length=10)
+
+
+class LyricsTimingSerializer(serializers.Serializer):
+    """New timing for a track's lyrics, and the revision it was edited from"""
+    
+    synced_lyrics = serializers.CharField(max_length=MAX_LRC_CHARACTERS, trim_whitespace=False)
+    base_revision = serializers.CharField(max_length=REVISION_LENGTH)
 
 
 class LRCUploadSerializer(serializers.Serializer):
@@ -85,6 +106,32 @@ class LRCUploadSerializer(serializers.Serializer):
             return value
         except UnicodeDecodeError:
             raise serializers.ValidationError("LRC file must be UTF-8 encoded")
+
+
+class LyricsBatchSerializer(serializers.Serializer):
+    """Tracks to fetch lyrics for, bounded because each one costs provider requests"""
+    
+    youtube_ids = serializers.ListField(
+        child=serializers.CharField(max_length=YOUTUBE_ID_MAX_LENGTH),
+        allow_empty=False,
+        max_length=MAX_LYRICS_BATCH_SIZE,
+    )
+
+
+class LyricsMissingFetchSerializer(serializers.Serializer):
+    """How many of the requester's tracks without lyrics to process"""
+    
+    limit = serializers.IntegerField(
+        min_value=1, max_value=MAX_MISSING_LYRICS_LIMIT, default=DEFAULT_MISSING_LYRICS_LIMIT
+    )
+
+
+class LyricsCacheCleanupSerializer(serializers.Serializer):
+    """Retention for cache cleanup; at least a day, so a request cannot empty the cache"""
+    
+    days_old = serializers.IntegerField(
+        min_value=1, max_value=MAX_CACHE_RETENTION_DAYS, default=DEFAULT_CACHE_RETENTION_DAYS
+    )
 
 
 class LyricsFetchSerializer(serializers.Serializer):
