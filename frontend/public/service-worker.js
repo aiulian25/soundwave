@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'soundwave-v19';
+const CACHE_NAME = 'soundwave-v20';
 const API_CACHE_NAME = 'soundwave-api-v3';
 const AUDIO_CACHE_NAME = 'soundwave-audio-v3'; // PINNED only: "Make available offline" downloads
 const STREAM_CACHE_NAME = 'soundwave-stream-v1'; // EVICTABLE: casual + prefetched streams
@@ -14,6 +14,63 @@ const AUDIO_STREAM_MAX_ENTRIES = 40;
 const AUDIO_STREAM_MAX_BYTES = 500 * 1024 * 1024; // 500 MB, mirrors the old IndexedDB cap
 const PINNED_AUDIO_RE = /\/api\/audio\/[^/]+\/download\/?$/;
 
+const SINGLE_BYTE_RANGE_RE = /^\s*bytes\s*=\s*(\d*)-(\d*)\s*$/i;
+const UNSATISFIABLE_RANGE = Symbol('unsatisfiable range');
+
+// Caches holding one account's data. The app shell (CACHE_NAME) is public and stays.
+// Must match ACCOUNT_CACHE_NAME_PATTERN in src/utils/pwa.ts.
+const ACCOUNT_CACHE_NAME_PATTERN = /^soundwave-(api|audio|stream|images)-/;
+// The only API responses kept for offline use. Anything else (API keys, 2FA, passkeys,
+// admin lists) goes straight to the network and never reaches Cache Storage.
+const OFFLINE_API_RE = /^\/api\/(v1\/)?(audio\/|playlist\/|channel\/|stats\/|version\/|user\/account\/|user\/config\/)/;
+
+const OLD_SHAPE_LIST_RE = /^\/api\/(v1\/)?(audio\/list|channel)\/$/;
+
+// Bumped by every clear. A fetch that started before a clear belongs to the previous
+// account, so its response must not be written into the emptied caches. In memory on
+// purpose: a fetch cannot outlive the worker that started it.
+let cacheGeneration = 0;
+
+// Running playlist fills by playlist id, so one can be told to stop.
+const activeFills = new Map();
+
+function cancelFill(playlistId) {
+  const fill = activeFills.get(playlistId);
+  if (fill) fill.canceled = true;
+  return Boolean(fill);
+}
+
+async function putIfCurrent(generation, cacheName, key, response) {
+  const cache = await caches.open(cacheName);
+  if (generation !== cacheGeneration) return false;
+  await cache.put(key, response);
+  return true;
+}
+
+async function deleteAccountCaches() {
+  const cacheNames = await caches.keys();
+  await Promise.all(
+    cacheNames.filter((name) => ACCOUNT_CACHE_NAME_PATTERN.test(name)).map((name) => caches.delete(name))
+  );
+}
+
+// Older versions cached every API response, including sensitive ones, and these lists in a
+// shape without `next`, which the client now refuses. Online pages refetch them straight away.
+async function pruneNonOfflineApiEntries() {
+  try {
+    const cache = await caches.open(API_CACHE_NAME);
+    const keys = await cache.keys();
+    const isStale = (pathname) => !OFFLINE_API_RE.test(pathname) || OLD_SHAPE_LIST_RE.test(pathname);
+    await Promise.all(
+      keys
+        .filter((request) => isStale(new URL(request.url).pathname))
+        .map((request) => cache.delete(request))
+    );
+  } catch (error) {
+    console.warn('[Service Worker] API cache prune failed:', error);
+  }
+}
+
 // Assets to cache on install
 const STATIC_ASSETS = [
   '/',
@@ -21,21 +78,32 @@ const STATIC_ASSETS = [
   '/offline.html',
   '/manifest.json',
   '/favicon.ico',
+  '/locales/en/translation.json',
+  '/locales/ro/translation.json',
 ];
 
-// Install event - cache static assets and immediately activate.
+// The scripts and styles index.html loads directly; without them it renders a blank page offline.
+const ENTRY_ASSET_PATTERN = /(?:src|href)="(\/assets\/[^"]+)"/g;
+
+async function cacheAppShell() {
+  const cache = await caches.open(CACHE_NAME);
+  const index = await fetch('/index.html', { cache: 'no-cache' });
+  const html = await index.text();
+  // Assets first: the new index.html must not replace a working one until they are safely stored.
+  await cache.addAll([...html.matchAll(ENTRY_ASSET_PATTERN)].map((match) => match[1]));
+  await cache.addAll(STATIC_ASSETS);
+}
+
+// Install event - cache the whole shell, then activate immediately.
 // skipWaiting() ensures the new SW takes over right away without waiting
 // for the user to click an "Update" button. This is important for critical
 // fixes (e.g. broken image caching) that need to reach users immediately.
+// A failed cache fails the install on purpose: the working version stays, and the browser
+// tries again on its next update check.
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing new version...');
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching static assets');
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.error('[Service Worker] Failed to cache static assets:', err);
-      });
-    }).then(() => {
+    cacheAppShell().then(() => {
       console.log('[Service Worker] Installed - activating immediately');
       return self.skipWaiting();
     })
@@ -61,7 +129,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => pruneCasualFromPinnedCache()).then(() => {
+    }).then(() => pruneCasualFromPinnedCache()).then(() => pruneNonOfflineApiEntries()).then(() => {
       console.log('[Service Worker] Activated');
       return self.clients.claim(); // Take control immediately
     })
@@ -94,6 +162,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // The app asks with a version per release, so the version installed with the shell answers
+  // offline; without it a reload right after an upgrade shows raw translation keys.
+  if (url.pathname.startsWith('/locales/')) {
+    event.respondWith(fetch(request).catch(() => caches.match(url.pathname)));
+    return;
+  }
+
   // Audio download API endpoints - Cache first (critical for offline playback)
   // These are cached by "Make Available Offline" feature
   if (url.pathname.match(/\/api\/audio\/[^/]+\/download\/?$/)) {
@@ -108,8 +183,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API requests - Network first, fallback to cache
+  // API requests - Network first, fallback to cache, only for what is useful offline
   if (url.pathname.startsWith('/api/')) {
+    if (!OFFLINE_API_RE.test(url.pathname)) {
+      return;
+    }
     event.respondWith(networkFirstStrategy(request, API_CACHE_NAME));
     return;
   }
@@ -164,14 +242,13 @@ self.addEventListener('fetch', (event) => {
 
 // Network first strategy - try network, fallback to cache
 async function networkFirstStrategy(request, cacheName) {
+  const generation = cacheGeneration;
   try {
     const networkResponse = await fetch(request);
     
     // Only cache GET requests with successful responses
     if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
-      const responseClone = networkResponse.clone();
-      const cache = await caches.open(cacheName);
-      cache.put(request, responseClone);
+      putIfCurrent(generation, cacheName, request, networkResponse.clone());
     }
     
     return networkResponse;
@@ -208,22 +285,21 @@ async function cacheFirstStrategy(request, cacheName) {
   if (request.method === 'GET') {
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
-      return cachedResponse;
+      const rangeHeader = request.headers.get('range');
+      return rangeHeader ? handleRangeRequest(cachedResponse, rangeHeader) : cachedResponse;
     }
   }
   
+  const generation = cacheGeneration;
   try {
     const networkResponse = await fetch(request);
     
     // Only cache GET requests with successful responses
     if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
-      const responseClone = networkResponse.clone();
-      const cache = await caches.open(cacheName);
+      const written = putIfCurrent(generation, cacheName, request, networkResponse.clone());
       if (cacheName === STREAM_CACHE_NAME) {
         // Trim the (casual-stream) audio cache after each new write so it stays bounded.
-        cache.put(request, responseClone).then(() => trimStreamCache()).catch(() => {});
-      } else {
-        cache.put(request, responseClone);
+        written.then(() => trimStreamCache()).catch(() => {});
       }
     }
 
@@ -329,13 +405,13 @@ async function audioCacheFirstStrategy(request) {
   }
   
   // No cache hit, try network
+  const generation = cacheGeneration;
   try {
     const networkResponse = await fetch(request);
     
     if (networkResponse && networkResponse.status === 200) {
       // Cache the response for future offline use
-      const responseClone = networkResponse.clone();
-      audioCache.put(url.pathname, responseClone);
+      putIfCurrent(generation, AUDIO_CACHE_NAME, url.pathname, networkResponse.clone());
       console.log('[Service Worker] Cached new audio:', url.pathname);
     }
     
@@ -352,52 +428,69 @@ async function audioCacheFirstStrategy(request) {
   }
 }
 
+// What a Range header asks of a cached body of `length` bytes. Returns null when the header
+// should be ignored, which HTTP allows: malformed, reversed and multiple ranges get the whole
+// body with a 200, because media elements only ever ask for one range.
+function resolveByteRange(rangeHeader, length) {
+  const match = rangeHeader.match(SINGLE_BYTE_RANGE_RE);
+  if (!match) return null;
+
+  const [, first, last] = match;
+  if (!first && !last) return null;
+
+  if (!first) {
+    const suffixLength = Number(last);
+    if (suffixLength === 0 || length === 0) return UNSATISFIABLE_RANGE;
+    return { start: Math.max(length - suffixLength, 0), end: length - 1 };
+  }
+
+  const start = Number(first);
+  if (last && Number(last) < start) return null;
+  if (start >= length) return UNSATISFIABLE_RANGE;
+  return { start, end: last ? Math.min(Number(last), length - 1) : length - 1 };
+}
+
 // Handle range requests for cached audio (required for iOS Safari seeking)
 async function handleRangeRequest(cachedResponse, rangeHeader) {
-  try {
-    // Use the Blob (disk-backed in Cache Storage) and slice it. blob.slice() returns a
-    // zero-copy view, so we never pull the whole file into the JS heap the way
-    // arrayBuffer() did — important because iOS Safari issues many range requests.
-    const blob = await cachedResponse.blob();
-    const totalLength = blob.size;
+  // Use the Blob (disk-backed in Cache Storage) and slice it. blob.slice() returns a
+  // zero-copy view, so we never pull the whole file into the JS heap the way
+  // arrayBuffer() did — important because iOS Safari issues many range requests.
+  const blob = await cachedResponse.blob();
+  const totalLength = blob.size;
+  const contentType = cachedResponse.headers.get('Content-Type') || 'audio/mpeg';
+  const range = resolveByteRange(rangeHeader, totalLength);
 
-    // Parse range header: "bytes=0-" or "bytes=123-456"
-    const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
-    if (!rangeMatch) {
-      // Invalid range header, return full response
-      return new Response(blob, {
-        status: 200,
-        headers: {
-          'Content-Type': cachedResponse.headers.get('Content-Type') || 'audio/mpeg',
-          'Content-Length': totalLength.toString(),
-          'Accept-Ranges': 'bytes',
-        }
-      });
-    }
-
-    let start = rangeMatch[1] ? parseInt(rangeMatch[1], 10) : 0;
-    let end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalLength - 1;
-
-    // Clamp values
-    start = Math.max(0, Math.min(start, totalLength - 1));
-    end = Math.max(start, Math.min(end, totalLength - 1));
-
-    const slicedBlob = blob.slice(start, end + 1);
-
-    return new Response(slicedBlob, {
-      status: 206,
-      statusText: 'Partial Content',
-      headers: {
-        'Content-Type': cachedResponse.headers.get('Content-Type') || 'audio/mpeg',
-        'Content-Length': slicedBlob.size.toString(),
-        'Content-Range': `bytes ${start}-${end}/${totalLength}`,
-        'Accept-Ranges': 'bytes',
-      }
+  if (range === UNSATISFIABLE_RANGE) {
+    return new Response(null, {
+      status: 416,
+      statusText: 'Range Not Satisfiable',
+      headers: { 'Content-Range': `bytes */${totalLength}`, 'Accept-Ranges': 'bytes' },
     });
-  } catch (error) {
-    console.error('[Service Worker] Range request handling failed:', error);
-    return cachedResponse;
   }
+
+  if (!range) {
+    return new Response(blob, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': totalLength.toString(),
+        'Accept-Ranges': 'bytes',
+      },
+    });
+  }
+
+  const slicedBlob = blob.slice(range.start, range.end + 1);
+
+  return new Response(slicedBlob, {
+    status: 206,
+    statusText: 'Partial Content',
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': slicedBlob.size.toString(),
+      'Content-Range': `bytes ${range.start}-${range.end}/${totalLength}`,
+      'Accept-Ranges': 'bytes',
+    },
+  });
 }
 
 // Stale while revalidate - return cache immediately, update in background
@@ -417,30 +510,6 @@ async function staleWhileRevalidateStrategy(request, cacheName) {
   });
   
   return cachedResponse || fetchPromise;
-}
-
-// Background sync for offline uploads
-self.addEventListener('sync', (event) => {
-  console.log('[Service Worker] Background sync:', event.tag);
-  
-  if (event.tag === 'sync-audio-uploads') {
-    event.waitUntil(syncAudioUploads());
-  }
-  
-  if (event.tag === 'sync-favorites') {
-    event.waitUntil(syncFavorites());
-  }
-});
-
-async function syncAudioUploads() {
-  console.log('[Service Worker] Syncing audio uploads...');
-  // Implementation for syncing pending uploads when back online
-  // This would read from IndexedDB and upload pending files
-}
-
-async function syncFavorites() {
-  console.log('[Service Worker] Syncing favorites...');
-  // Implementation for syncing favorite changes when back online
 }
 
 // Push notifications
@@ -487,7 +556,17 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
   
+  if (event.data && event.data.type === 'CLEAR_ACCOUNT_DATA') {
+    cacheGeneration += 1;
+    event.waitUntil(
+      deleteAccountCaches().then(() => {
+        event.ports[0].postMessage({ success: true });
+      })
+    );
+  }
+
   if (event.data && event.data.type === 'CLEAR_CACHE') {
+    cacheGeneration += 1;
     event.waitUntil(
       caches.keys().then((cacheNames) => {
         return Promise.all(
@@ -504,6 +583,7 @@ self.addEventListener('message', (event) => {
   // STREAM_CACHE rather than being mis-routed to the image cache by a page-side fetch().
   if (event.data && event.data.type === 'PREFETCH_STREAM') {
     const { url } = event.data;
+    const generation = cacheGeneration;
     event.waitUntil(
       (async () => {
         let success = false;
@@ -514,9 +594,8 @@ self.addEventListener('message', (event) => {
           } else {
             const resp = await fetch(url, { credentials: 'include' });
             if (resp && resp.status === 200) {
-              await cache.put(url, resp.clone());
+              success = await putIfCurrent(generation, STREAM_CACHE_NAME, url, resp.clone());
               await trimStreamCache();
-              success = true;
             }
           }
         } catch (err) {
@@ -534,11 +613,13 @@ self.addEventListener('message', (event) => {
 
   if (event.data && event.data.type === 'CACHE_AUDIO') {
     const { url } = event.data;
+    const generation = cacheGeneration;
     event.waitUntil(
-      caches.open(AUDIO_CACHE_NAME).then((cache) => {
-        return cache.add(url);
-      }).then(() => {
-        event.ports[0].postMessage({ success: true });
+      fetch(url).then((response) => {
+        if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
+        return putIfCurrent(generation, AUDIO_CACHE_NAME, url, response);
+      }).then((success) => {
+        event.ports[0].postMessage({ success });
       }).catch((error) => {
         event.ports[0].postMessage({ success: false, error: error.message });
       })
@@ -548,10 +629,15 @@ self.addEventListener('message', (event) => {
   // Cache playlist for offline access with authentication
   if (event.data && event.data.type === 'CACHE_PLAYLIST') {
     const { playlistId, audioUrls } = event.data;
+    const generation = cacheGeneration;
+    cancelFill(playlistId);
+    const fill = { canceled: false };
+    activeFills.set(playlistId, fill);
     event.waitUntil(
       (async () => {
         try {
           console.log('[Service Worker] Caching playlist:', playlistId, 'with', audioUrls.length, 'tracks');
+          const audioCache = await caches.open(AUDIO_CACHE_NAME);
           
           const results = {
             metadata: false,
@@ -577,7 +663,6 @@ self.addEventListener('message', (event) => {
           // Cache playlist metadata API response (includes items)
           sendProgress('Playlist metadata', 'downloading');
           try {
-            const apiCache = await caches.open(API_CACHE_NAME);
             const metadataUrl = `/api/playlist/${playlistId}/?include_items=true`;
             const metadataResponse = await fetch(metadataUrl, {
               headers: {
@@ -586,8 +671,7 @@ self.addEventListener('message', (event) => {
               credentials: 'include',
             });
             if (metadataResponse.ok) {
-              await apiCache.put(metadataUrl, metadataResponse.clone());
-              results.metadata = true;
+              results.metadata = await putIfCurrent(generation, API_CACHE_NAME, metadataUrl, metadataResponse.clone());
               console.log('[Service Worker] Cached playlist metadata');
             }
           } catch (err) {
@@ -597,9 +681,11 @@ self.addEventListener('message', (event) => {
           sendProgress('Playlist metadata', 'done');
           
           // Cache all audio files in playlist with authentication
-          const audioCache = await caches.open(AUDIO_CACHE_NAME);
-          
           for (let i = 0; i < audioUrls.length; i++) {
+            if (generation !== cacheGeneration) {
+              throw new Error('Caches were cleared while saving this playlist');
+            }
+            if (fill.canceled) break;
             const url = audioUrls[i];
             const trackNum = i + 1;
             const trackName = `Track ${trackNum}/${audioUrls.length}`;
@@ -607,6 +693,14 @@ self.addEventListener('message', (event) => {
             sendProgress(trackName, 'downloading');
             
             try {
+              // Saving again after an interruption only fetches what is still missing.
+              if (await audioCache.match(url)) {
+                results.audioFiles.push(url);
+                completedItems++;
+                sendProgress(trackName, 'done');
+                continue;
+              }
+
               const response = await fetch(url, {
                 headers: {
                   'Accept': 'audio/*',
@@ -614,11 +708,14 @@ self.addEventListener('message', (event) => {
                 credentials: 'include',
               });
               
+              if (fill.canceled) break;
+
               if (response.ok) {
                 // Clone and cache the response
-                await audioCache.put(url, response.clone());
-                results.audioFiles.push(url);
-                console.log('[Service Worker] Cached audio:', url);
+                if (await putIfCurrent(generation, AUDIO_CACHE_NAME, url, response.clone())) {
+                  results.audioFiles.push(url);
+                  console.log('[Service Worker] Cached audio:', url);
+                }
               } else {
                 results.failed.push(url);
                 console.warn('[Service Worker] Failed to cache audio (status ' + response.status + '):', url);
@@ -636,6 +733,7 @@ self.addEventListener('message', (event) => {
           event.ports[0].postMessage({ 
             type: 'complete',
             success: results.audioFiles.length > 0,
+            canceled: fill.canceled,
             metadata: results.metadata,
             cached: results.audioFiles.length,
             failed: results.failed.length,
@@ -644,21 +742,32 @@ self.addEventListener('message', (event) => {
         } catch (error) {
           console.error('[Service Worker] Playlist caching error:', error);
           event.ports[0].postMessage({ type: 'complete', success: false, error: error.message });
+        } finally {
+          if (activeFills.get(playlistId) === fill) activeFills.delete(playlistId);
         }
       })()
     );
+  }
+
+  if (event.data && event.data.type === 'CANCEL_PLAYLIST_CACHE') {
+    cancelFill(event.data.playlistId);
+    event.ports[0].postMessage({ success: true });
   }
   
   // Remove cached playlist
   if (event.data && event.data.type === 'REMOVE_PLAYLIST_CACHE') {
     const { playlistId, audioUrls } = event.data;
+    cancelFill(playlistId);
     event.waitUntil(
       Promise.all([
-        // Remove playlist metadata from cache
+        // Remove playlist metadata from cache, under the key CACHE_PLAYLIST stored it
         caches.open(API_CACHE_NAME).then((cache) => {
-          return cache.delete(`/api/playlist/${playlistId}/`);
+          return Promise.all([
+            cache.delete(`/api/playlist/${playlistId}/?include_items=true`),
+            cache.delete(`/api/playlist/${playlistId}/`),
+          ]);
         }),
-        // Remove audio files from cache (only if not used by other playlists)
+        // The page sends only the audio no other saved playlist needs
         caches.open(AUDIO_CACHE_NAME).then((cache) => {
           return Promise.all(
             audioUrls.map(url => cache.delete(url))

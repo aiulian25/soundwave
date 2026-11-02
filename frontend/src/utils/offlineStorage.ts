@@ -3,7 +3,7 @@
  */
 
 const DB_NAME = 'soundwave-offline';
-const DB_VERSION = 2; // Increment version to add LYRICS store
+const DB_VERSION = 4; // Increment version to add a store
 const STORES = {
   AUDIO_QUEUE: 'audioQueue',
   FAVORITES: 'favorites',
@@ -11,7 +11,15 @@ const STORES = {
   SETTINGS: 'settings',
   PENDING_UPLOADS: 'pendingUploads',
   LYRICS: 'lyrics',
+  LISTENING_OUTBOX: 'listeningOutbox',
+  LYRICS_TIMING_DRAFTS: 'lyricsTimingDrafts',
 };
+
+export interface LyricsTimingDraft {
+  youtube_id: string;
+  base_revision: string;
+  lines: { timeMs: number; text: string }[];
+}
 
 class OfflineStorageManager {
   private db: IDBDatabase | null = null;
@@ -26,6 +34,11 @@ class OfflineStorageManager {
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
         this.db = request.result;
+        // Another tab is upgrading: let go, or its upgrade waits on this tab forever.
+        this.db.onversionchange = () => {
+          this.db?.close();
+          this.db = null;
+        };
         resolve();
       };
 
@@ -56,6 +69,13 @@ class OfflineStorageManager {
         // Lyrics cache for offline access
         if (!db.objectStoreNames.contains(STORES.LYRICS)) {
           db.createObjectStore(STORES.LYRICS, { keyPath: 'youtube_id' });
+        }
+        if (!db.objectStoreNames.contains(STORES.LISTENING_OUTBOX)) {
+          db.createObjectStore(STORES.LISTENING_OUTBOX, { keyPath: 'event_id' });
+        }
+
+        if (!db.objectStoreNames.contains(STORES.LYRICS_TIMING_DRAFTS)) {
+          db.createObjectStore(STORES.LYRICS_TIMING_DRAFTS, { keyPath: 'youtube_id' });
         }
       };
     });
@@ -116,61 +136,40 @@ class OfflineStorageManager {
   }
 
   /**
+   * Run one write and settle when the transaction does: a request can succeed and its
+   * transaction still abort (for example over quota), and then nothing was stored.
+   */
+  private async write(storeName: string, operation: (store: IDBObjectStore) => void): Promise<void> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(storeName, 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error ?? new Error(`Write to ${storeName} was aborted`));
+      operation(transaction.objectStore(storeName));
+    });
+  }
+
+  /**
    * Put data into store
    */
   async put(storeName: string, data: any): Promise<void> {
-    try {
-      if (!this.db) await this.init();
-      
-      // Check if the store exists
-      if (!this.db!.objectStoreNames.contains(storeName)) {
-        console.log(`[OfflineStorage] Store ${storeName} does not exist, skipping put`);
-        return;
-      }
-
-      return new Promise((resolve, reject) => {
-        const transaction = this.db!.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.put(data);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.error(`[OfflineStorage] Error putting to ${storeName}:`, err);
-    }
+    return this.write(storeName, (store) => store.put(data));
   }
 
   /**
    * Delete data from store
    */
   async delete(storeName: string, key: string | number): Promise<void> {
-    if (!this.db) await this.init();
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(storeName, 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.delete(key);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+    return this.write(storeName, (store) => store.delete(key));
   }
 
   /**
    * Clear all data from store
    */
   async clear(storeName: string): Promise<void> {
-    if (!this.db) await this.init();
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(storeName, 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.clear();
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+    return this.write(storeName, (store) => store.clear());
   }
 
   // Convenience methods for specific stores
@@ -279,7 +278,33 @@ class OfflineStorageManager {
     await this.clear(STORES.PLAYLISTS);
     await this.clear(STORES.PENDING_UPLOADS);
     await this.clear(STORES.LYRICS);
+    await this.clear(STORES.LISTENING_OUTBOX);
+    await this.clear(STORES.LYRICS_TIMING_DRAFTS);
     // Keep settings
+  }
+
+  async saveLyricsTimingDraft(draft: LyricsTimingDraft): Promise<void> {
+    await this.put(STORES.LYRICS_TIMING_DRAFTS, draft);
+  }
+
+  async getLyricsTimingDraft(youtubeId: string): Promise<LyricsTimingDraft | undefined> {
+    return this.get(STORES.LYRICS_TIMING_DRAFTS, youtubeId);
+  }
+
+  async removeLyricsTimingDraft(youtubeId: string): Promise<void> {
+    await this.delete(STORES.LYRICS_TIMING_DRAFTS, youtubeId);
+  }
+
+  async saveListeningEvent(event: any): Promise<void> {
+    await this.put(STORES.LISTENING_OUTBOX, event);
+  }
+
+  async getListeningEvents(): Promise<any[]> {
+    return await this.getAll(STORES.LISTENING_OUTBOX);
+  }
+
+  async removeListeningEvent(eventId: string): Promise<void> {
+    await this.delete(STORES.LISTENING_OUTBOX, eventId);
   }
 
   /**

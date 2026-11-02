@@ -130,6 +130,7 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
           <Tooltip title={t('topbar.logout')} arrow>
             <IconButton 
               onClick={onLogout}
+              data-testid="topbar-logout"
               sx={{ 
                 width: { xs: 44, md: 48 }, 
                 height: { xs: 44, md: 48 },

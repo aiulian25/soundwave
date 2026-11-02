@@ -1,4 +1,4 @@
-import { Box, IconButton, Slider, Typography, LinearProgress, Fade, Skeleton, CircularProgress, Tabs, Tab, useMediaQuery, useTheme, Tooltip, Chip, Menu, MenuItem, ListItemIcon, ListItemText, Divider, Collapse, List, ListItemButton } from '@mui/material';
+import { Box, IconButton, Slider, Typography, Fade, CircularProgress, useMediaQuery, useTheme, Tooltip, Chip, Menu, MenuItem, ListItemIcon, ListItemText, Divider, Collapse, List, ListItemButton } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
@@ -12,7 +12,6 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
-import RecommendIcon from '@mui/icons-material/Recommend';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CachedIcon from '@mui/icons-material/Cached';
 import CloseIcon from '@mui/icons-material/Close';
@@ -22,6 +21,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import RadioIcon from '@mui/icons-material/Radio';
 import BedtimeIcon from '@mui/icons-material/Bedtime';
 import QueueMusicIcon from '@mui/icons-material/QueueMusic';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { Audio, Chapter } from '../types';
@@ -32,12 +32,13 @@ import { useEqualizer } from '../context/EqualizerContext';
 import { useAchievementNotification } from '../context/AchievementNotificationContext';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { useStreamUrl } from '../hooks/useStreamUrl';
-import { audioAPI, statsAPI, getCsrfToken } from '../api/client';
+import { audioAPI, getCsrfToken } from '../api/client';
+import { ListeningTracker } from '../utils/listeningTracker';
+import { recordListeningEvent } from '../utils/listeningOutbox';
 // Code-split: the visualizer (17 theme renderers) loads only when the player is shown.
 const AudioVisualizer = lazy(() => import('./AudioVisualizer'));
 import WaveformSeekBar from './WaveformSeekBar';
 import { visualizerThemes } from '../config/visualizerThemes';
-import { audioCache } from '../utils/audioCache';
 import MetadataEditor from './MetadataEditor';
 import DownloadDialog from './DownloadDialog';
 import StartRadioMenu from './StartRadioMenu';
@@ -69,6 +70,8 @@ interface PlayerProps {
   onClose?: () => void;
   onMinimize?: () => void;
   onNext?: () => void;
+  /** Moving on because the track finished, which is not a skip. Falls back to onNext. */
+  onTrackEnded?: () => void;
   onPrevious?: () => void;
   hasNext?: boolean;
   hasPrevious?: boolean;
@@ -86,7 +89,7 @@ interface PlayerProps {
   onClearQueue?: () => void;
 }
 
-export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect, onTimeUpdate, initialSeek, isRadioMode = false, queue = [], currentQueueIndex = 0, onQueueReorder, onRemoveFromQueue, onPlayQueueTrack, onClearQueue }: PlayerProps) {
+export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onTrackEnded, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect, onTimeUpdate, initialSeek, queue = [], currentQueueIndex = 0, onQueueReorder, onRemoveFromQueue, onPlayQueueTrack, onClearQueue }: PlayerProps) {
   const { t } = useTranslation();
   const { settings, updateSetting, getExtraSetting } = useSettings();
   const { isRadioMode: radioActive, stopRadio } = useRadio();
@@ -112,7 +115,6 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [trackActionsMenuAnchor, setTrackActionsMenuAnchor] = useState<HTMLElement | null>(null);
   const [showAddToPlaylistDialog, setShowAddToPlaylistDialog] = useState(false);
   const [currentAudioData, setCurrentAudioData] = useState<Audio>(audio);
-  const [activeTab, setActiveTab] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isFavorite, setIsFavorite] = useState(audio.is_favorite || false);
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -131,11 +133,10 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const isSeeking = useRef(false);
   const currentAudioId = useRef(audio.id);
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const playStartTimeRef = useRef<number>(0);
   const [graphReady, setGraphReady] = useState(false);  // Web Audio graph built (F9)
-  const listenedDurationRef = useRef<number>(0);
-  const hasRecordedPlayRef = useRef<boolean>(false);
+  const listeningTracker = useRef(new ListeningTracker());
   const initialSeekApplied = useRef<boolean>(false);  // Track if initial seek was applied
+  const advanceAfterEnd = onTrackEnded ?? onNext;
 
   // EQ frequencies (10-band)
   const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -257,73 +258,35 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     currentAudioId.current = audio.id;
     setIsFavorite(audio.is_favorite || false);
     setImageLoadError(false); // Reset image error state for new track
-    // Reset listening tracking for new track
-    playStartTimeRef.current = 0;
-    listenedDurationRef.current = 0;
-    hasRecordedPlayRef.current = false;
   }
 
-  // Record listening history when playback ends or track changes
-  const recordListeningHistory = useCallback(async (completed: boolean) => {
-    if (!audio.youtube_id || hasRecordedPlayRef.current) return;
-    
-    const durationListened = listenedDurationRef.current;
-    // Only record if listened for at least 10 seconds
-    if (durationListened < 10) return;
-    
-    hasRecordedPlayRef.current = true;
-    const youtubeId = audio.youtube_id; // Capture for closure (ensures non-null)
-    
-    // Non-blocking: defer API call to not block UI thread
-    setTimeout(async () => {
-      try {
-        const response = await statsAPI.recordListening({
-          youtube_id: youtubeId,
-          duration_listened: Math.floor(durationListened),
-          completed,
-        });
-        
-        // Check for new achievements in the response
-        if (response.data?.new_achievements && response.data.new_achievements.length > 0) {
-          showAchievements(response.data.new_achievements);
-        }
-      } catch (error) {
-        console.error('Failed to record listening history:', error);
-      }
-    }, 0);
-  }, [audio.youtube_id, showAchievements]);
+  const showAchievementsRef = useRef(showAchievements);
+  showAchievementsRef.current = showAchievements;
 
-  // Track play duration
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    
-    if (isPlaying && !loadingStream) {
-      if (playStartTimeRef.current === 0) {
-        playStartTimeRef.current = Date.now();
-      }
-      
-      // Update listened duration every second
-      interval = setInterval(() => {
-        listenedDurationRef.current += 1;
-      }, 1000);
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isPlaying, loadingStream]);
+  const finishPlay = useCallback((completed: boolean) => {
+    const play = listeningTracker.current.finish(completed);
+    if (play) recordListeningEvent(play, showAchievementsRef.current);
+  }, []);
 
-  // Record on component unmount or track change
+  // One play per track, finished before the next begins. Ending the old play in this cleanup is
+  // what keeps a partial listen when the user skips. Closing the page ends it too, and if the page
+  // comes back from the browser's cache, what follows is a new play.
   useEffect(() => {
-    return () => {
-      // Record when track changes (component stays mounted)
-      if (listenedDurationRef.current >= 10 && audio.youtube_id && !hasRecordedPlayRef.current) {
-        recordListeningHistory(false);
-      }
+    const youtubeId = audio.youtube_id;
+    if (!youtubeId) return undefined;
+
+    listeningTracker.current.begin(youtubeId);
+    const finishOnPageHide = () => {
+      finishPlay(false);
+      listeningTracker.current.begin(youtubeId);
     };
-  }, [audio.id, audio.youtube_id, recordListeningHistory]);
+    window.addEventListener('pagehide', finishOnPageHide);
+
+    return () => {
+      window.removeEventListener('pagehide', finishOnPageHide);
+      finishPlay(false);
+    };
+  }, [audio.id, audio.youtube_id, finishPlay]);
 
   // Save playback progress for "Continue Listening" feature
   // Saves position periodically and when pausing/changing tracks
@@ -877,6 +840,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
       const time = audioRef.current.currentTime;
       currentTimeRef.current = time;
       setCurrentTime(time);
+      listeningTracker.current.observePosition(time);
       
       // Hand the position to App for cross-device sync. App stores it in a ref, so
       // this does not re-render the app tree.
@@ -930,6 +894,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const handleSeeked = useCallback(() => {
     // Called when the audio element completes seeking - now it's safe to update from time events
     isSeeking.current = false;
+    if (audioRef.current) listeningTracker.current.observeSeek(audioRef.current.currentTime);
     publishPositionState();
   }, [publishPositionState]);
 
@@ -1162,8 +1127,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               // Just wait for the browser to recover
             }}
             onEnded={() => {
-              // Record completed play
-              recordListeningHistory(true);
+              finishPlay(true);
               // Mark progress as completed
               saveProgress(true);
               
@@ -1179,18 +1143,19 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               
               // Handle repeat modes
               if (repeatMode === 'one') {
-                // Repeat current track
+                // Repeat current track: a genuinely new play
+                if (audio.youtube_id) listeningTracker.current.begin(audio.youtube_id);
                 if (audioRef.current) {
                   audioRef.current.currentTime = 0;
                   audioRef.current.play().catch(console.error);
                 }
-              } else if (hasNext && onNext) {
+              } else if (hasNext && advanceAfterEnd) {
                 // Play next track (works for both 'none' and 'all' when not at end)
-                onNext();
-              } else if (repeatMode === 'all' && onNext) {
+                advanceAfterEnd();
+              } else if (repeatMode === 'all' && advanceAfterEnd) {
                 // At end of playlist with repeat all - go back to first track
-                // This is handled by the parent component through onNext
-                onNext();
+                // This is handled by the parent component
+                advanceAfterEnd();
               } else {
                 setIsPlaying(false);
               }
@@ -1367,6 +1332,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           </Box>
           {/* Track Actions & Related Tracks & Metadata Buttons */}
           <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+            {onMinimize && (
+              <Tooltip title={t('player.a11y.minimize')}>
+                <IconButton onClick={onMinimize} data-testid="player-minimize" aria-label={t('player.a11y.minimize')} sx={{ color: 'text.secondary' }}>
+                  <ExpandMoreIcon />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title={t('player.trackOptions')}>
               <IconButton
                 onClick={(e) => setTrackActionsMenuAnchor(e.currentTarget)}
@@ -1438,6 +1410,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             {audio.youtube_id && !radioActive && (
               <Tooltip title={t('player.startRadio')}>
                 <IconButton
+                  data-testid="player-start-radio"
                   onClick={(e) => setRadioMenuAnchor(e.currentTarget)}
                   sx={{
                     color: 'text.secondary',
@@ -1614,6 +1587,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               <IconButton
                 size="small"
                 onClick={handleShuffleToggle}
+                aria-label={t('player.a11y.shuffle')}
+                aria-pressed={shuffleEnabled}
                 sx={{
                   color: shuffleEnabled ? 'primary.main' : 'text.secondary',
                   transition: 'all 0.2s ease',
@@ -1648,6 +1623,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <IconButton
                 onClick={onPrevious}
+                aria-label={t('player.a11y.previous')}
                 disabled={!hasPrevious}
                 sx={{
                   color: 'text.primary',
@@ -1666,6 +1642,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </IconButton>
               <IconButton
                 onClick={() => setIsPlaying(!isPlaying)}
+                aria-label={isPlaying ? t('player.a11y.pause') : t('player.a11y.play')}
                 disabled={loadingStream}
                 data-testid="player-playpause"
                 data-playing={isPlaying ? 'true' : 'false'}
@@ -1699,7 +1676,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                 )}
               </IconButton>
               <IconButton
+                data-testid="player-next"
                 onClick={onNext}
+                aria-label={t('player.a11y.next')}
                 disabled={!hasNext}
                 sx={{
                   color: 'text.primary',
@@ -1722,6 +1701,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               <IconButton
                 size="small"
                 onClick={handleRepeatToggle}
+                aria-label={t(`player.a11y.repeat.${repeatMode}`)}
                 sx={{
                   color: repeatMode !== 'none' ? 'primary.main' : 'text.secondary',
                   transition: 'all 0.2s ease',
@@ -1758,6 +1738,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mt: 1 }}>
             <IconButton 
               onClick={toggleMute} 
+              aria-label={isMuted ? t('player.a11y.unmute') : t('player.a11y.mute')}
+              aria-pressed={isMuted}
               size="small" 
               sx={{ 
                 color: isMuted ? 'text.disabled' : 'primary.main',
@@ -1773,6 +1755,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               <Slider
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
+                aria-label={t('player.a11y.volume')}
                 min={0}
                 max={100}
                 size="small"
@@ -1838,7 +1821,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                   <AutoAwesomeIcon sx={{ color: 'primary.main' }} />
                   {t('player.relatedTracks')}
                 </Typography>
-                <IconButton onClick={() => setShowRelatedTracks(false)} size="small">
+                <IconButton aria-label={t('common.close')} onClick={() => setShowRelatedTracks(false)} size="small">
                   <CloseIcon />
                 </IconButton>
               </Box>
@@ -1875,6 +1858,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             <LyricsPlayer
               youtubeId={audio.youtube_id}
               currentTime={currentTime}
+              duration={audio.duration}
               onClose={handleLyricsClose}
               embedded={true}
               visualizerTheme={settings.visualizer_theme}

@@ -232,7 +232,7 @@ export default function TrackActionsMenu({
   
   return (
     <>
-      <IconButton
+      <IconButton aria-label={t('common.moreActions')}
         size={size}
         onClick={handleOpenMenu}
         sx={{

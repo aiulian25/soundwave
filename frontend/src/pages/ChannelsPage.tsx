@@ -129,7 +129,6 @@ export default function ChannelsPage() {
     try {
       const response = await channelAPI.subscribe({ url: channelUrl });
       const taskId = response.data?.task_id;
-      const message = response.data?.message || t('channels.messages.subscriptionStarted');
       
       // Extract channel name from URL for better UX
       const urlMatch = channelUrl.match(/@([^/?]+)/);

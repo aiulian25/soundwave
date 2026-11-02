@@ -85,19 +85,6 @@ const QuickSyncSettings = () => {
     }
   };
 
-  const getSystemStatusColor = (status: string) => {
-    switch (status) {
-      case 'low_load':
-        return 'success';
-      case 'moderate_load':
-        return 'warning';
-      case 'high_load':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -110,7 +97,7 @@ const QuickSyncSettings = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="subtitle1" fontWeight={600}>{t('quickSync.title')}</Typography>
-        <IconButton size="small" onClick={refreshStatus} disabled={loading}>
+        <IconButton aria-label={t('common.refresh')} size="small" onClick={refreshStatus} disabled={loading}>
           <RefreshIcon />
         </IconButton>
       </Box>

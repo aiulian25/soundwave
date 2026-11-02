@@ -22,6 +22,8 @@ const LEGACY_DB_NAME = 'soundwave-audio-cache';
 // Storage buckets; reading the wrong name made the offline-cache index always empty.
 const SW_AUDIO_CACHE_NAME = 'soundwave-audio-v3'; // PINNED downloads
 const SW_STREAM_CACHE_NAME = 'soundwave-stream-v1'; // EVICTABLE casual + prefetched streams
+const SW_API_CACHE_NAME = 'soundwave-api-v3';
+const PINNED_TRACK_ID_RE = /\/api\/audio\/([^/]+)\/download\/?$/;
 
 // Cache configuration (surfaced to the settings UI).
 const CACHE_CONFIG = {
@@ -34,16 +36,13 @@ class AudioCacheManager {
   private prefetchQueue: Set<string> = new Set();
   private prefetchingInProgress: Set<string> = new Set();
   private initialized = false;
-  // Service Worker pinned-download cache index (populated on init).
-  private swCachedTrackIds: Set<string> = new Set();
 
   /**
-   * Initialise: build the SW cache index and drop the legacy IndexedDB blob store.
+   * Initialise: drop the legacy IndexedDB blob store.
    */
   async init(): Promise<void> {
     if (this.initialized) return;
     this.initialized = true;
-    await this.buildServiceWorkerCacheIndex();
     this.deleteLegacyDatabase();
     console.log('[AudioCache] Initialized (Service Worker cache as source of truth)');
   }
@@ -57,38 +56,6 @@ class AudioCacheManager {
     } catch {
       // Best-effort cleanup; ignore failures.
     }
-  }
-
-  /**
-   * Build in-memory index of Service Worker pinned-download tracks (by youtube_id).
-   */
-  private async buildServiceWorkerCacheIndex(): Promise<void> {
-    try {
-      if (!('caches' in window)) return;
-
-      const cache = await caches.open(SW_AUDIO_CACHE_NAME);
-      const keys = await cache.keys();
-
-      this.swCachedTrackIds = new Set(
-        keys
-          .map((req) => {
-            const match = req.url.match(/\/api\/audio\/([^/]+)\/download\//);
-            return match ? match[1] : null;
-          })
-          .filter((id): id is string => id !== null),
-      );
-
-      console.log(`[AudioCache] SW index built: ${this.swCachedTrackIds.size} pinned track(s)`);
-    } catch (error) {
-      console.error('[AudioCache] Failed to build SW cache index:', error);
-    }
-  }
-
-  /**
-   * Fast synchronous check whether a track is likely available offline (pinned index).
-   */
-  isLikelyCached(youtubeId: string): boolean {
-    return this.swCachedTrackIds.has(youtubeId);
   }
 
   /**
@@ -275,6 +242,11 @@ class AudioCacheManager {
     return { count, totalSize };
   }
 
+  /** Forget what was known about the previous account's caches. */
+  resetIndex(): void {
+    this.prefetchQueue.clear();
+  }
+
   /**
    * Clear the casual stream cache (does not touch pinned "available offline" downloads).
    */
@@ -292,23 +264,17 @@ class AudioCacheManager {
   /**
    * Whether a track is durably available offline.
    *
-   * Single source of truth: the Service Worker **download** cache (tracks the user
-   * explicitly "Made available offline" — pinned, never evicted). Casual/prefetched
-   * streams in STREAM_CACHE are deliberately NOT counted — they are LRU-evictable, so a
-   * merely-prefetched track must not report as durably "available offline".
+   * Asks the Service Worker **download** cache every time (tracks the user explicitly
+   * "Made available offline"), never a remembered answer, because the browser can evict it
+   * and other tabs can clear it. Casual/prefetched streams in STREAM_CACHE are deliberately
+   * NOT counted: they are LRU-evictable, so a merely-prefetched track must not report as
+   * durably "available offline".
    */
   async isAvailableOffline(youtubeId: string): Promise<boolean> {
-    if (this.swCachedTrackIds.has(youtubeId)) {
-      return true;
-    }
     try {
       if ('caches' in window) {
         const cache = await caches.open(SW_AUDIO_CACHE_NAME);
-        const response = await cache.match(`/api/audio/${youtubeId}/download/`);
-        if (response) {
-          this.swCachedTrackIds.add(youtubeId);
-          return true;
-        }
+        return !!(await cache.match(`/api/audio/${youtubeId}/download/`));
       }
     } catch {
       // Ignore errors — treat as not-offline.
@@ -316,18 +282,21 @@ class AudioCacheManager {
     return false;
   }
 
-  /**
-   * Refresh the Service Worker cache index (call after caching a playlist offline).
-   */
-  async refreshServiceWorkerIndex(): Promise<void> {
-    await this.buildServiceWorkerCacheIndex();
+  /** Every track whose audio is in the download cache right now. */
+  async pinnedTrackIds(): Promise<Set<string>> {
+    if (!('caches' in window)) return new Set();
+
+    const cache = await caches.open(SW_AUDIO_CACHE_NAME);
+    const keys = await cache.keys();
+    const trackIds = keys.map((request) => request.url.match(PINNED_TRACK_ID_RE)?.[1]);
+    return new Set(trackIds.filter((id): id is string => Boolean(id)));
   }
 
-  /**
-   * Add a track ID to the Service Worker cache index (when known to be freshly pinned).
-   */
-  addToServiceWorkerIndex(youtubeId: string): void {
-    this.swCachedTrackIds.add(youtubeId);
+  async forgetLyricsResponse(youtubeId: string): Promise<void> {
+    if (!('caches' in window)) return;
+
+    const cache = await caches.open(SW_API_CACHE_NAME);
+    await cache.delete(`/api/audio/${youtubeId}/lyrics/`);
   }
 }
 

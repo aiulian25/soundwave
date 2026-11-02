@@ -39,8 +39,10 @@
       "enter2fa": "Please enter your two-factor authentication code",
       "accountLocked": "Account temporarily locked",
       "invalidCredentials": "Invalid credentials",
-      "invalidCredentialsOrCode": "Invalid credentials or verification code"
-    }
+      "invalidCredentialsOrCode": "Invalid credentials or verification code",
+      "passkeyFailed": "That passkey could not sign you in"
+    },
+    "passkeyButton": "Sign in with a passkey"
   },
   "topbar": {
     "greeting": {
@@ -89,7 +91,26 @@
     "equalizer": "Equalizer",
     "equalizerOn": "Equalizer (on)",
     "classicBars": "Classic Bars",
-    "visualizerThemeHint": "Click to change visualizer theme (Current: {{themeName}})"
+    "visualizerThemeHint": "Click to change visualizer theme (Current: {{themeName}})",
+    "a11y": {
+      "shuffle": "Shuffle",
+      "previous": "Previous track",
+      "play": "Play",
+      "pause": "Pause",
+      "next": "Next track",
+      "repeat": {
+        "none": "Repeat: off",
+        "all": "Repeat: all tracks",
+        "one": "Repeat: this track"
+      },
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "volume": "Volume",
+      "restore": "Open player: {{title}}",
+      "moveUp": "Move up: {{title}}",
+      "moveDown": "Move down: {{title}}",
+      "minimize": "Minimize player"
+    }
   },
   "home": {
     "sections": {
@@ -172,7 +193,9 @@
     "empty": {
       "title": "Search Your Library",
       "description": "Find songs, playlists, and channels in your collection"
-    }
+    },
+    "failed": "Search failed. Check your connection and try again.",
+    "loadMore": "Load more"
   },
   "library": {
     "title": "Library",
@@ -238,7 +261,7 @@
       "subscribeToChannel": "Subscribe to Channel",
       "deselectAll": "Deselect All",
       "selectAll": "Select All",
-      "deleteSelected": "Delete Selected",
+      "deleteSelected": "Unsubscribe Selected",
       "subscribe": "Subscribe",
       "subscribing": "Subscribing..."
     },
@@ -261,8 +284,8 @@
       "channelUrlHelp": "Enter a YouTube channel URL or channel ID"
     },
     "confirm": {
-      "unsubscribeOne": "Are you sure you want to unsubscribe from this channel?",
-      "unsubscribeMany": "Are you sure you want to unsubscribe from {{count}} channel(s)?"
+      "unsubscribeOne": "Unsubscribe from this channel? New videos will stop syncing. Tracks you already have stay in your library.",
+      "unsubscribeMany": "Unsubscribe from {{count}} channel(s)? New videos will stop syncing. Tracks you already have stay in your library."
     },
     "messages": {
       "subscriptionStarted": "Channel subscription started",
@@ -293,7 +316,7 @@
       "urlHelp": "Enter a YouTube playlist URL"
     },
     "confirm": {
-      "delete": "Are you sure you want to remove this playlist?"
+      "delete": "Remove this playlist? Its tracks stay in your library and in your other playlists."
     },
     "messages": {
       "subscriptionStarted": "✅ Playlist subscription started! Fetching metadata and downloading audio...",
@@ -311,6 +334,7 @@
   },
   "playlistDetail": {
     "status": {
+      "partiallyCached": "Partly cached",
       "offline": "Offline",
       "cached": "Cached",
       "availableOffline": "Available offline",
@@ -322,9 +346,16 @@
       "preparing": "Preparing export…",
       "progress": "Exporting {{count}} tracks…",
       "done": "Export ready",
-      "failed": "Export failed"
+      "failed": "Export failed",
+      "partial": "ZIP saved. {{omitted}} tracks could not be included and {{warned}} are missing some tags or artwork. See export-summary.json inside the ZIP.",
+      "jobProgress": "Exporting in the background: {{done}} of {{total}} tracks",
+      "jobContinues": "You can close this. The export keeps going, and the file stays available for an hour.",
+      "cancelJob": "Cancel export",
+      "downloadReady": "Download ZIP"
     },
     "actions": {
+      "cancelCaching": "Cancel",
+      "downloadMissing": "Download missing",
       "playAll": "Play All",
       "shuffle": "Shuffle",
       "saveAll": "Save All",
@@ -344,6 +375,8 @@
       "unavailableHint": "You are offline. Cache playlists when online for offline access."
     },
     "cacheCard": {
+      "partialDescription": "{{available}} tracks are available offline, {{missing}} are missing",
+      "partialTitle": "⚠️ Partly Offline",
       "readyTitle": "📱 Offline Ready",
       "cacheTitle": "💾 Cache for Offline",
       "readyDescription": "{{count}} tracks cached and available without internet",
@@ -358,6 +391,9 @@
     "stats": {
       "totalTracks": "Total Tracks",
       "downloaded": "Downloaded",
+      "pending": "Pending",
+      "failed": "Failed",
+      "unavailable": "Unavailable on YouTube",
       "lastUpdated": "Last Updated"
     },
     "columns": {
@@ -370,6 +406,7 @@
       "noTracks": "No tracks found in this playlist"
     },
     "messages": {
+      "cacheCanceled": "Offline download canceled",
       "downloadingTracks": "Downloading {{count}} tracks to your device",
       "forceRecheckStarted": "Force recheck started — checking all tracks and re-downloading missing files...",
       "forceRecheckFailed": "Failed to start recheck: {{error}}",
@@ -747,6 +784,8 @@
       "subscribers": "{{count}} subscribers",
       "tracks": "{{count}} tracks",
       "downloaded": "{{count}} downloaded",
+      "pending": "{{count}} pending",
+      "failed": "{{count}} failed",
       "views": "{{count}} views"
     },
     "messages": {
@@ -778,7 +817,8 @@
     "quality": {
       "high": "High (320 kbps)",
       "medium": "Medium (192 kbps)",
-      "low": "Low (128 kbps)"
+      "low": "Low (128 kbps)",
+      "original": "Original (no re-encoding)"
     },
     "sections": {
       "outputFormat": "Output Format",
@@ -806,6 +846,14 @@
     },
     "fallback": {
       "audioFilename": "audio"
+    },
+    "qualityHelp": {
+      "mp3": "Choosing a bitrate re-encodes the track, and a higher bitrate cannot restore quality the source never had.",
+      "flac": "FLAC keeps what the source has without further loss, but cannot restore quality the source never had."
+    },
+    "warnings": {
+      "tags_failed": "The file was saved, but its tags could not be written.",
+      "artwork_unavailable": "The file was saved without artwork, because the artwork could not be fetched."
     }
   },
   "equalizer": {
@@ -894,6 +942,35 @@
       "invalidLrcFile": "Please select a valid .lrc file",
       "lrcTooLarge": "LRC file must be smaller than 1MB",
       "uploadFailed": "Failed to upload LRC file"
+    },
+    "timing": {
+      "open": "Adjust timing",
+      "title": "Adjust timing",
+      "help": "Shift every line, or play the track and stamp each line as it begins. Nothing changes until you save.",
+      "shiftAll": "Shift all lines",
+      "earlierSecond": "1 s earlier",
+      "earlierTenth": "0.1 s earlier",
+      "laterTenth": "0.1 s later",
+      "laterSecond": "1 s later",
+      "stampNext": "Stamp next line (T)",
+      "undo": "Undo",
+      "restoreOriginal": "Restore original timing",
+      "reset": "Discard changes",
+      "downloadLrc": "Download revised LRC",
+      "save": "Save timing",
+      "draftRestored": "Your unsaved draft was restored from this device.",
+      "offlineDraft": "You are offline. Your changes are kept on this device; save again when you are back online.",
+      "saveFailed": "Could not save the timing. Your changes are kept on this device.",
+      "stampLine": "Stamp this line at the current position",
+      "nudgeEarlier": "Move this line 0.1 s earlier",
+      "nudgeLater": "Move this line 0.1 s later",
+      "seekLine": "Play from {{time}}",
+      "outOfOrder": "Starts before the previous line",
+      "pastEnd": "Starts after the end of the track",
+      "conflictTitle": "These lyrics changed since you started editing",
+      "conflictKeep": "Keep mine",
+      "conflictTextChanged": "The words changed too, so your timing cannot be applied to them. You can still download it.",
+      "useLatest": "Use the latest"
     }
   },
   "pwaSettings": {
@@ -1100,7 +1177,8 @@
       "minutesAgo": "{{count}} minutes ago",
       "hoursAgo": "{{count}} hours ago",
       "daysAgo": "{{count}} days ago"
-    }
+    },
+    "tracksUnavailable": "{{count}} track(s) from your queue are no longer available"
   },
   "sleepTimer": {
     "title": "Sleep Timer",
@@ -1229,27 +1307,28 @@
     "offline": "Offline",
     "tooltip": {
       "online": "Download Status",
-      "offline": "Offline - Downloads will sync when online"
+      "offline": "Offline - Download status updates when you reconnect"
     },
     "actions": {
-      "refresh": "Refresh",
-      "syncWhenOnline": "Sync when online"
+      "refresh": "Refresh"
     },
-    "backgroundEnabled": "✓ Background downloads enabled - Downloads continue when app is closed",
     "sections": {
-      "activeDownloads": "Active Downloads ({{count}})",
-      "queuedForSync": "Queued for Sync ({{count}})"
+      "activeDownloads": "Active Downloads ({{count}})"
     },
     "empty": {
       "title": "No active downloads",
       "online": "Downloads you start will appear here",
-      "offline": "Queue downloads offline and they will sync when online"
+      "offline": "You are offline. Download status updates when you reconnect."
     },
-    "syncWhenOnlinePending": "Will sync when online ({{count}} pending)",
     "errors": {
       "blockedUrl": "This download link is invalid or points to a blocked address.",
       "cookiesRefresh": "YouTube asked to sign in: replace cookies.txt with a fresh export, then retry (see README).",
-      "cookiesFileAccess": "SoundWave can't access cookies.txt: chown 1000:1000, chmod 600, remove :ro, then retry."
+      "cookiesFileAccess": "SoundWave can't access cookies.txt: chown 1000:1000, chmod 600, remove :ro, then retry.",
+      "quotaExceeded": "Your storage quota is used up. Delete some tracks, then retry.",
+      "downloadTooLarge": "This track is larger or longer than the allowed limit.",
+      "notSingleItem": "This is a playlist, channel or live stream. Subscribe to playlists and channels instead.",
+      "diskFull": "The server is low on disk space. Ask an administrator to free some.",
+      "invalidOutput": "The download did not produce a valid audio file. Try again later."
     }
   },
   "relatedTracks": {
@@ -1465,6 +1544,7 @@
     "completed": "Listened to completion"
   },
   "offlineManager": {
+    "partialTrackCount": "{{available}} of {{total}} tracks playable offline",
     "title": "Offline Storage",
     "subtitle": "Manage playlists cached for offline playback",
     "offlineWarning": "You are currently offline. You can only play cached content.",
@@ -1598,7 +1678,7 @@
       "userCreated": "User created successfully",
       "userUpdated": "User updated successfully",
       "userActivated": "User activated",
-      "userDeactivated": "User deactivated",
+      "userDeactivated": "User deactivated. Sign-ins and API keys are blocked; they work again if the user is reactivated.",
       "storageReset": "Storage reset successfully",
       "twoFaReset": "2FA reset successfully",
       "userDeleted": "User deleted successfully"
@@ -1614,6 +1694,17 @@
     }
   },
   "smartPlaylists": {
+    "ruleErrors": {
+      "unsupportedField": "This field cannot be used in a rule",
+      "unsupportedOperator": "This condition does not apply to this field",
+      "valueRequired": "Enter a value",
+      "wholeNumberRequired": "Enter a whole number",
+      "numberOutOfRange": "This number is out of range",
+      "reversedRange": "The second value must not be smaller than the first",
+      "dateRequired": "Enter a date as YYYY-MM-DD",
+      "dateOutOfRange": "This date is out of range",
+      "invalid": "This rule is not valid"
+    },
     "title": "Smart Playlists",
     "description": "Dynamic playlists that automatically update based on rules. Your library changes, they update instantly.",
     "trackCount": "{{count}} tracks",
@@ -1706,6 +1797,7 @@
     }
   },
   "smartPlaylistDetail": {
+    "invalidRulesWarning": "A rule in this playlist needs fixing, so it matches no tracks until you edit the rules.",
     "trackCount": "{{count}} tracks",
     "badges": {
       "auto": "Auto"
@@ -1779,7 +1871,12 @@
       "title": "Could not load this page",
       "description": "You may be offline, or the app was just updated. Try again.",
       "retry": "Retry"
-    }
+    },
+    "refresh": "Refresh",
+    "remove": "Remove",
+    "moreActions": "More actions",
+    "copy": "Copy",
+    "clear": "Clear"
   },
   "sidebar": {
     "home": "Home",
@@ -1883,7 +1980,7 @@
     "title": "Settings",
     "backup": {
       "title": "Backup & Restore",
-      "description": "Export your library definition (tracks, playlists, smart-playlist rules, favorites, and channel subscriptions) as a JSON file, or restore it into this account. Audio re-downloads from the saved video IDs.",
+      "description": "Export your library definition (tracks, playlists, smart-playlist rules, favorites, and channel subscriptions) as a JSON file, or restore it into this account. Audio downloads again from the saved video IDs, so videos since deleted or made private cannot come back, and your own lyrics, listening history and audio files are not included. For a complete backup, see docs/BACKUP_RESTORE.md.",
       "create": "Create backup",
       "restore": "Restore from file",
       "summary": "Restore preview",
@@ -2107,6 +2204,11 @@
       "columnNumber": "#",
       "columnArtist": "Artist",
       "columnAlbum": "Album"
+    },
+    "unclaimed": {
+      "description": "{{count}} file(s) were imported before each account got its own library. They may belong to someone else using this browser.",
+      "claim": "Add to my library",
+      "failed": "Could not add those files to your library"
     }
   },
   "forcePasswordChange": {
@@ -2172,5 +2274,42 @@
   },
   "nowPlaying": {
     "label": "Now playing"
+  },
+  "passkeys": {
+    "title": "Passkeys",
+    "description": "Sign in with your fingerprint, face or device PIN instead of a password. A passkey replaces both your password and your two-factor code.",
+    "add": "Add a passkey",
+    "added": "Passkey added",
+    "removed": "Passkey removed",
+    "addedOn": "Added {{date}}",
+    "lastUsed": "Last used {{date}}",
+    "neverUsed": "Never used",
+    "otherAddress": "Made for {{address}}",
+    "removeLabel": "Remove passkey {{name}}",
+    "unavailableBrowser": "This browser does not support passkeys.",
+    "unavailableHere": "Passkeys need this app to be opened from an HTTPS address with a domain name, or from localhost, and that address must be listed in SW_HOST or CORS_ALLOWED_ORIGINS.",
+    "addDialog": {
+      "title": "Add a passkey",
+      "description": "Confirm it's you first, then follow your browser's prompt.",
+      "password": "Current password",
+      "twoFactorCode": "Two-factor or backup code",
+      "name": "Name (optional)",
+      "namePlaceholder": "My phone",
+      "continue": "Continue"
+    },
+    "removeDialog": {
+      "title": "Remove passkey?",
+      "message": "\"{{name}}\" will no longer be able to sign in. Also delete it from your device or password manager."
+    },
+    "errors": {
+      "generic": "Something went wrong with the passkey. Please try again.",
+      "passkey_step_up_failed": "The password or code is incorrect.",
+      "passkey_locked": "Too many failed attempts. Please try again later.",
+      "passkey_refused": "The passkey was not accepted.",
+      "passkey_unavailable": "Passkeys cannot be used from this address.",
+      "passkey_limit_reached": "You have reached the maximum number of passkeys. Remove one first.",
+      "passkey_already_registered": "This device already has a passkey for your account.",
+      "passkey_invalid_request": "Please check the details and try again."
+    }
   }
 }

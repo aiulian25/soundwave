@@ -39,7 +39,6 @@ import {
   Explore as ExploreIcon,
   Bolt as BoltIcon,
   Album as AlbumIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
   PlayArrow as PlayIcon,
   Shuffle as ShuffleIcon,
@@ -48,6 +47,8 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { smartPlaylistAPI } from '../api/client';
+import { fetchSmartPlaylistTracks } from '../utils/fetchAll';
+import { firstRuleError, ruleErrorsFromResponse } from '../utils/smartRuleErrors';
 import type { SmartPlaylist, SmartPlaylistChoices, Audio } from '../types';
 import ScrollToTop from '../components/ScrollToTop';
 
@@ -185,7 +186,10 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       console.error('Failed to create smart playlist:', err);
       setSnackbar({
         open: true,
-        message: err.response?.data?.name?.[0] || t('smartPlaylists.errors.createFailed'),
+        message:
+          err.response?.data?.name?.[0] ||
+          firstRuleError(ruleErrorsFromResponse(err.response?.data, t)) ||
+          t('smartPlaylists.errors.createFailed'),
         severity: 'error',
       });
     }
@@ -215,8 +219,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
     event.stopPropagation();
     
     try {
-      const response = await smartPlaylistAPI.getTracks(playlist.id, { page_size: 100 });
-      const tracks = response.data.data as Audio[];
+      const { tracks } = (await fetchSmartPlaylistTracks(playlist.id)) as { tracks: Audio[] };
       
       if (tracks.length === 0) {
         setSnackbar({ open: true, message: t('smartPlaylists.messages.noTracks'), severity: 'info' });
@@ -575,7 +578,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
                       sx={{ flex: 1 }}
                     />
                   )}
-                  <IconButton
+                  <IconButton aria-label={t('common.remove')}
                     size="small"
                     onClick={() => {
                       const updated = customRules.filter((_, i) => i !== index);

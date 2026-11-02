@@ -20,12 +20,10 @@ import {
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
-  Pause as PauseIcon,
   ArrowBack as BackIcon,
   Download as DownloadIcon,
   Shuffle as ShuffleIcon,
   CloudDownload as CloudDownloadIcon,
-  CloudOff as CloudOffIcon,
   DeleteOutline as DeleteIcon,
   CloudDone as CloudDoneIcon,
   WifiOff as WifiOffIcon,
@@ -40,6 +38,7 @@ import { playlistAPI, audioAPI } from '../api/client';
 import PlaylistExportDialog from '../components/PlaylistExportDialog';
 import { usePWA, CacheProgress } from '../context/PWAContext';
 import { offlineStorage } from '../utils/offlineStorage';
+import { offlineAudioUrl, removeOfflinePlaylist, saveOfflinePlaylist, verifiedOfflinePlaylist } from '../utils/offlineLibrary';
 import { audioCache } from '../utils/audioCache';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
@@ -65,6 +64,10 @@ interface PlaylistDetail {
   thumbnail_url: string;
   subscribed: boolean;
   item_count: number;
+  remote_total?: number | null;
+  remote_unavailable_count?: number;
+  pending?: number;
+  failed?: number;
   downloaded_count: number;
   last_refresh: string | null;
   sync_status: 'pending' | 'syncing' | 'success' | 'failed' | 'stale';
@@ -83,7 +86,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  const { isOnline, cachePlaylist, removePlaylistCache, cacheSize } = usePWA();
+  const { isOnline, cachePlaylist, cancelPlaylistCache, removePlaylistCache, cacheSize } = usePWA();
   const { getTrackRef, shouldHighlight } = useHighlightTrack();
   const isNowPlaying = useIsNowPlaying();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
@@ -96,6 +99,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<CacheProgress | null>(null);
   const [offlineTracks, setOfflineTracks] = useState<Set<string>>(new Set());
+  const [offlineCounts, setOfflineCounts] = useState({ available: 0, missing: 0 });
 
   // Check which tracks are available offline
   const checkOfflineTracks = useCallback(async () => {
@@ -127,11 +131,17 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     }
   }, [playlist?.items, isOfflineAvailable, checkOfflineTracks]);
 
+  const showOfflineCounts = (verified: { downloaded_count: number; missing_count: number } | null) => {
+    const available = verified?.downloaded_count ?? 0;
+    setOfflineCounts({ available, missing: verified?.missing_count ?? 0 });
+    setIsOfflineAvailable(available > 0);
+  };
+
   const checkOfflineAvailability = async () => {
     if (!playlistId) return;
     try {
-      const cachedPlaylist = await offlineStorage.getPlaylistByPlaylistId(playlistId);
-      setIsOfflineAvailable(cachedPlaylist?.offline || false);
+      const cachedPlaylist = await verifiedOfflinePlaylist(playlistId);
+      showOfflineCounts(cachedPlaylist);
     } catch (err) {
       console.error('Failed to check offline status:', err);
     }
@@ -143,8 +153,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       
       // If offline, try to load from IndexedDB first
       if (!isOnline) {
-        // Use getPlaylistByPlaylistId to find by YouTube playlist ID
-        const cachedPlaylist = await offlineStorage.getPlaylistByPlaylistId(playlistId!);
+        const cachedPlaylist = await verifiedOfflinePlaylist(playlistId!);
         if (cachedPlaylist && cachedPlaylist.items) {
           console.log('[Offline] Loading playlist from cache:', cachedPlaylist.title);
           setPlaylist({
@@ -153,7 +162,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             status_display: t('playlistDetail.status.offline'),
             progress_percent: 100,
           } as PlaylistDetail);
-          setIsOfflineAvailable(true);
+          showOfflineCounts(cachedPlaylist);
           setError('');
           return;
         } else {
@@ -171,7 +180,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       
       // If online request fails, try offline cache as fallback
       try {
-        const cachedPlaylist = await offlineStorage.getPlaylistByPlaylistId(playlistId!);
+        const cachedPlaylist = await verifiedOfflinePlaylist(playlistId!);
         if (cachedPlaylist && cachedPlaylist.items) {
           console.log('[Fallback] Loading playlist from cache:', cachedPlaylist.title);
           setPlaylist({
@@ -180,7 +189,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             status_display: t('playlistDetail.status.cached'),
             progress_percent: 100,
           } as PlaylistDetail);
-          setIsOfflineAvailable(true);
+          showOfflineCounts(cachedPlaylist);
           setError('');
           return;
         }
@@ -277,65 +286,59 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
 
     try {
       // Build audio URLs for caching
-      const audioUrls = downloadedTracks.map(item => 
-        `/api/audio/${item.audio.youtube_id}/download/`
-      );
+      const audioUrls = downloadedTracks.map(item => offlineAudioUrl(item.audio.youtube_id!));
 
       // Cache playlist metadata and audio files via Service Worker with progress callback
       const result = await cachePlaylist(playlist.playlist_id, audioUrls, (progress) => {
         setOfflineProgress(progress);
       });
       
-      if (result.success) {
-        // Save playlist metadata to IndexedDB
-        await offlineStorage.savePlaylist({
-          id: playlist.id,
-          playlist_id: playlist.playlist_id,
-          title: playlist.title,
-          description: playlist.description,
-          channel_name: playlist.channel_name,
-          thumbnail_url: playlist.thumbnail_url,
-          item_count: playlist.item_count,
-          downloaded_count: downloadedTracks.length,
-          items: downloadedTracks.map(item => ({
-            id: item.id,
-            position: item.position,
-            audio: item.audio,
-          })),
-          offline: true,
-          lastSync: Date.now(),
-        });
+      // What is saved and reported comes from the bytes that arrived, not from the attempt.
+      const saved = await saveOfflinePlaylist({
+        id: playlist.id,
+        playlist_id: playlist.playlist_id,
+        title: playlist.title,
+        description: playlist.description,
+        channel_name: playlist.channel_name,
+        thumbnail_url: playlist.thumbnail_url,
+        item_count: playlist.item_count,
+        downloaded_count: downloadedTracks.length,
+        items: downloadedTracks.map(item => ({
+          id: item.id,
+          position: item.position,
+          audio: item.audio,
+        })),
+        offline: true,
+        lastSync: Date.now(),
+      });
+      showOfflineCounts(saved.items.length > 0 ? saved : null);
+      await checkOfflineTracks();
 
-        // Cache lyrics for each track (in background, don't block)
-        for (const item of downloadedTracks) {
-          if (item.audio.youtube_id) {
-            try {
-              const lyricsResponse = await fetch(`/api/audio/${item.audio.youtube_id}/lyrics/`, {
-                credentials: 'include',
-              });
-              if (lyricsResponse.ok) {
-                const lyricsData = await lyricsResponse.json();
-                await offlineStorage.saveLyrics(item.audio.youtube_id, lyricsData);
-                console.log('[Offline] Cached lyrics for:', item.audio.title);
-              }
-            } catch (err) {
-              // Lyrics caching is optional, don't fail the whole operation
-              console.log('[Offline] Could not cache lyrics for:', item.audio.title);
+      if (saved.items.length === 0) {
+        setSnackbarMessage(t(result.canceled ? 'playlistDetail.messages.cacheCanceled' : 'playlistDetail.errors.cacheFailed'));
+        return;
+      }
+
+      if (!result.canceled) {
+        // Lyrics are optional, so a track without them still counts as available.
+        for (const item of saved.items) {
+          try {
+            const lyricsResponse = await fetch(`/api/audio/${item.audio.youtube_id}/lyrics/`, {
+              credentials: 'include',
+            });
+            if (lyricsResponse.ok) {
+              await offlineStorage.saveLyrics(item.audio.youtube_id, await lyricsResponse.json());
             }
+          } catch (err) {
+            console.log('[Offline] Could not cache lyrics for:', item.audio.title);
           }
         }
+      }
 
-        setIsOfflineAvailable(true);
-        // Refresh offline tracks display
-        await checkOfflineTracks();
-        
-        if (result.failed > 0) {
-          setSnackbarMessage(t('playlistDetail.messages.cachePartial', { cached: result.cached, failed: result.failed }));
-        } else {
-          setSnackbarMessage(t('playlistDetail.messages.cacheSuccess', { count: result.cached }));
-        }
+      if (saved.missing_count > 0) {
+        setSnackbarMessage(t('playlistDetail.messages.cachePartial', { cached: saved.downloaded_count, failed: saved.missing_count }));
       } else {
-        setSnackbarMessage(t('playlistDetail.errors.cacheFailed'));
+        setSnackbarMessage(t('playlistDetail.messages.cacheSuccess', { count: saved.downloaded_count }));
       }
     } catch (err) {
       console.error('Failed to cache offline:', err);
@@ -351,19 +354,11 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     if (!playlist?.items) return;
 
     try {
-      const audioUrls = playlist.items
-        .filter(item => item.audio.file_path)
-        .map(item => `/api/audio/${item.audio.youtube_id}/download/`);
+      await removeOfflinePlaylist(playlist, removePlaylistCache);
 
-      // Remove from Service Worker cache
-      await removePlaylistCache(playlist.playlist_id, audioUrls);
-      
-      // Remove from IndexedDB
-      await offlineStorage.removePlaylist(playlist.id);
-
-      setIsOfflineAvailable(false);
-      // Clear offline tracks display
-      setOfflineTracks(new Set());
+      showOfflineCounts(null);
+      // A track another saved playlist needs is still available, so ask rather than assume.
+      await checkOfflineTracks();
       setSnackbarMessage(t('playlistDetail.messages.offlineDataRemoved'));
       setSnackbarOpen(true);
     } catch (err) {
@@ -469,7 +464,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   if (error || !playlist) {
     return (
       <Box>
-        <IconButton onClick={() => navigate('/playlists')} sx={{ mb: 2 }}>
+        <IconButton aria-label={t('common.back')} onClick={() => navigate('/playlists')} sx={{ mb: 2 }}>
           <BackIcon />
         </IconButton>
         <Alert severity="error">{error || t('playlistDetail.errors.notFound')}</Alert>
@@ -477,11 +472,35 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     );
   }
 
+  const offlineCardCopy = () => {
+    if (!isOfflineAvailable) {
+      return { title: t('playlistDetail.cacheCard.cacheTitle'), description: t('playlistDetail.cacheCard.cacheDescription') };
+    }
+    if (offlineCounts.missing > 0) {
+      return {
+        title: t('playlistDetail.cacheCard.partialTitle'),
+        description: t('playlistDetail.cacheCard.partialDescription', offlineCounts),
+      };
+    }
+    return {
+      title: t('playlistDetail.cacheCard.readyTitle'),
+      description: t('playlistDetail.cacheCard.readyDescription', { count: offlineCounts.available }),
+    };
+  };
+  const { title: offlineCardTitle, description: offlineCardDescription } = offlineCardCopy();
+
+  const trackTotal = playlist.remote_total ?? playlist.item_count;
+  const outstandingStats = [
+    { key: 'pending', count: playlist.pending ?? 0 },
+    { key: 'failed', count: playlist.failed ?? 0 },
+    { key: 'unavailable', count: playlist.remote_unavailable_count ?? 0 },
+  ].filter(({ count }) => count > 0);
+
   return (
     <Box>
       {/* Header with Back Button */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-        <IconButton 
+        <IconButton aria-label={t('common.back')} 
           onClick={() => navigate('/playlists')}
           sx={{ 
             bgcolor: 'rgba(255, 255, 255, 0.05)',
@@ -657,17 +676,31 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             )}
             <Box sx={{ flex: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                {isOfflineAvailable ? t('playlistDetail.cacheCard.readyTitle') : t('playlistDetail.cacheCard.cacheTitle')}
+                {offlineCardTitle}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {isOfflineAvailable 
-                  ? t('playlistDetail.cacheCard.readyDescription', { count: playlist.downloaded_count })
-                  : t('playlistDetail.cacheCard.cacheDescription')}
+                {offlineCardDescription}
               </Typography>
             </Box>
           </Box>
 
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+            {isDownloadingOffline && (
+              <Button variant="outlined" size="small" onClick={() => cancelPlaylistCache(playlist.playlist_id)}>
+                {t('playlistDetail.actions.cancelCaching')}
+              </Button>
+            )}
+            {isOfflineAvailable && offlineCounts.missing > 0 && (
+              <Button
+                variant="contained"
+                startIcon={<CloudDownloadIcon />}
+                onClick={handleCacheForOffline}
+                disabled={!isOnline || isDownloadingOffline}
+                size="small"
+              >
+                {t('playlistDetail.actions.downloadMissing')}
+              </Button>
+            )}
             {!isOfflineAvailable ? (
               <Button
                 variant="contained"
@@ -708,8 +741,8 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                 </Tooltip>
                 <Chip 
                   icon={<CloudDoneIcon />}
-                  label={t('playlistDetail.status.cached')}
-                  color="success"
+                  label={offlineCounts.missing > 0 ? t('playlistDetail.status.partiallyCached') : t('playlistDetail.status.cached')}
+                  color={offlineCounts.missing > 0 ? 'warning' : 'success'}
                   size="small"
                   sx={{ fontWeight: 600 }}
                 />
@@ -730,14 +763,14 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       </Card>
 
       {/* Progress Bar */}
-      {playlist.downloaded_count < playlist.item_count && (
+      {trackTotal > 0 && playlist.progress_percent < 100 && (
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography variant="caption" color="text.secondary">
               {t('playlistDetail.progress.title')}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {t('playlistDetail.progress.count', { downloaded: playlist.downloaded_count, total: playlist.item_count })}
+              {t('playlistDetail.progress.count', { downloaded: playlist.downloaded_count, total: trackTotal })}
             </Typography>
           </Box>
           <LinearProgress
@@ -755,7 +788,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             {t('playlistDetail.stats.totalTracks')}
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            {playlist.item_count}
+            {trackTotal}
           </Typography>
         </Box>
         <Box>
@@ -766,6 +799,16 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
             {playlist.downloaded_count}
           </Typography>
         </Box>
+        {outstandingStats.map(({ key, count }) => (
+          <Box key={key}>
+            <Typography variant="caption" color="text.secondary">
+              {t(`playlistDetail.stats.${key}`)}
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {count}
+            </Typography>
+          </Box>
+        ))}
         {playlist.last_refresh && (
           <Box>
             <Typography variant="caption" color="text.secondary">

@@ -328,7 +328,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                       backgroundPosition: 'center',
                     }}
                   />
-                  <IconButton
+                  <IconButton aria-label={t('player.a11y.play')}
                     className="play-button"
                     size="small"
                     sx={{
@@ -479,7 +479,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                       },
                     }}
                   />
-                  <IconButton
+                  <IconButton aria-label={t('player.a11y.play')}
                     className="play-button"
                     sx={{
                       position: 'absolute',
@@ -590,7 +590,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                       transition: 'background-color 0.3s ease',
                     }}
                   />
-                  <IconButton
+                  <IconButton aria-label={t('player.a11y.play')}
                     className="play-button"
                     sx={{
                       position: 'absolute',
@@ -701,7 +701,7 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
                       transition: 'background-color 0.3s ease',
                     }}
                   />
-                  <IconButton
+                  <IconButton aria-label={t('player.a11y.play')}
                     className="play-button"
                     sx={{
                       position: 'absolute',

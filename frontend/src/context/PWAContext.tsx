@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { pwaManager } from '../utils/pwa';
-import { audioCache } from '../utils/audioCache';
 
 export interface CacheProgress {
   current: number;
@@ -14,6 +13,7 @@ interface CacheResult {
   success: boolean;
   cached: number;
   failed: number;
+  canceled: boolean;
 }
 
 interface PWAContextType {
@@ -27,6 +27,7 @@ interface PWAContextType {
   clearCache: () => Promise<boolean>;
   cacheAudio: (url: string) => Promise<boolean>;
   cachePlaylist: (playlistId: string, audioUrls: string[], onProgress?: (progress: CacheProgress) => void) => Promise<CacheResult>;
+  cancelPlaylistCache: (playlistId: string) => Promise<boolean>;
   removePlaylistCache: (playlistId: string, audioUrls: string[]) => Promise<boolean>;
   requestNotifications: () => Promise<NotificationPermission>;
 }
@@ -119,14 +120,7 @@ export const PWAProvider: React.FC<PWAProviderProps> = ({ children }) => {
 
   const cachePlaylist = async (playlistId: string, audioUrls: string[], onProgress?: (progress: CacheProgress) => void) => {
     const result = await pwaManager.cachePlaylist(playlistId, audioUrls, onProgress);
-    if (result.success) {
-      const size = await pwaManager.getCacheSize();
-      setCacheSize(size);
-      
-      // Refresh the in-memory cache index so Player can find cached tracks instantly
-      await audioCache.refreshServiceWorkerIndex();
-      console.log('[PWA] Refreshed cache index after playlist cache');
-    }
+    setCacheSize(await pwaManager.getCacheSize());
     return result;
   };
 
@@ -135,9 +129,6 @@ export const PWAProvider: React.FC<PWAProviderProps> = ({ children }) => {
     if (result) {
       const size = await pwaManager.getCacheSize();
       setCacheSize(size);
-      
-      // Refresh the in-memory cache index
-      await audioCache.refreshServiceWorkerIndex();
     }
     return result;
   };
@@ -157,6 +148,7 @@ export const PWAProvider: React.FC<PWAProviderProps> = ({ children }) => {
     clearCache,
     cacheAudio,
     cachePlaylist,
+    cancelPlaylistCache: (playlistId: string) => pwaManager.cancelPlaylistCache(playlistId),
     removePlaylistCache,
     requestNotifications,
   };

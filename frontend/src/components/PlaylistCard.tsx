@@ -23,7 +23,9 @@ interface PlaylistCardProps {
     channel_name: string;
     thumbnail_url: string;
     item_count: number;
+    remote_total?: number | null;
     downloaded_count: number;
+    progress_percent: number;
     sync_status: string;
     last_refresh: string | null;
   };
@@ -50,9 +52,8 @@ export default function PlaylistCard({
 }: PlaylistCardProps) {
   const { t } = useTranslation();
   const [imgError, setImgError] = useState(false);
-  const progress = playlist.item_count > 0 
-    ? Math.round((playlist.downloaded_count / playlist.item_count) * 100) 
-    : 0;
+  const trackTotal = playlist.remote_total ?? playlist.item_count;
+  const progress = playlist.progress_percent;
 
   const getLastRefreshText = (lastRefresh: string | null) => {
     if (!lastRefresh) return t('playlistCard.lastRefresh.never');
@@ -192,7 +193,7 @@ export default function PlaylistCard({
         >
           <MusicNoteIcon sx={{ fontSize: 14, color: 'white' }} />
           <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
-            {playlist.downloaded_count}/{playlist.item_count}
+            {playlist.downloaded_count}/{trackTotal}
           </Typography>
         </Box>
 

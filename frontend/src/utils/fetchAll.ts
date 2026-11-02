@@ -1,111 +1,68 @@
-import { audioAPI, playlistAPI, channelAPI } from '../api/client';
+import type { AxiosResponse } from 'axios';
+import { audioAPI, playlistAPI, channelAPI, smartPlaylistAPI } from '../api/client';
 
-const PAGE_SIZE = 50;
+const FIRST_PAGE = 1;
+const SMART_PLAYLIST_PAGE_SIZE = 100;
 
-/**
- * Fetch all pages of audio data
- */
-export async function fetchAllAudio(params: Record<string, any> = {}): Promise<any[]> {
-  let allData: any[] = [];
-  let page = 1;
-  let hasMore = true;
+type RequestConfig = { signal?: AbortSignal };
+type ListRequest = (params: Record<string, any>, config: RequestConfig) => Promise<AxiosResponse<any>>;
 
-  while (hasMore) {
-    const response = await audioAPI.list({ ...params, page });
-    const data = response.data?.data || response.data || [];
-
-    if (Array.isArray(data) && data.length > 0) {
-      allData = [...allData, ...data];
-      page++;
-      if (data.length < PAGE_SIZE) {
-        hasMore = false;
-      }
-    } else {
-      hasMore = false;
-    }
+export class MalformedPaginationError extends Error {
+  constructor(reason: string) {
+    super(`Malformed pagination response: ${reason}`);
+    this.name = 'MalformedPaginationError';
   }
-
-  return allData;
 }
 
-/**
- * Fetch all playlists (handles both paginated and non-paginated responses)
- */
-export async function fetchAllPlaylists(params: Record<string, any> = {}): Promise<any[]> {
-  const response = await playlistAPI.list(params);
-  
-  // Handle different response formats
-  if (Array.isArray(response.data)) {
-    return response.data;
-  }
-  
-  // Paginated response
-  const data = response.data?.data || response.data?.results || [];
-  
-  // If paginated, fetch all pages
-  if (response.data?.paginate || response.data?.next) {
-    let allData = Array.isArray(data) ? [...data] : [];
-    let page = 2;
-    let hasMore = data.length >= PAGE_SIZE;
-    
-    while (hasMore) {
-      const nextResponse = await playlistAPI.list({ ...params, page });
-      const nextData = nextResponse.data?.data || nextResponse.data?.results || nextResponse.data || [];
-      
-      if (Array.isArray(nextData) && nextData.length > 0) {
-        allData = [...allData, ...nextData];
-        page++;
-        if (nextData.length < PAGE_SIZE) {
-          hasMore = false;
-        }
-      } else {
-        hasMore = false;
-      }
+/** Follows the server's `next` to its end; anything that could not terminate is an error. */
+async function fetchAllPages(request: ListRequest, params: Record<string, any>, signal?: AbortSignal): Promise<any[]> {
+  const allItems: any[] = [];
+  let page: number | null = FIRST_PAGE;
+
+  while (page !== null) {
+    const response: AxiosResponse<any> = await request({ ...params, page }, { signal });
+    const items = response.data?.data;
+    const next = response.data?.next;
+
+    if (!Array.isArray(items)) throw new MalformedPaginationError('no data array');
+    if (next !== null && (!Number.isInteger(next) || next <= page)) {
+      throw new MalformedPaginationError(`next page ${next} does not advance past ${page}`);
     }
-    
-    return allData;
+    if (next !== null && items.length === 0) throw new MalformedPaginationError('an empty page claims more');
+
+    allItems.push(...items);
+    page = next;
   }
-  
-  return Array.isArray(data) ? data : [];
+
+  return allItems;
 }
 
-/**
- * Fetch all channels (handles both paginated and non-paginated responses)
- */
-export async function fetchAllChannels(params: Record<string, any> = {}): Promise<any[]> {
-  const response = await channelAPI.list(params);
-  
-  // Handle different response formats
-  if (Array.isArray(response.data)) {
-    return response.data;
-  }
-  
-  // Paginated response
-  const data = response.data?.data || response.data?.results || [];
-  
-  // If paginated, fetch all pages
-  if (response.data?.paginate || response.data?.next) {
-    let allData = Array.isArray(data) ? [...data] : [];
-    let page = 2;
-    let hasMore = data.length >= PAGE_SIZE;
-    
-    while (hasMore) {
-      const nextResponse = await channelAPI.list({ ...params, page });
-      const nextData = nextResponse.data?.data || nextResponse.data?.results || nextResponse.data || [];
-      
-      if (Array.isArray(nextData) && nextData.length > 0) {
-        allData = [...allData, ...nextData];
-        page++;
-        if (nextData.length < PAGE_SIZE) {
-          hasMore = false;
-        }
-      } else {
-        hasMore = false;
-      }
-    }
-    
-    return allData;
-  }
-  
-  return Array.isArray(data) ? data : [];
+export function fetchAllAudio(params: Record<string, any> = {}, signal?: AbortSignal): Promise<any[]> {
+  return fetchAllPages(audioAPI.list, params, signal);
+}
+
+export function fetchAllChannels(params: Record<string, any> = {}, signal?: AbortSignal): Promise<any[]> {
+  return fetchAllPages(channelAPI.list, params, signal);
+}
+
+/** Sends back the seed the first page chose, so a random playlist is one order from end to end. */
+export async function fetchSmartPlaylistTracks(playlistId: number, signal?: AbortSignal) {
+  let seed: number | null = null;
+  let playlist: any = null;
+  const tracks = await fetchAllPages(async (params, config) => {
+    const seedParam = seed === null ? {} : { seed };
+    const response = await smartPlaylistAPI.getTracks(playlistId, { ...params, ...seedParam }, config);
+    seed = response.data?.seed ?? null;
+    playlist = response.data?.playlist;
+    return response;
+  }, { page_size: SMART_PLAYLIST_PAGE_SIZE }, signal);
+  return { playlist, tracks };
+}
+
+/** The playlist list is not paginated: one response holds every playlist. */
+export async function fetchAllPlaylists(params: Record<string, any> = {}, signal?: AbortSignal): Promise<any[]> {
+  const response = await playlistAPI.list(params, { signal });
+  const items = response.data?.data;
+  if (!Array.isArray(items)) throw new MalformedPaginationError('no data array');
+  return items;
 }

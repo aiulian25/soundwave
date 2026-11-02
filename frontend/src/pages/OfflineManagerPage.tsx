@@ -26,9 +26,11 @@ import {
   Refresh as RefreshIcon,
   CloudOff as CloudOffIcon,
   CheckCircle as CheckCircleIcon,
+  WarningAmber as WarningAmberIcon,
 } from '@mui/icons-material';
 import { usePWA } from '../context/PWAContext';
 import { offlineStorage } from '../utils/offlineStorage';
+import { removeOfflinePlaylist, verifiedOfflinePlaylists } from '../utils/offlineLibrary';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -39,6 +41,8 @@ interface CachedPlaylist {
   channel_name: string;
   item_count: number;
   downloaded_count: number;
+  wanted_count: number;
+  missing_count: number;
   offline: boolean;
   lastSync: number;
 }
@@ -60,7 +64,7 @@ export default function OfflineManagerPage() {
 
   const loadCachedPlaylists = async () => {
     try {
-      const playlists = await offlineStorage.getOfflinePlaylists();
+      const playlists = await verifiedOfflinePlaylists();
       setCachedPlaylists(playlists);
     } catch (err) {
       console.error('Failed to load cached playlists:', err);
@@ -71,16 +75,7 @@ export default function OfflineManagerPage() {
 
   const handleRemovePlaylist = async (playlist: CachedPlaylist) => {
     try {
-      // Build audio URLs
-      const audioUrls = (playlist as any).items?.map((item: any) => 
-        `/api/audio/${item.audio.youtube_id}/download/`
-      ) || [];
-
-      // Remove from cache
-      await removePlaylistCache(playlist.playlist_id, audioUrls);
-      
-      // Remove from IndexedDB
-      await offlineStorage.removePlaylist(playlist.id);
+      await removeOfflinePlaylist(playlist, removePlaylistCache);
 
       // Reload list
       await loadCachedPlaylists();
@@ -260,7 +255,11 @@ export default function OfflineManagerPage() {
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
                             {playlist.title}
                           </Typography>
-                          <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                          {playlist.missing_count > 0 ? (
+                            <WarningAmberIcon sx={{ fontSize: 16, color: 'warning.main' }} />
+                          ) : (
+                            <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                          )}
                         </Box>
                       }
                       secondary={
@@ -270,7 +269,12 @@ export default function OfflineManagerPage() {
                           </Typography>
                           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                             <Chip
-                              label={t('offlineManager.trackCount', { count: playlist.downloaded_count })}
+                              label={
+                                playlist.missing_count > 0
+                                  ? t('offlineManager.partialTrackCount', { available: playlist.downloaded_count, total: playlist.wanted_count })
+                                  : t('offlineManager.trackCount', { count: playlist.downloaded_count })
+                              }
+                              color={playlist.missing_count > 0 ? 'warning' : 'default'}
                               size="small"
                               sx={{ height: 20, fontSize: '0.7rem' }}
                             />
@@ -286,7 +290,7 @@ export default function OfflineManagerPage() {
                     />
                     {/* In-flow action (replaces absolutely-positioned ListItemSecondaryAction). */}
                     <Box sx={{ flexShrink: 0 }}>
-                      <IconButton
+                      <IconButton aria-label={t('common.delete')}
                         edge="end"
                         color="error"
                         onClick={(e) => {

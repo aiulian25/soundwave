@@ -92,7 +92,7 @@ export const versionAPI = {
 
 // Audio API
 export const audioAPI = {
-  list: (params?: any) => api.get('/audio/list/', { params }),
+  list: (params?: any, config?: { signal?: AbortSignal }) => api.get('/audio/list/', { params, ...config }),
   get: (youtubeId: string) => api.get(`/audio/${youtubeId}/`),
   delete: (youtubeId: string) => api.delete(`/audio/${youtubeId}/`),
   download: (youtubeId: string) => api.post(`/audio/${youtubeId}/`, { action: 'download' }),
@@ -112,6 +112,8 @@ export const audioAPI = {
   getLyrics: (youtubeId: string) => api.get(`/audio/${youtubeId}/lyrics/`),
   fetchLyrics: (youtubeId: string, force?: boolean) => api.post(`/audio/${youtubeId}/lyrics/fetch/`, { force }),
   updateLyrics: (youtubeId: string, data: any) => api.put(`/audio/${youtubeId}/lyrics/`, data),
+  saveLyricsTiming: (youtubeId: string, data: { synced_lyrics: string; base_revision: string }) =>
+    api.post(`/audio/${youtubeId}/lyrics/timing/`, data),
   deleteLyrics: (youtubeId: string) => api.delete(`/audio/${youtubeId}/lyrics/`),
   uploadLrcFile: (youtubeId: string, file: File) => {
     const formData = new FormData();
@@ -140,7 +142,7 @@ export const audioAPI = {
 
 // Channel API
 export const channelAPI = {
-  list: (params?: any) => api.get('/channel/', { params }),
+  list: (params?: any, config?: { signal?: AbortSignal }) => api.get('/channel/', { params, ...config }),
   get: (channelId: string) => api.get(`/channel/${channelId}/`),
   subscribe: (data: any) => api.post('/channel/', data),
   unsubscribe: (channelId: string) => api.delete(`/channel/${channelId}/`),
@@ -151,7 +153,7 @@ export const channelAPI = {
 
 // Playlist API
 export const playlistAPI = {
-  list: (params?: any) => api.get('/playlist/', { params }),
+  list: (params?: any, config?: { signal?: AbortSignal }) => api.get('/playlist/', { params, ...config }),
   get: (playlistId: string) => api.get(`/playlist/${playlistId}/`),
   getWithItems: (playlistId: string) => api.get(`/playlist/${playlistId}/`, { params: { include_items: 'true' } }),
   create: (data: any) => api.post('/playlist/', data),
@@ -171,6 +173,14 @@ export const playlistAPI = {
   ) => api.post(`/playlist/${playlistId}/export/`, data, { responseType: 'blob' }),
 };
 
+// Background playlist exports
+export const exportJobAPI = {
+  list: (playlistId: string) => api.get('/export-jobs/', { params: { playlist: playlistId } }),
+  get: (jobId: string) => api.get(`/export-jobs/${jobId}/`),
+  cancel: (jobId: string) => api.delete(`/export-jobs/${jobId}/`),
+  downloadUrl: (jobId: string) => `/api/export-jobs/${jobId}/download/`,
+};
+
 // Smart Playlist API
 export const smartPlaylistAPI = {
   // List all smart playlists
@@ -181,8 +191,8 @@ export const smartPlaylistAPI = {
   getWithTracks: (playlistId: number) => api.get(`/playlist/smart/${playlistId}/`, { params: { include_tracks: 'true' } }),
   
   // Get tracks for a smart playlist (paginated)
-  getTracks: (playlistId: number, params?: { page?: number; page_size?: number }) => 
-    api.get(`/playlist/smart/${playlistId}/tracks/`, { params }),
+  getTracks: (playlistId: number, params?: { page?: number; page_size?: number; seed?: number }, config?: { signal?: AbortSignal }) =>
+    api.get(`/playlist/smart/${playlistId}/tracks/`, { params, ...config }),
   
   // Create a new smart playlist
   create: (data: {
@@ -248,7 +258,7 @@ export const statsAPI = {
   download: () => api.get('/stats/download/'),
   // Analytics endpoints
   insights: (days?: number) => api.get('/stats/insights/', { params: days ? { days } : {} }),
-  recordListening: (data: { youtube_id: string; duration_listened: number; completed: boolean }) => 
+  recordListening: (data: { youtube_id: string; duration_listened: number; completed: boolean; event_id: string; occurred_at: string }) => 
     api.post('/stats/record/', data),
   history: (params?: { page?: number; page_size?: number; date?: string }) => 
     api.get('/stats/history/', { params }),
@@ -281,6 +291,15 @@ export const userAPI = {
   confirmEmail: (token: string) => api.post('/user/email/confirm/', { token }),
   config: () => api.get('/user/config/'),
   updateConfig: (data: any) => api.post('/user/config/', data),
+  // Passkeys
+  passkeyAvailability: () => api.post('/user/passkeys/availability/'),
+  passkeyLoginOptions: () => api.post('/user/passkeys/login/options/'),
+  passkeyLogin: (data: { credential: unknown }) => api.post('/user/passkeys/login/', data),
+  passkeys: () => api.get('/user/passkeys/'),
+  passkeyEnrolOptions: (data: { password: string; two_factor_code: string }) =>
+    api.post('/user/passkeys/options/', data),
+  passkeyEnrol: (data: { credential: unknown; name: string }) => api.post('/user/passkeys/', data),
+  passkeyRemove: (passkeyId: number) => api.delete(`/user/passkeys/${passkeyId}/`),
   // Two-Factor Authentication
   twoFactorStatus: () => api.get('/user/2fa/status/'),
   twoFactorSetup: () => api.post('/user/2fa/setup/'),
@@ -344,6 +363,9 @@ export const playbackSyncAPI = {
     device_name?: string;
   }) => api.post('/playback-sync/', data),
   
+  // The saved queue as tracks, in order, with the current track's index
+  getQueue: () => api.get('/playback-sync/queue/'),
+
   // Clear the playback session
   clearSession: () => api.delete('/playback-sync/'),
 };

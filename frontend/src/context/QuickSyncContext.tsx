@@ -95,7 +95,7 @@ export const QuickSyncProvider = ({ children }: QuickSyncProviderProps) => {
   const runSpeedTest = async () => {
     try {
       setLoading(true);
-      const response = await api.post('/audio/quick-sync/test/');
+      await api.post('/audio/quick-sync/test/');
       await fetchStatus(); // Refresh full status after test
     } catch (error) {
       console.error('Error running speed test:', error);

@@ -163,7 +163,6 @@ const darkTheme = createTheme({
       main: '#22d3ee', // Cyan 400 - brighter for dark mode
       light: '#67e8f9', // Cyan 300
       dark: '#06b6d4', // Cyan 500
-      contrastText: '#ffffff',
     },
     secondary: {
       main: '#fbbf24', // Amber 400 accent

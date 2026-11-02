@@ -216,7 +216,7 @@ export default function MetadataEditor({ audio, open, onClose, onUpdate }: Metad
           <MusicIcon color="primary" />
           <Typography variant="h6">{t('metadataEditor.title')}</Typography>
         </Box>
-        <IconButton onClick={onClose} size="small">
+        <IconButton aria-label={t('common.close')} onClick={onClose} size="small">
           <CloseIcon />
         </IconButton>
       </DialogTitle>

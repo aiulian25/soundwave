@@ -84,7 +84,7 @@ export default function ResumePlaybackDialog({
             {t('resumePlayback.title')}
           </Typography>
         </Box>
-        <IconButton size="small" onClick={onDismiss} sx={{ color: 'text.secondary' }}>
+        <IconButton aria-label={t('common.close')} size="small" onClick={onDismiss} sx={{ color: 'text.secondary' }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>

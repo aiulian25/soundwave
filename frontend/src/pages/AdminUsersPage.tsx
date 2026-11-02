@@ -27,7 +27,6 @@ import {
   CardContent,
 } from '@mui/material';
 import {
-  Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Info as InfoIcon,
@@ -276,7 +275,7 @@ const AdminUsersPage = () => {
           {t('adminUsers.title')}
         </Typography>
         <Box>
-          <IconButton onClick={loadUsers} sx={{ mr: 1 }}>
+          <IconButton aria-label={t('common.refresh')} onClick={loadUsers} sx={{ mr: 1 }}>
             <RefreshIcon />
           </IconButton>
           <Button

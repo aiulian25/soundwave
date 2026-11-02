@@ -117,7 +117,7 @@ export default function SleepTimerDialog({ open, onClose }: SleepTimerDialogProp
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <BedtimeIcon sx={{ color: 'primary.main' }} />
         {t('sleepTimer.title')}
-        <IconButton
+        <IconButton aria-label={t('common.close')}
           onClick={onClose}
           sx={{ ml: 'auto' }}
           size="small"

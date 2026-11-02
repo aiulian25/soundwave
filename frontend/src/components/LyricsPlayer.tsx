@@ -12,9 +12,6 @@ import {
   FormControlLabel,
   Tabs,
   Tab,
-  List,
-  ListItem,
-  ListItemText,
   Chip,
   TextField,
   InputAdornment,
@@ -27,13 +24,9 @@ import {
   Snackbar,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import SearchIcon from '@mui/icons-material/Search';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
@@ -41,14 +34,17 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import TuneIcon from '@mui/icons-material/Tune';
 import { useTranslation } from 'react-i18next';
 import api, { audioAPI } from '../api/client';
 import { offlineStorage } from '../utils/offlineStorage';
-import { getLyricsColors, LyricsThemeColors, DEFAULT_VISUALIZER_THEME } from '../config/visualizerThemes';
+import { removeOfflineLyrics, replaceOfflineLyrics } from '../utils/offlineLibrary';
+import { getLyricsColors, DEFAULT_VISUALIZER_THEME } from '../config/visualizerThemes';
 import { useSettings } from '../context/SettingsContext';
 import TrackDetails, { hasTrackDetails } from './TrackDetails';
 import LyricsSuggestionList, { type LyricsSuggestion } from './LyricsSuggestionList';
 import { parseSyncedLyrics, type LyricsLine } from '../utils/lrc';
+import LyricsTimingEditor from './LyricsTimingEditor';
 
 const MAX_LRC_UPLOAD_BYTES = 1024 * 1024;
 const UPLOAD_SNACKBAR_DURATION_MS = 3000;
@@ -58,6 +54,8 @@ interface LyricsData {
   audio_id: string;
   audio_title: string;
   synced_lyrics: string;
+  original_synced_lyrics?: string;
+  revision?: string;
   plain_lyrics: string;
   is_instrumental: boolean;
   source: string;
@@ -74,6 +72,7 @@ interface LyricsData {
 interface LyricsPlayerProps {
   youtubeId: string;
   currentTime: number;
+  duration?: number;
   onClose?: () => void;
   embedded?: boolean;
   onSeek?: (time: number) => void; // Optional callback to seek to a specific time
@@ -85,7 +84,7 @@ interface LyricsPlayerProps {
   publishedDate?: string;
 }
 
-function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSeek, visualizerTheme, isLightMode, description, viewCount, likeCount, publishedDate }: LyricsPlayerProps) {
+function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visualizerTheme, isLightMode, description, viewCount, likeCount, publishedDate }: LyricsPlayerProps) {
   const { t } = useTranslation();
   // Get settings and theme for automatic detection
   const { settings } = useSettings();
@@ -114,7 +113,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
   // Suggestions state
   const [suggestions, setSuggestions] = useState<LyricsSuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [, setShowSuggestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [applyingId, setApplyingId] = useState<number | null>(null);
   
@@ -131,6 +130,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
   // Offline-cache save failure (surfaced instead of being swallowed silently)
   const [offlineSaveError, setOfflineSaveError] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [adjustingTiming, setAdjustingTiming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
@@ -150,6 +150,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
   };
 
   useEffect(() => {
+    setAdjustingTiming(false);
     loadLyrics();
   }, [youtubeId]);
 
@@ -239,6 +240,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
       const response = await api.post(`/audio/${youtubeId}/lyrics/fetch/`, {
         force: true,
       });
+      replaceOfflineLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
       if (isStaleRequest(requestId)) return;
       applyLyricsData(response.data);
       
@@ -280,6 +282,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
         track_name: suggestion.track_name,
         artist_name: suggestion.artist_name,
       });
+      replaceOfflineLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
       if (isStaleRequest(requestId)) return;
       applyLyricsData(response.data);
       
@@ -298,6 +301,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
     try {
       setDeleting(true);
       await api.delete(`/audio/${youtubeId}/lyrics/delete/`);
+      removeOfflineLyrics(youtubeId).catch(() => setOfflineSaveError(true));
       if (isStaleRequest(requestId)) return;
       // Reset to empty lyrics state
       setLyrics({
@@ -394,12 +398,10 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
       setError('');
       
       const response = await audioAPI.uploadLrcFile(youtubeId, file);
+      replaceOfflineLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
       
       if (isStaleRequest(requestId)) return;
       applyLyricsData(response.data);
-      
-      // Update offline cache
-      offlineStorage.saveLyrics(youtubeId, response.data).catch(() => setOfflineSaveError(true));
 
       setUploadSuccess(true);
       setEditMode(false);
@@ -515,7 +517,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {onClose && (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1 }}>
-            <IconButton size="small" onClick={onClose}>
+            <IconButton aria-label={t('common.close')} size="small" onClick={onClose}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -532,7 +534,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {onClose && (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1 }}>
-            <IconButton size="small" onClick={onClose}>
+            <IconButton aria-label={t('common.close')} size="small" onClick={onClose}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -559,7 +561,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
         {onClose && (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', p: 1 }}>
             {renderDetailsToggleButton()}
-            <IconButton size="small" onClick={onClose}>
+            <IconButton aria-label={t('common.close')} size="small" onClick={onClose}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -605,7 +607,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
         {onClose && (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', p: 1 }}>
             {renderDetailsToggleButton()}
-            <IconButton size="small" onClick={onClose}>
+            <IconButton aria-label={t('common.close')} size="small" onClick={onClose}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -688,6 +690,26 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
     );
   }
 
+  if (adjustingTiming && lyrics.is_synced) {
+    return (
+      <LyricsTimingEditor
+        youtubeId={youtubeId}
+        title={lyrics.audio_title}
+        syncedLyrics={lyrics.synced_lyrics}
+        originalSyncedLyrics={lyrics.original_synced_lyrics ?? ''}
+        revision={lyrics.revision ?? ''}
+        currentTime={currentTime}
+        duration={duration}
+        onSeek={onSeek}
+        onClose={() => setAdjustingTiming(false)}
+        onSaved={(saved) => {
+          applyLyricsData(saved);
+          setAdjustingTiming(false);
+        }}
+      />
+    );
+  }
+
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 2, pt: 1 }}>
@@ -711,6 +733,18 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
           <SwapHorizIcon />
         </IconButton>
         
+        {lyrics.is_synced && (
+          <IconButton
+            size="small"
+            onClick={() => setAdjustingTiming(true)}
+            sx={{ mr: 1 }}
+            title={t('lyrics.timing.open')}
+            aria-label={t('lyrics.timing.open')}
+          >
+            <TuneIcon />
+          </IconButton>
+        )}
+
         {/* Download button */}
         <IconButton 
           size="small" 
@@ -760,7 +794,7 @@ function LyricsPlayer({ youtubeId, currentTime, onClose, embedded = false, onSee
         {renderDetailsToggleButton()}
         
         {onClose && (
-          <IconButton size="small" onClick={onClose}>
+          <IconButton aria-label={t('common.close')} size="small" onClick={onClose}>
             <CloseIcon />
           </IconButton>
         )}

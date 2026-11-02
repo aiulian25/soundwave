@@ -17,7 +17,6 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { useTranslation } from 'react-i18next';
-import { audioAPI } from '../api/client';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
@@ -252,7 +251,7 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
                     {audio.play_count}
                   </TableCell>
                   <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                    <IconButton 
+                    <IconButton aria-label={t('player.a11y.play')} 
                       size="small" 
                       sx={{
                         color: 'primary.main',

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -24,7 +24,6 @@ import {
   Error as ErrorIcon,
   Schedule as PendingIcon,
   Sync as SyncIcon,
-  Delete as DeleteIcon,
   CloudOff as OfflineIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
@@ -41,13 +40,9 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const {
-    isSupported,
     isOnline,
-    pendingDownloads,
     activeDownloads,
     isLoading,
-    removePendingDownload,
-    triggerSync,
     refreshStatus,
     startPolling,
     stopPolling,
@@ -56,9 +51,8 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
   const open = Boolean(anchorEl);
   
   // Calculate total active downloads
-  const totalPending = pendingDownloads.filter(d => d.status === 'pending').length;
   const totalDownloading = activeDownloads.filter(d => d.status === 'downloading').length;
-  const totalActive = totalPending + totalDownloading + activeDownloads.filter(d => d.status === 'pending').length;
+  const totalActive = totalDownloading + activeDownloads.filter(d => d.status === 'pending').length;
   
   const hasActivity = totalActive > 0;
 
@@ -73,11 +67,6 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
     setAnchorEl(null);
     // Stop polling when popup closes - save resources
     stopPolling();
-  };
-
-  const handleSync = async () => {
-    await triggerSync();
-    await refreshStatus();
   };
 
   const getStatusIcon = (status: string) => {
@@ -200,26 +189,10 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
                 <RefreshIcon sx={{ fontSize: 20 }} />
               </IconButton>
             </Tooltip>
-            {!isOnline && pendingDownloads.length > 0 && (
-              <Tooltip title={t('downloadStatus.actions.syncWhenOnline')}>
-                <IconButton size="small" onClick={handleSync} disabled={isLoading || !isOnline}>
-                  <SyncIcon sx={{ fontSize: 20 }} />
-                </IconButton>
-              </Tooltip>
-            )}
           </Box>
         </Box>
         
         <Divider />
-
-        {/* Background Sync Support Info */}
-        {isSupported && (
-          <Box sx={{ px: 2, py: 1, bgcolor: alpha(theme.palette.success.main, 0.1) }}>
-            <Typography variant="caption" color="success.main">
-              {t('downloadStatus.backgroundEnabled')}
-            </Typography>
-          </Box>
-        )}
 
         {isLoading && <LinearProgress />}
 
@@ -263,58 +236,8 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
           </>
         )}
 
-        {/* Pending Local Downloads (queued offline) */}
-        {pendingDownloads.length > 0 && (
-          <>
-            <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover' }}>
-              <Typography variant="overline" color="text.secondary">
-                {t('downloadStatus.sections.queuedForSync', { count: pendingDownloads.length })}
-              </Typography>
-            </Box>
-            <List dense disablePadding>
-              {pendingDownloads.map((download) => (
-                <ListItem key={`local-${download.id}`} sx={{ gap: 1 }}>
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    {getStatusIcon(download.status)}
-                  </ListItemIcon>
-                  <ListItemText
-                    sx={{ minWidth: 0 }}
-                    primary={download.title || download.url}
-                    secondary={
-                      <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Chip
-                          label={download.status}
-                          size="small"
-                          color={getStatusColor(download.status) as any}
-                          sx={{ height: 18, fontSize: '0.65rem' }}
-                        />
-                        {download.error && (
-                          <Typography variant="caption" color="error">
-                            {download.error}
-                          </Typography>
-                        )}
-                      </Box>
-                    }
-                    primaryTypographyProps={{ noWrap: true }}
-                  />
-                  {/* In-flow action (replaces absolutely-positioned ListItemSecondaryAction). */}
-                  <Box sx={{ flexShrink: 0 }}>
-                    <IconButton
-                      edge="end"
-                      size="small"
-                      onClick={() => removePendingDownload(download.id)}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </ListItem>
-              ))}
-            </List>
-          </>
-        )}
-
         {/* Empty State */}
-        {activeDownloads.length === 0 && pendingDownloads.length === 0 && (
+        {activeDownloads.length === 0 && (
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <DownloadIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
             <Typography variant="body2" color="text.secondary">
@@ -329,19 +252,6 @@ export default function DownloadStatus({ variant = 'icon' }: DownloadStatusProps
           </Box>
         )}
 
-        {/* Sync Button for Offline Queue */}
-        {!isOnline && pendingDownloads.filter(d => d.status === 'pending').length > 0 && (
-          <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<SyncIcon />}
-              disabled
-            >
-              {t('downloadStatus.syncWhenOnlinePending', { count: pendingDownloads.filter(d => d.status === 'pending').length })}
-            </Button>
-          </Box>
-        )}
       </Popover>
     </>
   );

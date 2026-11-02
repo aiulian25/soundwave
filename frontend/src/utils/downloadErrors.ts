@@ -5,6 +5,11 @@ const ERROR_HINT_TRANSLATION_KEYS: Record<string, string> = {
   '[blocked_url]': 'downloadStatus.errors.blockedUrl',
   '[cookies_refresh]': 'downloadStatus.errors.cookiesRefresh',
   '[cookies_file_access]': 'downloadStatus.errors.cookiesFileAccess',
+  '[quota_exceeded]': 'downloadStatus.errors.quotaExceeded',
+  '[download_too_large]': 'downloadStatus.errors.downloadTooLarge',
+  '[not_single_item]': 'downloadStatus.errors.notSingleItem',
+  '[disk_full]': 'downloadStatus.errors.diskFull',
+  '[invalid_output]': 'downloadStatus.errors.invalidOutput',
 };
 
 export function describeDownloadError(errorMessage: string, translate: (key: string) => string): string {

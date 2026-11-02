@@ -1,41 +1,10 @@
 /**
- * Background Download Service
- * 
- * Provides utilities for queueing downloads that persist even when the app is closed.
- * Uses Service Worker with Background Sync API for reliability.
- * 
+ * Polls the server's download queue while the download UI is open.
+ *
  * Network-aware: adjusts polling based on connection quality.
  */
 
 import { getNetworkInfo, getPollingInterval, apiBackoffs } from './networkQuality';
-import { downloadAPI } from '../api/client';
-
-/** One queued download as the API returns it. */
-interface QueuedDownloadResponse {
-  id: number;
-}
-
-/** Readable text for a failed request, standing in for the raw response body the previous
- *  hand-rolled fetch surfaced. DRF returns an object for validation errors and a string for
- *  plain ones, so both shapes are handled. */
-export function describeRequestError(error: unknown): string {
-  const data = (error as { response?: { data?: unknown } })?.response?.data;
-  if (data === undefined || data === null) {
-    return String(error);
-  }
-  return typeof data === 'string' ? data : JSON.stringify(data);
-}
-
-export interface PendingDownload {
-  id: number;
-  url: string;
-  title?: string;
-  status: 'pending' | 'submitted' | 'failed';
-  createdAt: number;
-  updatedAt?: number;
-  attempts: number;
-  error?: string;
-}
 
 export interface DownloadProgress {
   id: number;
@@ -46,194 +15,9 @@ export interface DownloadProgress {
   error_message?: string;
 }
 
-class BackgroundDownloadService {
-  private swRegistration: ServiceWorkerRegistration | null = null;
-  private isSupported: boolean = false;
+class DownloadStatusPoller {
   private statusPollingInterval: number | null = null;
   private statusListeners: Set<(downloads: DownloadProgress[]) => void> = new Set();
-
-  constructor() {
-    this.checkSupport();
-    this.setupServiceWorker();
-    this.setupNetworkListeners();
-  }
-
-  private checkSupport() {
-    this.isSupported = 
-      'serviceWorker' in navigator && 
-      'SyncManager' in window;
-    
-    console.log('[BackgroundDownload] Support:', {
-      serviceWorker: 'serviceWorker' in navigator,
-      syncManager: 'SyncManager' in window,
-      periodicSync: 'PeriodicSyncManager' in window,
-    });
-  }
-
-  private async setupServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-
-    try {
-      this.swRegistration = await navigator.serviceWorker.ready;
-      console.log('[BackgroundDownload] Service Worker ready');
-
-      // Register periodic sync for checking download status
-      if ('periodicSync' in this.swRegistration) {
-        try {
-          const status = await navigator.permissions.query({
-            name: 'periodic-background-sync' as PermissionName,
-          });
-          
-          if (status.state === 'granted') {
-            await (this.swRegistration as any).periodicSync.register('check-download-status', {
-              minInterval: 60 * 1000, // Check every minute
-            });
-            console.log('[BackgroundDownload] Periodic sync registered');
-          }
-        } catch (e) {
-          console.log('[BackgroundDownload] Periodic sync not available');
-        }
-      }
-
-      // Listen for messages from service worker
-      navigator.serviceWorker.addEventListener('message', this.handleServiceWorkerMessage.bind(this));
-    } catch (error) {
-      console.error('[BackgroundDownload] Setup error:', error);
-    }
-  }
-
-  private setupNetworkListeners() {
-    // When coming back online, trigger sync
-    window.addEventListener('online', () => {
-      console.log('[BackgroundDownload] Network online, triggering sync');
-      this.triggerSync();
-    });
-  }
-
-  private handleServiceWorkerMessage(event: MessageEvent) {
-    const { type, ...data } = event.data || {};
-    
-    if (type === 'DOWNLOAD_STATUS_UPDATE') {
-      // Status update from service worker
-      this.notifyStatusListeners(data.downloads);
-    }
-    
-    if (type === 'PLAY_AUDIO') {
-      // Request to play audio (from notification click)
-      window.dispatchEvent(new CustomEvent('playAudio', { detail: data }));
-    }
-  }
-
-  /**
-   * Legacy no-op kept for backward compatibility with existing callers.
-   */
-  setAuthToken(_token: string | null) {
-    return;
-  }
-
-  /**
-   * Queue a download for background processing
-   */
-  async queueDownload(url: string, title?: string): Promise<{ success: boolean; id?: number; error?: string }> {
-    // If online and basic mode, try direct API call first
-    if (navigator.onLine && !this.isSupported) {
-      return this.directDownload(url);
-    }
-
-    // Use service worker for background download
-    try {
-      const result = await this.sendMessage('QUEUE_DOWNLOAD', {
-        url,
-        title,
-      });
-      
-      return result;
-    } catch (error) {
-      console.error('[BackgroundDownload] Queue error:', error);
-      
-      // Fallback to direct API if service worker fails
-      if (navigator.onLine) {
-        return this.directDownload(url);
-      }
-      
-      return { success: false, error: 'Failed to queue download' };
-    }
-  }
-
-  /**
-   * Queue multiple downloads for background processing
-   */
-  async queueDownloads(downloads: { url: string; title?: string }[]): Promise<{ success: boolean; ids?: number[]; error?: string }> {
-    // If online and basic mode, try direct API call
-    if (navigator.onLine && !this.isSupported) {
-      return this.directDownloadBatch(downloads.map(d => d.url));
-    }
-
-    try {
-      const result = await this.sendMessage('QUEUE_DOWNLOADS_BATCH', {
-        downloads,
-      });
-      
-      return result;
-    } catch (error) {
-      console.error('[BackgroundDownload] Batch queue error:', error);
-      
-      if (navigator.onLine) {
-        return this.directDownloadBatch(downloads.map(d => d.url));
-      }
-      
-      return { success: false, error: 'Failed to queue downloads' };
-    }
-  }
-
-  /**
-   * Get all pending downloads from service worker
-   */
-  async getPendingDownloads(): Promise<PendingDownload[]> {
-    try {
-      const result = await this.sendMessage('GET_PENDING_DOWNLOADS', {});
-      return result.downloads || [];
-    } catch (error) {
-      console.error('[BackgroundDownload] Get pending error:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Remove a pending download
-   */
-  async removePendingDownload(id: number): Promise<boolean> {
-    try {
-      const result = await this.sendMessage('REMOVE_PENDING_DOWNLOAD', { id });
-      return result.success;
-    } catch (error) {
-      console.error('[BackgroundDownload] Remove error:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Manually trigger sync (useful when coming back online)
-   */
-  async triggerSync(): Promise<boolean> {
-    if (!this.swRegistration) return false;
-
-    try {
-      // Try Background Sync API first
-      if ('sync' in this.swRegistration) {
-        await (this.swRegistration as any).sync.register('sync-downloads');
-        console.log('[BackgroundDownload] Sync triggered via Background Sync API');
-        return true;
-      }
-      
-      // Fallback: send message to service worker
-      const result = await this.sendMessage('TRIGGER_DOWNLOAD_SYNC', {});
-      return result.success;
-    } catch (error) {
-      console.error('[BackgroundDownload] Trigger sync error:', error);
-      return false;
-    }
-  }
 
   /**
    * Start polling for download status updates
@@ -285,7 +69,7 @@ class BackgroundDownloadService {
     const setupPolling = () => {
       const interval = getPollingInterval(baseIntervalMs);
       const networkInfo = getNetworkInfo();
-      console.debug(`[BackgroundDownload] Setting poll interval: ${Math.round(interval / 1000)}s (network: ${networkInfo.quality})`);
+      console.debug(`[BackgroundDownload] Setting poll interval: ${Math.round(interval / 1000)}s (${networkInfo.quality})`);
       
       this.statusPollingInterval = window.setInterval(() => {
         poll();
@@ -323,78 +107,8 @@ class BackgroundDownloadService {
   private notifyStatusListeners(downloads: DownloadProgress[]) {
     this.statusListeners.forEach(listener => listener(downloads));
   }
-
-  /**
-   * Direct API call fallback when service worker not available
-   */
-  private async directDownload(url: string): Promise<{ success: boolean; id?: number; error?: string }> {
-    try {
-      const response = await downloadAPI.add({ urls: [url], auto_start: true });
-      const queued: QueuedDownloadResponse[] = response.data;
-      return { success: true, id: queued[0]?.id };
-    } catch (error) {
-      // Axios rejects on any non-2xx, so this covers both HTTP errors and network failures.
-      return { success: false, error: describeRequestError(error) };
-    }
-  }
-
-  private async directDownloadBatch(urls: string[]): Promise<{ success: boolean; ids?: number[]; error?: string }> {
-    try {
-      const response = await downloadAPI.add({ urls, auto_start: true });
-      const queued: QueuedDownloadResponse[] = response.data;
-      return { success: true, ids: queued.map((item) => item.id) };
-    } catch (error) {
-      return { success: false, error: describeRequestError(error) };
-    }
-  }
-
-  /**
-   * Send message to service worker and wait for response
-   */
-  private sendMessage(type: string, data: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      if (!('serviceWorker' in navigator) || !navigator.serviceWorker || !navigator.serviceWorker.controller) {
-        // No controller yet - this is normal during SW update, just resolve with empty
-        console.log('[BackgroundDownload] No service worker controller, returning empty');
-        resolve({ downloads: [], success: true });
-        return;
-      }
-
-      const messageChannel = new MessageChannel();
-      
-      // Timeout after 5 seconds (shorter timeout to fail fast)
-      const timeout = setTimeout(() => {
-        console.log('[BackgroundDownload] Service worker message timeout, returning empty');
-        resolve({ downloads: [], success: true }); // Resolve with empty instead of rejecting
-      }, 5000);
-
-      messageChannel.port1.onmessage = (event) => {
-        clearTimeout(timeout);
-        resolve(event.data);
-      };
-
-      navigator.serviceWorker.controller.postMessage(
-        { type, ...data },
-        [messageChannel.port2]
-      );
-    });
-  }
-
-  /**
-   * Check if background downloads are supported
-   */
-  get supported(): boolean {
-    return this.isSupported;
-  }
-
-  /**
-   * Check if we're online
-   */
-  get online(): boolean {
-    return navigator.onLine;
-  }
 }
 
 // Singleton instance
-export const backgroundDownload = new BackgroundDownloadService();
+const backgroundDownload = new DownloadStatusPoller();
 export default backgroundDownload;

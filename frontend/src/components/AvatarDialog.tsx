@@ -29,7 +29,7 @@ interface AvatarDialogProps {
 
 export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarChange }: AvatarDialogProps) {
   const { t } = useTranslation();
-  const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
+  const [, setSelectedPreset] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -57,7 +57,6 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
         throw new Error(t('avatarDialog.errors.setPresetFailed'));
       }
 
-      const data = await response.json();
       setSuccess(t('avatarDialog.success.updated'));
       onAvatarChange(`/avatars/preset_${preset}.svg`);
     } catch (err) {
@@ -160,7 +159,7 @@ export default function AvatarDialog({ open, onClose, currentAvatar, onAvatarCha
       <DialogTitle>
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <Typography variant="h6">{t('avatarDialog.title')}</Typography>
-          <IconButton onClick={onClose} size="small">
+          <IconButton aria-label={t('common.close')} onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
         </Box>

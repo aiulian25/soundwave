@@ -105,7 +105,6 @@ export function usePullToRefresh(
       scroller.removeEventListener('touchcancel', onTouchEnd as EventListener);
     };
     // pullDistance is read via a ref inside handlers to avoid re-subscribing each frame.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onRefresh, threshold, maxPull, resistance, disabled, refreshing]);
 
   // Keep a ref of the latest pullDistance for the touchend closure.

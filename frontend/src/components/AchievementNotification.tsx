@@ -87,7 +87,7 @@ export default function AchievementNotification({ achievements, onClose }: Achie
           },
         }}
       >
-        <IconButton
+        <IconButton aria-label={t('common.close')}
           onClick={onClose}
           sx={{
             position: 'absolute',

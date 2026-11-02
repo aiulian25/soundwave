@@ -50,8 +50,12 @@ const DEFAULT_SETTINGS: UserSettings = {
   extra_settings: {},
 };
 
+/** A field an older server omits keeps its intended default instead of becoming undefined. */
+const withDefaults = (fromServer: Partial<UserSettings>): UserSettings => ({ ...DEFAULT_SETTINGS, ...fromServer });
+
 export const useUserSettings = () => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,12 +66,17 @@ export const useUserSettings = () => {
       setError(null);
       const response = await api.get('/user/config/');
       console.log('[Settings] Loaded from backend:', response.data);
-      setSettings(response.data);
+      const loaded = withDefaults(response.data);
+      setSettings(loaded);
+      setSettingsLoaded(true);
+      return loaded;
     } catch (err: any) {
       console.error('Failed to load user settings:', err);
       setError(err?.message || 'Failed to load settings');
       // Use defaults on error
       setSettings(DEFAULT_SETTINGS);
+      setSettingsLoaded(false);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -77,7 +86,7 @@ export const useUserSettings = () => {
   const saveSettings = useCallback(async (newSettings: Partial<UserSettings>) => {
     try {
       const response = await api.post('/user/config/', newSettings);
-      setSettings(response.data.config);
+      setSettings(withDefaults(response.data.config));
       return true;
     } catch (err: any) {
       console.error('Failed to save user settings:', err);
@@ -127,6 +136,9 @@ export const useUserSettings = () => {
 
   return {
     settings,
+    // Off until the account's real preference is known: an opted-out user must send nothing
+    // during the moment the defaults are still showing.
+    playbackSyncEnabled: settingsLoaded && settings.playback_sync_enabled,
     loading,
     error,
     updateSetting,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Box, IconButton, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { ButtonBase, Box, IconButton, Snackbar, Typography, useMediaQuery, useTheme } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import LoginPage from './pages/LoginPage';
@@ -38,14 +38,19 @@ import { useIntelligentPrefetch } from './hooks/useIntelligentPrefetch';
 import { useSettings } from './context/SettingsContext';
 import { useRadio } from './context/RadioContext';
 import { NowPlayingProvider, getTrackKey } from './context/NowPlayingContext';
-import { checkPlaybackSession, type PlaybackSession } from './hooks/usePlaybackSync';
-import { offlineStorage } from './utils/offlineStorage';
-import { pwaManager } from './utils/pwa';
+import { checkPlaybackSession, loadResumedQueue, usePlaybackSyncWriter, type PlaybackSession } from './hooks/usePlaybackSync';
+import { useTranslation } from 'react-i18next';
+import { claimBrowserData, clearAccountData, watchDataOwner } from './utils/accountData';
+import { flushListeningEvents } from './utils/listeningOutbox';
 import { audioAPI, playbackSyncAPI, userAPI, ensureCsrfCookie, setAuthEventsEnabled } from './api/client';
 import type { Audio } from './types';
 
+const UNAVAILABLE_NOTICE_MS = 6000;
+
 function App() {
+  const { t } = useTranslation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [accountId, setAccountId] = useState<number | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [currentAudio, setCurrentAudio] = useState<Audio | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -63,17 +68,9 @@ function App() {
   // Playback sync state
   const [resumeSession, setResumeSession] = useState<PlaybackSession | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
-  const lastSyncTimeRef = useRef<number>(0);
-  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [unavailableOnResume, setUnavailableOnResume] = useState(0);
   
-  // Get settings from context (may not be available if not authenticated)
-  const settingsContext = (() => {
-    try {
-      return useSettings();
-    } catch {
-      return null;
-    }
-  })();
+  const settingsContext = useSettings();
   
   // Radio mode hook
   const { isRadioMode, getNextTrack, reportPlayed, reportSkip, stopRadio, setCurrentTrackInfo } = useRadio();
@@ -92,7 +89,7 @@ function App() {
   });
 
   // Intelligent prefetch hook for caching upcoming tracks
-  const prefetch = useIntelligentPrefetch({
+  useIntelligentPrefetch({
     enabled: settingsContext?.settings?.prefetch_enabled !== false && isAuthenticated,
     queue,
     currentIndex: currentQueueIndex,
@@ -101,11 +98,25 @@ function App() {
     shuffleEnabled: settingsContext?.settings?.shuffle_enabled ?? false,
   });
 
+  // The account's settings first: a session is only read when sync is allowed.
+  const offerResumeIfAllowed = async () => {
+    const loaded = await settingsContext?.loadSettings();
+    if (!loaded?.playback_sync_enabled) return;
+
+    const session = await checkPlaybackSession();
+    if (session?.audio_details) {
+      setResumeSession(session);
+      setShowResumeDialog(true);
+    }
+  };
+
   useEffect(() => {
     const bootstrapAuth = async () => {
       try {
         await ensureCsrfCookie();
         const accountRes = await userAPI.account();
+        await claimBrowserData(accountRes.data.id, { adoptUnknown: true });
+        setAccountId(accountRes.data.id);
         setIsAuthenticated(true);
         setAuthEventsEnabled(true);
 
@@ -116,21 +127,7 @@ function App() {
           return;
         }
 
-        if (settingsContext?.loadSettings) {
-          settingsContext.loadSettings();
-        }
-
-        // Check for existing playback session from another device (only on page load)
-        try {
-          const session = await checkPlaybackSession();
-          if (session && session.audio_details) {
-            console.log('[App] Found existing playback session on page load:', session);
-            setResumeSession(session);
-            setShowResumeDialog(true);
-          }
-        } catch {
-          console.debug('[App] No playback session to resume');
-        }
+        await offerResumeIfAllowed();
       } catch {
         setIsAuthenticated(false);
         setAuthEventsEnabled(false);
@@ -153,6 +150,9 @@ function App() {
     };
   }, []);
 
+  // Another tab signed out or switched account: this tab must not keep showing the old one.
+  useEffect(() => watchDataOwner(accountId, () => window.location.reload()), [accountId]);
+
   // Auto-play when new audio is set
   useEffect(() => {
     if (currentAudio) {
@@ -160,143 +160,16 @@ function App() {
     }
   }, [currentAudio]);
 
-  // Cross-device playback sync - periodically save playback state
-  // Optimized: Skip when offline, use longer intervals, debounce
-  // Can be disabled in settings to reduce battery/data usage
-  useEffect(() => {
-    // Skip if sync is disabled in settings
-    if (!settingsContext?.settings?.playback_sync_enabled) {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-        syncIntervalRef.current = null;
-      }
-      return;
-    }
-    
-    if (!isAuthenticated || !currentAudio?.youtube_id) {
-      // Clear sync interval if no audio
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-        syncIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Get device info
-    const getDeviceId = () => {
-      let deviceId = localStorage.getItem('soundwave_device_id');
-      if (!deviceId) {
-        deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-        localStorage.setItem('soundwave_device_id', deviceId);
-      }
-      return deviceId;
-    };
-
-    const getDeviceName = () => {
-      const ua = navigator.userAgent;
-      if (/iPhone/i.test(ua)) return 'iPhone';
-      if (/iPad/i.test(ua)) return 'iPad';
-      if (/Android/i.test(ua)) return 'Android';
-      if (/Mac/i.test(ua)) return 'Mac';
-      if (/Windows/i.test(ua)) return 'Windows';
-      if (/Linux/i.test(ua)) return 'Linux';
-      return 'Web Browser';
-    };
-
-    // Sync function - only syncs when online
-    const syncPlayback = async () => {
-      // Skip sync if offline - playback sync is not needed for cached playback
-      if (!navigator.onLine) {
-        console.debug('[PlaybackSync] Skipping sync - offline');
-        return;
-      }
-      
-      if (!currentAudio?.youtube_id) return;
-      
-      try {
-        await playbackSyncAPI.syncPlayback({
-          youtube_id: currentAudio.youtube_id,
-          position: currentTimeRef.current,
-          duration: currentAudio.duration,
-          is_playing: isPlaying,
-          volume: settingsContext?.settings?.volume ?? 100,
-          queue_youtube_ids: queue.map(a => a.youtube_id).filter(Boolean) as string[],
-          queue_index: currentQueueIndex,
-          device_id: getDeviceId(),
-          device_name: getDeviceName(),
-        });
-        lastSyncTimeRef.current = Date.now();
-      } catch (error) {
-        // Silently fail - sync is best-effort
-        console.debug('[PlaybackSync] Sync failed:', error);
-      }
-    };
-
-    // Delay initial sync to not block playback startup
-    const initialSyncTimeout = setTimeout(() => {
-      syncPlayback();
-    }, 3000);
-
-    // Set up periodic sync (every 60 seconds while playing) - increased from 30s for better mobile performance
-    syncIntervalRef.current = setInterval(() => {
-      if (isPlaying && navigator.onLine) {
-        syncPlayback();
-      }
-    }, 60000);
-
-    return () => {
-      clearTimeout(initialSyncTimeout);
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-        syncIntervalRef.current = null;
-      }
-    };
-  }, [isAuthenticated, currentAudio?.youtube_id, currentAudio?.duration, isPlaying, queue, currentQueueIndex, settingsContext?.settings?.volume, settingsContext?.settings?.playback_sync_enabled]);
-
-  // Sync when pausing (important for resume) - only when online and sync is enabled
-  useEffect(() => {
-    if (!isAuthenticated || !currentAudio?.youtube_id) return;
-
-    // Skip if sync is disabled
-    if (!settingsContext?.settings?.playback_sync_enabled) return;
-
-    // Skip if offline - pause position will be synced when back online
-    if (!navigator.onLine) return;
-
-    // When pausing, sync after a short delay (non-blocking)
-    if (!isPlaying && currentTimeRef.current > 0 && currentAudio?.youtube_id) {
-      // Debounce pause sync - only sync if still paused after 2 seconds
-      const youtubeId = currentAudio.youtube_id; // Capture for closure
-      const timeoutId = setTimeout(() => {
-        // Double-check still online before syncing
-        if (!navigator.onLine) return;
-        
-        const getDeviceId = () => localStorage.getItem('soundwave_device_id') || 'unknown';
-        const getDeviceName = () => {
-          const ua = navigator.userAgent;
-          if (/iPhone|iPad/i.test(ua)) return 'iOS';
-          if (/Android/i.test(ua)) return 'Android';
-          if (/Mac/i.test(ua)) return 'Mac';
-          if (/Windows/i.test(ua)) return 'Windows';
-          return 'Web';
-        };
-
-        playbackSyncAPI.syncPlayback({
-          youtube_id: youtubeId,
-          position: currentTimeRef.current,
-          duration: currentAudio.duration,
-          is_playing: false,
-          volume: settingsContext?.settings?.volume ?? 100,
-          queue_youtube_ids: queue.map(a => a.youtube_id).filter(Boolean) as string[],
-          queue_index: currentQueueIndex,
-          device_id: getDeviceId(),
-          device_name: getDeviceName(),
-        }).catch(() => {});
-      }, 2000);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isPlaying]);
+  // Cross-device playback sync; can be disabled in settings to reduce battery/data usage.
+  usePlaybackSyncWriter({
+    enabled: isAuthenticated && (settingsContext?.playbackSyncEnabled ?? false),
+    audio: currentAudio,
+    isPlaying,
+    queue,
+    queueIndex: currentQueueIndex,
+    volume: settingsContext?.settings?.volume ?? 100,
+    positionRef: currentTimeRef,
+  });
 
   // Update current time from Player (via callback). Writing a ref rather than state
   // keeps the whole App tree from reconciling on every timeupdate event.
@@ -320,27 +193,14 @@ function App() {
     setIsPlaying(true);
   };
 
-  // Post-auth bootstrap shared by fresh login and forced-password-change completion.
-  const runPostAuthBootstrap = async () => {
-    // Load user settings after login
-    if (settingsContext?.loadSettings) {
-      settingsContext.loadSettings();
+  const handleLoginSuccess = async (passwordChangeRequired = false, loggedInAccountId?: number) => {
+    // Before anything renders: the previous account's data must not be readable by this one.
+    if (loggedInAccountId === undefined) {
+      await clearAccountData();
+    } else {
+      await claimBrowserData(loggedInAccountId);
+      setAccountId(loggedInAccountId);
     }
-
-    // Check for existing playback session from another device
-    try {
-      const session = await checkPlaybackSession();
-      if (session && session.audio_details) {
-        console.log('[App] Found existing playback session:', session);
-        setResumeSession(session);
-        setShowResumeDialog(true);
-      }
-    } catch (error) {
-      console.debug('[App] No playback session to resume');
-    }
-  };
-
-  const handleLoginSuccess = async (passwordChangeRequired = false) => {
     setIsAuthenticated(true);
     setAuthEventsEnabled(true);
 
@@ -350,13 +210,13 @@ function App() {
       return;
     }
 
-    await runPostAuthBootstrap();
+    await offerResumeIfAllowed();
   };
 
   // Called when the forced password change completes successfully.
   const handlePasswordChanged = async () => {
     setMustChangePassword(false);
-    await runPostAuthBootstrap();
+    await offerResumeIfAllowed();
   };
 
   // Handle resume playback from another device
@@ -372,31 +232,11 @@ function App() {
         // Calculate resume position (5 seconds before last position)
         const resumePosition = Math.max(0, resumeSession.position - 5);
         
-        // Set up the queue if available
-        if (resumeSession.queue_youtube_ids?.length > 0) {
-          // Try to restore queue - fetch audio details for queue items
-          try {
-            const queueResponse = await audioAPI.list({ 
-              youtube_ids: resumeSession.queue_youtube_ids.join(','),
-              page_size: 100 
-            });
-            const queueTracks = queueResponse.data?.data || queueResponse.data || [];
-            if (queueTracks.length > 0) {
-              setQueue(queueTracks);
-              setCurrentQueueIndex(resumeSession.queue_index);
-            } else {
-              setQueue([audio]);
-              setCurrentQueueIndex(0);
-            }
-          } catch {
-            setQueue([audio]);
-            setCurrentQueueIndex(0);
-          }
-        } else {
-          setQueue([audio]);
-          setCurrentQueueIndex(0);
-        }
-        
+        const resumed = await loadResumedQueue(audio);
+        setQueue(resumed.tracks);
+        setCurrentQueueIndex(resumed.index);
+        setUnavailableOnResume(resumed.missing);
+
         // Set the audio with initial seek position
         setCurrentAudio({ ...audio, _initialSeek: resumePosition } as Audio & { _initialSeek: number });
         setIsPlaying(true);
@@ -416,7 +256,7 @@ function App() {
     playbackSyncAPI.clearSession().catch(() => {});
   };
 
-  const handleLogout = async () => {
+  const endServerSession = async () => {
     try {
       await ensureCsrfCookie();
       // Call logout endpoint via API client so CSRF header is included.
@@ -425,30 +265,16 @@ function App() {
       console.error('Logout error:', error);
     }
 
-    setAuthEventsEnabled(false);
-    
-    // Clear offline data (IndexedDB playlists, favorites, etc.)
-    try {
-      await offlineStorage.clearAllData();
-      console.log('[Logout] Cleared IndexedDB offline data');
-    } catch (error) {
-      console.error('Failed to clear offline data:', error);
-    }
-    
-    // Clear Service Worker caches (audio files, API responses)
-    try {
-      await pwaManager.clearCache();
-      console.log('[Logout] Cleared Service Worker caches');
-    } catch (error) {
-      console.error('Failed to clear SW cache:', error);
-    }
-    
     // Clear all session cookies
     document.cookie.split(";").forEach((c) => {
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
-    
-    // Reset all state
+  };
+
+  const handleLogout = async () => {
+    setAuthEventsEnabled(false);
+
+    // The interface goes first, so logging out never waits on the network or a service worker.
     setCurrentAudio(null);
     setQueue([]);
     setCurrentQueueIndex(0);
@@ -460,6 +286,9 @@ function App() {
     navigate('/', { replace: true });
     setIsAuthenticated(false);
     setMustChangePassword(false);
+    setAccountId(null);
+
+    await clearAccountData(endServerSession);
   };
 
   const toggleMobileDrawer = () => {
@@ -473,15 +302,10 @@ function App() {
     }
   }, [currentAudio?.id, isPlaying]);
 
-  const playNext = useCallback(async () => {
+  const advanceToNext = useCallback(async () => {
     // Radio mode - get next track from radio
     if (isRadioMode) {
       try {
-        // Report current track as played (not skipped) when auto-advancing
-        if (currentAudio) {
-          await reportPlayed();
-        }
-        
         const result = await getNextTrack();
         if (result) {
           setCurrentAudio(result as Audio);
@@ -534,7 +358,7 @@ function App() {
       setCurrentQueueIndex(0);
       setCurrentAudio(queue[0]);
     }
-  }, [queue, currentQueueIndex, settingsContext?.settings?.shuffle_enabled, settingsContext?.settings?.smart_shuffle_enabled, settingsContext?.settings?.repeat_mode, smartShuffle, isRadioMode, getNextTrack, reportPlayed, currentAudio]);
+  }, [queue, currentQueueIndex, settingsContext?.settings?.shuffle_enabled, settingsContext?.settings?.smart_shuffle_enabled, settingsContext?.settings?.repeat_mode, smartShuffle, isRadioMode, getNextTrack]);
 
   const playPrevious = () => {
     if (queue.length > 0 && currentQueueIndex > 0) {
@@ -544,15 +368,41 @@ function App() {
     }
   };
 
-  // Skip handler - reports skip to radio for learning
+  // Hiding the player would drop keyboard focus to nowhere, so it moves with the player: the
+  // mini player takes it when it appears, and the minimize button gets it back here.
+  const wasMinimized = useRef(false);
+  useEffect(() => {
+    if (wasMinimized.current && !playerMinimized) {
+      document.querySelector<HTMLElement>('[data-testid="player-minimize"]')?.focus();
+    }
+    wasMinimized.current = playerMinimized;
+  }, [playerMinimized]);
+
+  // The user chose to move on, which is what radio learns from.
   const handleSkip = useCallback(async () => {
     if (isRadioMode) {
-      // Report the skip before moving to next track
       await reportSkip();
     }
-    // Then play the next track
-    await playNext();
-  }, [isRadioMode, reportSkip, playNext]);
+    await advanceToNext();
+  }, [isRadioMode, reportSkip, advanceToNext]);
+
+  // The track played to its end: a play, not a skip.
+  const handleTrackEnded = useCallback(async () => {
+    if (isRadioMode && currentAudio) {
+      await reportPlayed();
+    }
+    await advanceToNext();
+  }, [isRadioMode, currentAudio, reportPlayed, advanceToNext]);
+
+  // Waiting plays go out when the app opens and when the connection returns.
+  useEffect(() => {
+    if (!accountId) return undefined;
+
+    const flush = () => { flushListeningEvents(); };
+    flush();
+    window.addEventListener('online', flush);
+    return () => window.removeEventListener('online', flush);
+  }, [accountId]);
 
   const setAudioWithQueue = (audio: Audio, audioQueue?: Audio[]) => {
     setCurrentAudio(audio);
@@ -623,37 +473,6 @@ function App() {
       setCurrentQueueIndex(0);
     }
   }, [currentAudio]);
-
-  // Add track to play next (after current)
-  const addToPlayNext = useCallback((track: Audio) => {
-    setQueue(prev => {
-      // Remove if already in queue (except current)
-      const existingIndex = prev.findIndex(t => t.id === track.id);
-      const newQueue = [...prev];
-      
-      if (existingIndex !== -1 && existingIndex !== currentQueueIndex) {
-        newQueue.splice(existingIndex, 1);
-        const adjustedInsertIndex = existingIndex < currentQueueIndex + 1 
-          ? currentQueueIndex 
-          : currentQueueIndex + 1;
-        newQueue.splice(adjustedInsertIndex, 0, track);
-      } else if (existingIndex === -1) {
-        newQueue.splice(currentQueueIndex + 1, 0, track);
-      }
-      
-      return newQueue;
-    });
-  }, [currentQueueIndex]);
-
-  // Add track to end of queue
-  const addToQueueEnd = useCallback((track: Audio) => {
-    setQueue(prev => {
-      if (prev.some(t => t.id === track.id)) {
-        return prev;  // Don't add duplicates
-      }
-      return [...prev, track];
-    });
-  }, []);
 
   // Public route: email-change confirmation, reachable from the emailed link even
   // when logged out / on another device (APP-10).
@@ -741,7 +560,7 @@ function App() {
             <Route path="/achievements" element={<AchievementsPage />} />
             <Route path="/wrapped" element={<YearlyWrappedPage />} />
             <Route path="/history" element={<ListeningHistoryPage onTrackSelect={setAudioWithQueue} />} />
-            <Route path="/local-files" element={<LocalFilesPage setCurrentAudio={setAudioWithQueue} />} />
+            <Route path="/local-files" element={accountId !== null && <LocalFilesPage setCurrentAudio={setAudioWithQueue} accountId={accountId} />} />
             <Route path="/offline" element={<OfflineManagerPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
@@ -776,6 +595,7 @@ function App() {
               if (isRadioMode) stopRadio();
             }}
             onNext={handleSkip}
+            onTrackEnded={handleTrackEnded}
             onPrevious={playPrevious}
             hasNext={isRadioMode || queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || settingsContext?.settings?.repeat_mode === 'all' || currentQueueIndex < queue.length - 1)}
             hasPrevious={currentQueueIndex > 0}
@@ -839,6 +659,7 @@ function App() {
               }}
               onMinimize={() => setPlayerMinimized(true)}
               onNext={handleSkip}
+              onTrackEnded={handleTrackEnded}
               onPrevious={playPrevious}
               hasNext={isRadioMode || queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || settingsContext?.settings?.repeat_mode === 'all' || currentQueueIndex < queue.length - 1)}
               hasPrevious={currentQueueIndex > 0}
@@ -859,7 +680,6 @@ function App() {
           {/* Minimized Player Bar */}
           {playerMinimized && (
             <Box
-              onClick={() => setPlayerMinimized(false)}
               sx={{
                 display: { xs: 'flex', lg: 'none' },
                 position: 'fixed',
@@ -874,13 +694,31 @@ function App() {
                 px: 2,
                 gap: 2,
                 zIndex: 1000,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                '&:active': {
-                  bgcolor: 'rgba(255, 255, 255, 0.05)',
-                },
               }}
             >
+              <ButtonBase
+                autoFocus
+                onClick={() => setPlayerMinimized(false)}
+                aria-label={t('player.a11y.restore', { title: currentAudio.title })}
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  gap: 2,
+                  transition: 'all 0.2s ease',
+                  '&:active': {
+                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  },
+                  '&:focus-visible': {
+                    outline: '2px solid',
+                    outlineColor: 'primary.main',
+                  },
+                }}
+              >
               {/* Album Art */}
               <Box
                 component="img"
@@ -919,16 +757,15 @@ function App() {
                     display: 'block',
                   }}
                 >
-                  {currentAudio.artist || 'Unknown Artist'}
+                  {currentAudio.artist || t('player.unknownArtist')}
                 </Typography>
               </Box>
+              </ButtonBase>
 
               {/* Play/Pause Button */}
               <IconButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsPlaying(!isPlaying);
-                }}
+                onClick={() => setIsPlaying(!isPlaying)}
+                aria-label={isPlaying ? t('player.a11y.pause') : t('player.a11y.play')}
                 sx={{
                   bgcolor: 'primary.main',
                   color: 'background.dark',
@@ -949,6 +786,12 @@ function App() {
       )}
 
       {/* Resume Playback Dialog - Shows when user has an active session from another device */}
+      <Snackbar
+        open={unavailableOnResume > 0}
+        autoHideDuration={UNAVAILABLE_NOTICE_MS}
+        onClose={() => setUnavailableOnResume(0)}
+        message={t('resumePlayback.tracksUnavailable', { count: unavailableOnResume })}
+      />
       <ResumePlaybackDialog
         open={showResumeDialog}
         session={resumeSession}

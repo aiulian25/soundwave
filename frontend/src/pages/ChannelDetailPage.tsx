@@ -26,7 +26,6 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
-  Pause as PauseIcon,
   ArrowBack as BackIcon,
   Download as DownloadIcon,
   Shuffle as ShuffleIcon,
@@ -54,6 +53,8 @@ interface ChannelDetail {
   video_count: number;
   subscriber_count: number;
   downloaded_count: number;
+  pending?: number;
+  failed?: number;
   last_refreshed: string;
   sync_status: 'pending' | 'syncing' | 'success' | 'failed' | 'stale';
   sync_depth: number;
@@ -248,7 +249,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
     return (
       <Box>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <IconButton onClick={() => navigate('/channels')}>
+          <IconButton aria-label={t('common.back')} onClick={() => navigate('/channels')}>
             <BackIcon />
           </IconButton>
           <Typography variant="h5">{t('channelDetail.title')}</Typography>
@@ -262,7 +263,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <IconButton onClick={() => navigate('/channels')} sx={{ mr: 1 }}>
+        <IconButton aria-label={t('common.back')} onClick={() => navigate('/channels')} sx={{ mr: 1 }}>
           <BackIcon />
         </IconButton>
         <Typography variant="h4" fontWeight="bold">
@@ -306,6 +307,21 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                 variant="outlined" 
                 size="small" 
               />
+              {Boolean(channel.pending) && (
+                <Chip
+                  label={t('channelDetail.stats.pending', { count: channel.pending })}
+                  variant="outlined"
+                  size="small"
+                />
+              )}
+              {Boolean(channel.failed) && (
+                <Chip
+                  label={t('channelDetail.stats.failed', { count: channel.failed })}
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                />
+              )}
             </Box>
 
             {/* Action Buttons */}
@@ -402,7 +418,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                       <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
                         {isNowPlaying(audio.youtube_id) ? <NowPlayingIndicator /> : index + 1}
                       </Typography>
-                      <IconButton 
+                      <IconButton aria-label={t('player.a11y.play')} 
                         size="small" 
                         onClick={(e) => {
                           e.stopPropagation();

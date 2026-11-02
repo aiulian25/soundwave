@@ -39,8 +39,10 @@
       "enter2fa": "Te rugam sa introduci codul de autentificare in doi pasi",
       "accountLocked": "Cont blocat temporar",
       "invalidCredentials": "Credentiale invalide",
-      "invalidCredentialsOrCode": "Credentiale sau cod de verificare invalide"
-    }
+      "invalidCredentialsOrCode": "Credentiale sau cod de verificare invalide",
+      "passkeyFailed": "Aceasta cheie de acces nu te-a putut conecta"
+    },
+    "passkeyButton": "Conecteaza-te cu o cheie de acces"
   },
   "topbar": {
     "greeting": {
@@ -89,7 +91,26 @@
     "equalizer": "Egalizator",
     "equalizerOn": "Egalizator (activ)",
     "classicBars": "Bare clasice",
-    "visualizerThemeHint": "Apasa pentru a schimba tema vizualizatorului (Curenta: {{themeName}})"
+    "visualizerThemeHint": "Apasa pentru a schimba tema vizualizatorului (Curenta: {{themeName}})",
+    "a11y": {
+      "shuffle": "Amestecare",
+      "previous": "Melodia anterioara",
+      "play": "Reda",
+      "pause": "Pauza",
+      "next": "Melodia urmatoare",
+      "repeat": {
+        "none": "Repetare: oprita",
+        "all": "Repetare: toate melodiile",
+        "one": "Repetare: aceasta melodie"
+      },
+      "mute": "Fara sunet",
+      "unmute": "Cu sunet",
+      "volume": "Volum",
+      "restore": "Deschide playerul: {{title}}",
+      "moveUp": "Muta mai sus: {{title}}",
+      "moveDown": "Muta mai jos: {{title}}",
+      "minimize": "Minimizeaza playerul"
+    }
   },
   "home": {
     "sections": {
@@ -172,7 +193,9 @@
     "empty": {
       "title": "Cauta in biblioteca ta",
       "description": "Gaseste melodii, playlisturi si canale din colectia ta"
-    }
+    },
+    "failed": "Cautarea a esuat. Verifica conexiunea si incearca din nou.",
+    "loadMore": "Incarca mai multe"
   },
   "library": {
     "title": "Biblioteca",
@@ -238,7 +261,7 @@
       "subscribeToChannel": "Aboneaza-te la canal",
       "deselectAll": "Deselecteaza tot",
       "selectAll": "Selecteaza tot",
-      "deleteSelected": "Sterge selectia",
+      "deleteSelected": "Dezaboneaza selectia",
       "subscribe": "Aboneaza-te",
       "subscribing": "Se aboneaza..."
     },
@@ -261,8 +284,8 @@
       "channelUrlHelp": "Introdu un URL de canal YouTube sau ID-ul canalului"
     },
     "confirm": {
-      "unsubscribeOne": "Sigur vrei sa te dezabonezi de la acest canal?",
-      "unsubscribeMany": "Sigur vrei sa te dezabonezi de la {{count}} canal(e)?"
+      "unsubscribeOne": "Te dezabonezi de la acest canal? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai raman in biblioteca ta.",
+      "unsubscribeMany": "Te dezabonezi de la {{count}} canal(e)? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai raman in biblioteca ta."
     },
     "messages": {
       "subscriptionStarted": "Abonarea la canal a inceput",
@@ -293,7 +316,7 @@
       "urlHelp": "Introdu URL-ul unui playlist YouTube"
     },
     "confirm": {
-      "delete": "Sigur vrei sa elimini acest playlist?"
+      "delete": "Elimini acest playlist? Melodiile sale raman in biblioteca ta si in celelalte playlisturi."
     },
     "messages": {
       "subscriptionStarted": "✅ Abonarea la playlist a inceput! Se preiau metadatele si se descarca audio in fundal...",
@@ -311,6 +334,7 @@
   },
   "playlistDetail": {
     "status": {
+      "partiallyCached": "Partial salvata",
       "offline": "Offline",
       "cached": "In cache",
       "availableOffline": "Disponibil offline",
@@ -322,9 +346,16 @@
       "preparing": "Se pregateste exportul…",
       "progress": "Se exporta {{count}} melodii…",
       "done": "Export gata",
-      "failed": "Exportul a esuat"
+      "failed": "Exportul a esuat",
+      "partial": "ZIP salvat. {{omitted}} melodii nu au putut fi incluse, iar la {{warned}} lipsesc etichete sau coperta. Vezi export-summary.json din ZIP.",
+      "jobProgress": "Export in fundal: {{done}} din {{total}} melodii",
+      "jobContinues": "Poti inchide. Exportul continua, iar fisierul ramane disponibil o ora.",
+      "cancelJob": "Anuleaza exportul",
+      "downloadReady": "Descarca ZIP"
     },
     "actions": {
+      "cancelCaching": "Anuleaza",
+      "downloadMissing": "Descarca ce lipseste",
       "playAll": "Reda tot",
       "shuffle": "Amesteca",
       "saveAll": "Salveaza tot",
@@ -344,6 +375,8 @@
       "unavailableHint": "Esti offline. Pune playlisturile in cache atunci cand esti online pentru acces offline."
     },
     "cacheCard": {
+      "partialDescription": "{{available}} melodii sunt disponibile offline, {{missing}} lipsesc",
+      "partialTitle": "⚠️ Partial offline",
       "readyTitle": "📱 Gata pentru offline",
       "cacheTitle": "💾 Pune in cache pentru offline",
       "readyDescription": "{{count}} melodii in cache si disponibile fara internet",
@@ -358,6 +391,9 @@
     "stats": {
       "totalTracks": "Total melodii",
       "downloaded": "Descarcate",
+      "pending": "In asteptare",
+      "failed": "Esuate",
+      "unavailable": "Indisponibile pe YouTube",
       "lastUpdated": "Ultima actualizare"
     },
     "columns": {
@@ -370,6 +406,7 @@
       "noTracks": "Nu au fost gasite melodii in acest playlist"
     },
     "messages": {
+      "cacheCanceled": "Descarcarea offline a fost anulata",
       "downloadingTracks": "Se descarca {{count}} melodii pe dispozitiv",
       "forceRecheckStarted": "Reverificarea fortata a inceput — toate melodiile sunt verificate si fisierele lipsa se redescarca...",
       "forceRecheckFailed": "Pornirea reverificarii a esuat: {{error}}",
@@ -747,6 +784,8 @@
       "subscribers": "{{count}} abonati",
       "tracks": "{{count}} melodii",
       "downloaded": "{{count}} descarcate",
+      "pending": "{{count}} in asteptare",
+      "failed": "{{count}} esuate",
       "views": "{{count}} vizualizari"
     },
     "messages": {
@@ -778,7 +817,8 @@
     "quality": {
       "high": "Ridicata (320 kbps)",
       "medium": "Medie (192 kbps)",
-      "low": "Scazuta (128 kbps)"
+      "low": "Scazuta (128 kbps)",
+      "original": "Original (fara re-codare)"
     },
     "sections": {
       "outputFormat": "Format iesire",
@@ -806,6 +846,14 @@
     },
     "fallback": {
       "audioFilename": "audio"
+    },
+    "qualityHelp": {
+      "mp3": "Alegerea unui bitrate re-codeaza melodia, iar un bitrate mai mare nu poate reface calitatea pe care sursa nu a avut-o.",
+      "flac": "FLAC pastreaza ce are sursa fara alte pierderi, dar nu poate reface calitatea pe care sursa nu a avut-o."
+    },
+    "warnings": {
+      "tags_failed": "Fisierul a fost salvat, dar etichetele nu au putut fi scrise.",
+      "artwork_unavailable": "Fisierul a fost salvat fara coperta, pentru ca aceasta nu a putut fi descarcata."
     }
   },
   "equalizer": {
@@ -894,6 +942,35 @@
       "invalidLrcFile": "Selecteaza un fisier .lrc valid",
       "lrcTooLarge": "Fisierul LRC trebuie sa fie mai mic de 1MB",
       "uploadFailed": "Incarcarea fisierului LRC a esuat"
+    },
+    "timing": {
+      "open": "Ajusteaza sincronizarea",
+      "title": "Ajusteaza sincronizarea",
+      "help": "Muta toate liniile sau reda piesa si marcheaza fiecare linie cand incepe. Nimic nu se schimba pana nu salvezi.",
+      "shiftAll": "Muta toate liniile",
+      "earlierSecond": "Cu 1 s mai devreme",
+      "earlierTenth": "Cu 0,1 s mai devreme",
+      "laterTenth": "Cu 0,1 s mai tarziu",
+      "laterSecond": "Cu 1 s mai tarziu",
+      "stampNext": "Marcheaza linia urmatoare (T)",
+      "undo": "Anuleaza",
+      "restoreOriginal": "Restabileste sincronizarea originala",
+      "reset": "Renunta la modificari",
+      "downloadLrc": "Descarca LRC modificat",
+      "save": "Salveaza sincronizarea",
+      "draftRestored": "Ciorna nesalvata a fost restabilita de pe acest dispozitiv.",
+      "offlineDraft": "Esti offline. Modificarile raman pe acest dispozitiv; salveaza din nou cand revii online.",
+      "saveFailed": "Sincronizarea nu a putut fi salvata. Modificarile raman pe acest dispozitiv.",
+      "stampLine": "Marcheaza aceasta linie la pozitia curenta",
+      "nudgeEarlier": "Muta aceasta linie cu 0,1 s mai devreme",
+      "nudgeLater": "Muta aceasta linie cu 0,1 s mai tarziu",
+      "seekLine": "Reda de la {{time}}",
+      "outOfOrder": "Incepe inaintea liniei anterioare",
+      "pastEnd": "Incepe dupa sfarsitul piesei",
+      "conflictTitle": "Versurile s-au schimbat de cand ai inceput editarea",
+      "conflictKeep": "Pastreaza versiunea mea",
+      "conflictTextChanged": "S-au schimbat si cuvintele, deci sincronizarea ta nu li se poate aplica. O poti descarca in continuare.",
+      "useLatest": "Foloseste ultima versiune"
     }
   },
   "pwaSettings": {
@@ -1100,7 +1177,8 @@
       "minutesAgo": "acum {{count}} minute",
       "hoursAgo": "acum {{count}} ore",
       "daysAgo": "acum {{count}} zile"
-    }
+    },
+    "tracksUnavailable": "{{count}} melodie(i) din coada ta nu mai sunt disponibile"
   },
   "sleepTimer": {
     "title": "Cronometru oprire",
@@ -1229,27 +1307,28 @@
     "offline": "Offline",
     "tooltip": {
       "online": "Stare descarcari",
-      "offline": "Offline - descarcarile se vor sincroniza cand revii online"
+      "offline": "Offline - Starea descarcarilor se actualizeaza cand revii online"
     },
     "actions": {
-      "refresh": "Actualizeaza",
-      "syncWhenOnline": "Sincronizeaza cand esti online"
+      "refresh": "Actualizeaza"
     },
-    "backgroundEnabled": "✓ Descarcari in fundal activate - continua chiar daca aplicatia este inchisa",
     "sections": {
-      "activeDownloads": "Descarcari active ({{count}})",
-      "queuedForSync": "In coada pentru sincronizare ({{count}})"
+      "activeDownloads": "Descarcari active ({{count}})"
     },
     "empty": {
       "title": "Nu exista descarcari active",
       "online": "Descarcarile pornite vor aparea aici",
-      "offline": "Pune descarcari in coada offline si se vor sincroniza cand revii online"
+      "offline": "Esti offline. Starea descarcarilor se actualizeaza cand revii online."
     },
-    "syncWhenOnlinePending": "Se va sincroniza cand esti online ({{count}} in asteptare)",
     "errors": {
       "blockedUrl": "Acest link de descarcare este invalid sau indica o adresa blocata.",
       "cookiesRefresh": "YouTube cere autentificare: inlocuieste cookies.txt cu un export nou, apoi reincearca (vezi README).",
-      "cookiesFileAccess": "SoundWave nu poate accesa cookies.txt: chown 1000:1000, chmod 600, elimina :ro, apoi reincearca."
+      "cookiesFileAccess": "SoundWave nu poate accesa cookies.txt: chown 1000:1000, chmod 600, elimina :ro, apoi reincearca.",
+      "quotaExceeded": "Spatiul tau de stocare este plin. Sterge cateva melodii, apoi incearca din nou.",
+      "downloadTooLarge": "Aceasta melodie depaseste limita de dimensiune sau durata.",
+      "notSingleItem": "Acesta este un playlist, un canal sau un live. Aboneaza-te la playlisturi si canale.",
+      "diskFull": "Serverul are putin spatiu pe disc. Roaga un administrator sa elibereze spatiu.",
+      "invalidOutput": "Descarcarea nu a produs un fisier audio valid. Incearca din nou mai tarziu."
     }
   },
   "relatedTracks": {
@@ -1465,6 +1544,7 @@
     "completed": "Ascultat complet"
   },
   "offlineManager": {
+    "partialTrackCount": "{{available}} din {{total}} melodii se pot reda offline",
     "title": "Stocare offline",
     "subtitle": "Gestioneaza playlisturile puse in cache pentru redare offline",
     "offlineWarning": "Esti offline. Poti reda doar continutul din cache.",
@@ -1598,7 +1678,7 @@
       "userCreated": "Utilizator creat cu succes",
       "userUpdated": "Utilizator actualizat cu succes",
       "userActivated": "Utilizator activat",
-      "userDeactivated": "Utilizator dezactivat",
+      "userDeactivated": "Utilizator dezactivat. Autentificarile si cheile API sunt blocate; vor functiona din nou daca utilizatorul este reactivat.",
       "storageReset": "Stocarea a fost resetata cu succes",
       "twoFaReset": "2FA a fost resetat cu succes",
       "userDeleted": "Utilizator sters cu succes"
@@ -1614,6 +1694,17 @@
     }
   },
   "smartPlaylists": {
+    "ruleErrors": {
+      "unsupportedField": "Acest camp nu poate fi folosit intr-o regula",
+      "unsupportedOperator": "Aceasta conditie nu se aplica acestui camp",
+      "valueRequired": "Introdu o valoare",
+      "wholeNumberRequired": "Introdu un numar intreg",
+      "numberOutOfRange": "Acest numar este in afara intervalului",
+      "reversedRange": "A doua valoare nu poate fi mai mica decat prima",
+      "dateRequired": "Introdu o data in formatul AAAA-LL-ZZ",
+      "dateOutOfRange": "Aceasta data este in afara intervalului",
+      "invalid": "Aceasta regula nu este valida"
+    },
     "title": "Playlisturi inteligente",
     "description": "Playlisturi dinamice care se actualizeaza automat pe baza regulilor. Biblioteca ta se schimba, ele se actualizeaza instant.",
     "trackCount": "{{count}} melodii",
@@ -1706,6 +1797,7 @@
     }
   },
   "smartPlaylistDetail": {
+    "invalidRulesWarning": "O regula din aceasta lista trebuie corectata, asa ca nu se potriveste nicio melodie pana cand editezi regulile.",
     "trackCount": "{{count}} melodii",
     "badges": {
       "auto": "Auto"
@@ -1779,7 +1871,12 @@
       "title": "Pagina nu a putut fi incarcata",
       "description": "Posibil sa fii offline sau aplicatia tocmai s-a actualizat. Incearca din nou.",
       "retry": "Incearca din nou"
-    }
+    },
+    "refresh": "Reimprospateaza",
+    "remove": "Elimina",
+    "moreActions": "Mai multe actiuni",
+    "copy": "Copiaza",
+    "clear": "Sterge"
   },
   "sidebar": {
     "home": "Acasa",
@@ -1883,7 +1980,7 @@
     "title": "Setari",
     "backup": {
       "title": "Backup si restaurare",
-      "description": "Exporta definitia bibliotecii (melodii, playlist-uri, reguli de playlist inteligent, favorite si abonari la canale) intr-un fisier JSON sau restaureaz-o in acest cont. Audio se redescarca pe baza ID-urilor video salvate.",
+      "description": "Exporta definitia bibliotecii (melodii, playlist-uri, reguli de playlist inteligent, favorite si abonari la canale) intr-un fisier JSON sau restaureaz-o in acest cont. Audio se descarca din nou pe baza ID-urilor video salvate, asa ca videoclipurile sterse sau devenite private intre timp nu mai pot fi recuperate, iar versurile tale, istoricul de ascultare si fisierele audio nu sunt incluse. Pentru o copie completa, vezi docs/BACKUP_RESTORE.md.",
       "create": "Creeaza backup",
       "restore": "Restaureaza din fisier",
       "summary": "Previzualizare restaurare",
@@ -2107,6 +2204,11 @@
       "columnNumber": "#",
       "columnArtist": "Artist",
       "columnAlbum": "Album"
+    },
+    "unclaimed": {
+      "description": "{{count}} fisier(e) au fost importate inainte ca fiecare cont sa aiba propria biblioteca. Pot apartine altcuiva care foloseste acest browser.",
+      "claim": "Adauga in biblioteca mea",
+      "failed": "Fisierele nu au putut fi adaugate in biblioteca ta"
     }
   },
   "forcePasswordChange": {
@@ -2172,5 +2274,42 @@
   },
   "nowPlaying": {
     "label": "Se reda acum"
+  },
+  "passkeys": {
+    "title": "Chei de acces",
+    "description": "Conecteaza-te cu amprenta, fata sau PIN-ul dispozitivului in loc de parola. O cheie de acces inlocuieste atat parola, cat si codul de autentificare in doi pasi.",
+    "add": "Adauga o cheie de acces",
+    "added": "Cheie de acces adaugata",
+    "removed": "Cheie de acces stearsa",
+    "addedOn": "Adaugata {{date}}",
+    "lastUsed": "Folosita ultima data {{date}}",
+    "neverUsed": "Nefolosita inca",
+    "otherAddress": "Creata pentru {{address}}",
+    "removeLabel": "Sterge cheia de acces {{name}}",
+    "unavailableBrowser": "Acest browser nu suporta chei de acces.",
+    "unavailableHere": "Cheile de acces necesita deschiderea aplicatiei de la o adresa HTTPS cu nume de domeniu sau de pe localhost, iar adresa trebuie sa fie in SW_HOST sau CORS_ALLOWED_ORIGINS.",
+    "addDialog": {
+      "title": "Adauga o cheie de acces",
+      "description": "Mai intai confirma ca esti tu, apoi urmeaza instructiunile browserului.",
+      "password": "Parola curenta",
+      "twoFactorCode": "Cod in doi pasi sau de rezerva",
+      "name": "Nume (optional)",
+      "namePlaceholder": "Telefonul meu",
+      "continue": "Continua"
+    },
+    "removeDialog": {
+      "title": "Stergi cheia de acces?",
+      "message": "\"{{name}}\" nu se va mai putea conecta. Sterge-o si de pe dispozitiv sau din managerul de parole."
+    },
+    "errors": {
+      "generic": "Ceva nu a mers cu cheia de acces. Te rugam sa incerci din nou.",
+      "passkey_step_up_failed": "Parola sau codul este incorect.",
+      "passkey_locked": "Prea multe incercari esuate. Te rugam sa incerci mai tarziu.",
+      "passkey_refused": "Cheia de acces nu a fost acceptata.",
+      "passkey_unavailable": "Cheile de acces nu pot fi folosite de la aceasta adresa.",
+      "passkey_limit_reached": "Ai atins numarul maxim de chei de acces. Sterge una mai intai.",
+      "passkey_already_registered": "Acest dispozitiv are deja o cheie de acces pentru contul tau.",
+      "passkey_invalid_request": "Te rugam sa verifici datele si sa incerci din nou."
+    }
   }
 }

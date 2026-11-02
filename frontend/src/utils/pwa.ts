@@ -11,6 +11,12 @@ export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+const WORKER_REPLY_TIMEOUT_MS = 1500;
+// A single large track can take minutes on a slow link; this bounds silence, not the whole fill.
+const PLAYLIST_FILL_SILENCE_TIMEOUT_MS = 5 * 60 * 1000;
+// Must match ACCOUNT_CACHE_NAME_PATTERN in public/service-worker.js.
+const ACCOUNT_CACHE_NAME_PATTERN = /^soundwave-(api|audio|stream|images)-/;
+
 class PWAManager {
   private deferredPrompt: BeforeInstallPromptEvent | null = null;
   private isInstalled = false;
@@ -240,31 +246,62 @@ class PWAManager {
   }
 
   /**
-   * Clear all caches
+   * Message the active worker if there is one. `getRegistration` rather than `ready`, which
+   * never settles without a worker, and a bounded wait, because a worker may not reply.
    */
-  async clearCache(): Promise<boolean> {
-    if (!('serviceWorker' in navigator)) {
-      return false;
-    }
+  private async askWorker(message: { type: string; [detail: string]: unknown }): Promise<boolean> {
+    if (!('serviceWorker' in navigator)) return false;
+
+    const registration = await navigator.serviceWorker.getRegistration();
+    const worker = registration?.active;
+    if (!worker) return false;
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), WORKER_REPLY_TIMEOUT_MS);
+      const messageChannel = new MessageChannel();
+      messageChannel.port1.onmessage = (event) => {
+        clearTimeout(timer);
+        resolve(event.data.success);
+      };
+      worker.postMessage(message, [messageChannel.port2]);
+    });
+  }
+
+  /**
+   * The worker goes first: it must stop accepting in-flight fills before the final delete.
+   * Deleting from the page as well means the result does not depend on the worker at all.
+   */
+  private async deleteCaches(workerMessage: { type: string }, shouldDelete: (name: string) => boolean): Promise<boolean> {
+    if (!('caches' in window)) return false;
 
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const messageChannel = new MessageChannel();
-
-      return new Promise((resolve) => {
-        messageChannel.port1.onmessage = (event) => {
-          resolve(event.data.success);
-        };
-
-        registration.active?.postMessage(
-          { type: 'CLEAR_CACHE' },
-          [messageChannel.port2]
-        );
-      });
+      await this.askWorker(workerMessage);
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.filter(shouldDelete).map((name) => caches.delete(name)));
+      return true;
     } catch (error) {
       console.error('Error clearing cache:', error);
       return false;
     }
+  }
+
+  /**
+   * Clear all caches
+   */
+  async clearCache(): Promise<boolean> {
+    return this.deleteCaches({ type: 'CLEAR_CACHE' }, () => true);
+  }
+
+  /**
+   * Clear everything that belongs to the signed-in account; the public app shell stays, so
+   * the app still starts offline. Rejects on failure so callers keep the data owner recorded.
+   */
+  async clearAccountCaches(): Promise<void> {
+    const cleared = await this.deleteCaches(
+      { type: 'CLEAR_ACCOUNT_DATA' },
+      (name) => ACCOUNT_CACHE_NAME_PATTERN.test(name),
+    );
+    if (!cleared && 'caches' in window) throw new Error('Could not clear account caches');
   }
 
   /**
@@ -386,16 +423,17 @@ class PWAManager {
   
 
   /**
-   * Cache entire playlist for offline access with progress updates
+   * Cache entire playlist for offline access with progress updates. A worker that goes
+   * silent is told to stop, so a fill the page gave up on does not carry on unseen.
    */
   async cachePlaylist(
     playlistId: string, 
     audioUrls: string[],
     onProgress?: (progress: { current: number; total: number; percent: number; currentItem: string; status: string }) => void
-  ): Promise<{ success: boolean; cached: number; failed: number }> {
+  ): Promise<{ success: boolean; cached: number; failed: number; canceled: boolean }> {
     if (!('serviceWorker' in navigator)) {
       console.log('[PWA] Service Worker not supported');
-      return { success: false, cached: 0, failed: 0 };
+      return { success: false, cached: 0, failed: 0, canceled: false };
     }
 
     try {
@@ -403,18 +441,23 @@ class PWAManager {
       const messageChannel = new MessageChannel();
 
       return new Promise((resolve) => {
-        // Set a timeout to avoid hanging
-        const timeout = setTimeout(() => {
-          console.error('[PWA] Playlist caching timed out');
-          resolve({ success: false, cached: 0, failed: audioUrls.length });
-        }, 300000); // 5 minutes timeout for large playlists
+        let silenceTimer: ReturnType<typeof setTimeout>;
+        const restartSilenceTimer = () => {
+          clearTimeout(silenceTimer);
+          silenceTimer = setTimeout(() => {
+            console.error('[PWA] Playlist caching went silent');
+            this.cancelPlaylistCache(playlistId).catch(console.error);
+            resolve({ success: false, cached: 0, failed: audioUrls.length, canceled: false });
+          }, PLAYLIST_FILL_SILENCE_TIMEOUT_MS);
+        };
+        restartSilenceTimer();
 
         messageChannel.port1.onmessage = (event) => {
           const data = event.data;
           
           // Handle progress updates
           if (data.type === 'progress') {
-            console.log('[PWA] Cache progress:', data);
+            restartSilenceTimer();
             if (onProgress) {
               onProgress({
                 current: data.current,
@@ -429,12 +472,13 @@ class PWAManager {
           
           // Handle completion
           if (data.type === 'complete' || data.success !== undefined) {
-            clearTimeout(timeout);
+            clearTimeout(silenceTimer);
             console.log('[PWA] Playlist cache complete:', data);
             resolve({ 
               success: data.success, 
               cached: data.cached || 0, 
-              failed: data.failed || 0 
+              failed: data.failed || 0,
+              canceled: Boolean(data.canceled),
             });
           }
         };
@@ -446,32 +490,23 @@ class PWAManager {
       });
     } catch (error) {
       console.error('Error caching playlist:', error);
-      return { success: false, cached: 0, failed: audioUrls.length };
+      return { success: false, cached: 0, failed: audioUrls.length, canceled: false };
     }
+  }
+
+  /**
+   * Stop a running fill. What already arrived stays, so saving again resumes from there.
+   */
+  async cancelPlaylistCache(playlistId: string): Promise<boolean> {
+    return this.askWorker({ type: 'CANCEL_PLAYLIST_CACHE', playlistId });
   }
 
   /**
    * Remove playlist from cache
    */
   async removePlaylistCache(playlistId: string, audioUrls: string[]): Promise<boolean> {
-    if (!('serviceWorker' in navigator)) {
-      return false;
-    }
-
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const messageChannel = new MessageChannel();
-
-      return new Promise((resolve) => {
-        messageChannel.port1.onmessage = (event) => {
-          resolve(event.data.success);
-        };
-
-        registration.active?.postMessage(
-          { type: 'REMOVE_PLAYLIST_CACHE', playlistId, audioUrls },
-          [messageChannel.port2]
-        );
-      });
+      return await this.askWorker({ type: 'REMOVE_PLAYLIST_CACHE', playlistId, audioUrls });
     } catch (error) {
       console.error('Error removing playlist cache:', error);
       return false;

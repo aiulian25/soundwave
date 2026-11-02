@@ -11,9 +11,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  LinearProgress,
   Chip,
-  Divider,
   Avatar,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +20,6 @@ import {
   AccessTime as TimeIcon,
   LocalFireDepartment as FireIcon,
   Person as ArtistIcon,
-  YouTube as ChannelIcon,
   CalendarMonth as CalendarIcon,
   EmojiEvents as TrophyIcon,
   WbSunny as SunIcon,

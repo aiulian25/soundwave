@@ -33,7 +33,6 @@ import {
   TableRow,
   Paper,
   Tooltip,
-  Checkbox,
 } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -64,6 +63,7 @@ import ThemePreview from '../components/ThemePreview';
 import VisualizerThemePreview from '../components/VisualizerThemePreview';
 import QuickSyncSettings from '../components/QuickSyncSettings';
 import PWASettingsCard from '../components/PWASettingsCard';
+import PasskeySettings from '../components/PasskeySettings';
 import UserProfileCard from '../components/UserProfileCard';
 import BackupRestoreCard from '../components/BackupRestoreCard';
 import { useSettings } from '../context/SettingsContext';
@@ -455,6 +455,8 @@ export default function SettingsPage() {
       {/* PWA Settings */}
       <PWASettingsCard />
 
+      <PasskeySettings twoFactorEnabled={twoFactorStatus.enabled} />
+
       {/* Security Settings */}
       <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
         <CardContent>
@@ -560,7 +562,7 @@ export default function SettingsPage() {
               severity="warning" 
               sx={{ mb: 2 }}
               action={
-                <IconButton size="small" onClick={() => copyToClipboard(newApiKey.key)}>
+                <IconButton aria-label={t('common.copy')} size="small" onClick={() => copyToClipboard(newApiKey.key)}>
                   <ContentCopyIcon fontSize="small" />
                 </IconButton>
               }
@@ -885,7 +887,7 @@ export default function SettingsPage() {
               control={
                 <Switch 
                   size="small" 
-                  checked={settings.playback_sync_enabled !== false}
+                  checked={settings.playback_sync_enabled}
                   onChange={(e) => updateSetting('playback_sync_enabled', e.target.checked)}
                 />
               }
@@ -1074,6 +1076,7 @@ export default function SettingsPage() {
                       a.href = url;
                       a.download = 'soundwave-backup-codes.txt';
                       a.click();
+                      URL.revokeObjectURL(url);
                     }}
                     sx={{ mb: 2 }}
                   >

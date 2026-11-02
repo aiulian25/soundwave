@@ -18,7 +18,6 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { audioAPI } from '../api/client';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
@@ -243,7 +242,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
                   {audio.play_count}
                 </TableCell>
                 <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                  <IconButton 
+                  <IconButton aria-label={t('player.a11y.play')} 
                     size="small" 
                     sx={{
                       color: 'primary.main',

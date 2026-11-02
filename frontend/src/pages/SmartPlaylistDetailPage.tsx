@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -15,7 +15,6 @@ import {
   Chip,
   Button,
   Snackbar,
-  Tooltip,
   Card,
   CardContent,
   Dialog,
@@ -26,20 +25,16 @@ import {
   Select,
   MenuItem,
   FormControl,
+  FormHelperText,
   InputLabel,
   Paper,
   Divider,
   Grid,
-  Switch,
-  FormControlLabel,
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
-  Pause as PauseIcon,
   ArrowBack as BackIcon,
   Shuffle as ShuffleIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
   Add as AddIcon,
   AutoAwesome as AutoAwesomeIcon,
   Tune as TuneIcon,
@@ -47,7 +42,9 @@ import {
   Preview as PreviewIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { smartPlaylistAPI, audioAPI } from '../api/client';
+import { smartPlaylistAPI } from '../api/client';
+import { fetchSmartPlaylistTracks } from '../utils/fetchAll';
+import { ruleErrorsFromResponse, type RuleFieldErrors } from '../utils/smartRuleErrors';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import { useHighlightTrack } from '../hooks/useHighlightTrack';
 import type { Audio, SmartPlaylist, SmartPlaylistRule, SmartPlaylistChoices } from '../types';
@@ -82,6 +79,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
   const [editingLimit, setEditingLimit] = useState<number | ''>('');
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [ruleErrors, setRuleErrors] = useState<RuleFieldErrors[]>([]);
 
   useEffect(() => {
     if (playlistId) {
@@ -93,9 +91,9 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
   const loadPlaylist = async () => {
     try {
       setLoading(true);
-      const response = await smartPlaylistAPI.getTracks(parseInt(playlistId!));
-      setPlaylist(response.data.playlist);
-      setTracks(response.data.data || []);
+      const { playlist: loadedPlaylist, tracks: loadedTracks } = await fetchSmartPlaylistTracks(parseInt(playlistId!));
+      setPlaylist(loadedPlaylist);
+      setTracks(loadedTracks);
       setError('');
     } catch (err: any) {
       console.error('Failed to load smart playlist:', err);
@@ -149,6 +147,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
       setEditingMatchMode(fullPlaylist.match_mode);
       setEditingOrderBy(fullPlaylist.order_by);
       setEditingLimit(fullPlaylist.limit || '');
+      setRuleErrors([]);
       setEditDialogOpen(true);
     } catch (err) {
       console.error('Failed to load playlist details:', err);
@@ -163,10 +162,12 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
   };
 
   const handleRemoveRule = (index: number) => {
+    setRuleErrors([]);
     setEditingRules(editingRules.filter((_, i) => i !== index));
   };
 
   const handleRuleChange = (index: number, field: keyof SmartPlaylistRule, value: string) => {
+    setRuleErrors((errors) => errors.map((ruleError, i) => (i === index ? {} : ruleError)));
     setEditingRules(
       editingRules.map((rule, i) =>
         i === index ? { ...rule, [field]: value } : rule
@@ -189,8 +190,10 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
         limit: editingLimit ? parseInt(editingLimit.toString()) : null,
       });
       setPreviewCount(response.data.total_count);
-    } catch (err) {
+      setRuleErrors([]);
+    } catch (err: any) {
       console.error('Failed to preview:', err);
+      setRuleErrors(ruleErrorsFromResponse(err.response?.data, t));
     } finally {
       setPreviewLoading(false);
     }
@@ -217,7 +220,8 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
       loadPlaylist(); // Reload to get updated tracks
     } catch (err: any) {
       console.error('Failed to save rules:', err);
-      setSnackbarMessage(err.response?.data?.error || t('smartPlaylistDetail.errors.saveRulesFailed'));
+      setRuleErrors(ruleErrorsFromResponse(err.response?.data, t));
+      setSnackbarMessage(err.response?.data?.limit?.[0] || t('smartPlaylistDetail.errors.saveRulesFailed'));
       setSnackbarOpen(true);
     }
   };
@@ -288,6 +292,11 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                     sx={{ bgcolor: `${playlist.color}22`, color: playlist.color }}
                   />
                 </Box>
+                {Boolean(playlist.invalid_rule_ids?.length) && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    {t('smartPlaylistDetail.invalidRulesWarning')}
+                  </Alert>
+                )}
               </Box>
 
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -454,7 +463,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
             <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
               {editingRules.map((rule, index) => (
                 <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <FormControl size="small" sx={{ minWidth: 140 }} error={Boolean(ruleErrors[index]?.field)}>
                     <InputLabel>{t('smartPlaylistDetail.dialog.field')}</InputLabel>
                     <Select
                       value={rule.field}
@@ -465,9 +474,10 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                         <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>
                       ))}
                     </Select>
+                    {ruleErrors[index]?.field && <FormHelperText>{ruleErrors[index].field}</FormHelperText>}
                   </FormControl>
 
-                  <FormControl size="small" sx={{ minWidth: 160 }}>
+                  <FormControl size="small" sx={{ minWidth: 160 }} error={Boolean(ruleErrors[index]?.operator)}>
                     <InputLabel>{t('smartPlaylistDetail.dialog.operator')}</InputLabel>
                     <Select
                       value={rule.operator}
@@ -480,6 +490,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                           <MenuItem key={op.value} value={op.value}>{op.label}</MenuItem>
                         ))}
                     </Select>
+                    {ruleErrors[index]?.operator && <FormHelperText>{ruleErrors[index].operator}</FormHelperText>}
                   </FormControl>
 
                   {!['is_true', 'is_false', 'is_set', 'is_not_set'].includes(rule.operator) && (
@@ -488,6 +499,8 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                       label={t('smartPlaylistDetail.dialog.value')}
                       value={rule.value}
                       onChange={(e) => handleRuleChange(index, 'value', e.target.value)}
+                      error={Boolean(ruleErrors[index]?.value)}
+                      helperText={ruleErrors[index]?.value}
                       sx={{ minWidth: 120 }}
                     />
                   )}
@@ -498,11 +511,13 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
                       label={t('smartPlaylistDetail.dialog.to')}
                       value={rule.value_2 || ''}
                       onChange={(e) => handleRuleChange(index, 'value_2', e.target.value)}
+                      error={Boolean(ruleErrors[index]?.value_2)}
+                      helperText={ruleErrors[index]?.value_2}
                       sx={{ width: 80 }}
                     />
                   )}
 
-                  <IconButton size="small" onClick={() => handleRemoveRule(index)} color="error">
+                  <IconButton aria-label={t('common.remove')} size="small" onClick={() => handleRemoveRule(index)} color="error">
                     <RemoveIcon />
                   </IconButton>
                 </Box>

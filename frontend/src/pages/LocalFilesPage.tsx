@@ -20,14 +20,10 @@ import {
   Alert,
   Tab,
   Tabs,
-  List,
-  ListItem,
-  ListItemText,
   InputAdornment,
   FormControl,
   InputLabel,
   Select,
-  Divider,
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
@@ -37,12 +33,9 @@ import {
   FavoriteBorder as FavoriteOutlineIcon,
   MoreVert as MoreIcon,
   Delete as DeleteIcon,
-  Edit as EditIcon,
   Search as SearchIcon,
   Album as AlbumIcon,
-  Person as PersonIcon,
   MusicNote as MusicIcon,
-  QueueMusic as PlaylistIcon,
   CloudDownload as DownloadIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
@@ -90,7 +83,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
   const { t } = useTranslation();
   const [tab, setTab] = useState(0);
   const [audioFiles, setAudioFiles] = useState<LocalAudio[]>([]);
-  const [playlists, setPlaylists] = useState<LocalPlaylist[]>([]);
+  const [, setPlaylists] = useState<LocalPlaylist[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -107,7 +100,6 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
   const [genres, setGenres] = useState<string[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedAudio, setSelectedAudio] = useState<LocalAudio | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [stats, setStats] = useState<any>({});
   const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
 
@@ -531,7 +523,7 @@ const LocalFilesPage: React.FC<LocalFilesPageProps> = ({ currentAudio, onPlay, i
                             {audio.is_favorite ? <FavoriteIcon /> : <FavoriteOutlineIcon />}
                           </IconButton>
                         </Box>
-                        <IconButton onClick={(e) => handleMenuOpen(e, audio)}>
+                        <IconButton aria-label={t('common.moreActions')} onClick={(e) => handleMenuOpen(e, audio)}>
                           <MoreIcon />
                         </IconButton>
                       </Box>

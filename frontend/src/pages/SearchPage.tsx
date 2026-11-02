@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -12,6 +12,8 @@ import {
   CardMedia,
   Grid,
   CircularProgress,
+  Alert,
+  Button,
   Chip,
   IconButton,
   List,
@@ -35,10 +37,8 @@ import HistoryIcon from '@mui/icons-material/History';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ClearIcon from '@mui/icons-material/Clear';
 import PersonIcon from '@mui/icons-material/Person';
-import AlbumIcon from '@mui/icons-material/Album';
 import { useTranslation } from 'react-i18next';
 import { audioAPI, playlistAPI, channelAPI } from '../api/client';
-import { fetchAllAudio, fetchAllPlaylists, fetchAllChannels } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import { NowPlayingBadge } from '../components/NowPlayingIndicator';
@@ -85,7 +85,6 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
-  const [allAudio, setAllAudio] = useState<Audio[]>([]);
   const popularSearches = useMemo(
     () => t('search.popularSearches', { returnObjects: true }) as string[],
     [t]
@@ -93,25 +92,20 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
   
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const activeSearch = useRef<AbortController | null>(null);
   
   // Search results
   const [audioResults, setAudioResults] = useState<Audio[]>([]);
   const [playlistResults, setPlaylistResults] = useState<Playlist[]>([]);
   const [channelResults, setChannelResults] = useState<Channel[]>([]);
+  const [audioTotal, setAudioTotal] = useState(0);
+  const [channelTotal, setChannelTotal] = useState(0);
+  const [nextAudioPage, setNextAudioPage] = useState<number | null>(null);
+  const [searchFailed, setSearchFailed] = useState(false);
+  const searchedTerm = useRef('');
   
-  // Load all audio for suggestions on mount
-  useEffect(() => {
-    const loadAudioForSuggestions = async () => {
-      try {
-        const allAudioData = await fetchAllAudio();
-        setAllAudio(allAudioData);
-      } catch (err) {
-        console.error('Failed to load audio for suggestions:', err);
-      }
-    };
-    loadAudioForSuggestions();
-  }, []);
-  
+  useEffect(() => () => activeSearch.current?.abort(), []);
+
   // Load recent searches on component mount
   useEffect(() => {
     const stored = localStorage.getItem('soundwave_recent_searches');
@@ -166,7 +160,8 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
     const artists = new Set<string>();
     const matchingSongs: Audio[] = [];
     
-    allAudio.forEach(audio => {
+    // What the last search found: suggestions never need the whole library.
+    audioResults.forEach(audio => {
       if (audio.channel_name) {
         artists.add(audio.channel_name);
       }
@@ -224,7 +219,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
       });
     
     return result;
-  }, [query, recentSearches, popularSearches, allAudio]);
+  }, [query, recentSearches, popularSearches, audioResults]);
   
   // Reset selection when suggestions change
   useEffect(() => {
@@ -258,6 +253,10 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
       setAudioResults([]);
       setPlaylistResults([]);
       setChannelResults([]);
+      setAudioTotal(0);
+      setChannelTotal(0);
+      setNextAudioPage(null);
+      setSearchFailed(false);
       return;
     }
 
@@ -275,41 +274,50 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
     saveRecentSearch(searchQuery.trim());
     setShowSuggestions(false);
     
+    // A newer search replaces this one: aborting rejects its requests, so its results never arrive.
+    activeSearch.current?.abort();
+    const search = new AbortController();
+    activeSearch.current = search;
+    const { signal } = search;
+
     setLoading(true);
+    setSearchFailed(false);
+    const term = searchQuery.trim();
     try {
-      const searchTerm = searchQuery.toLowerCase();
+      const [audio, playlists, channels] = await Promise.all([
+        audioAPI.list({ q: term, page: 1 }, { signal }),
+        playlistAPI.list({ q: term }, { signal }),
+        channelAPI.list({ q: term, page: 1 }, { signal }),
+      ]);
 
-      // Search audio files - fetch all
-      const allAudioData = await fetchAllAudio();
-      
-      const filteredAudio = allAudioData.filter((audio: Audio) =>
-        audio.title?.toLowerCase().includes(searchTerm) ||
-        audio.channel_name?.toLowerCase().includes(searchTerm)
-      );
-      setAudioResults(filteredAudio);
-      
-      // Also update allAudio for suggestions
-      setAllAudio(allAudioData);
-
-      // Search playlists - fetch all
-      const allPlaylistData = await fetchAllPlaylists();
-      const filteredPlaylists = allPlaylistData.filter((playlist: Playlist) =>
-        playlist.title?.toLowerCase().includes(searchTerm) ||
-        playlist.channel_name?.toLowerCase().includes(searchTerm)
-      );
-      setPlaylistResults(filteredPlaylists);
-
-      // Search channels - fetch all
-      const allChannelData = await fetchAllChannels();
-      const filteredChannels = allChannelData.filter((channel: Channel) =>
-        channel.channel_name?.toLowerCase().includes(searchTerm)
-      );
-      setChannelResults(filteredChannels);
-
+      searchedTerm.current = term;
+      setAudioResults(audio.data.data);
+      setAudioTotal(audio.data.count);
+      setNextAudioPage(audio.data.next);
+      setPlaylistResults(playlists.data.data);
+      setChannelResults(channels.data.data);
+      setChannelTotal(channels.data.count);
     } catch (err) {
+      if (signal.aborted) return;
       console.error('Search failed:', err);
+      setSearchFailed(true);
     } finally {
-      setLoading(false);
+      if (activeSearch.current === search) setLoading(false);
+    }
+  };
+
+  const loadMoreAudio = async () => {
+    if (nextAudioPage === null) return;
+
+    const { signal } = activeSearch.current ?? new AbortController();
+    try {
+      const response = await audioAPI.list({ q: searchedTerm.current, page: nextAudioPage }, { signal });
+      setAudioResults((shown) => [...shown, ...response.data.data]);
+      setNextAudioPage(response.data.next);
+    } catch (err) {
+      if (signal.aborted) return;
+      console.error('Loading more results failed:', err);
+      setSearchFailed(true);
     }
   };
   
@@ -379,7 +387,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const totalResults = audioResults.length + playlistResults.length + channelResults.length;
+  const totalResults = audioTotal + playlistResults.length + channelTotal;
 
   return (
     <Box>
@@ -408,7 +416,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
               ),
               endAdornment: query && (
                 <InputAdornment position="end">
-                  <IconButton
+                  <IconButton aria-label={t('common.clear')}
                     onClick={() => {
                       setQuery('');
                       setAudioResults([]);
@@ -581,7 +589,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
               <Tab
-                label={t('search.tabs.songs', { count: audioResults.length })}
+                label={t('search.tabs.songs', { count: audioTotal })}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
               <Tab
@@ -589,18 +597,19 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
               <Tab
-                label={t('search.tabs.channels', { count: channelResults.length })}
+                label={t('search.tabs.channels', { count: channelTotal })}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               />
             </Tabs>
           </Box>
 
+          {searchFailed && <Alert severity="error" sx={{ mb: 2 }}>{t('search.failed')}</Alert>}
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
               <CircularProgress />
             </Box>
           ) : totalResults === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 8 }}>
+            <Box sx={{ textAlign: 'center', py: 8, display: searchFailed ? 'none' : 'block' }}>
               <SearchIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.3, mb: 2 }} />
               <Typography variant="h6" color="text.secondary">
                 {t('search.noResults.title')}
@@ -626,7 +635,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             disablePadding
                             secondaryAction={
                               <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                <IconButton
+                                <IconButton aria-label={t('player.a11y.play')}
                                   edge="end"
                                   onClick={() => setCurrentAudio(audio, audioResults)}
                                   disabled={!audio.file_path}
@@ -638,7 +647,6 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                                   track={audio}
                                   onTrackUpdate={(updatedTrack) => {
                                     setAudioResults(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
-                                    setAllAudio(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
                                   }}
                                 />
                               </Box>
@@ -748,7 +756,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                       disablePadding
                       secondaryAction={
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton
+                          <IconButton aria-label={t('player.a11y.play')}
                             edge="end"
                             onClick={() => setCurrentAudio(audio, audioResults)}
                             disabled={!audio.file_path}
@@ -760,7 +768,6 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             track={audio}
                             onTrackUpdate={(updatedTrack) => {
                               setAudioResults(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
-                              setAllAudio(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
                             }}
                           />
                         </Box>
@@ -792,6 +799,11 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                       </ListItemButton>
                     </ListItem>
                   ))}
+                  {nextAudioPage !== null && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                      <Button variant="outlined" onClick={loadMoreAudio}>{t('search.loadMore')}</Button>
+                    </Box>
+                  )}
                 </List>
               )}
 

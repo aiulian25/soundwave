@@ -9,7 +9,7 @@
  * - Currently playing highlight
  */
 
-import React, { useState, memo } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import {
   Box,
   Drawer,
@@ -21,7 +21,6 @@ import {
   ListItemText,
   Avatar,
   Divider,
-  Button,
   Tooltip,
   Chip,
   useTheme,
@@ -38,6 +37,8 @@ import {
   MusicNote as MusicNoteIcon,
   Equalizer as EqualizerIcon,
 } from '@mui/icons-material';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { useTranslation } from 'react-i18next';
 import type { Audio } from '../types';
 import ScrollingText from './ScrollingText';
@@ -75,6 +76,7 @@ function QueueDrawer({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const focusAfterMove = useRef<{ trackId: number; direction: 'up' | 'down' } | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   
   const upcomingTracks = queue.slice(currentIndex + 1);
@@ -113,6 +115,25 @@ function QueueDrawer({
     onReorderTrack(fromIndex, toIndex);
   };
   
+  // The same action as dragging, for keyboards and touch. The moved row is rebuilt, so focus is
+  // put back on its button, or on the other one when it has just reached the end of the list.
+  const moveTrack = (track: Audio, fromIndex: number, toIndex: number, direction: 'up' | 'down') => {
+    focusAfterMove.current = { trackId: track.id, direction };
+    onReorderTrack(fromIndex, toIndex);
+  };
+
+  useEffect(() => {
+    const target = focusAfterMove.current;
+    if (!target) return;
+    focusAfterMove.current = null;
+
+    const button = (direction: string) =>
+      document.querySelector<HTMLButtonElement>(`[data-queue-move="${target.trackId}-${direction}"]`);
+    const same = button(target.direction);
+    const other = button(target.direction === 'up' ? 'down' : 'up');
+    (same && !same.disabled ? same : other)?.focus();
+  }, [queue]);
+
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
@@ -123,6 +144,7 @@ function QueueDrawer({
     const isDragging = index === draggedIndex;
     const isDragOver = index === dragOverIndex;
     const canDrag = !isCurrentTrack;
+    const canMove = index > currentIndex;
     
     return (
       <ListItem
@@ -243,6 +265,28 @@ function QueueDrawer({
           }
           sx={{ mr: 8 }}
         />
+        {canMove && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            <IconButton
+              size="small"
+              aria-label={t('player.a11y.moveUp', { title: track.title })}
+              data-queue-move={`${track.id}-up`}
+              disabled={index <= currentIndex + 1}
+              onClick={() => moveTrack(track, index, index - 1, 'up')}
+            >
+              <KeyboardArrowUpIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label={t('player.a11y.moveDown', { title: track.title })}
+              data-queue-move={`${track.id}-down`}
+              disabled={index >= queue.length - 1}
+              onClick={() => moveTrack(track, index, index + 1, 'down')}
+            >
+              <KeyboardArrowDownIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
       </ListItem>
     );
   };
@@ -296,7 +340,7 @@ function QueueDrawer({
                 </IconButton>
               </Tooltip>
             )}
-            <IconButton onClick={onClose}>
+            <IconButton aria-label={t('common.close')} onClick={onClose}>
               <CloseIcon />
             </IconButton>
           </Box>

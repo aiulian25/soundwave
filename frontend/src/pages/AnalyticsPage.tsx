@@ -17,7 +17,6 @@ import {
   ListItemText,
   Chip,
   LinearProgress,
-  IconButton,
   Tooltip,
   useTheme,
   alpha,
@@ -27,12 +26,10 @@ import {
   AccessTime as AccessTimeIcon,
   MusicNote as MusicNoteIcon,
   Person as PersonIcon,
-  Album as AlbumIcon,
   TrendingUp as TrendingUpIcon,
   LocalFireDepartment as FireIcon,
   Schedule as ScheduleIcon,
   CalendarToday as CalendarIcon,
-  PlayArrow as PlayIcon,
   YouTube as YouTubeIcon,
 } from '@mui/icons-material';
 import { statsAPI } from '../api/client';
@@ -441,7 +438,7 @@ export default function AnalyticsPage() {
                 </Typography>
               ) : (
                 <List dense disablePadding>
-                  {insights.top_channels.slice(0, 5).map((channel, index) => (
+                  {insights.top_channels.slice(0, 5).map((channel) => (
                     <ListItem key={channel.channel_name} disableGutters sx={{ py: 1 }}>
                       <ListItemAvatar>
                         <Avatar

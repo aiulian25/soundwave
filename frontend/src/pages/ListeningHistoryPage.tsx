@@ -8,7 +8,7 @@
  * - Clear history options
  */
 
-import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   Box,
   Typography,
@@ -610,7 +610,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                             secondary={track.artist || track.channel_name}
                             secondaryTypographyProps={{ noWrap: true, fontSize: '0.75rem' }}
                           />
-                          <IconButton 
+                          <IconButton aria-label={t('player.a11y.play')} 
                             size="small" 
                             color="primary"
                             onClick={(e) => {

@@ -30,6 +30,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import HighQualityIcon from '@mui/icons-material/HighQuality';
 import { useTranslation } from 'react-i18next';
 import api from '../api/client';
+import { exportErrorMessage } from '../utils/exportErrors';
 
 interface ArtworkSource {
   type: string;
@@ -66,7 +67,7 @@ interface DownloadDialogProps {
   title?: string;
 }
 
-export default function DownloadDialog({ open, onClose, youtubeId, title }: DownloadDialogProps) {
+export default function DownloadDialog({ open, onClose, youtubeId }: DownloadDialogProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -75,7 +76,8 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
   
   // Export settings
   const [format, setFormat] = useState<'mp3' | 'flac'>('mp3');
-  const [quality, setQuality] = useState<'high' | 'medium' | 'low'>('high');
+  const [quality, setQuality] = useState<'high' | 'medium' | 'low' | 'original'>('high');
+  const [exportWarnings, setExportWarnings] = useState<string[]>([]);
   const [embedLyrics, setEmbedLyrics] = useState(true);
   const [embedArtwork, setEmbedArtwork] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState('');
@@ -112,12 +114,13 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
     try {
       setExporting(true);
       setError('');
+      setExportWarnings([]);
       
       const response = await api.post(
         `/audio/${youtubeId}/export/`,
         {
           format,
-          quality,
+          quality: canKeepOriginal || quality !== 'original' ? quality : 'high',
           embed_lyrics: embedLyrics,
           embed_artwork: embedArtwork,
           artwork_url: embedArtwork ? selectedArtwork : '',
@@ -150,25 +153,22 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
+      // The file is delivered either way; stay open so anything missing from it gets read.
+      const warnings = (response.headers['x-export-warnings'] ?? '').split(',').filter(Boolean);
+      if (warnings.length > 0) {
+        setExportWarnings(warnings);
+        return;
+      }
       onClose();
     } catch (err: any) {
       console.error('Export failed:', err);
-      setError(err.response?.data?.error || t('downloadDialog.errors.exportFailed'));
+      setError((await exportErrorMessage(err)) || t('downloadDialog.errors.exportFailed'));
     } finally {
       setExporting(false);
     }
   };
 
-  const getFormatLabel = (fmt: string) => {
-    switch (fmt) {
-      case 'mp3':
-        return t('downloadDialog.format.mp3');
-      case 'flac':
-        return t('downloadDialog.format.flac');
-      default:
-        return fmt.toUpperCase();
-    }
-  };
+  const canKeepOriginal = options?.current_format === format;
 
   const getQualityLabel = (q: string) => {
     switch (q) {
@@ -273,15 +273,19 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
                 </InputLabel>
                 <Select
                   value={quality}
-                  onChange={(e) => setQuality(e.target.value as 'high' | 'medium' | 'low')}
+                  onChange={(e) => setQuality(e.target.value as 'high' | 'medium' | 'low' | 'original')}
                   label={t('downloadDialog.sections.quality')}
                 >
                   <MenuItem value="high">{getQualityLabel('high')}</MenuItem>
                   <MenuItem value="medium">{getQualityLabel('medium')}</MenuItem>
                   <MenuItem value="low">{getQualityLabel('low')}</MenuItem>
+                  {canKeepOriginal && <MenuItem value="original">{t('downloadDialog.quality.original')}</MenuItem>}
                 </Select>
               </FormControl>
             )}
+            <Typography variant="caption" color="text.secondary">
+              {t(format === 'mp3' ? 'downloadDialog.qualityHelp.mp3' : 'downloadDialog.qualityHelp.flac')}
+            </Typography>
 
             <Divider />
 
@@ -377,6 +381,12 @@ export default function DownloadDialog({ open, onClose, youtubeId, title }: Down
                 {error}
               </Alert>
             )}
+
+            {exportWarnings.map((warning) => (
+              <Alert key={warning} severity="warning" sx={{ mt: 1 }}>
+                {t(`downloadDialog.warnings.${warning}`)}
+              </Alert>
+            ))}
           </Box>
         ) : null}
       </DialogContent>

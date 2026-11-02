@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -24,8 +24,9 @@ import {
   Refresh as RefreshIcon,
   Add as AddIcon,
 } from '@mui/icons-material';
-import { localAudioDB, type LocalAudioFile } from '../utils/localAudioDB';
+import { countUnclaimedFiles, LocalAudioDB, type LocalAudioFile } from '../utils/localAudioDB';
 import { extractMetadata, getAudioDuration } from '../utils/id3Reader';
+import { localFileUrl, releaseAllLocalFileUrls, releaseLocalFileUrl } from '../utils/localFileUrls';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
 import NowPlayingIndicator from '../components/NowPlayingIndicator';
@@ -34,18 +35,18 @@ import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface LocalFilesPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
+  accountId: number;
 }
 
-export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps) {
+export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFilesPageProps) {
   const { t } = useTranslation();
   const isNowPlaying = useIsNowPlaying();
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
 
-  useEffect(() => {
-    loadFiles();
-  }, []);
+  const [unclaimedCount, setUnclaimedCount] = useState(0);
+  const localAudioDB = useMemo(() => new LocalAudioDB(accountId), [accountId]);
 
   const loadFiles = async () => {
     try {
@@ -53,6 +54,24 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       setAudioFiles(files);
     } catch (error) {
       console.error('Error loading files:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadFiles();
+    countUnclaimedFiles().then(setUnclaimedCount).catch((error) => {
+      console.error('Error checking for unclaimed files:', error);
+    });
+  }, [localAudioDB]);
+
+  const handleClaimUnclaimed = async () => {
+    try {
+      await localAudioDB.claimUnclaimedFiles();
+      setUnclaimedCount(0);
+      await loadFiles();
+    } catch (error) {
+      console.error('Error claiming files:', error);
+      setAlert({ message: t('localFilesNew.unclaimed.failed'), severity: 'error' });
     }
   };
 
@@ -207,8 +226,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
       // Update play count
       await localAudioDB.updatePlayCount(localFile.id);
 
-      // Create object URL for the file
-      const audioURL = localFile.file ? URL.createObjectURL(localFile.file) : '';
+      const audioURL = localFileUrl(localFile);
 
       // Convert to Audio format expected by player
       const audio: Audio = {
@@ -237,7 +255,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
 
       // Convert all audio files to queue format
       const queue: Audio[] = audioFiles.map(file => {
-        const fileURL = file.file ? URL.createObjectURL(file.file) : '';
+        const fileURL = localFileUrl(file);
         return {
           id: parseInt(file.id.split('-')[0]) || Date.now(),
           youtube_id: undefined,
@@ -275,6 +293,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
     
     try {
       await localAudioDB.delete(id);
+      releaseLocalFileUrl(id);
       await loadFiles();
       setAlert({ message: t('localFilesNew.alerts.fileRemoved'), severity: 'success' });
     } catch (error) {
@@ -288,6 +307,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
 
     try {
       await localAudioDB.clear();
+      releaseAllLocalFileUrls();
       await loadFiles();
       setAlert({ message: t('localFilesNew.alerts.allFilesRemoved'), severity: 'success' });
     } catch (error) {
@@ -300,11 +320,6 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(1)} MB`;
   };
 
   return (
@@ -398,6 +413,21 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
           </Tooltip>
         </Box>
       </Box>
+
+      {unclaimedCount > 0 && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3, borderRadius: 3 }}
+          data-testid="local-files-unclaimed"
+          action={
+            <Button color="inherit" size="small" onClick={handleClaimUnclaimed} data-testid="local-files-claim">
+              {t('localFilesNew.unclaimed.claim')}
+            </Button>
+          }
+        >
+          {t('localFilesNew.unclaimed.description', { count: unclaimedCount })}
+        </Alert>
+      )}
 
       {/* Info Alert */}
       {audioFiles.length === 0 && !loading && (
@@ -520,7 +550,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                     {formatDuration(file.duration)}
                   </TableCell>
                   <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                    <IconButton
+                    <IconButton aria-label={t('player.a11y.play')}
                       size="small"
                       onClick={() => handlePlay(file)}
                       sx={{
@@ -533,7 +563,7 @@ export default function LocalFilesPage({ setCurrentAudio }: LocalFilesPageProps)
                     >
                       <PlayIcon sx={{ fontSize: { xs: '1rem', sm: '1.2rem' } }} />
                     </IconButton>
-                    <IconButton
+                    <IconButton aria-label={t('common.delete')}
                       size="small"
                       onClick={() => handleDelete(file.id)}
                       sx={{

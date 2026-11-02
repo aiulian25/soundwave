@@ -7,13 +7,14 @@ import { useUserSettings, UserSettings } from '../hooks/useUserSettings';
 
 interface SettingsContextType {
   settings: UserSettings;
+  playbackSyncEnabled: boolean;
   loading: boolean;
   error: string | null;
   updateSetting: <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => Promise<boolean>;
   updateExtraSetting: (key: string, value: any) => Promise<boolean>;
   getExtraSetting: (key: string, defaultValue?: any) => any;
   saveSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
-  loadSettings: () => Promise<void>;
+  loadSettings: () => Promise<UserSettings | null>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

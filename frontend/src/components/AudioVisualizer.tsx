@@ -4,8 +4,8 @@
  * Supports 16 visualization styles including Radial Metallic (kept)
  */
 
-import { Box, useTheme } from '@mui/material';
-import { useMemo, useRef, useEffect, useCallback } from 'react';
+import { useMediaQuery, Box, useTheme } from '@mui/material';
+import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import {
   VisualizerStyle,
   VisualizerColorScheme,
@@ -130,8 +130,25 @@ export default function AudioVisualizer({
   const barsRef = useRef<number[]>(new Array(16).fill(0));
   const sizeRef = useRef({ w: 0, h: 0 });
 
+  // Nothing to see means nothing to draw: off screen (however the player got hidden) or when the
+  // person asked for less motion. Audio is unaffected, because it does not depend on this canvas.
+  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const [isOnScreen, setIsOnScreen] = useState(true);
+  const shouldDraw = isOnScreen && !prefersReducedMotion;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof IntersectionObserver === 'undefined') return undefined;
+
+    const observer = new IntersectionObserver(([entry]) => setIsOnScreen(entry.isIntersecting));
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
+
   // Draw visualizer on canvas
   useEffect(() => {
+    if (!shouldDraw) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -245,7 +262,7 @@ export default function AudioVisualizer({
         animationRef.current = null;
       }
     };
-  }, [colors, primaryColor, currentStyle, showGlow, isPlaying, createParticle, height]);
+  }, [colors, primaryColor, currentStyle, showGlow, isPlaying, createParticle, height, shouldDraw]);
 
   return (
     <Box sx={{ width: '100%', height, position: 'relative' }}>

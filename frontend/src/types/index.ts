@@ -93,6 +93,7 @@ export interface SmartPlaylist {
   is_system: boolean;
   preset_type?: string;
   rules: SmartPlaylistRule[];
+  invalid_rule_ids?: number[];
   track_count: number;
   cached_count: number;
   cache_updated?: string;

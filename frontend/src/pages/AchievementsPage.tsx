@@ -24,12 +24,11 @@ import {
   TrendingUp as TrendingIcon,
   CheckCircle as CheckIcon,
   Lock as LockIcon,
-  Celebration as CelebrationIcon,
   Refresh as RefreshIcon,
   AutoAwesome as SpecialIcon,
 } from '@mui/icons-material';
 import { statsAPI } from '../api/client';
-import type { Achievement, AchievementProgress, StreakInfo } from '../types';
+import type { AchievementProgress, StreakInfo } from '../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;

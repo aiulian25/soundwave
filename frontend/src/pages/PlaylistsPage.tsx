@@ -27,7 +27,6 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -39,7 +38,7 @@ import { playlistAPI } from '../api/client';
 import { fetchAllPlaylists } from '../utils/fetchAll';
 import { usePWA } from '../context/PWAContext';
 import { useSettings } from '../context/SettingsContext';
-import { offlineStorage } from '../utils/offlineStorage';
+import { verifiedOfflinePlaylists } from '../utils/offlineLibrary';
 import ScrollToTop from '../components/ScrollToTop';
 import PlaylistCard from '../components/PlaylistCard';
 import SortableItem from '../components/SortableItem';
@@ -109,7 +108,7 @@ export default function PlaylistsPage() {
       // If offline, load from IndexedDB
       if (!isOnline) {
         console.log('[Offline] Loading playlists from cache');
-        const cachedPlaylists = await offlineStorage.getOfflinePlaylists();
+        const cachedPlaylists = await verifiedOfflinePlaylists();
         if (cachedPlaylists.length > 0) {
           // Convert cached playlists to expected format
           const offlineData = cachedPlaylists.map(p => ({
@@ -154,7 +153,7 @@ export default function PlaylistsPage() {
 
   const loadOfflineStatus = async () => {
     try {
-      const cachedPlaylists = await offlineStorage.getOfflinePlaylists();
+      const cachedPlaylists = await verifiedOfflinePlaylists();
       const offlineIds = new Set(cachedPlaylists.map(p => p.id));
       setOfflinePlaylists(offlineIds);
     } catch (err) {

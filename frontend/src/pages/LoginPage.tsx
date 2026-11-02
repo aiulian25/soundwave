@@ -16,11 +16,14 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import LockClockIcon from '@mui/icons-material/LockClock';
+import FingerprintIcon from '@mui/icons-material/Fingerprint';
+import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 import { userAPI, ensureCsrfCookie } from '../api/client';
 import { useTranslation } from 'react-i18next';
+import { isDismissedPasskeyPrompt } from '../utils/passkeys';
 
 interface LoginPageProps {
-  onLoginSuccess: (passwordChangeRequired?: boolean) => void;
+  onLoginSuccess: (passwordChangeRequired?: boolean, accountId?: number) => void;
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
@@ -35,6 +38,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [passkeyOffered, setPasskeyOffered] = useState(false);
+
+  useEffect(() => {
+    if (!browserSupportsWebAuthn()) return;
+    userAPI
+      .passkeyAvailability()
+      .then((response) => setPasskeyOffered(response.data.usable && response.data.offered))
+      .catch(() => setPasskeyOffered(false));
+  }, []);
 
   // Countdown timer for lockout
   useEffect(() => {
@@ -59,6 +71,20 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handlePasskeyLogin = async () => {
+    setError('');
+    try {
+      const options = await userAPI.passkeyLoginOptions();
+      const credential = await startAuthentication({ optionsJSON: options.data });
+      const response = await userAPI.passkeyLogin({ credential });
+      onLoginSuccess(response.data.user?.password_change_required === true, response.data.user?.id);
+    } catch (passkeyError) {
+      if (!isDismissedPasskeyPrompt(passkeyError)) {
+        setError(t('login.errors.passkeyFailed'));
+      }
+    }
+  };
+
   const handleLogin = async () => {
     if (isLocked) return;
     
@@ -77,7 +103,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         return;
       }
 
-      onLoginSuccess(response.data.user?.password_change_required === true);
+      onLoginSuccess(response.data.user?.password_change_required === true, response.data.user?.id);
     } catch (err: any) {
       const data = err.response?.data;
       
@@ -437,6 +463,26 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               ? t('login.lockedCountdown', { time: formatLockoutTime(lockoutRemaining) })
               : t('login.loginButton')}
           </Button>
+
+          {passkeyOffered && (
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={handlePasskeyLogin}
+              data-testid="login-passkey"
+              startIcon={<FingerprintIcon />}
+              sx={{
+                mt: 1.5,
+                color: '#22d3ee',
+                borderColor: 'rgba(34, 211, 238, 0.5)',
+                borderRadius: 3,
+                padding: { xs: '10px', sm: '12px' },
+                '&:hover': { borderColor: '#22d3ee', backgroundColor: 'rgba(34, 211, 238, 0.08)' },
+              }}
+            >
+              {t('login.passkeyButton')}
+            </Button>
+          )}
 
           {/* Lockout Warning */}
           {isLocked && (

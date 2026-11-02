@@ -6,7 +6,6 @@ import {
   Box,
   IconButton,
   Typography,
-  Chip,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -146,7 +145,7 @@ const PWAPrompts: React.FC = () => {
               >
                 {t('pwa.installAction')}
               </Button>
-              <IconButton
+              <IconButton aria-label={t('common.close')}
                 size="small"
                 color="inherit"
                 onClick={() => setShowInstallAlert(false)}
@@ -188,7 +187,7 @@ const PWAPrompts: React.FC = () => {
               >
                 {t('pwa.updateAction')}
               </Button>
-              <IconButton
+              <IconButton aria-label={t('common.close')}
                 size="small"
                 color="inherit"
                 onClick={() => setShowUpdateAlert(false)}

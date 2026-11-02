@@ -14,8 +14,10 @@ React + TypeScript + Material-UI frontend for SoundWave audio archiving platform
 
 ### Install Dependencies
 
+Requires Node.js 22.12 or newer; `.node-version` is the exact version CI and the Docker image use.
+
 ```bash
-npm install
+npm ci
 ```
 
 ### Run Development Server
