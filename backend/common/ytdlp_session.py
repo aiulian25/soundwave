@@ -69,15 +69,17 @@ def _publish_changed_cookies(private_path, values_at_start):
 
 @contextmanager
 def _private_cookie_options():
-    if not _shared_cookies_usable():
-        yield {}
-        return
-
     descriptor, private_path = tempfile.mkstemp(prefix=PRIVATE_COOKIES_PREFIX)
     os.close(descriptor)
     try:
+        # Checked under the lock: mid-rewrite the shared file looks too small to hold cookies.
         with _cookie_file_lock():
-            shutil.copyfile(COOKIES_FILE, private_path)
+            has_cookies = _shared_cookies_usable()
+            if has_cookies:
+                shutil.copyfile(COOKIES_FILE, private_path)
+        if not has_cookies:
+            yield {}
+            return
         values_at_start = _cookie_values(_load_cookie_jar(private_path))
         try:
             yield {'cookiefile': private_path}

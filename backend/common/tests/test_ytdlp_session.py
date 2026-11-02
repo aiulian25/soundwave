@@ -19,6 +19,7 @@ COOKIE_COUNT = 1500
 PARALLEL_SESSIONS = 2
 ROUNDS_PER_SESSION = 15
 QUIET = {'quiet': True, 'no_warnings': True}
+SESSION_START_WAIT_SECONDS = 0.3
 
 
 def _cookie_line(name, value):
@@ -79,6 +80,27 @@ class ParallelSessionTests(CookieFileCase):
         self.assertEqual(len(values), COOKIE_COUNT + PARALLEL_SESSIONS)
         for worker in range(PARALLEL_SESSIONS):
             self.assertEqual(values[f'ROTATED{worker}'], f'round{ROUNDS_PER_SESSION - 1}')
+
+    def test_a_session_starting_during_another_sessions_save_waits_and_keeps_its_cookies(self):
+        finished = threading.Event()
+        cookie_counts = []
+
+        def start_session():
+            with youtube_session(QUIET) as client:
+                cookie_counts.append(len(client.cookiejar))
+            finished.set()
+
+        with ytdlp_session._cookie_file_lock():
+            complete_file = open(self.path).read()
+            open(self.path, 'w').close()
+            session = threading.Thread(target=start_session)
+            session.start()
+            self.assertFalse(finished.wait(SESSION_START_WAIT_SECONDS))
+            with open(self.path, 'w') as cookie_file:
+                cookie_file.write(complete_file)
+        session.join()
+
+        self.assertEqual(cookie_counts, [COOKIE_COUNT])
 
     def test_a_slow_session_does_not_put_back_a_cookie_that_rotated_meanwhile(self):
         with youtube_session(QUIET) as slow:
