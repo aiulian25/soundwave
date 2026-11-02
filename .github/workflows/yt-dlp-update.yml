@@ -34,7 +34,7 @@ jobs:
       REQ_FILE: backend/requirements.txt
       GH_TOKEN: ${{ secrets.soundwave || secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # PAT (if set) so the branch push triggers the pull_request checks that
           # branch protection requires; falls back to GITHUB_TOKEN (PR opens, no CI).
