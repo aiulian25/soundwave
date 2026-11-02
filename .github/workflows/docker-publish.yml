@@ -25,7 +25,80 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # Everything an image must pass before it can be published. build-and-push needs these, so a
+  # failure anywhere here means nothing reaches the registry.
+  verify-backend:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_DEBUG: 'True'
+      DJANGO_SECRET_KEY: 'ci-test-secret-not-for-production'
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1
+          pip install -r requirements.txt
+
+      - name: Models and migrations agree
+        run: python manage.py makemigrations --check --dry-run --settings=config.settings_test
+
+      - name: Whole backend suite
+        run: python manage.py test --settings=config.settings_test
+
+  verify-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: frontend/.node-version
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Types
+        run: npx tsc --noEmit -p .
+
+      - name: Unit tests
+        run: npm test
+
+  verify-context:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build context excludes secrets and durable data
+        run: scripts/check-build-context.sh
+
+  verify-e2e:
+    uses: ./.github/workflows/e2e.yml
+
   build-and-push:
+    needs: [verify-backend, verify-frontend, verify-context, verify-e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,26 +108,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
-      # Build frontend before Docker build
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Run frontend unit tests
-        working-directory: ./frontend
-        run: npm test
-
-      - name: Build frontend
-        working-directory: ./frontend
-        run: npm run build
 
       # Setup Docker buildx for multi-platform builds
       - name: Set up Docker Buildx
@@ -100,14 +153,34 @@ jobs:
           build-args: |
             OS_PATCH_CACHE_BUST=${{ github.run_id }}
           platforms: linux/amd64,linux/arm64
+          # Published with the image, so what shipped can be examined later.
+          sbom: true
+          provenance: mode=max
           # Always re-pull the base image so a fresh layer is used (CNT-01).
           pull: true
           # On the weekly/manual rebuild, skip the layer cache so `apt-get upgrade`
           # actually re-runs and pulls the latest OS security patches.
           no-cache: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
 
-      # Output image digest
-      - name: Output image details
+      # Record exactly what was published, and scan that digest rather than a tag that can move.
+      - name: Record the published image
+        if: github.event_name != 'pull_request'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
-          echo "Image pushed to:"
-          echo "${{ steps.meta.outputs.tags }}"
+          {
+            echo "### Published image"
+            echo "Digest: \`$DIGEST\`"
+            echo '```'
+            echo "$TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Scan the published digest
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push.outputs.digest }}
+          exit-code: '0'
+          severity: CRITICAL,HIGH

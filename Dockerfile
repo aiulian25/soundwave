@@ -18,14 +18,16 @@ RUN pip install --no-cache-dir --upgrade "setuptools==82.0.1" "wheel==0.47.0"
 # (CNT-02) — do NOT re-install it unpinned here, which would defeat the pin.
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# The exact versions this build resolved, kept in the image so two builds can be compared.
+RUN pip freeze > /resolved-requirements.txt
 
 # Frontend build stage — compile the React/TypeScript SPA from source so the image is
-# self-contained and never ships a stale committed frontend/dist (Node 18 matches CI,
-# .github/workflows/docker-publish.yml).
-FROM node:18-slim AS frontend
+# self-contained and never ships a stale committed frontend/dist. Keep this version equal to
+# frontend/.node-version, which CI reads; frontend/src/toolchain.test.ts fails if they differ.
+FROM node:22.23.4-slim AS frontend
 WORKDIR /fe
 # Install deps first so this layer is cached unless the manifests change.
-COPY frontend/package*.json ./
+COPY frontend/package*.json frontend/.npmrc ./
 RUN npm ci
 # Build the SPA: `npm run build` == `tsc && vite build` -> /fe/dist
 COPY frontend ./
@@ -79,6 +81,9 @@ COPY --from=deno /deno /usr/local/bin/deno
 # solver runs unattended inside download jobs.
 ENV DENO_NO_UPDATE_CHECK=1 \
     DENO_NO_PROMPT=1
+# librosa's compiled-code cache: Numba refuses to run at all when it cannot write one, and the
+# production container's filesystem is read-only apart from /tmp.
+ENV NUMBA_CACHE_DIR=/tmp/numba
 
 # Remove build tools not needed at runtime — eliminates pip/setuptools/wheel CVEs
 # and reduces image size. The app is a Django server; it never installs packages at runtime.
@@ -103,6 +108,7 @@ COPY backend /app/backend
 COPY --from=frontend /fe/dist /app/frontend/dist
 # Copy assets
 COPY docker_assets /app/docker_assets
+COPY --from=builder /resolved-requirements.txt /app/resolved-requirements.txt
 
 # Set ownership for the app directory
 RUN chown -R appuser:appgroup /app && chmod -R 755 /app

@@ -27,30 +27,6 @@ for dir in /app/data /app/audio /app/cache; do
     fi
 done
 
-# Wait for ElasticSearch with better health check
-echo "Waiting for ElasticSearch..."
-ES_RETRIES=0
-ES_MAX_RETRIES=30
-while [ $ES_RETRIES -lt $ES_MAX_RETRIES ]; do
-    ES_HEALTH=$(curl -s -u elastic:$ELASTIC_PASSWORD $ES_URL/_cluster/health 2>/dev/null)
-    if [ $? -eq 0 ] && echo "$ES_HEALTH" | grep -q '"status"'; then
-        ES_STATUS=$(echo "$ES_HEALTH" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-        if [ "$ES_STATUS" = "green" ] || [ "$ES_STATUS" = "yellow" ]; then
-            echo "ElasticSearch is up! (status: $ES_STATUS)"
-            break
-        fi
-        echo "ElasticSearch status: $ES_STATUS - waiting..."
-    else
-        echo "ElasticSearch is unavailable - sleeping"
-    fi
-    sleep 3
-    ES_RETRIES=$((ES_RETRIES + 1))
-done
-
-if [ $ES_RETRIES -eq $ES_MAX_RETRIES ]; then
-    echo "WARNING: ElasticSearch may not be fully ready, continuing anyway..."
-fi
-
 # Build Redis URL with optional password
 REDIS_URL="redis://${REDIS_HOST}:6379"
 if [ -n "${REDIS_PASSWORD}" ]; then
@@ -162,7 +138,17 @@ END
 python manage.py collectstatic --noinput 2>/dev/null \
     || echo "Static collection skipped (assets baked at build / read-only rootfs)"
 
-# Start Celery worker in background with proper error handling
+# Run the worker, the scheduler and the web server side by side, and treat them as one unit.
+# If any of them stops, stop the rest and exit, so the container's restart policy brings the
+# whole thing back clean rather than leaving a healthy web server with nothing doing the work.
+# Their logs go to stdout, where Docker rotates them, so they cannot fill the small /tmp.
+stop_all() {
+    echo "Stopping worker, scheduler and web server..."
+    kill -TERM "$WORKER_PID" "$BEAT_PID" "$WEB_PID" 2>/dev/null
+    wait "$WORKER_PID" "$BEAT_PID" "$WEB_PID" 2>/dev/null
+}
+trap 'stop_all; exit 0' TERM INT
+
 # Limit concurrency to avoid SQLite locks
 echo "Starting Celery worker..."
 celery -A config worker \
@@ -170,29 +156,25 @@ celery -A config worker \
     --concurrency=2 \
     --max-tasks-per-child=100 \
     --time-limit=600 \
-    --soft-time-limit=580 \
-    --logfile=/tmp/celery-worker.log \
-    >> /tmp/celery-worker.log 2>&1 &
+    --soft-time-limit=580 &
 WORKER_PID=$!
 echo "Celery worker started (PID: $WORKER_PID)"
 
-# Start Celery beat scheduler in background
+# Exactly one scheduler per container: running a second copy of this container would mean a
+# second scheduler, so this deployment is single-replica by design.
 echo "Starting Celery beat scheduler..."
 celery -A config beat \
     --loglevel=info \
     --schedule=/tmp/celerybeat-schedule \
-    --pidfile=/tmp/celerybeat.pid \
-    --logfile=/tmp/celery-beat.log \
-    >> /tmp/celery-beat.log 2>&1 &
+    --pidfile=/tmp/celerybeat.pid &
 BEAT_PID=$!
 echo "Celery beat started (PID: $BEAT_PID)"
 
-# Start Django/Gunicorn server
 # Use gunicorn in production for security and performance; runserver in development
 echo "Starting Django application..."
 if [ "$IS_PRODUCTION" = "true" ]; then
     echo "→ Production mode: Gunicorn"
-    exec gunicorn config.wsgi:application \
+    gunicorn config.wsgi:application \
         --bind 0.0.0.0:8888 \
         --workers 3 \
         --threads 2 \
@@ -202,8 +184,14 @@ if [ "$IS_PRODUCTION" = "true" ]; then
         --access-logfile - \
         --access-logformat '%(h)s %(l)s %(u)s %(t)s "%(m)s %(U)s" %(s)s %(b)s' \
         --error-logfile - \
-        --log-level info
+        --log-level info &
 else
     echo "→ Development mode: Django runserver"
-    python manage.py runserver 0.0.0.0:8888
+    python manage.py runserver 0.0.0.0:8888 &
 fi
+WEB_PID=$!
+
+wait -n "$WORKER_PID" "$BEAT_PID" "$WEB_PID"
+echo "A SoundWave process stopped unexpectedly (exit code $?); restarting the container."
+stop_all
+exit 1

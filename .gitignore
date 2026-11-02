@@ -67,6 +67,7 @@ security-reports/
 # (README links docs/WIDGET_API.md, and docs/screenshots/ holds README images.)
 docs/*
 !docs/WIDGET_API.md
+!docs/BACKUP_RESTORE.md
 !docs/screenshots/
 !docs/screenshots/**
 
@@ -80,3 +81,6 @@ frontend/coverage/
 /build and push.md
 # Local code-review report — maps unpatched issues; never push it
 /CODE_REVIEW_REPORT*.md
+
+# Instance backups (scripts/backup-instance.sh)
+/backups/

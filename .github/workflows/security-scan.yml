@@ -134,7 +134,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '18'
+          node-version-file: frontend/.node-version
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -143,6 +143,9 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - name: Build context excludes secrets and durable data
+        run: scripts/check-build-context.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -198,7 +201,7 @@ jobs:
   # Authorization / multi-tenant isolation (BOLA) regression tests (APP-04).
   # Fails the build if any endpoint leaks another tenant's data.
   backend-tests:
-    name: Backend authz / BOLA tests
+    name: Backend tests and migration drift
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -214,9 +217,19 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
 
-      - name: Run BOLA / isolation tests
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1
+
+      - name: Models and migrations agree
         working-directory: ./backend
         env:
           DJANGO_DEBUG: 'True'
           DJANGO_SECRET_KEY: 'ci-test-secret-not-for-production'
-        run: python manage.py test common.tests --settings=config.settings_test -v 2
+        run: python manage.py makemigrations --check --dry-run --settings=config.settings_test
+
+      - name: Run the whole backend suite
+        working-directory: ./backend
+        env:
+          DJANGO_DEBUG: 'True'
+          DJANGO_SECRET_KEY: 'ci-test-secret-not-for-production'
+        run: python manage.py test --settings=config.settings_test -v 2

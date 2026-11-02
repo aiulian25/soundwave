@@ -3,6 +3,7 @@ name: E2E
 # Heavy (full stack + browser), so run on demand and on PRs — not every push.
 on:
   workflow_dispatch:
+  workflow_call:   # docker-publish.yml requires this before publishing
   pull_request:
     branches: [main, master]
 
@@ -15,7 +16,6 @@ jobs:
       SW_PASSWORD: 'E2e-Admin_2026!'
       POSTGRES_PASSWORD: e2e_pg_pw
       REDIS_PASSWORD: e2e_redis_pw
-      ELASTIC_PASSWORD: e2e_es_pw
       DJANGO_SECRET_KEY: e2e-secret-key-not-for-production
       ALLOW_LOCAL_NETWORK: 'true'
       E2E_USERNAME: e2e_user
@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: '18'
+          node-version-file: frontend/.node-version
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 

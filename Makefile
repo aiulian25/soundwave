@@ -11,29 +11,29 @@ help:
 	@echo "make migrate   - Run database migrations"
 	@echo "make frontend  - Install frontend dependencies"
 	@echo "make backend   - Install backend dependencies"
-	@echo "make clean     - Clean up containers and volumes"
+	@echo "make clean     - Remove containers, keeping all data"
 	@echo "make scan          - Quick image vulnerability scan (trivy/grype/hadolint)"
 	@echo "make security-scan - Full security suite (code, deps, config, secrets, SBOM, image)"
 
 build:
-	docker-compose build
+	docker compose build
 
 up:
-	docker-compose up -d
+	docker compose up -d
 	@echo "SoundWave is starting..."
-	@echo "Access at: http://localhost:123456"
+	@echo "Access at: http://localhost:8889"
 
 down:
-	docker-compose down
+	docker compose down
 
 logs:
-	docker-compose logs -f soundwave
+	docker compose logs -f soundwave
 
 shell:
-	docker-compose exec soundwave python backend/manage.py shell
+	docker compose exec soundwave python manage.py shell
 
 migrate:
-	docker-compose exec soundwave python backend/manage.py migrate
+	docker compose exec soundwave python manage.py migrate
 
 frontend:
 	cd frontend && npm install
@@ -42,9 +42,8 @@ backend:
 	cd backend && pip install -r requirements.txt
 
 clean:
-	docker-compose down -v
-	rm -rf audio/ cache/ es/ redis/
-	@echo "Cleaned up all data volumes"
+	docker compose down
+	@echo "Containers removed. Your database and audio are untouched."
 
 IMAGE_TAG ?= soundwave:latest
 

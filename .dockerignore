@@ -21,3 +21,49 @@ backend/static/assets
 
 # VCS metadata
 .git
+
+# Credentials. Secrets reach the container at runtime, as mounts and environment variables,
+# and must never be build inputs, wherever someone happens to put them.
+**/.env
+**/.env.*
+**/cookies.txt
+**/cookies*.txt
+**/*.pem
+**/*.key
+**/*.p12
+**/id_rsa*
+**/*secret*
+!backend/**/*secret*.py
+
+# Durable state and media. `audio` here is only the top-level library folder; backend/audio
+# is application code.
+/audio
+/cache
+/data
+/es
+/redis
+/security-reports
+/backups
+**/celerybeat-schedule*
+
+# Dumps, backups and local databases
+**/*.sql
+**/*.dump
+**/*.sqlite3
+**/*.db
+**/*.bak
+**/*.bak.*
+**/*.tar.gz
+**/*.tgz
+**/*.zip
+
+# Local environments and private notes
+**/.venv
+**/venv
+.github
+docs
+scripts
+"build and push.md"
+**/*AUDIT*.md
+frontend/test-results
+frontend/playwright-report

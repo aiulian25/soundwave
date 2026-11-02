@@ -53,7 +53,6 @@ if [ ! -f .env ]; then
     set_secret_if_empty SW_PASSWORD "$ADMIN_PW"
     set_secret_if_empty POSTGRES_PASSWORD "$(gen_secret)"
     set_secret_if_empty REDIS_PASSWORD "$(gen_secret)"
-    set_secret_if_empty ELASTIC_PASSWORD "$(gen_secret)"
     set_secret_if_empty DJANGO_SECRET_KEY "$(gen_secret)$(gen_secret)"
     chmod 600 .env 2>/dev/null || true
 
@@ -102,12 +101,7 @@ echo ""
 
 # Step 5: Start database services
 echo -e "${YELLOW}🗄️  Step 5/6: Starting database services...${NC}"
-docker compose up -d soundwave-es soundwave-redis
-echo -e "${BLUE}⏳ Waiting 30 seconds for Elasticsearch to initialize...${NC}"
-for i in {30..1}; do
-    echo -ne "${YELLOW}   $i seconds remaining...\r${NC}"
-    sleep 1
-done
+docker compose up -d --wait soundwave-pg soundwave-redis
 echo -e "${GREEN}✅ Database services ready${NC}"
 echo ""
 

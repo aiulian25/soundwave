@@ -42,7 +42,7 @@
 ### Core Features
 - **Audio-Only Downloads** - Extract high-quality audio from YouTube using yt-dlp
 - **Smart Organization** - Index audio files with full metadata (title, artist, duration, etc.)
-- **Powerful Search** - Find your audio quickly with ElasticSearch-powered indexing
+- **Fast Search** - Find tracks, playlists and channels by title, artist or channel, one page at a time
 - **Built-in Player** - Stream your collection directly in the browser
 - **Auto-Play / Continuous Playback** - Automatically plays next track in queue
 - **Repeat Modes** - Repeat one track, repeat all, or normal playback
@@ -101,7 +101,7 @@
 - **Backend**: Django REST Framework (Python)
 - **Frontend**: React + TypeScript + Material-UI
 - **Database**: PostgreSQL (SQLite fallback for local development)
-- **Search Engine**: ElasticSearch
+- **Search**: database queries, with no separate search engine to run
 - **Task Queue**: Celery + Redis
 - **Audio Extraction**: yt-dlp + FFmpeg
 - **Containerization**: Docker
@@ -110,7 +110,7 @@
 
 - **Docker** (version 20.10+) and **Docker Compose V2** (`docker compose`, not the old `docker-compose`)
 - **Python 3** on the host (for generating secrets in Step 3 — usually pre-installed)
-- 2-4GB available RAM
+- 2-4GB available RAM (the idle stack measured about 580 MiB, on a small library with nothing downloading)
 - Dual-core CPU (quad-core recommended)
 - Storage space for your audio library
 - **YouTube cookies** from a signed-in browser session, ideally a secondary Google account. Downloads need them: see [YouTube Cookies](#youtube-cookies-required-for-downloads)
@@ -159,14 +159,12 @@ SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
 SW_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(16))")
 REDIS_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
 PG_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
-ES_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
 
 cat > .env << EOF
 # Change SW_HOST to your server's IP/hostname if accessing from other machines
 SW_HOST=http://localhost:8889
 SW_USERNAME=admin
 SW_PASSWORD=$SW_PASS
-ELASTIC_PASSWORD=$ES_PASS
 REDIS_HOST=soundwave-redis
 REDIS_PASSWORD=$REDIS_PASS
 # Change to your local timezone (e.g. Europe/London, America/New_York, Europe/Bucharest)
@@ -178,8 +176,6 @@ POSTGRES_USER=soundwave
 POSTGRES_PASSWORD=$PG_PASS
 # Optional: uncomment and set to your server hostname/IP if getting 400 Bad Request errors
 # DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.100
-# Optional: auto-update yt-dlp on startup (recommended for production)
-# SW_AUTO_UPDATE_YTDLP=true
 # Optional: API keys for lyrics and artwork enrichment
 # LASTFM_API_KEY=
 # LASTFM_API_SECRET=
@@ -211,7 +207,25 @@ grep SW_PASSWORD .env
 
 > **First login:** You'll be **required to set a new admin password** before you can use the app — the initial `SW_PASSWORD` cannot remain in use. Choose something strong and memorable.
 
-Wait ~60-90 seconds on first start — PostgreSQL and Elasticsearch need time to initialize before SoundWave starts.
+Wait about a minute on first start — PostgreSQL needs time to initialize before SoundWave starts.
+
+**Upgrading from a version with Elasticsearch:** nothing used it, so it is no longer part of the stack, and `ELASTIC_PASSWORD` can go from your `.env`. Its old container and `es_data` volume stay on your host until you choose to remove them; `docker compose up -d --remove-orphans` removes the container, and `docker volume ls` shows the volume.
+
+## Backups and Recovery
+
+Settings > Backup exports one account's library definition and downloads the audio again, so it cannot bring back deleted or private videos, your own lyrics or your history. For a real backup of everything, use `scripts/backup-instance.sh`. [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) covers what is included, restoring, upgrading and going back.
+
+## Building Your Own Image
+
+Secrets, cookies and your library are runtime inputs, passed as environment variables and mounts, and never go into an image. `.dockerignore` keeps `.env` files, `cookies.txt`, the `audio`, `data` and `cache` folders, database dumps and backups out of the build context, including for a remote builder. `scripts/check-build-context.sh` proves it with harmless stand-in files and also fails if a source file is left out.
+
+## Health, Logs and Stopping
+
+- `GET /api/ping/` only says the web server answers, and Docker's health check uses it.
+- Whether everything is really working (database, Redis, the background worker and the scheduler) is a separate question: run `scripts/check-readiness.sh`, or as an admin call `GET /api/ready/`, which returns 503 and the details when something is wrong. It also shows how many tasks are queued and whether Redis is near its memory limit.
+- The worker, the scheduler and the web server run together in one container. If any of them stops, the container restarts as a whole. Run one copy of it, because each copy brings its own scheduler.
+- All three log to `docker compose logs soundwave`, and Docker rotates those logs.
+- `docker compose stop` gives running tasks up to 60 seconds. A download cut off by that is picked up again after the next start.
 
 ## YouTube Cookies (Required for Downloads)
 
@@ -256,7 +270,6 @@ Cookies expire, and YouTube can invalidate them at any time. When a failed downl
 | `SW_HOST` | Application URL | `http://localhost:8889` |
 | `SW_USERNAME` | Initial admin username | `admin` |
 | `SW_PASSWORD` | Initial admin password (**change after first login**) | — |
-| `ELASTIC_PASSWORD` | ElasticSearch password (**required** in production) | — |
 | `REDIS_HOST` | Redis hostname | `soundwave-redis` |
 | `TZ` | Timezone | `UTC` |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins | `http://localhost:8889` |
@@ -278,7 +291,7 @@ Cookies expire, and YouTube can invalidate them at any time. When a failed downl
 | `EMAIL_USE_TLS` | Use STARTTLS for SMTP | `true` |
 | `DEFAULT_FROM_EMAIL` | From-address for confirmation emails | `SoundWave <no-reply@localhost>` |
 | `EMAIL_VERIFICATION_REQUIRED` | Force email-change verification even without SMTP | `false` |
-| `SW_AUTO_UPDATE_YTDLP` | Auto-update yt-dlp on startup | `false` |
+| `TOTP_ENC_KEY` | Key for two-factor secrets; defaults to `DJANGO_SECRET_KEY` | — |
 | `LASTFM_API_KEY` | Last.fm API key for artist/track metadata | — |
 | `LASTFM_API_SECRET` | Last.fm API secret | — |
 | `FANART_API_KEY` | Fanart.tv API key for high-res artwork | — |
@@ -292,8 +305,42 @@ Cookies expire, and YouTube can invalidate them at any time. When a failed downl
 | `./data` | App data (avatars, migration scripts) |
 | `./cookies.txt` | YouTube session cookies: required for downloads, must be writable by user 1000 (see [YouTube Cookies](#youtube-cookies-required-for-downloads)) |
 | `pg_data` (Docker volume) | PostgreSQL database — created automatically by Docker Compose |
-| `es_data` (Docker volume) | Elasticsearch index — created automatically by Docker Compose |
 | `redis_data` (Docker volume) | Redis persistence — created automatically by Docker Compose |
+
+## Passkeys
+
+Add a passkey under **Settings → Passkeys** to sign in with your fingerprint, face or device PIN. Adding one asks for your current password (and two-factor code, when enabled); signing in with one replaces both, because the authenticator has already verified you.
+
+Browsers only allow passkeys on a secure address with a name, so the app must be opened from either:
+
+- an `https://` address with a domain name, listed in `SW_HOST` or `CORS_ALLOWED_ORIGINS`, or
+- `http://localhost`.
+
+They do not work over plain HTTP on a LAN or from an IP address; Settings says so when that is the case. A passkey belongs to the exact hostname it was made on, so changing your domain means adding new ones. Administrators can clear a user's passkeys with **Reset 2FA**.
+
+## Media Storage
+
+New downloads are stored per owner as `users/<owner id>/<video id>.<ext>` under the media folder, so one owner's delete or tag edit never affects another's copy. Older installs may have files shared between owners of the same video. They keep working, and an owner gets a private copy the first time their tags change. To separate them all at once:
+
+```bash
+docker exec soundwave python manage.py migrate_media_paths          # dry run: counts and space needed
+docker exec soundwave python manage.py migrate_media_paths --apply  # add --limit N to work in batches
+```
+
+Safe to stop and re-run. No file is moved or deleted; the last owner of each shared file keeps the original.
+
+Storage quotas count downloads and uploads from their stored sizes. Older downloads may have recorded a size of 0, so correct them once after upgrading:
+
+```bash
+docker exec soundwave python manage.py reconcile_media_sizes          # dry run
+docker exec soundwave python manage.py reconcile_media_sizes --apply  # add --limit N to work in batches
+```
+
+One download is limited by `MAX_DOWNLOAD_BYTES` (4 GiB), `MAX_DOWNLOAD_DURATION_SECONDS` (24 hours) and `MIN_FREE_DISK_BYTES` (1 GiB must stay free); all three can be set in the environment.
+
+## Outbound Artwork Fetching
+
+Artwork fetches validate every redirect, refuse private and internal addresses, and cap size and time. The compose files keep PostgreSQL, Redis and Elasticsearch on an internal network with no internet access, but the app must reach them, so it can still reach anything else on its own networks. If other private services share those networks or your LAN, restrict the app container's egress with a firewall as well. Environment proxies (`HTTP_PROXY`) are ignored for these fetches.
 
 ## Dashboard Integration (Homepage)
 
@@ -416,9 +463,9 @@ Smart Playlists automatically update based on rules you define:
 git clone https://github.com/aiulian25/soundwave.git
 cd soundwave
 
-# Build frontend
+# Build frontend (Node version: frontend/.node-version; npm refuses unsupported versions)
 cd frontend
-npm install
+npm ci
 npm run build
 cd ..
 
@@ -444,9 +491,11 @@ python manage.py runserver
 
 ### Frontend Development
 
+Requires Node.js 22.12 or newer; `frontend/.node-version` is the exact version CI and the Docker image use.
+
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -500,9 +549,6 @@ sudo chown -R 1000:1000 ./audio ./cache ./data
 # Check logs
 docker compose logs soundwave
 
-# Check ElasticSearch
-docker compose logs soundwave-es
-
 # Check PostgreSQL
 docker compose logs soundwave-pg
 
@@ -532,7 +578,7 @@ docker compose up -d
 
 ### Download Failures
 
-- Ensure yt-dlp is up to date: Set `SW_AUTO_UPDATE_YTDLP=true`
+- Ensure yt-dlp is up to date: it ships inside the image, so pull the latest image (`docker compose pull`, then `up -d`)
 - Check FFmpeg is installed in the container
 - Review download logs in the admin panel
 
