@@ -338,6 +338,9 @@ TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY_HOURS', 24 * 7))  # Defaul
 MAX_DOWNLOAD_BYTES = int(os.environ.get('MAX_DOWNLOAD_BYTES', 4 * 1024 ** 3))
 MAX_DOWNLOAD_DURATION_SECONDS = int(os.environ.get('MAX_DOWNLOAD_DURATION_SECONDS', 24 * 60 * 60))
 MIN_FREE_DISK_BYTES = int(os.environ.get('MIN_FREE_DISK_BYTES', 1024 ** 3))
+# Downloading and converting one track. A small server converts a long mix at about 6x real time,
+# so a three-hour mix needs half an hour; the worker's ten-minute default applies to other tasks.
+DOWNLOAD_TASK_SOFT_LIMIT_SECONDS = int(os.environ.get('DOWNLOAD_TASK_SOFT_LIMIT_SECONDS', 4 * 60 * 60))
 TOKEN_EXPIRY_HOURS_EXTENDED = int(os.environ.get('TOKEN_EXPIRY_HOURS_EXTENDED', 24 * 30))  # Default: 30 days (for "remember me")
 # REST Framework
 RATELIMIT_ENABLED = _env_bool('RATELIMIT_ENABLED', True)

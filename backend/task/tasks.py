@@ -315,6 +315,16 @@ INCOMPLETE_SCAN_MESSAGE = (
 MAX_AUTO_RETRIES = 3
 
 
+UNKNOWN_TITLE = 'Unknown'
+# After the soft limit, the time a download has to fail cleanly before it is killed.
+DOWNLOAD_TASK_CLEANUP_SECONDS = 60
+
+
+def title_of(item, fallback=UNKNOWN_TITLE):
+    """The title yt-dlp reported, or the fallback; YouTube can report the key with no value."""
+    return item.get('title') or fallback
+
+
 # Titles that yt-dlp returns in extract_flat mode for deleted/private videos
 DELETED_VIDEO_TITLES = [
     '[deleted video]',
@@ -544,7 +554,7 @@ def _publish_download(queue_id, claim_token, info, file_path, out_ext, file_size
             owner=queue_item.owner,
             youtube_id=info['id'],
             defaults={
-                'title': info.get('title', 'Unknown'),
+                'title': title_of(info),
                 'description': info.get('description', ''),
                 'channel_id': info.get('channel_id', ''),
                 'channel_name': info.get('channel', 'Unknown'),
@@ -575,7 +585,7 @@ def _publish_download(queue_id, claim_token, info, file_path, out_ext, file_size
         queue_item.status = 'completed'
         queue_item.completed_date = timezone.now()
         queue_item.youtube_id = info['id']
-        queue_item.title = info.get('title', '')
+        queue_item.title = title_of(info, '')
         queue_item.claim_token = None
         queue_item.lease_expires_at = None
         queue_item.save()
@@ -592,7 +602,10 @@ def _publish_download(queue_id, claim_token, info, file_path, out_ext, file_size
     return True
 
 
-@shared_task
+@shared_task(
+    soft_time_limit=settings.DOWNLOAD_TASK_SOFT_LIMIT_SECONDS,
+    time_limit=settings.DOWNLOAD_TASK_SOFT_LIMIT_SECONDS + DOWNLOAD_TASK_CLEANUP_SECONDS,
+)
 def download_audio_task(queue_id):
     """Download audio from YouTube - AUDIO ONLY, no video"""
     claim_token = claim_download(queue_id)
@@ -757,7 +770,7 @@ def download_channel_task(channel_id):
                 url=f"https://www.youtube.com/watch?v={video_id}",
                 defaults={
                     'youtube_id': video_id,
-                    'title': entry.get('title', 'Unknown'),
+                    'title': title_of(entry),
                     # Stamp the source channel so download_audio_task can honor this
                     # channel's download_quality (F1).
                     'channel_name': channel.channel_name,
@@ -1194,7 +1207,7 @@ def download_playlist_task(playlist_id, force=False):
                         url=f"https://www.youtube.com/watch?v={video_id}",
                         defaults={
                             'youtube_id': video_id,
-                            'title': entry.get('title', 'Unknown'),
+                            'title': title_of(entry),
                             'status': 'pending',
                             'auto_start': True,
                             'source_playlist_id': playlist.playlist_id,

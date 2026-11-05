@@ -336,7 +336,7 @@ docker exec soundwave python manage.py reconcile_media_sizes          # dry run
 docker exec soundwave python manage.py reconcile_media_sizes --apply  # add --limit N to work in batches
 ```
 
-One download is limited by `MAX_DOWNLOAD_BYTES` (4 GiB), `MAX_DOWNLOAD_DURATION_SECONDS` (24 hours) and `MIN_FREE_DISK_BYTES` (1 GiB must stay free); all three can be set in the environment.
+One download is limited by `MAX_DOWNLOAD_BYTES` (4 GiB), `MAX_DOWNLOAD_DURATION_SECONDS` (24 hours) and `MIN_FREE_DISK_BYTES` (1 GiB must stay free); all three can be set in the environment. Downloading and converting one track may take up to `DOWNLOAD_TASK_SOFT_LIMIT_SECONDS` (4 hours): converting a long mix is slow on a small server, about 30 minutes for three hours of audio.
 
 ## Outbound Artwork Fetching
 

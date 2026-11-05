@@ -14,6 +14,7 @@ import wave
 from unittest import mock
 
 from django.core.cache import cache
+from django.conf import settings
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
@@ -266,6 +267,40 @@ class _PlaylistEntriesYDL:
 
     def extract_info(self, url, download=False):
         return {'entries': [{'id': 'REPAIR_YT_01', 'title': 'Repair Track'}]}
+
+
+# Three hours of audio at 3x real time: half the conversion speed measured on a 6-core shared VPS.
+THREE_HOUR_MIX_SECONDS = 3 * 60 * 60
+CONSERVATIVE_CONVERSION_SPEED = 3
+THREE_HOUR_MIX_CONVERSION_SECONDS = THREE_HOUR_MIX_SECONDS // CONSERVATIVE_CONVERSION_SPEED
+
+
+class _UntitledEntryYDL(_PlaylistEntriesYDL):
+    """YouTube's flat listings can report the title key with no value."""
+
+    def extract_info(self, url, download=False):
+        return {'entries': [{'id': 'UNTITLED_001', 'title': None}, {'id': 'TITLED_0001', 'title': 'Named'}]}
+
+
+class UntitledPlaylistEntryTests(TestCase):
+    def test_an_entry_without_a_title_is_queued_and_does_not_stop_the_rest(self):
+        owner = Account.objects.create_user('untitled_u', 'untitled@test.local', 'Untitledpw_2026!')
+        playlist = Playlist.objects.create(owner=owner, playlist_id='PL_untitled', title='Untitled')
+
+        with mock.patch('task.tasks.yt_dlp.YoutubeDL', _UntitledEntryYDL), \
+                mock.patch('task.tasks.download_audio_task.delay') as delay:
+            download_playlist_task(playlist.pk)
+
+        queued = dict(DownloadQueue.objects.filter(owner=owner).values_list('youtube_id', 'title'))
+        self.assertEqual(queued, {'UNTITLED_001': 'Unknown', 'TITLED_0001': 'Named'})
+        self.assertEqual(delay.call_count, 2)
+
+
+class DownloadTimeBudgetTests(SimpleTestCase):
+    def test_a_download_gets_its_own_time_budget_rather_than_the_ten_minute_default(self):
+        self.assertEqual(download_audio_task.soft_time_limit, settings.DOWNLOAD_TASK_SOFT_LIMIT_SECONDS)
+        self.assertGreater(download_audio_task.time_limit, download_audio_task.soft_time_limit)
+        self.assertGreaterEqual(download_audio_task.soft_time_limit, THREE_HOUR_MIX_CONVERSION_SECONDS)
 
 
 class ForceRecheckKeepsTrackTests(TestCase):
