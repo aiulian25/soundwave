@@ -3,13 +3,14 @@
 Run: python manage.py test audio.tests.test_playback_sync --settings=config.settings_test
 """
 import random
+from datetime import timedelta
 
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from audio.models import Audio
-from audio.models_playback_sync import PlaybackSession
+from audio.models_playback_sync import LIVE_SESSION_SECONDS, PlaybackSession
 from audio.serializers_playback_sync import MAX_QUEUE_IDS
 from user.models import Account, UserConfig
 
@@ -152,3 +153,48 @@ class QueueRestoreTests(PlaybackSyncTestCase):
         other = APIClient()
         other.force_authenticate(self.bob)
         self.assertEqual(other.get(QUEUE_URL).status_code, 404)
+
+
+class LiveSessionTests(PlaybackSyncTestCase):
+    """Other devices show a session as playing only while its device keeps reporting."""
+
+    def setUp(self):
+        super().setUp()
+        self.make_audio(self.alice, 'LIVE_TRACK')
+
+    def _report(self, is_playing):
+        response = self.client.post(SYNC_URL, {
+            'youtube_id': 'LIVE_TRACK', 'position': 10, 'duration': 100, 'is_playing': is_playing,
+            'queue_youtube_ids': ['LIVE_TRACK'], 'queue_index': 0, 'device_id': 'device_mac', 'device_name': 'Mac',
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def _seen_elsewhere(self):
+        return self.client.get(SYNC_URL).json()['session']
+
+    def test_a_device_that_just_reported_playing_is_live(self):
+        self._report(is_playing=True)
+
+        session = self._seen_elsewhere()
+
+        self.assertTrue(session['is_live'])
+        self.assertEqual(session['device_name'], 'Mac')
+        self.assertEqual(session['audio_details']['thumbnail_url'], '/api/audio/LIVE_TRACK/artwork/')
+
+    def test_a_paused_device_is_not_live(self):
+        self._report(is_playing=False)
+
+        self.assertFalse(self._seen_elsewhere()['is_live'])
+
+    def test_a_device_that_went_quiet_is_not_live(self):
+        self._report(is_playing=True)
+        quiet_since = timezone.now() - timedelta(seconds=LIVE_SESSION_SECONDS + 1)
+        PlaybackSession.objects.filter(user=self.alice).update(updated_at=quiet_since)
+
+        self.assertFalse(self._seen_elsewhere()['is_live'])
+
+    def test_the_stop_report_keeps_the_saved_queue(self):
+        self._report(is_playing=True)
+        self._report(is_playing=False)
+
+        self.assertEqual(PlaybackSession.objects.get(user=self.alice).queue_youtube_ids, ['LIVE_TRACK'])

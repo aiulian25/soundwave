@@ -76,7 +76,7 @@ class ListeningHistorySerializer(serializers.ModelSerializer):
     """Listening history entry"""
     audio_id = serializers.IntegerField(source='audio.id')
     youtube_id = serializers.CharField(source='audio.youtube_id')
-    thumbnail_url = serializers.CharField(source='audio.thumbnail_url', allow_blank=True)
+    thumbnail_url = serializers.CharField(source='audio.artwork_url', allow_blank=True)
     
     class Meta:
         model = ListeningHistory

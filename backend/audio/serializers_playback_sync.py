@@ -15,6 +15,7 @@ class PlaybackSessionSerializer(serializers.ModelSerializer):
     # Include audio details for the current track
     audio_details = serializers.SerializerMethodField()
     seconds_since_update = serializers.ReadOnlyField()
+    is_live = serializers.ReadOnlyField()
     
     class Meta:
         model = PlaybackSession
@@ -30,9 +31,10 @@ class PlaybackSessionSerializer(serializers.ModelSerializer):
             'device_name',
             'updated_at',
             'seconds_since_update',
+            'is_live',
             'audio_details',
         ]
-        read_only_fields = ['updated_at', 'seconds_since_update', 'audio_details']
+        read_only_fields = ['updated_at', 'seconds_since_update', 'is_live', 'audio_details']
     
     def get_audio_details(self, obj):
         """Get details of the currently playing track"""
@@ -49,8 +51,8 @@ class PlaybackSessionSerializer(serializers.ModelSerializer):
                 'artist': audio.artist or audio.channel_name,
                 'album': audio.album,
                 'duration': audio.duration,
-                'thumbnail_url': audio.thumbnail_url,
-                'cover_art_url': audio.cover_art_url,
+                'thumbnail_url': audio.artwork_url,
+                'cover_art_url': audio.cover_artwork_url,
             }
         except Audio.DoesNotExist:
             return None

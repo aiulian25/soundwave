@@ -33,9 +33,11 @@ REFUSED_UPSTREAM_STATUS = 'upstream_status'
 class FetchRefused(Exception):
     """The fetch was stopped by policy; `code` is a stable reason. Network errors stay `requests` errors."""
 
-    def __init__(self, code):
+    def __init__(self, code, status_code=None):
         super().__init__(code)
         self.code = code
+        # Set for REFUSED_UPSTREAM_STATUS, so callers can tell "gone" from "try again later".
+        self.status_code = status_code
 
 
 @dataclass(frozen=True)
@@ -101,7 +103,7 @@ def _remaining_seconds(deadline):
 def _read_body(response, max_bytes, deadline):
     """read1 returns after one socket read, so a slow-drip server cannot outrun the deadline."""
     if response.status_code != HTTP_OK:
-        raise FetchRefused(REFUSED_UPSTREAM_STATUS)
+        raise FetchRefused(REFUSED_UPSTREAM_STATUS, response.status_code)
     body = bytearray()
     while chunk := response.raw.read1(READ_CHUNK_BYTES, decode_content=True):
         body += chunk

@@ -56,6 +56,11 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute=0, hour='*/2'),  # Every 2 hours
         'kwargs': {'limit': 50},
     },
+    # Keep downloaded tracks' artwork on this server, a small batch at a time.
+    'archive-missing-artwork': {
+        'task': 'audio.archive_missing_artwork',
+        'schedule': crontab(minute='*/15'),
+    },
     # Prune radio feedback weekly, Sunday 5 AM (after the 3 AM / 4 AM lyrics jobs).
     'system-heartbeat': {
         'task': 'common.record_heartbeat',

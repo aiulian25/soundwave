@@ -7,7 +7,7 @@ from django.db.models.functions import ExtractHour, ExtractWeekDay, TruncDate, T
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
-from audio.models import Audio
+from audio.models import Audio, artwork_path
 from audio.models import AudioProgress
 from channel.models import Channel
 from download.models import DownloadQueue
@@ -144,7 +144,7 @@ class ListeningInsightsView(ApiBaseView):
         
         # Top tracks
         top_tracks = history.values(
-            'title', 'artist', 'audio__youtube_id', 'audio__thumbnail_url'
+            'title', 'artist', 'audio__youtube_id'
         ).annotate(
             play_count=Count('id'),
             total_duration=Sum('duration_listened')
@@ -155,7 +155,7 @@ class ListeningInsightsView(ApiBaseView):
                 'title': t['title'],
                 'artist': t['artist'],
                 'youtube_id': t['audio__youtube_id'],
-                'thumbnail_url': t['audio__thumbnail_url'] or '',
+                'thumbnail_url': artwork_path(t['audio__youtube_id']),
                 'play_count': t['play_count'],
                 'total_duration': t['total_duration'] or 0,
             }
@@ -592,7 +592,7 @@ class YearlyWrappedView(ApiBaseView):
         
         # Top tracks
         top_tracks = history.values(
-            'title', 'artist', 'audio__youtube_id', 'audio__thumbnail_url'
+            'title', 'artist', 'audio__youtube_id'
         ).annotate(
             play_count=Count('id'),
             total_duration=Sum('duration_listened')
@@ -604,7 +604,7 @@ class YearlyWrappedView(ApiBaseView):
                 'title': top_tracks[0]['title'],
                 'artist': top_tracks[0]['artist'],
                 'youtube_id': top_tracks[0]['audio__youtube_id'],
-                'thumbnail_url': top_tracks[0]['audio__thumbnail_url'] or '',
+                'thumbnail_url': artwork_path(top_tracks[0]['audio__youtube_id']),
                 'play_count': top_tracks[0]['play_count'],
             }
         
@@ -613,7 +613,7 @@ class YearlyWrappedView(ApiBaseView):
                 'title': t['title'],
                 'artist': t['artist'],
                 'youtube_id': t['audio__youtube_id'],
-                'thumbnail_url': t['audio__thumbnail_url'] or '',
+                'thumbnail_url': artwork_path(t['audio__youtube_id']),
                 'play_count': t['play_count'],
                 'total_duration': t['total_duration'] or 0,
             }
@@ -764,7 +764,7 @@ class HomepageDataView(ApiBaseView):
                 'artist': audio.artist or '',
                 'channel_name': audio.channel_name,
                 'duration': audio.duration,
-                'thumbnail_url': audio.thumbnail_url or '',
+                'thumbnail_url': audio.artwork_url,
                 'position': entry.position,
                 'time_left': time_left,
                 'progress_percent': round(progress_pct, 1),
@@ -810,7 +810,7 @@ class HomepageDataView(ApiBaseView):
                     'artist': audio.artist or '',
                     'channel_name': audio.channel_name,
                     'duration': audio.duration,
-                    'thumbnail_url': audio.thumbnail_url or '',
+                    'thumbnail_url': audio.artwork_url,
                     'tag': 'FOR_YOU',
                     'reason': f'Because you like {audio.artist or audio.channel_name}',
                 })
@@ -833,7 +833,7 @@ class HomepageDataView(ApiBaseView):
                 'artist': audio.artist or '',
                 'channel_name': audio.channel_name,
                 'duration': audio.duration,
-                'thumbnail_url': audio.thumbnail_url or '',
+                'thumbnail_url': audio.artwork_url,
                 'tag': 'DISCOVER',
                 'reason': 'Hidden gem in your library',
             })
@@ -857,7 +857,7 @@ class HomepageDataView(ApiBaseView):
                     'artist': audio.artist or '',
                     'channel_name': audio.channel_name,
                     'duration': audio.duration,
-                    'thumbnail_url': audio.thumbnail_url or '',
+                    'thumbnail_url': audio.artwork_url,
                     'tag': 'OTHER',
                     'reason': 'More other you might like',
                 })
@@ -887,7 +887,7 @@ class HomepageDataView(ApiBaseView):
                     'artist': audio.artist or '',
                     'channel_name': audio.channel_name,
                     'duration': audio.duration,
-                    'thumbnail_url': audio.thumbnail_url or '',
+                    'thumbnail_url': audio.artwork_url,
                     'tag': 'THROWBACK',
                     'reason': 'From your collection',
                 })
@@ -907,7 +907,7 @@ class HomepageDataView(ApiBaseView):
                     'artist': entry.artist or '',
                     'channel_name': entry.channel_name,
                     'duration': entry.audio.duration,
-                    'thumbnail_url': entry.audio.thumbnail_url or '',
+                    'thumbnail_url': entry.audio.artwork_url,
                     'played_at': entry.listened_at,
                 })
         
@@ -923,7 +923,7 @@ class HomepageDataView(ApiBaseView):
                 'artist': audio.artist or '',
                 'channel_name': audio.channel_name,
                 'duration': audio.duration,
-                'thumbnail_url': audio.thumbnail_url or '',
+                'thumbnail_url': audio.artwork_url,
                 'downloaded_date': audio.downloaded_date,
             })
         

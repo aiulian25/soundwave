@@ -43,8 +43,8 @@ class RadioSessionSerializer(serializers.ModelSerializer):
                 'youtube_id': audio.youtube_id,
                 'title': audio.title,
                 'artist': audio.artist or audio.channel_name,
-                'thumbnail_url': audio.thumbnail_url,
-                'cover_art_url': audio.cover_art_url,
+                'thumbnail_url': audio.artwork_url,
+                'cover_art_url': audio.cover_artwork_url,
             }
         except Audio.DoesNotExist:
             return None

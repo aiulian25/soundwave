@@ -128,12 +128,30 @@ def _artwork_source(audio, artwork_url):
     return artwork_url or audio.cover_art_url or audio.thumbnail_url
 
 
+def _kept_artwork(audio):
+    from audio.artwork_archive import archive_track_artwork
+    from audio.artwork_images import InvalidArtworkImage, load_artwork_image
+
+    artwork = archive_track_artwork(audio)
+    if artwork is None:
+        return None
+    try:
+        return load_artwork_image(artwork)[0]
+    except InvalidArtworkImage:
+        return None
+
+
 def _fetch_cover_art(audio, artwork_url):
     # Lazy import avoids an import cycle (audio.views imports this module's export core).
     from audio.views import is_safe_artwork_url
     from audio.artwork_images import InvalidArtworkImage, MAX_ARTWORK_BYTES, decoded_mime_type
     from common.safe_http import FetchRefused, fetch_public_url
     import requests
+
+    if not artwork_url:
+        kept = _kept_artwork(audio)
+        if kept is not None:
+            return kept
 
     art_url = _artwork_source(audio, artwork_url)
     if not art_url or not is_safe_artwork_url(art_url):

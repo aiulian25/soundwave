@@ -5,6 +5,7 @@ import yt_dlp
 from audio.models import Audio
 from audio.radio_features import RADIO_FEEDBACK_RETENTION_DAYS
 from channel.models import Channel
+from audio.artwork_archive import archive_track_artwork
 from common.ytdlp_session import COOKIES_FILE, youtube_session
 from audio.storage_service import (
     DOWNLOAD_TOO_LARGE_MARKER,
@@ -589,6 +590,9 @@ def _publish_download(queue_id, claim_token, info, file_path, out_ext, file_size
         queue_item.claim_token = None
         queue_item.lease_expires_at = None
         queue_item.save()
+
+    # The artwork is kept now, while the video and its thumbnail certainly still exist.
+    archive_track_artwork(audio)
 
     # Queue a task to link this audio to playlists (optimized - runs after download)
     # This prevents blocking the download task with expensive playlist lookups

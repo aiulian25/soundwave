@@ -40,6 +40,13 @@ class AudioSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'downloaded_date', 'play_count', 'last_played', 'chapters', 'loudness_lufs']
 
+    def to_representation(self, instance):
+        # Clients get this server's copy of the artwork; the stored links are where it came from.
+        data = super().to_representation(instance)
+        data['thumbnail_url'] = instance.artwork_url
+        data['cover_art_url'] = instance.cover_artwork_url
+        return data
+
 
 class AudioListSerializer(serializers.Serializer):
     """Audio list response"""

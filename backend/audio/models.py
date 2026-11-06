@@ -10,6 +10,15 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+# The canonical address; the same view is also reachable under /api/v1/.
+ARTWORK_PATH_TEMPLATE = '/api/audio/{youtube_id}/artwork/'
+
+
+def artwork_path(youtube_id):
+    """Where clients load a track's artwork: always this server, never the host it came from."""
+    return ARTWORK_PATH_TEMPLATE.format(youtube_id=youtube_id) if youtube_id else ''
+
+
 class Audio(models.Model):
     """Audio file model"""
     # User isolation
@@ -75,6 +84,15 @@ class Audio(models.Model):
             models.Index(fields=['owner', '-published_date']),
             models.Index(fields=['owner', 'is_favorite']),
         ]
+
+    @property
+    def artwork_url(self):
+        return artwork_path(self.youtube_id)
+
+    @property
+    def cover_artwork_url(self):
+        """The artwork address when this track has cover art, as `cover_art_url` signals to clients."""
+        return self.artwork_url if self.cover_art_url else ''
 
     def __str__(self):
         return f"{self.owner.username} - {self.title}"

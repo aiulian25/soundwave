@@ -22,6 +22,7 @@ class Artwork(models.Model):
         ('lastfm', 'Last.fm'),
         ('fanart', 'Fanart.tv'),
         ('manual', 'Manual Upload'),
+        ('cover_link', 'Cover art link'),
     ]
     
     # Related objects

@@ -20,15 +20,11 @@ from audio.lastfm_client import LastFMClient
 from audio.fanart_client import FanartClient
 from audio.id3_service import ID3TagService
 from audio.storage_service import ensure_private_file
+from audio.artwork_archive import EXTENSION_BY_MIME_TYPE, THUMBNAIL_TYPE, archive_track_artwork
 
 logger = get_task_logger(__name__)
 
 ARTWORK_FETCH_DEADLINE_SECONDS = 60
-EXTENSION_BY_MIME_TYPE = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-}
 
 
 @shared_task(bind=True, max_retries=3)
@@ -153,17 +149,8 @@ def fetch_artwork_for_audio(self, audio_id: int):
         except MusicMetadata.DoesNotExist:
             pass
         
-        # Use YouTube thumbnail as fallback
-        if audio.thumb_url and not Artwork.objects.filter(audio=audio, source='youtube').exists():
-            artwork = Artwork.objects.create(
-                audio=audio,
-                artwork_type='audio_thumbnail',
-                source='youtube',
-                url=audio.thumb_url,
-                priority=10
-            )
-            download_artwork.delay(artwork.id)
-            logger.info(f"Created YouTube thumbnail artwork for audio {audio_id}")
+        # Keep the YouTube thumbnail too, as the fallback
+        archive_track_artwork(audio)
         
     except Audio.DoesNotExist:
         logger.error(f"Audio {audio_id} not found")
@@ -556,3 +543,28 @@ def update_id3_tags_from_metadata(audio_id: int):
         logger.error(f"Audio {audio_id} not found")
     except Exception as e:
         logger.error(f"Error updating ID3 tags for audio {audio_id}: {e}")
+
+
+# Small, spaced batches: this only reads images YouTube already serves to every viewer, but it
+# should never look like a crawler.
+ARCHIVE_BATCH_SIZE = 100
+ARCHIVE_PAUSE_SECONDS = 1
+
+
+@shared_task(name='audio.archive_missing_artwork')
+def archive_missing_artwork(limit: int = ARCHIVE_BATCH_SIZE):
+    """Keep the artwork of downloaded tracks that have not had theirs kept yet."""
+    import time
+
+    waiting = (
+        Audio.objects.exclude(file_path='')
+        .exclude(thumbnail_url='')
+        .exclude(artworks__artwork_type=THUMBNAIL_TYPE)
+        .order_by('-downloaded_date')[:limit]
+    )
+    kept = 0
+    for audio in waiting:
+        if archive_track_artwork(audio) is not None:
+            kept += 1
+        time.sleep(ARCHIVE_PAUSE_SECONDS)
+    return f'Kept artwork for {kept} of {len(waiting)} tracks'

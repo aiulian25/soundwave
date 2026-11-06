@@ -10,11 +10,15 @@ the lookup is owner-scoped.
 
 Run: python manage.py test audio --settings=config.settings_test
 """
+import io
+import shutil
+import tempfile
 from unittest import mock
 
 import requests
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
+from PIL import Image
 from rest_framework.test import APIClient
 
 from audio.models import Audio
@@ -25,11 +29,17 @@ from user.models import Account
 
 ARTWORK_URL = 'https://i.ytimg.com/vi/ART_TEST_ID/hqdefault.jpg'
 ARTWORK_PATH = '/api/audio/{youtube_id}/artwork/'
-FETCH = 'common.safe_http.fetch_public_url'
+FETCH = 'audio.artwork_archive.fetch_public_url'
 
 
-def _fetched(content_type='image/jpeg'):
-    return FetchedResponse(b'\xff\xd8\xff-image-bytes', content_type)
+def _jpeg_bytes():
+    buffer = io.BytesIO()
+    Image.new('RGB', (2, 2)).save(buffer, format='JPEG')
+    return buffer.getvalue()
+
+
+def _fetched(content_type='image/jpeg', content=None):
+    return FetchedResponse(_jpeg_bytes() if content is None else content, content_type)
 
 
 def _make_audio(owner, youtube_id):
@@ -56,6 +66,11 @@ class ArtworkProxyAuthTests(TestCase):
         cls.other_audio = _make_audio(cls.alice, 'ART_ALICE_2')
 
     def setUp(self):
+        media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media_root)
+        override = override_settings(MEDIA_ROOT=media_root)
+        override.enable()
+        self.addCleanup(override.disable)
         self.client = APIClient()
 
     def url_for(self, youtube_id):
@@ -118,34 +133,32 @@ class ArtworkProxyAuthTests(TestCase):
         self.assertEqual(resp.status_code, 401)
         fake_get.assert_not_called()
 
-    # --- upstream response hardening ------------------------------------------
+    # --- what is fetched is checked before it is kept ---------------------------
     @mock.patch(FETCH)
-    def test_oversized_artwork_is_rejected(self, fake_get):
+    def test_oversized_artwork_is_not_kept(self, fake_get):
         fake_get.side_effect = FetchRefused(REFUSED_TOO_LARGE)
         self.client.force_authenticate(user=self.alice)
         resp = self.client.get(self.url_for('ART_ALICE_1'))
-        self.assertEqual(resp.status_code, 502)
+        self.assertEqual(resp.status_code, 404)
 
     @mock.patch(FETCH)
-    def test_non_image_content_type_is_coerced(self, fake_get):
-        fake_get.return_value = _fetched(content_type='text/html')
+    def test_content_that_is_not_an_image_is_not_served(self, fake_get):
+        fake_get.return_value = _fetched(content_type='text/html', content=b'<html></html>')
         self.client.force_authenticate(user=self.alice)
         resp = self.client.get(self.url_for('ART_ALICE_1'))
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp['Content-Type'], 'image/jpeg')
+        self.assertEqual(resp.status_code, 404)
 
     @mock.patch(FETCH)
-    def test_refused_fetch_is_a_bad_gateway_without_details(self, fake_get):
+    def test_refused_fetch_reveals_no_details(self, fake_get):
         fake_get.side_effect = FetchRefused('internal_address')
         self.client.force_authenticate(user=self.alice)
         resp = self.client.get(self.url_for('ART_ALICE_1'))
-        self.assertEqual(resp.status_code, 502)
-        self.assertEqual(resp.json(), {'error': 'Failed to fetch artwork'})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {'error': 'No artwork available'})
 
     @mock.patch(FETCH)
-    def test_network_failure_stays_a_server_error(self, fake_get):
+    def test_network_failure_is_no_artwork_for_now(self, fake_get):
         fake_get.side_effect = requests.ConnectionError('synthetic')
         self.client.force_authenticate(user=self.alice)
         resp = self.client.get(self.url_for('ART_ALICE_1'))
-        self.assertEqual(resp.status_code, 500)
-        self.assertEqual(resp.json(), {'error': 'Error fetching artwork'})
+        self.assertEqual(resp.status_code, 404)

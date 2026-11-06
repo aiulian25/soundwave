@@ -7,6 +7,10 @@ from django.utils import timezone
 User = get_user_model()
 
 
+# A few missed 15-second reports before a session stops counting as playing somewhere.
+LIVE_SESSION_SECONDS = 45
+
+
 class PlaybackSession(models.Model):
     """
     Stores the user's current playback state for cross-device sync.
@@ -92,6 +96,11 @@ class PlaybackSession(models.Model):
         """Check if session is older than 30 days"""
         return (timezone.now() - self.updated_at).days > 30
     
+    @property
+    def is_live(self):
+        """Playing right now: a playing device reports every 15 seconds, so silence means it stopped."""
+        return self.is_playing and self.seconds_since_update <= LIVE_SESSION_SECONDS
+
     @property
     def seconds_since_update(self):
         """Get seconds since last update"""

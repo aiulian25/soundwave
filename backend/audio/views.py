@@ -6,8 +6,10 @@ import subprocess
 from urllib.parse import urlparse
 
 from django.core.serializers.json import DjangoJSONEncoder
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from audio.models import Audio, AudioProgress
@@ -39,10 +41,7 @@ ALLOWED_ARTWORK_HOST_SCHEMES = {
     'lastfm.freetls.fastly.net': {'https'},
 }
 
-MAX_ARTWORK_BYTES = 5 * 1024 * 1024
-ARTWORK_FETCH_TIMEOUT_SECONDS = 10
 ARTWORK_CACHE_MAX_AGE_SECONDS = 86400
-DEFAULT_ARTWORK_CONTENT_TYPE = 'image/jpeg'
 ARTWORK_TICKET_PREFIX = 'artwork:'
 
 
@@ -746,17 +745,16 @@ class MetadataAutoFetchView(ApiBaseView):
 
 
 class ArtworkProxyView(APIView):
-    """Proxy cover art for the Media Session API and other cookie-less clients.
+    """A track's artwork, served from this server for lists, the player and the Media Session API.
 
-    Authorization is carried by the URL because artwork fetches (OS lock screen, media
-    controls, external widgets) do not reliably send the session cookie: a short-lived,
-    path-bound media ticket (`?t=`) or an API key both work, and a normal session is
-    still accepted. The lookup is owner-scoped, so this endpoint cannot be used to probe
-    which tracks an instance holds. Outbound fetches stay restricted to
-    ALLOWED_ARTWORK_HOST_SCHEMES (SSRF) and are size-capped.
+    The image is fetched once from where the track's links point and kept on disk; after that it
+    never depends on, or tells, the original host. Authorization: a session, an API key, or a
+    short-lived path-bound media ticket (`?t=`) for clients that send no cookie (OS lock screen,
+    media controls, external widgets). The lookup is owner-scoped, so this endpoint cannot be
+    used to probe which tracks an instance holds.
     """
 
-    authentication_classes = [APIKeyAuthentication]
+    authentication_classes = [APIKeyAuthentication, SessionAuthentication]
     permission_classes = []
 
     def _authorized_user(self, request, youtube_id):
@@ -774,55 +772,26 @@ class ArtworkProxyView(APIView):
         return None
 
     def get(self, request, youtube_id):
-        """Proxy artwork for a track"""
-        import requests as http_requests
-        from django.http import HttpResponse
-        from common.safe_http import FetchRefused, REFUSED_TOO_LARGE, fetch_public_url
+        """This server's copy of a track's artwork, kept the first time it is asked for."""
+        from audio.artwork_archive import archive_track_artwork
+        from audio.artwork_images import InvalidArtworkImage, load_artwork_image
 
         user = self._authorized_user(request, youtube_id)
         if user is None:
-            return Response(
-                {'error': 'Authentication required'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
 
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=user)
-
-        artwork_url = audio.cover_art_url or audio.thumbnail_url
-        if not artwork_url:
-            return Response(
-                {'error': 'No artwork available'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # SSRF protection: validate URL is from allowed sources
-        if not is_safe_artwork_url(artwork_url):
-            return Response(
-                {'error': 'Invalid artwork source'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        artwork = archive_track_artwork(audio)
+        if artwork is None:
+            return Response({'error': 'No artwork available'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            fetched = fetch_public_url(artwork_url, MAX_ARTWORK_BYTES, ARTWORK_FETCH_TIMEOUT_SECONDS)
-        except FetchRefused as refusal:
-            logger.warning("[Artwork Proxy] Refused fetch for %s: %s", youtube_id, refusal)
-            message = 'Artwork too large' if refusal.code == REFUSED_TOO_LARGE else 'Failed to fetch artwork'
-            return Response({'error': message}, status=status.HTTP_502_BAD_GATEWAY)
-        except http_requests.RequestException:
-            # Don't expose exception details in response
-            logger.warning("[Artwork Proxy] Error fetching artwork for %s", youtube_id, exc_info=True)
-            return Response(
-                {'error': 'Error fetching artwork'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            image_data, mime_type = load_artwork_image(artwork)
+        except InvalidArtworkImage:
+            logger.warning("[Artwork] Stored artwork %s for %s is unreadable", artwork.id, youtube_id)
+            return Response({'error': 'No artwork available'}, status=status.HTTP_404_NOT_FOUND)
 
-        content = fetched.content
-        content_type = fetched.content_type
-        if not content_type.startswith('image/'):
-            content_type = DEFAULT_ARTWORK_CONTENT_TYPE
-
-        response = HttpResponse(content, content_type=content_type)
-        response['Access-Control-Allow-Origin'] = '*'
+        response = HttpResponse(image_data, content_type=mime_type)
         # `private`: the response is owner-scoped, so a shared cache must never hand one
         # user's artwork to another.
         response['Cache-Control'] = f'private, max-age={ARTWORK_CACHE_MAX_AGE_SECONDS}'

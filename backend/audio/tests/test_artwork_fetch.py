@@ -139,5 +139,6 @@ class ArtworkProxyRedirectTests(ArtworkFetchTestCase):
         client.force_authenticate(self.owner)
         with public_network({COVER_URL: redirect_to(PRIVATE_URL)}) as transport:
             response = client.get('/api/audio/FETCH_YT_01/artwork/')
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 404)
         self.assertEqual(transport.requested, [COVER_URL])
+        self.assertFalse(Artwork.objects.exclude(local_path='').exists())
