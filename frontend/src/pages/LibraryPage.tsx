@@ -1,14 +1,7 @@
 import {
   Box,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   IconButton,
-  Paper,
   Button,
   Snackbar,
 } from '@mui/material';
@@ -21,13 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
-import TrackThumbnail from '../components/TrackThumbnail';
-import { useHighlightTrack } from '../hooks/useHighlightTrack';
+import TrackTable from '../components/TrackTable';
 import type { Audio } from '../types';
-import ScrollingText from '../components/ScrollingText';
-import NowPlayingIndicator from '../components/NowPlayingIndicator';
-import { useIsNowPlaying } from '../context/NowPlayingContext';
-import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface LibraryPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -38,8 +26,6 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
   const [audioList, setAudioList] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(false);
   const location = useLocation();
-  const { getTrackRef, shouldHighlight } = useHighlightTrack();
-  const isNowPlaying = useIsNowPlaying();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -167,104 +153,31 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
         {t('library.trackCount', { count: audioList.length })}
       </Typography>
 
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          bgcolor: 'background.paper',
-          borderRadius: 3,
-          border: '1px solid',
-          borderColor: 'rgba(255, 255, 255, 0.05)',
-          '& .MuiTableCell-root': {
-            borderColor: 'rgba(255, 255, 255, 0.05)',
-          },
-        }}
-      >
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell width={50} sx={{ fontWeight: 600 }}>#</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>{t('library.columns.title')}</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>{t('library.columns.channel')}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>{t('library.columns.duration')}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>{t('library.columns.size')}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>{t('library.columns.plays')}</TableCell>
-              <TableCell align="center" width={100} sx={{ fontWeight: 600 }}>{t('library.columns.actions')}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {audioList.map((audio, index) => (
-              <TableRow
-                key={audio.id}
-                ref={getTrackRef(audio.youtube_id)}
-                sx={{
-                  cursor: 'pointer',
-                  // Skip layout/paint for off-screen rows (DOM stays, so refs,
-                  // highlight-scroll and the scroll-to-top FAB keep working).
-                  contentVisibility: 'auto',
-                  containIntrinsicSize: 'auto 64px',
-                  transition: 'background-color 0.3s ease',
-                  '&:hover': {
-                    bgcolor: 'rgba(19, 236, 106, 0.05)',
-                  },
-                  ...(shouldHighlight(audio.youtube_id) && {
-                    bgcolor: 'rgba(19, 236, 106, 0.1)',
-                  }),
-                  ...(isNowPlaying(audio.youtube_id) && nowPlayingRowSx),
-                }}
-                onClick={() => setCurrentAudio(audio, audioList)}
-              >
-                <TableCell sx={{ color: 'text.secondary' }}>
-                  {isNowPlaying(audio.youtube_id) ? <NowPlayingIndicator /> : index + 1}
-                </TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-                    <TrackThumbnail src={audio.thumbnail_url} alt={audio.title} size={40} />
-                    <ScrollingText
-                      variant="body2"
-                      sx={{ maxWidth: 300, fontWeight: 500, ...(isNowPlaying(audio.youtube_id) && nowPlayingTitleSx) }}
-                    >
-                      {audio.title}
-                    </ScrollingText>
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" color="text.secondary">
-                    {audio.channel_name}
-                  </Typography>
-                </TableCell>
-                <TableCell align="right" sx={{ color: 'text.secondary' }}>
-                  {formatDuration(audio.duration)}
-                </TableCell>
-                <TableCell align="right" sx={{ color: 'text.secondary' }}>
-                  {formatFileSize(audio.file_size)}
-                </TableCell>
-                <TableCell align="right" sx={{ color: 'text.secondary' }}>
-                  {audio.play_count}
-                </TableCell>
-                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                  <IconButton aria-label={t('player.a11y.play')} 
-                    size="small" 
-                    sx={{
-                      color: 'primary.main',
-                      '&:hover': {
-                        bgcolor: 'rgba(19, 236, 106, 0.1)',
-                      },
-                    }}
-                  >
-                    <PlayArrowIcon />
-                  </IconButton>
-                  <TrackActionsMenu 
-                    track={audio}
-                    onTrackUpdate={(updatedTrack) => {
-                      setAudioList(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
-                    }}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <TrackTable
+        items={audioList}
+        rowKey={(audio) => audio.id}
+        describe={(audio) => ({
+          key: audio.youtube_id,
+          title: audio.title,
+          subtitle: audio.artist || audio.channel_name,
+          artworkUrl: audio.thumbnail_url,
+        })}
+        onPlay={(audio) => setCurrentAudio(audio, audioList)}
+        columns={[
+          { id: 'duration', header: t('library.columns.duration'), width: 80, align: 'right', showFrom: 'sm', render: (audio) => formatDuration(audio.duration) },
+          { id: 'size', header: t('library.columns.size'), width: 96, align: 'right', showFrom: 'lg', render: (audio) => formatFileSize(audio.file_size) },
+          { id: 'plays', header: t('library.columns.plays'), width: 72, align: 'right', showFrom: 'md', render: (audio) => audio.play_count },
+        ]}
+        actionsWidth={56}
+        renderActions={(audio) => (
+          <TrackActionsMenu
+            track={audio}
+            onTrackUpdate={(updatedTrack) => {
+              setAudioList(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
+            }}
+          />
+        )}
+      />
 
       {/* Snackbar for notifications */}
       <Snackbar

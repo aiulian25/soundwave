@@ -264,7 +264,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
   }
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+    <Box>
       <ScrollToTop />
       
       {/* Header */}

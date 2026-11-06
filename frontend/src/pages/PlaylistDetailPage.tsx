@@ -3,12 +3,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   CircularProgress,
   Alert,
   Chip,
@@ -41,12 +35,8 @@ import { offlineStorage } from '../utils/offlineStorage';
 import { offlineAudioUrl, removeOfflinePlaylist, saveOfflinePlaylist, verifiedOfflinePlaylist } from '../utils/offlineLibrary';
 import { audioCache } from '../utils/audioCache';
 import TrackActionsMenu from '../components/TrackActionsMenu';
-import { useHighlightTrack } from '../hooks/useHighlightTrack';
+import TrackTable from '../components/TrackTable';
 import type { Audio } from '../types';
-import ScrollingText from '../components/ScrollingText';
-import NowPlayingIndicator from '../components/NowPlayingIndicator';
-import { useIsNowPlaying } from '../context/NowPlayingContext';
-import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface PlaylistItem {
   id: number;
@@ -87,8 +77,6 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { isOnline, cachePlaylist, cancelPlaylistCache, removePlaylistCache, cacheSize } = usePWA();
-  const { getTrackRef, shouldHighlight } = useHighlightTrack();
-  const isNowPlaying = useIsNowPlaying();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -496,6 +484,9 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     { key: 'unavailable', count: playlist.remote_unavailable_count ?? 0 },
   ].filter(({ count }) => count > 0);
 
+  const playlistItems = playlist.items ?? [];
+  const playableQueue = playlistItems.filter((item) => item.audio.file_path).map((item) => item.audio);
+
   return (
     <Box>
       {/* Header with Back Button */}
@@ -822,138 +813,56 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       </Box>
 
       {/* Tracks Table */}
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell width={60} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>#</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('playlistDetail.columns.title')}</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' }, display: { xs: 'none', md: 'table-cell' } }}>{t('playlistDetail.columns.channel')}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('playlistDetail.columns.duration')}</TableCell>
-              <TableCell align="center" width={120} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('playlistDetail.columns.actions')}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {playlist.items && playlist.items.length > 0 ? (
-              playlist.items.map((item, index) => {
-                // Create queue from all downloaded tracks
-                const playlistQueue = (playlist.items || [])
-                  .filter(i => i.audio.file_path)
-                  .map(i => i.audio);
-                const isCurrentTrack = isNowPlaying(item.audio.youtube_id);
-                return (
-                <TableRow
-                  key={item.id}
-                  ref={getTrackRef(item.audio.youtube_id)}
-                  sx={{
-                    cursor: 'pointer',
-                    transition: 'background-color 0.3s ease',
-                    '&:hover': {
-                      bgcolor: 'rgba(19, 236, 106, 0.05)',
-                    },
-                    opacity: item.audio.file_path ? 1 : 0.5,
-                    ...(shouldHighlight(item.audio.youtube_id) && {
-                      bgcolor: 'rgba(19, 236, 106, 0.1)',
-                    }),
-                    ...(isCurrentTrack && nowPlayingRowSx),
-                  }}
-                  onClick={() => item.audio.file_path && setCurrentAudio(item.audio, playlistQueue)}
-                >
-                  <TableCell sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                    {isCurrentTrack ? <NowPlayingIndicator /> : index + 1}
-                  </TableCell>
-                  <TableCell>
-                    <Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <ScrollingText
-                          variant="body2"
-                          sx={{
-                            maxWidth: { xs: 180, sm: 280, md: 380 },
-                            fontWeight: 500,
-                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                            ...(isCurrentTrack && nowPlayingTitleSx),
-                          }}
-                        >
-                          {item.audio.title}
-                        </ScrollingText>
-                        {item.audio.youtube_id && offlineTracks.has(item.audio.youtube_id) && (
-                          <Tooltip title={t('playlistDetail.status.availableOffline')}>
-                            <OfflinePinIcon sx={{ fontSize: 14, color: 'success.main', flexShrink: 0 }} />
-                          </Tooltip>
-                        )}
-                      </Box>
-                      {!item.audio.file_path && (
-                        <Chip 
-                          label={t('playlistDetail.status.notDownloaded')} 
-                          size="small" 
-                          color="warning"
-                          sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }}
-                        />
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      noWrap
-                      sx={{
-                        maxWidth: 150,
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {item.audio.channel_name}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                    {formatDuration(item.audio.duration)}
-                  </TableCell>
-                  <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                      <IconButton
-                        size="small"
-                        onClick={() => item.audio.file_path && setCurrentAudio(item.audio, playlistQueue)}
-                        disabled={!item.audio.file_path}
-                        sx={{
-                          color: 'primary.main',
-                          '&:disabled': { color: 'rgba(255, 255, 255, 0.3)' },
-                        }}
-                        title={t('playlistDetail.actions.play')}
-                      >
-                        <PlayIcon />
-                      </IconButton>
-                      {item.audio.file_path && item.audio.youtube_id && (
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDownloadTrackToDevice(item.audio.youtube_id!, item.audio.title)}
-                          sx={{
-                            color: 'primary.main',
-                          }}
-                          title={t('playlistDetail.actions.downloadToDevice')}
-                        >
-                          <DownloadIcon />
-                        </IconButton>
-                      )}
-                      <TrackActionsMenu 
-                        track={item.audio}
-                        onTrackUpdate={handleTrackUpdate}
-                      />
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              );})
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    {t('playlistDetail.empty.noTracks')}
-                  </Typography>
-                </TableCell>
-              </TableRow>
+      <TrackTable
+        items={playlistItems}
+        rowKey={(item) => item.id}
+        describe={(item) => ({
+          key: item.audio.youtube_id,
+          title: item.audio.title,
+          subtitle: item.audio.artist || item.audio.channel_name,
+          artworkUrl: item.audio.thumbnail_url,
+          playable: Boolean(item.audio.file_path),
+        })}
+        onPlay={(item) => setCurrentAudio(item.audio, playableQueue)}
+        renderTitleExtras={(item) => (
+          <>
+            {item.audio.youtube_id && offlineTracks.has(item.audio.youtube_id) && (
+              <Tooltip title={t('playlistDetail.status.availableOffline')}>
+                <OfflinePinIcon sx={{ fontSize: 14, color: 'success.main', flexShrink: 0 }} />
+              </Tooltip>
             )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            {!item.audio.file_path && (
+              <Chip
+                label={t('playlistDetail.status.notDownloaded')}
+                size="small"
+                color="warning"
+                sx={{ height: 18, fontSize: '0.65rem', flexShrink: 0 }}
+              />
+            )}
+          </>
+        )}
+        columns={[
+          { id: 'duration', header: t('playlistDetail.columns.duration'), width: 80, align: 'right', showFrom: 'sm', render: (item) => formatDuration(item.audio.duration) },
+        ]}
+        actionsWidth={96}
+        renderActions={(item) => (
+          <>
+            {item.audio.file_path && item.audio.youtube_id && (
+              <IconButton
+                size="small"
+                aria-label={t('playlistDetail.actions.downloadToDevice')}
+                title={t('playlistDetail.actions.downloadToDevice')}
+                onClick={() => handleDownloadTrackToDevice(item.audio.youtube_id!, item.audio.title)}
+                sx={{ color: 'primary.main' }}
+              >
+                <DownloadIcon />
+              </IconButton>
+            )}
+            <TrackActionsMenu track={item.audio} onTrackUpdate={handleTrackUpdate} />
+          </>
+        )}
+        emptyMessage={t('playlistDetail.empty.noTracks')}
+      />
 
       {/* Offline Caching Progress Snackbar - Non-blocking, auto-dismisses */}
       <Snackbar

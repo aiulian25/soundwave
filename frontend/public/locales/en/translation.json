@@ -1440,60 +1440,6 @@
       "awesome": "Awesome!"
     }
   },
-  "localFiles": {
-    "title": "My Local Files",
-    "tabs": {
-      "audioFiles": "Audio Files",
-      "playlists": "Playlists"
-    },
-    "stats": {
-      "totalFiles": "Total Files",
-      "artists": "Artists",
-      "totalSize": "Total Size",
-      "favorites": "Favorites"
-    },
-    "filters": {
-      "searchPlaceholder": "Search...",
-      "artist": "Artist",
-      "album": "Album",
-      "genre": "Genre",
-      "allArtists": "All Artists",
-      "allAlbums": "All Albums",
-      "allGenres": "All Genres",
-      "favorites": "Favorites",
-      "clearFilters": "Clear Filters"
-    },
-    "actions": {
-      "uploadAudio": "Upload Audio",
-      "upload": "Upload",
-      "download": "Download",
-      "delete": "Delete"
-    },
-    "messages": {
-      "uploadedWithMetadata": "File uploaded! Metadata extracted from ID3 tags.",
-      "fileDeleted": "File deleted successfully"
-    },
-    "errors": {
-      "loadAudioFilesFailed": "Failed to load audio files",
-      "uploadFailed": "Failed to upload file",
-      "deleteFailed": "Failed to delete file"
-    },
-    "empty": {
-      "title": "No audio files yet",
-      "description": "Upload your local audio files to start listening",
-      "uploadFirst": "Upload Your First File"
-    },
-    "playlistsComingSoon": "Playlists feature coming soon...",
-    "confirm": {
-      "deleteFile": "Delete \"{{title}}\"?"
-    },
-    "uploadDialog": {
-      "title": "Upload Audio File",
-      "chooseFile": "Choose File",
-      "fileInfo": "{{size}} MB • Metadata will be read from ID3 tags",
-      "uploading": "Uploading... {{progress}}%"
-    }
-  },
   "listeningHistory": {
     "title": "Listening History",
     "trackCount": "{{count}} tracks in your history",
@@ -2311,5 +2257,9 @@
       "passkey_already_registered": "This device already has a passkey for your account.",
       "passkey_invalid_request": "Please check the details and try again."
     }
+  },
+  "remotePlayback": {
+    "playingOn": "Playing on {{device}}",
+    "playHere": "Play here"
   }
 }

@@ -1440,60 +1440,6 @@
       "awesome": "Excelent!"
     }
   },
-  "localFiles": {
-    "title": "Fisierele mele locale",
-    "tabs": {
-      "audioFiles": "Fisiere audio",
-      "playlists": "Playlisturi"
-    },
-    "stats": {
-      "totalFiles": "Total fisiere",
-      "artists": "Artisti",
-      "totalSize": "Dimensiune totala",
-      "favorites": "Favorite"
-    },
-    "filters": {
-      "searchPlaceholder": "Cauta...",
-      "artist": "Artist",
-      "album": "Album",
-      "genre": "Gen",
-      "allArtists": "Toti artistii",
-      "allAlbums": "Toate albumele",
-      "allGenres": "Toate genurile",
-      "favorites": "Favorite",
-      "clearFilters": "Sterge filtrele"
-    },
-    "actions": {
-      "uploadAudio": "Incarca audio",
-      "upload": "Incarca",
-      "download": "Descarca",
-      "delete": "Sterge"
-    },
-    "messages": {
-      "uploadedWithMetadata": "Fisier incarcat! Metadatele au fost extrase din tag-urile ID3.",
-      "fileDeleted": "Fisierul a fost sters cu succes"
-    },
-    "errors": {
-      "loadAudioFilesFailed": "Incarcarea fisierelor audio a esuat",
-      "uploadFailed": "Incarcarea fisierului a esuat",
-      "deleteFailed": "Stergerea fisierului a esuat"
-    },
-    "empty": {
-      "title": "Nu exista fisiere audio inca",
-      "description": "Incarca fisierele audio locale pentru a incepe auditia",
-      "uploadFirst": "Incarca primul fisier"
-    },
-    "playlistsComingSoon": "Functia de playlisturi vine in curand...",
-    "confirm": {
-      "deleteFile": "Stergi \"{{title}}\"?"
-    },
-    "uploadDialog": {
-      "title": "Incarca fisier audio",
-      "chooseFile": "Alege fisier",
-      "fileInfo": "{{size}} MB • Metadatele vor fi citite din tag-urile ID3",
-      "uploading": "Se incarca... {{progress}}%"
-    }
-  },
   "listeningHistory": {
     "title": "Istoric de ascultare",
     "trackCount": "{{count}} melodii in istoric",
@@ -2311,5 +2257,9 @@
       "passkey_already_registered": "Acest dispozitiv are deja o cheie de acces pentru contul tau.",
       "passkey_invalid_request": "Te rugam sa verifici datele si sa incerci din nou."
     }
+  },
+  "remotePlayback": {
+    "playingOn": "Se reda pe {{device}}",
+    "playHere": "Reda aici"
   }
 }

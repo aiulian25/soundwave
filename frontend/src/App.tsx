@@ -38,7 +38,8 @@ import { useIntelligentPrefetch } from './hooks/useIntelligentPrefetch';
 import { useSettings } from './context/SettingsContext';
 import { useRadio } from './context/RadioContext';
 import { NowPlayingProvider, getTrackKey } from './context/NowPlayingContext';
-import { checkPlaybackSession, loadResumedQueue, usePlaybackSyncWriter, type PlaybackSession } from './hooks/usePlaybackSync';
+import { checkPlaybackSession, deviceId, loadResumedQueue, usePlaybackSyncWriter, useRemotePlayback, type PlaybackSession } from './hooks/usePlaybackSync';
+import RemotePlaybackBanner from './components/RemotePlaybackBanner';
 import { useTranslation } from 'react-i18next';
 import { claimBrowserData, clearAccountData, watchDataOwner } from './utils/accountData';
 import { flushListeningEvents } from './utils/listeningOutbox';
@@ -46,6 +47,8 @@ import { audioAPI, playbackSyncAPI, userAPI, ensureCsrfCookie, setAuthEventsEnab
 import type { Audio } from './types';
 
 const UNAVAILABLE_NOTICE_MS = 6000;
+// Resuming starts a little early, so the listener hears where they were.
+const RESUME_REWIND_SECONDS = 5;
 
 function App() {
   const { t } = useTranslation();
@@ -104,7 +107,9 @@ function App() {
     if (!loaded?.playback_sync_enabled) return;
 
     const session = await checkPlaybackSession();
-    if (session?.audio_details) {
+    // Still playing on another device: the "Playing on …" bar offers that instead.
+    const playingElsewhere = session?.is_live && session.device_id !== deviceId();
+    if (session?.audio_details && !playingElsewhere) {
       setResumeSession(session);
       setShowResumeDialog(true);
     }
@@ -160,9 +165,13 @@ function App() {
     }
   }, [currentAudio]);
 
+  const playbackSyncAllowed = isAuthenticated && (settingsContext?.playbackSyncEnabled ?? false);
+  // Only while nothing plays here: this device's own playback always comes first.
+  const remotePlayback = useRemotePlayback(playbackSyncAllowed && !currentAudio);
+
   // Cross-device playback sync; can be disabled in settings to reduce battery/data usage.
   usePlaybackSyncWriter({
-    enabled: isAuthenticated && (settingsContext?.playbackSyncEnabled ?? false),
+    enabled: playbackSyncAllowed,
     audio: currentAudio,
     isPlaying,
     queue,
@@ -220,17 +229,15 @@ function App() {
   };
 
   // Handle resume playback from another device
-  const handleResumePlayback = async () => {
-    if (!resumeSession?.audio_details) return;
-    
+  // Starts the session's track here, from `position`, with its saved queue.
+  const resumeFrom = async (session: PlaybackSession, position: number) => {
     try {
       // Fetch the full audio object
-      const response = await audioAPI.get(resumeSession.youtube_id);
+      const response = await audioAPI.get(session.youtube_id);
       const audio = response.data;
       
       if (audio) {
-        // Calculate resume position (5 seconds before last position)
-        const resumePosition = Math.max(0, resumeSession.position - 5);
+        const resumePosition = Math.max(0, position - RESUME_REWIND_SECONDS);
         
         const resumed = await loadResumedQueue(audio);
         setQueue(resumed.tracks);
@@ -244,10 +251,19 @@ function App() {
     } catch (error) {
       console.error('[App] Failed to resume playback:', error);
     }
-    
+  };
+
+  const handleResumePlayback = async () => {
+    if (!resumeSession?.audio_details) return;
+    await resumeFrom(resumeSession, resumeSession.position);
     setShowResumeDialog(false);
     setResumeSession(null);
   };
+
+  // The other device kept playing since its last report: carry on from where it is now,
+  // so the usual rewind is added back.
+  const playRemoteHere = (session: PlaybackSession) =>
+    resumeFrom(session, session.position + session.seconds_since_update + RESUME_REWIND_SECONDS);
 
   const handleDismissResume = () => {
     setShowResumeDialog(false);
@@ -544,7 +560,13 @@ function App() {
               </Box>
             }
           >
-          <NowPlayingProvider trackKey={getTrackKey(currentAudio)} isPlaying={isPlaying}>
+          <NowPlayingProvider
+            trackKey={getTrackKey(currentAudio) ?? remotePlayback?.youtube_id ?? null}
+            isPlaying={currentAudio ? isPlaying : Boolean(remotePlayback)}
+          >
+          {remotePlayback && (
+            <RemotePlaybackBanner session={remotePlayback} onPlayHere={() => playRemoteHere(remotePlayback)} />
+          )}
           <Routes>
             <Route path="/" element={<HomePage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/search" element={<SearchPage setCurrentAudio={setAudioWithQueue} />} />

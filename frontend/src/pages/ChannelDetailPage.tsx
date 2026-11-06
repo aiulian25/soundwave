@@ -3,12 +3,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   CircularProgress,
   Alert,
   Chip,
@@ -25,7 +19,6 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import {
-  PlayArrow as PlayIcon,
   ArrowBack as BackIcon,
   Download as DownloadIcon,
   Shuffle as ShuffleIcon,
@@ -37,12 +30,8 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { channelAPI, audioAPI } from '../api/client';
 import TrackActionsMenu from '../components/TrackActionsMenu';
-import { useHighlightTrack } from '../hooks/useHighlightTrack';
+import TrackTable from '../components/TrackTable';
 import type { Audio } from '../types';
-import ScrollingText from '../components/ScrollingText';
-import NowPlayingIndicator from '../components/NowPlayingIndicator';
-import { useIsNowPlaying } from '../context/NowPlayingContext';
-import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface ChannelDetail {
   id: number;
@@ -74,8 +63,6 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
   const { t, i18n } = useTranslation();
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
-  const { getTrackRef, shouldHighlight } = useHighlightTrack();
-  const isNowPlaying = useIsNowPlaying();
   const [channel, setChannel] = useState<ChannelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -385,134 +372,49 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
 
       {/* Audio Files Table */}
       {channel.audio_files && channel.audio_files.length > 0 ? (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell width={60}>#</TableCell>
-                <TableCell>{t('channelDetail.columns.title')}</TableCell>
-                <TableCell width={120}>{t('channelDetail.columns.duration')}</TableCell>
-                <TableCell width={120}>{t('channelDetail.columns.published')}</TableCell>
-                <TableCell width={100}>{t('channelDetail.columns.plays')}</TableCell>
-                <TableCell width={100}>{t('channelDetail.columns.actions')}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {channel.audio_files.map((audio, index) => (
-                <TableRow 
-                  key={audio.id}
-                  ref={getTrackRef(audio.youtube_id)}
-                  hover
-                  sx={{ 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' },
-                    ...(shouldHighlight(audio.youtube_id) && {
-                      bgcolor: 'rgba(19, 236, 106, 0.1)',
-                    }),
-                    ...(isNowPlaying(audio.youtube_id) && nowPlayingRowSx),
+        <TrackTable
+          items={channel.audio_files}
+          rowKey={(audio) => audio.id}
+          describe={(audio) => ({
+            key: audio.youtube_id,
+            title: audio.title,
+            subtitle: t('channelDetail.stats.views', { count: formatNumber(audio.view_count || 0) }),
+            artworkUrl: audio.thumbnail_url,
+          })}
+          onPlay={(audio) => handlePlayTrack(audio)}
+          columns={[
+            { id: 'duration', header: t('channelDetail.columns.duration'), width: 80, align: 'right', showFrom: 'sm', render: (audio) => formatDuration(audio.duration) },
+            { id: 'published', header: t('channelDetail.columns.published'), width: 120, showFrom: 'lg', render: (audio) => (audio.published_date ? new Date(audio.published_date).toLocaleDateString(i18n.language === 'ro' ? 'ro-RO' : 'en-US') : t('channelDetail.notAvailable')) },
+            { id: 'plays', header: t('channelDetail.columns.plays'), width: 72, align: 'right', showFrom: 'md', render: (audio) => audio.play_count },
+          ]}
+          actionsWidth={96}
+          renderActions={(audio) => (
+            <>
+              <Tooltip title={t('channelDetail.actions.download')}>
+                <IconButton
+                  size="small"
+                  aria-label={t('channelDetail.actions.download')}
+                  onClick={async () => {
+                    try {
+                      const blob = await audioAPI.downloadFile(audio.youtube_id!);
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = audio.title || t('channelDetail.fallback.audioFilename');
+                      link.click();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                      console.error('Download failed:', err);
+                    }
                   }}
-                  onClick={() => handlePlayTrack(audio)}
                 >
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
-                        {isNowPlaying(audio.youtube_id) ? <NowPlayingIndicator /> : index + 1}
-                      </Typography>
-                      <IconButton aria-label={t('player.a11y.play')} 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayTrack(audio);
-                        }}
-                      >
-                        <PlayIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Box
-                        component="img"
-                        src={audio.thumbnail_url}
-                        alt={audio.title}
-                        sx={{
-                          width: 40,
-                          height: 30,
-                          objectFit: 'cover',
-                          borderRadius: 1,
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                      <Box>
-                        <ScrollingText
-                          variant="body2"
-                          fontWeight="medium"
-                          sx={isNowPlaying(audio.youtube_id) ? nowPlayingTitleSx : undefined}
-                        >
-                          {audio.title}
-                        </ScrollingText>
-                        <Typography variant="caption" color="text.secondary">
-                          {t('channelDetail.stats.views', { count: formatNumber(audio.view_count || 0) })}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
-                      {formatDuration(audio.duration)}
-                    </Typography>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
-                      {audio.published_date ? new Date(audio.published_date).toLocaleDateString(i18n.language === 'ro' ? 'ro-RO' : 'en-US') : t('channelDetail.notAvailable')}
-                    </Typography>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
-                      {audio.play_count}
-                    </Typography>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title={t('channelDetail.actions.download')}>
-                        <IconButton 
-                          size="small"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              const blob = await audioAPI.downloadFile(audio.youtube_id!);
-                              const url = window.URL.createObjectURL(blob);
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.download = audio.title || t('channelDetail.fallback.audioFilename');
-                              link.click();
-                              window.URL.revokeObjectURL(url);
-                            } catch (err) {
-                              console.error('Download failed:', err);
-                            }
-                          }}
-                        >
-                          <DownloadIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <TrackActionsMenu 
-                        track={audio}
-                        onTrackUpdate={handleTrackUpdate}
-                      />
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                  <DownloadIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <TrackActionsMenu track={audio} onTrackUpdate={handleTrackUpdate} />
+            </>
+          )}
+        />
       ) : (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <YouTubeIcon sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />

@@ -2,14 +2,15 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const api = vi.hoisted(() => ({ syncPlayback: vi.fn(), getQueue: vi.fn() }));
-vi.mock('../api/client', () => ({ playbackSyncAPI: api }));
+const api = vi.hoisted(() => ({ syncPlayback: vi.fn(), getQueue: vi.fn(), getSession: vi.fn() }));
+vi.mock('../api/client', () => ({ playbackSyncAPI: api, getCsrfToken: () => 'csrf-token' }));
 
-import { loadResumedQueue, queueToSync, usePlaybackSyncWriter } from './usePlaybackSync';
+import { deviceId, loadResumedQueue, queueToSync, usePlaybackSyncWriter, useRemotePlayback, type PlaybackSession } from './usePlaybackSync';
 import type { Audio } from '../types';
 
 const DELAY_MS = 3000;
-const INTERVAL_MS = 60000;
+const INTERVAL_MS = 15000;
+const REMOTE_POLL_MS = 15000;
 const TRACK = { youtube_id: 'track-one', duration: 100 } as Audio;
 const OTHER_TRACK = { youtube_id: 'track-two', duration: 50 } as Audio;
 
@@ -59,6 +60,36 @@ describe('writing playback state', () => {
     advance(1);
     expect(api.syncPlayback).toHaveBeenCalledOnce();
     expect(api.syncPlayback.mock.calls[0][0]).toMatchObject({ youtube_id: 'track-one', position: 55, is_playing: true });
+  });
+
+  it('closing the tab reports the stop at once, keeping the queue', () => {
+    const sent = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('fetch', sent);
+    render({ queue: [TRACK, OTHER_TRACK], queueIndex: 1 });
+
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+
+    expect(sent).toHaveBeenCalledOnce();
+    const [, request] = sent.mock.calls[0];
+    expect(request.keepalive).toBe(true);
+    expect(request.headers['X-CSRFToken']).toBe('csrf-token');
+    expect(JSON.parse(request.body)).toMatchObject({
+      is_playing: false,
+      queue_youtube_ids: ['track-one', 'track-two'],
+      queue_index: 1,
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('closing a paused tab sends nothing extra', () => {
+    const sent = vi.fn();
+    vi.stubGlobal('fetch', sent);
+    render({ isPlaying: false });
+
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+
+    expect(sent).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it('keeps writing while playing', () => {
@@ -182,5 +213,73 @@ describe('resuming the queue', () => {
   it('falls back to the current track if the request fails', async () => {
     api.getQueue.mockRejectedValue(new Error('network down'));
     expect(await loadResumedQueue(TRACK)).toEqual({ tracks: [TRACK], index: 0, missing: 0 });
+  });
+});
+
+describe('seeing what another device plays', () => {
+  let root: Root;
+  let seen: PlaybackSession | null;
+  const session = (overrides: Partial<PlaybackSession>) =>
+    ({ youtube_id: 'track-one', is_live: true, device_id: 'device_elsewhere', device_name: 'Mac', ...overrides }) as PlaybackSession;
+
+  function Watcher({ enabled }: { enabled: boolean }) {
+    seen = useRemotePlayback(enabled);
+    return null;
+  }
+
+  const render = (enabled = true) => act(() => root.render(createElement(Watcher, { enabled })));
+  const settle = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  const reply = (value: PlaybackSession) => api.getSession.mockResolvedValue({ data: { has_session: true, session: value } });
+
+  beforeEach(() => {
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.useFakeTimers();
+    seen = null;
+    api.getSession.mockReset();
+    root = createRoot(document.createElement('div'));
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('shows a track playing live on another device', async () => {
+    reply(session({}));
+    render();
+    await settle();
+    expect(seen?.device_name).toBe('Mac');
+  });
+
+  it('ignores this device and anything not playing live', async () => {
+    for (const value of [session({ device_id: deviceId() }), session({ is_live: false })]) {
+      reply(value);
+      render();
+      await act(async () => { vi.advanceTimersByTime(REMOTE_POLL_MS); });
+      await settle();
+      expect(seen).toBeNull();
+    }
+  });
+
+  it('notices when the other device stops', async () => {
+    reply(session({}));
+    render();
+    await settle();
+    reply(session({ is_live: false }));
+    await act(async () => { vi.advanceTimersByTime(REMOTE_POLL_MS); });
+    await settle();
+    expect(seen).toBeNull();
+  });
+
+  it('does not ask while the page is hidden or when sync is off', async () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    render();
+    await act(async () => { vi.advanceTimersByTime(REMOTE_POLL_MS * 3); });
+    render(false);
+    await act(async () => { vi.advanceTimersByTime(REMOTE_POLL_MS * 3); });
+    expect(api.getSession).not.toHaveBeenCalled();
   });
 });

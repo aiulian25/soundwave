@@ -659,7 +659,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
   }
 
   return (
-    <Box data-history-page sx={{ p: { xs: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
+    <Box data-history-page>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

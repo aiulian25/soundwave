@@ -118,6 +118,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [isBuffering, setIsBuffering] = useState(false);
   const [isFavorite, setIsFavorite] = useState(audio.is_favorite || false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [lockScreenArtwork, setLockScreenArtwork] = useState('');
   const audioRef = useRef<HTMLAudioElement>(null);
   // Latest playback position without the re-render cost of state. Read this from
   // effects and callbacks that only need the value at the moment they run.
@@ -381,11 +382,27 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   }, [audio.youtube_id]);
 
 
+  // The OS fetches lock-screen artwork without our session cookie, so a server track's artwork
+  // needs the short-lived ticketed address. Imported local files carry their own image.
+  useEffect(() => {
+    setLockScreenArtwork('');
+    if (!audio.youtube_id) return undefined;
+
+    let cancelled = false;
+    audioAPI
+      .getPlayer(audio.youtube_id)
+      .then((response) => {
+        if (!cancelled) setLockScreenArtwork(response.data.artwork_ticket_url ?? '');
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [audio.youtube_id]);
+
   // Initialize Media Session API with artwork
   useEffect(() => {
-    // Raw CDN URL, not the /artwork/ proxy: the OS fetches Media Session artwork without
-    // our session cookie, and CSP img-src already allowlists these hosts.
-    const artworkUrl = audio.cover_art_url || audio.thumbnail_url;
+    const artworkUrl = audio.youtube_id ? lockScreenArtwork : audio.cover_art_url || audio.thumbnail_url;
     
     // Function to set metadata with artwork
     const updateMediaSession = (artworkArray?: Array<{src: string; sizes: string; type: string}>) => {
@@ -470,7 +487,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     return () => {
       clearMediaSession();
     };
-  }, [audio, hasNext, hasPrevious, onNext, onPrevious, setIsPlaying, settings.seek_duration]);
+  }, [audio, lockScreenArtwork, hasNext, hasPrevious, onNext, onPrevious, setIsPlaying, settings.seek_duration]);
 
   useEffect(() => {
     if (audioRef.current) {

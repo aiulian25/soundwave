@@ -5,15 +5,19 @@
  * One session per user and the last write wins; resuming elsewhere takes over.
  */
 
-import { useEffect, type RefObject } from 'react';
-import { playbackSyncAPI } from '../api/client';
+import { useEffect, useState, type RefObject } from 'react';
+import { getCsrfToken, playbackSyncAPI } from '../api/client';
 import type { Audio } from '../types';
 
 const DEVICE_ID_KEY = 'soundwave_device_id';
 // Delayed so playback startup is not blocked, and so a burst of changes writes once.
 const SYNC_DELAY_MS = 3000;
-// Longer than strictly needed, for mobile battery and data.
-const SYNC_INTERVAL_MS = 60000;
+// Often enough for other devices to show what is playing; the server stops calling a session
+// live after LIVE_SESSION_SECONDS (45 s) without a report.
+const SYNC_INTERVAL_MS = 15000;
+// How often another visible device checks what is playing elsewhere.
+const REMOTE_POLL_MS = 15000;
+const PLAYBACK_SYNC_PATH = '/api/playback-sync/';
 // Must stay within MAX_QUEUE_IDS in backend/audio/serializers_playback_sync.py.
 const MAX_SYNCED_QUEUE_IDS = 5000;
 
@@ -22,6 +26,8 @@ export interface PlaybackSession {
   position: number;
   duration: number;
   is_playing: boolean;
+  /** Playing right now on its device, as opposed to a position saved earlier. */
+  is_live: boolean;
   volume: number;
   queue_youtube_ids: string[];
   queue_index: number;
@@ -58,7 +64,7 @@ export async function checkPlaybackSession(): Promise<PlaybackSession | null> {
   return null;
 }
 
-function deviceId(): string {
+export function deviceId(): string {
   const existing = localStorage.getItem(DEVICE_ID_KEY);
   if (existing) return existing;
   const created = `device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -102,35 +108,87 @@ export function usePlaybackSyncWriter({ enabled, audio, isPlaying, queue, queueI
   useEffect(() => {
     if (!enabled || !youtubeId) return undefined;
 
-    const sync = () => {
-      if (!navigator.onLine) return;
+    // Every report carries the queue: the server replaces the whole session each time.
+    const report = (playing: boolean) => {
       const queueIds = queue.map((track) => track.youtube_id).filter(Boolean) as string[];
       const saved = queueToSync(queueIds, queueIndex);
+      return {
+        youtube_id: youtubeId,
+        position: positionRef.current ?? 0,
+        duration,
+        is_playing: playing,
+        volume,
+        queue_youtube_ids: saved.ids,
+        queue_index: saved.index,
+        device_id: deviceId(),
+        device_name: deviceName(),
+      };
+    };
+
+    const sync = () => {
+      if (!navigator.onLine) return;
       playbackSyncAPI
-        .syncPlayback({
-          youtube_id: youtubeId,
-          position: positionRef.current ?? 0,
-          duration,
-          is_playing: isPlaying,
-          volume,
-          queue_youtube_ids: saved.ids,
-          queue_index: saved.index,
-          device_id: deviceId(),
-          device_name: deviceName(),
-        })
+        .syncPlayback(report(isPlaying))
         .catch((error) => console.debug('[PlaybackSync] Sync failed:', error));
+    };
+
+    // Closing the tab says so straight away, rather than leaving other devices to wait out
+    // the live window. keepalive lets the request outlive the page.
+    const reportStopped = () => {
+      if (!isPlaying) return;
+      fetch(PLAYBACK_SYNC_PATH, {
+        method: 'POST',
+        keepalive: true,
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() ?? '' },
+        body: JSON.stringify(report(false)),
+      }).catch(() => undefined);
     };
 
     const delayed = setTimeout(sync, SYNC_DELAY_MS);
     const periodic = setInterval(() => {
       if (isPlaying) sync();
     }, SYNC_INTERVAL_MS);
+    window.addEventListener('pagehide', reportStopped);
 
     return () => {
       clearTimeout(delayed);
       clearInterval(periodic);
+      window.removeEventListener('pagehide', reportStopped);
     };
   }, [enabled, youtubeId, duration, isPlaying, queue, queueIndex, volume, positionRef]);
+}
+
+/** What another of this account's devices is playing right now, while this page is visible. */
+export function useRemotePlayback(enabled: boolean): PlaybackSession | null {
+  const [remote, setRemote] = useState<PlaybackSession | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setRemote(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const check = async () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      const session = await checkPlaybackSession();
+      if (cancelled) return;
+      const playingElsewhere = Boolean(session?.is_live && session.device_id !== deviceId());
+      setRemote(playingElsewhere ? session : null);
+    };
+
+    check();
+    const periodic = setInterval(check, REMOTE_POLL_MS);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      cancelled = true;
+      clearInterval(periodic);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [enabled]);
+
+  return remote;
 }
 
 export interface ResumedQueue {

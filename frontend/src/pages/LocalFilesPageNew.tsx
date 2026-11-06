@@ -4,13 +4,6 @@ import {
   Box,
   Typography,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   IconButton,
   LinearProgress,
   Alert,
@@ -19,7 +12,6 @@ import {
 } from '@mui/material';
 import {
   FolderOpen as FolderIcon,
-  PlayArrow as PlayIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
   Add as AddIcon,
@@ -28,10 +20,7 @@ import { countUnclaimedFiles, LocalAudioDB, type LocalAudioFile } from '../utils
 import { extractMetadata, getAudioDuration } from '../utils/id3Reader';
 import { localFileUrl, releaseAllLocalFileUrls, releaseLocalFileUrl } from '../utils/localFileUrls';
 import type { Audio } from '../types';
-import ScrollingText from '../components/ScrollingText';
-import NowPlayingIndicator from '../components/NowPlayingIndicator';
-import { useIsNowPlaying } from '../context/NowPlayingContext';
-import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
+import TrackTable from '../components/TrackTable';
 
 interface LocalFilesPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -40,7 +29,6 @@ interface LocalFilesPageProps {
 
 export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFilesPageProps) {
   const { t } = useTranslation();
-  const isNowPlaying = useIsNowPlaying();
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
@@ -450,138 +438,32 @@ export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFile
 
       {/* Files Table */}
       {audioFiles.length > 0 && (
-        <TableContainer
-          component={Paper}
-          sx={{
-            bgcolor: 'background.paper',
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'rgba(255, 255, 255, 0.05)',
-            '& .MuiTableCell-root': {
-              borderColor: 'rgba(255, 255, 255, 0.05)',
-              padding: { xs: '6px 8px', sm: '8px 12px' },
-              fontSize: { xs: '0.7rem', sm: '0.8125rem' },
-            },
-          }}
-        >
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell width={30} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('localFilesNew.table.columnNumber')}</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('library.columns.title')}</TableCell>
-                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' }, fontSize: '0.75rem' }}>{t('localFilesNew.table.columnArtist')}</TableCell>
-                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', md: 'table-cell' }, fontSize: '0.75rem' }}>{t('localFilesNew.table.columnAlbum')}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('library.columns.duration')}</TableCell>
-                <TableCell align="center" width={80} sx={{ fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>{t('library.columns.actions')}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {audioFiles.map((file, index) => (
-                <TableRow
-                  key={file.id}
-                  sx={{
-                    cursor: 'pointer',
-                    transition: 'background-color 0.3s ease',
-                    '&:hover': {
-                      bgcolor: 'rgba(19, 236, 106, 0.05)',
-                    },
-                    ...(isNowPlaying(file.id) && nowPlayingRowSx),
-                  }}
-                  onClick={() => handlePlay(file)}
-                >
-                  <TableCell sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                    {isNowPlaying(file.id) ? <NowPlayingIndicator /> : index + 1}
-                  </TableCell>
-                  <TableCell>
-                    <Box>
-                      <ScrollingText 
-                        variant="body2" 
-                        sx={{ 
-                          maxWidth: { xs: 150, sm: 200, md: 300 }, 
-                          fontWeight: 500,
-                          fontSize: { xs: '0.75rem', sm: '0.813rem' },
-                          lineHeight: 1.3,
-                          ...(isNowPlaying(file.id) && nowPlayingTitleSx),
-                        }}
-                      >
-                        {file.title}
-                      </ScrollingText>
-                      <Typography 
-                        variant="caption" 
-                        noWrap
-                        sx={{ 
-                          display: { xs: 'block', sm: 'none' },
-                          color: 'text.secondary',
-                          fontSize: '0.65rem',
-                          maxWidth: 150,
-                        }}
-                      >
-                        {file.artist}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary" 
-                      noWrap 
-                      sx={{ 
-                        maxWidth: 120,
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {file.artist}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary" 
-                      noWrap 
-                      sx={{ 
-                        maxWidth: 150,
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {file.album || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                    {formatDuration(file.duration)}
-                  </TableCell>
-                  <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                    <IconButton aria-label={t('player.a11y.play')}
-                      size="small"
-                      onClick={() => handlePlay(file)}
-                      sx={{
-                        color: 'primary.main',
-                        padding: { xs: '4px', sm: '6px' },
-                        '&:hover': {
-                          bgcolor: 'rgba(19, 236, 106, 0.1)',
-                        },
-                      }}
-                    >
-                      <PlayIcon sx={{ fontSize: { xs: '1rem', sm: '1.2rem' } }} />
-                    </IconButton>
-                    <IconButton aria-label={t('common.delete')}
-                      size="small"
-                      onClick={() => handleDelete(file.id)}
-                      sx={{
-                        color: 'error.main',
-                        padding: { xs: '4px', sm: '6px' },
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 0, 0, 0.1)',
-                        },
-                      }}
-                    >
-                      <DeleteIcon sx={{ fontSize: { xs: '1rem', sm: '1.2rem' } }} />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <TrackTable
+          items={audioFiles}
+          rowKey={(file) => file.id}
+          describe={(file) => ({
+            key: file.id,
+            title: file.title,
+            subtitle: file.artist,
+            artworkUrl: file.coverArt,
+          })}
+          onPlay={(file) => handlePlay(file)}
+          columns={[
+            { id: 'album', header: t('localFilesNew.table.columnAlbum'), width: 160, showFrom: 'md', render: (file) => file.album || '-' },
+            { id: 'duration', header: t('library.columns.duration'), width: 80, align: 'right', showFrom: 'sm', render: (file) => formatDuration(file.duration) },
+          ]}
+          actionsWidth={56}
+          renderActions={(file) => (
+            <IconButton
+              aria-label={t('common.delete')}
+              size="small"
+              onClick={() => handleDelete(file.id)}
+              sx={{ color: 'error.main' }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          )}
+        />
       )}
 
       {/* Snackbar for alerts */}

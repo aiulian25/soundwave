@@ -169,6 +169,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Track artwork this server keeps: it never changes once kept, so it is served offline too.
+  if (/^\/api\/audio\/[^/]+\/artwork\/?$/.test(url.pathname)) {
+    event.respondWith(cacheFirstStrategy(request, IMAGE_CACHE_NAME));
+    return;
+  }
+
   // Audio download API endpoints - Cache first (critical for offline playback)
   // These are cached by "Make Available Offline" feature
   if (url.pathname.match(/\/api\/audio\/[^/]+\/download\/?$/)) {

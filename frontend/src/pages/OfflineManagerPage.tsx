@@ -132,7 +132,7 @@ export default function OfflineManagerPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', px: 2 }}>
+    <Box>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '-0.02em', mb: 1 }}>

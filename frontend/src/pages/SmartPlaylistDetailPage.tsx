@@ -4,12 +4,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   CircularProgress,
   Alert,
   Chip,
@@ -46,12 +40,8 @@ import { smartPlaylistAPI } from '../api/client';
 import { fetchSmartPlaylistTracks } from '../utils/fetchAll';
 import { ruleErrorsFromResponse, type RuleFieldErrors } from '../utils/smartRuleErrors';
 import TrackActionsMenu from '../components/TrackActionsMenu';
-import { useHighlightTrack } from '../hooks/useHighlightTrack';
+import TrackTable from '../components/TrackTable';
 import type { Audio, SmartPlaylist, SmartPlaylistRule, SmartPlaylistChoices } from '../types';
-import ScrollingText from '../components/ScrollingText';
-import NowPlayingIndicator from '../components/NowPlayingIndicator';
-import { useIsNowPlaying } from '../context/NowPlayingContext';
-import { nowPlayingRowSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 interface SmartPlaylistDetailPageProps {
   setCurrentAudio: (audio: Audio, queue?: Audio[]) => void;
@@ -61,8 +51,6 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
   const { t } = useTranslation();
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
-  const { getTrackRef, shouldHighlight } = useHighlightTrack();
-  const isNowPlaying = useIsNowPlaying();
   const [playlist, setPlaylist] = useState<SmartPlaylist | null>(null);
   const [tracks, setTracks] = useState<Audio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,7 +242,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
   if (!playlist) return null;
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+    <Box>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Button
@@ -352,81 +340,22 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
           )}
         </Paper>
       ) : (
-        <TableContainer component={Paper}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell width={50}>#</TableCell>
-                <TableCell>{t('library.columns.title')}</TableCell>
-                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('search.suggestions.artists')}</TableCell>
-                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('library.columns.channel')}</TableCell>
-                <TableCell align="right" sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('library.columns.plays')}</TableCell>
-                <TableCell align="right" width={100}>{t('library.columns.actions')}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tracks.map((track, index) => (
-                <TableRow
-                  key={track.id}
-                  ref={getTrackRef(track.youtube_id)}
-                  hover
-                  sx={{ 
-                    cursor: 'pointer',
-                    ...(shouldHighlight(track.youtube_id) && {
-                      bgcolor: 'rgba(19, 236, 106, 0.1)',
-                    }),
-                    ...(isNowPlaying(track.youtube_id) && nowPlayingRowSx),
-                  }}
-                  onClick={() => handlePlay(index, false)}
-                >
-                  <TableCell>{isNowPlaying(track.youtube_id) ? <NowPlayingIndicator /> : index + 1}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {track.thumbnail_url && (
-                        <Box
-                          component="img"
-                          src={track.thumbnail_url}
-                          alt={track.title}
-                          sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover' }}
-                        />
-                      )}
-                      <Box sx={{ overflow: 'hidden' }}>
-                        <ScrollingText
-                          variant="body2"
-                          sx={isNowPlaying(track.youtube_id) ? nowPlayingTitleSx : undefined}
-                        >
-                          {track.title}
-                        </ScrollingText>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: { sm: 'none' } }}>
-                          {track.artist || track.channel_name}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
-                    <Typography variant="body2" noWrap>
-                      {track.artist || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                    <Typography variant="body2" noWrap>
-                      {track.channel_name}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" sx={{ display: { xs: 'none', lg: 'table-cell' } }}>
-                    {track.play_count}
-                  </TableCell>
-                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                    <TrackActionsMenu 
-                      track={track}
-                      onTrackUpdate={handleTrackUpdate}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <TrackTable
+          items={tracks}
+          rowKey={(track) => track.id}
+          describe={(track) => ({
+            key: track.youtube_id,
+            title: track.title,
+            subtitle: track.artist || track.channel_name,
+            artworkUrl: track.thumbnail_url,
+          })}
+          onPlay={(_track, index) => handlePlay(index, false)}
+          columns={[
+            { id: 'plays', header: t('library.columns.plays'), width: 72, align: 'right', showFrom: 'md', render: (track) => track.play_count },
+          ]}
+          actionsWidth={56}
+          renderActions={(track) => <TrackActionsMenu track={track} onTrackUpdate={handleTrackUpdate} />}
+        />
       )}
 
       {/* Edit Rules Dialog */}
