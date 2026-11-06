@@ -36,6 +36,7 @@ import {
   Preview as PreviewIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { formatDuration } from '../utils/formatDuration';
 import { smartPlaylistAPI } from '../api/client';
 import { fetchSmartPlaylistTracks } from '../utils/fetchAll';
 import { ruleErrorsFromResponse, type RuleFieldErrors } from '../utils/smartRuleErrors';
@@ -348,6 +349,7 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
             title: track.title,
             subtitle: track.artist || track.channel_name,
             artworkUrl: track.thumbnail_url,
+            duration: formatDuration(track.duration),
           })}
           onPlay={(_track, index) => handlePlay(index, false)}
           columns={[

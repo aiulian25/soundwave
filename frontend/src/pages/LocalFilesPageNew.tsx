@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatDuration } from '../utils/formatDuration';
 import {
   Box,
   Typography,
@@ -304,11 +305,6 @@ export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFile
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   return (
     <Box>
@@ -446,6 +442,7 @@ export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFile
             title: file.title,
             subtitle: file.artist,
             artworkUrl: file.coverArt,
+            duration: formatDuration(file.duration),
           })}
           onPlay={(file) => handlePlay(file)}
           columns={[

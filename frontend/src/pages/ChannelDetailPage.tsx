@@ -27,6 +27,7 @@ import {
   Sync as SyncIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { formatDuration } from '../utils/formatDuration';
 import { useParams, useNavigate } from 'react-router-dom';
 import { channelAPI, audioAPI } from '../api/client';
 import TrackActionsMenu from '../components/TrackActionsMenu';
@@ -197,16 +198,6 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
     });
   };
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -380,6 +371,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
             title: audio.title,
             subtitle: t('channelDetail.stats.views', { count: formatNumber(audio.view_count || 0) }),
             artworkUrl: audio.thumbnail_url,
+            duration: formatDuration(audio.duration),
           })}
           onPlay={(audio) => handlePlayTrack(audio)}
           columns={[

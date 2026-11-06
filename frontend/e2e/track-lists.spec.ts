@@ -124,7 +124,7 @@ async function open(browser: Browser, viewport: { width: number; height: number 
     return json({ data: [] });
   });
   await page.goto(path);
-  await expect(page.getByTestId('track-row').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('track-row').or(page.getByTestId('track-card')).first()).toBeVisible({ timeout: 20_000 });
   return { context, page };
 }
 
@@ -182,5 +182,56 @@ test('a device that stopped playing no longer shows', async ({ browser }) => {
 
   await expect(page.getByTestId('remote-playback')).toBeHidden();
   await expect(page.getByRole('img', { name: 'Now playing' })).toHaveCount(0);
+  await context.close();
+});
+
+// The main area clips overflow, so a card past the edge would be cut off without the page scrolling.
+const measureCards = (page: Page) => page.evaluate(() => {
+  const cards = [...document.querySelectorAll('[data-testid="track-card"]')].map((card) => card.getBoundingClientRect());
+  return {
+    cards: cards.length,
+    cardsCutOff: cards.filter((card) => card.left < 0 || card.right > window.innerWidth).length,
+    pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+  };
+});
+
+for (const [label, viewport] of [['phone', PHONE], ['desktop', DESKTOP]] as const) {
+  for (const [name, path] of PAGES) {
+    test(`${name} on a ${label} as cards: every track, rolling long title, local artwork, no sideways scroll`, async ({ browser }) => {
+      const stubs: Stubs = { remoteSession: null, foreignImageRequests: [] };
+      const { context, page } = await open(browser, viewport, path, stubs);
+
+      await page.getByRole('button', { name: 'Card view' }).click();
+
+      const longTitleCard = page.getByTestId('track-card').filter({ hasText: LONG_TITLE });
+      await expect(longTitleCard.locator('.scrolling-text-content')).toHaveAttribute('data-scrolling', 'true');
+      const { cards, cardsCutOff, pageOverflow } = await measureCards(page);
+      expect(cards).toBe(TRACKS.length);
+      expect(cardsCutOff).toBe(0);
+      expect(pageOverflow).toBeLessThanOrEqual(0);
+      await expect(page.getByTestId('track-row')).toHaveCount(0);
+      await expect(page.getByTestId('track-card-duration')).toHaveText(Array(TRACKS.length).fill('3:20'));
+      expect(stubs.foreignImageRequests).toEqual([]);
+      await context.close();
+    });
+  }
+}
+
+test('the chosen view is kept on this device, and playing from a card works', async ({ browser }) => {
+  const stubs: Stubs = { remoteSession: null, foreignImageRequests: [] };
+  const { context, page } = await open(browser, DESKTOP, '/library', stubs);
+
+  await page.getByRole('button', { name: 'Card view' }).click();
+  await page.reload();
+  await expect(page.getByTestId('track-card').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: 'Card view' })).toHaveAttribute('aria-pressed', 'true');
+
+  const card = page.getByTestId('track-card').filter({ hasText: 'Song 2' });
+  await card.getByRole('button').first().click();
+  await expect(page.getByTestId('player-playpause')).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByRole('img', { name: 'Now playing' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'List view' }).click();
+  await expect(page.getByTestId('track-row')).toHaveCount(TRACKS.length);
   await context.close();
 });

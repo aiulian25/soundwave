@@ -11,6 +11,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { formatDuration } from '../utils/formatDuration';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
@@ -47,11 +48,6 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
     loadAudio();
   }, [location.key, loadAudio]);
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const formatFileSize = (bytes: number) => {
     const mb = bytes / (1024 * 1024);
@@ -161,6 +157,7 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
           title: audio.title,
           subtitle: audio.artist || audio.channel_name,
           artworkUrl: audio.thumbnail_url,
+          duration: formatDuration(audio.duration),
         })}
         onPlay={(audio) => setCurrentAudio(audio, audioList)}
         columns={[

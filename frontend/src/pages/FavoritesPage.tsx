@@ -9,6 +9,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { useTranslation } from 'react-i18next';
+import { formatDuration } from '../utils/formatDuration';
 import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
@@ -89,11 +90,6 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
     setSnackbarOpen(true);
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const formatFileSize = (bytes: number) => {
     const mb = bytes / (1024 * 1024);
@@ -180,6 +176,7 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
             title: audio.title,
             subtitle: audio.artist || audio.channel_name,
             artworkUrl: audio.thumbnail_url,
+            duration: formatDuration(audio.duration),
           })}
           onPlay={(audio) => setCurrentAudio(audio, favorites)}
           columns={[

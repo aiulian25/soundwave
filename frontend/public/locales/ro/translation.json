@@ -2261,5 +2261,10 @@
   "remotePlayback": {
     "playingOn": "Se reda pe {{device}}",
     "playHere": "Reda aici"
+  },
+  "trackView": {
+    "label": "Mod de afisare",
+    "list": "Afisare lista",
+    "cards": "Afisare carduri"
   }
 }

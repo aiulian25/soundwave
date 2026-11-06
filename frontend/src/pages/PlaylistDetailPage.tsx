@@ -27,6 +27,7 @@ import {
   FolderZip as FolderZipIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { formatDuration } from '../utils/formatDuration';
 import { useParams, useNavigate } from 'react-router-dom';
 import { playlistAPI, audioAPI } from '../api/client';
 import PlaylistExportDialog from '../components/PlaylistExportDialog';
@@ -416,11 +417,6 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -821,6 +817,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           title: item.audio.title,
           subtitle: item.audio.artist || item.audio.channel_name,
           artworkUrl: item.audio.thumbnail_url,
+          duration: formatDuration(item.audio.duration),
           playable: Boolean(item.audio.file_path),
         })}
         onPlay={(item) => setCurrentAudio(item.audio, playableQueue)}
