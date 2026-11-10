@@ -30,6 +30,7 @@ from download.claims import (
     keep_claim_alive,
     locked_claim,
 )
+from download.cookie_health import COOKIES_FILE_ACCESS_MARKER, COOKIES_REFRESH_MARKER
 from download.models import DownloadQueue
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -40,6 +41,7 @@ from django.db.models import Q
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from importlib.util import find_spec
+from pathlib import Path
 import os
 import logging
 
@@ -73,38 +75,38 @@ def _cache_playlist_video_ids(playlist_id, ordered_ids):
 
 
 # --- Download audio-quality resolution (F1) --------------------------------------
-# Maps a user/channel quality tier to the yt-dlp FFmpegExtractAudio postprocessor and
-# the resulting file extension / stored Audio.audio_format. The two settings use
-# different vocabularies — UserConfig.audio_quality = low/medium/high/best;
-# Channel.download_quality = auto/low/medium/high/ultra — so both, plus a 'flac' alias,
-# are normalized here. best/ultra/flac = lossless FLAC; unknown/'auto' falls through to
-# the historical default (m4a @ 192 kbps).
+# Maps a user/channel quality tier to the yt-dlp FFmpegExtractAudio postprocessor. The two
+# settings use different vocabularies — UserConfig.audio_quality = original/low/medium/high/
+# best; Channel.download_quality = auto/original/low/medium/high/ultra — so both, plus a
+# 'flac' alias, are normalized here. Unknown/'auto' falls through to 'original'.
+#
+# YouTube audio is already lossy, so every preset but 'original' re-encodes it: that costs
+# CPU and disk and cannot add quality. yt-dlp's codec 'best' keeps the source stream as it
+# is and only moves it into its own container (Opus -> .opus, AAC -> .m4a).
+_KEEP_SOURCE_CODEC = 'best'
 _QUALITY_PRESETS = {
-    'flac':   {'pp': {'preferredcodec': 'flac'},                           'ext': 'flac'},
-    'best':   {'pp': {'preferredcodec': 'flac'},                           'ext': 'flac'},
-    'ultra':  {'pp': {'preferredcodec': 'flac'},                           'ext': 'flac'},
-    'high':   {'pp': {'preferredcodec': 'm4a', 'preferredquality': '320'}, 'ext': 'm4a'},
-    'medium': {'pp': {'preferredcodec': 'm4a', 'preferredquality': '192'}, 'ext': 'm4a'},
-    'low':    {'pp': {'preferredcodec': 'opus', 'preferredquality': '96'}, 'ext': 'opus'},
+    'original': {'preferredcodec': _KEEP_SOURCE_CODEC},
+    'flac':     {'preferredcodec': 'flac'},
+    'best':     {'preferredcodec': 'flac'},
+    'ultra':    {'preferredcodec': 'flac'},
+    'high':     {'preferredcodec': 'm4a', 'preferredquality': '320'},
+    'medium':   {'preferredcodec': 'm4a', 'preferredquality': '192'},
+    'low':      {'preferredcodec': 'opus', 'preferredquality': '96'},
 }
-_DEFAULT_QUALITY = 'medium'
-
-
-def _quality_preset(quality):
-    return _QUALITY_PRESETS.get((quality or '').strip().lower(), _QUALITY_PRESETS[_DEFAULT_QUALITY])
+_DEFAULT_QUALITY = 'original'
 
 
 def _postprocessor_for_quality(quality):
     """FFmpegExtractAudio options (WITHOUT the 'key') for a quality tier.
 
-    e.g. 'flac' -> {'preferredcodec': 'flac'}; 'high' -> {'preferredcodec':'m4a','preferredquality':'320'}.
+    e.g. 'original' -> {'preferredcodec': 'best'}; 'high' -> {'preferredcodec':'m4a','preferredquality':'320'}.
     """
-    return dict(_quality_preset(quality)['pp'])
+    return dict(_QUALITY_PRESETS.get((quality or '').strip().lower(), _QUALITY_PRESETS[_DEFAULT_QUALITY]))
 
 
-def _ext_for_quality(quality):
-    """Output file extension / Audio.audio_format for a quality tier (flac/m4a/opus)."""
-    return _quality_preset(quality)['ext']
+def _stored_format(file_path):
+    """Audio.audio_format: what the finished file is, which 'original' only settles on download"""
+    return Path(file_path).suffix.lstrip('.').lower()
 
 
 def _resolve_download_quality(queue_item):
@@ -112,7 +114,7 @@ def _resolve_download_quality(queue_item):
 
     Precedence: the originating channel's `download_quality` (when the item came from a
     channel subscription and that channel isn't 'auto') > the owner's
-    `UserConfig.audio_quality` > the historical default (medium / m4a-192).
+    `UserConfig.audio_quality` > the default (original, no conversion).
     """
     # Per-channel override — channel-subscription downloads stamp `channel_name`.
     if queue_item.channel_name:
@@ -196,8 +198,6 @@ def extract_features_task(audio_id):
     if not audio.file_path:
         return f"Audio {audio_id} has no file"
 
-    from django.conf import settings
-    from pathlib import Path
     from audio.radio_features import build_feature_vector, energy_from_rms, KEY_NAMES
 
     try:
@@ -331,11 +331,6 @@ DELETED_VIDEO_TITLES = [
     '[deleted video]',
     '[private video]',
 ]
-
-# Markers prefixed onto error_message so the SPA shows a localized cookies.txt hint
-# instead of raw yt-dlp output (same convention as '[blocked_url]').
-COOKIES_REFRESH_MARKER = '[cookies_refresh]'
-COOKIES_FILE_ACCESS_MARKER = '[cookies_file_access]'
 
 # Failures a freshly exported cookies.txt fixes. YouTube's own reason text ("Sign in to
 # confirm you're not a bot" / "... your age") also covers cookies it has rotated out;
@@ -635,10 +630,8 @@ def download_audio_task(queue_id):
             logger.warning("Blocked SSRF download attempt for queue %s: %s", queue_id, queue_item.url)
             return
 
-        # Honor the owner's (and originating channel's) audio-quality setting (F1)
-        # instead of always producing m4a/192.
+        # Honor the owner's (and originating channel's) audio-quality setting (F1).
         quality = _resolve_download_quality(queue_item)
-        out_ext = _ext_for_quality(quality)
 
         refuse_if_over_quota(queue_item.owner)
 
@@ -671,7 +664,7 @@ def download_audio_task(queue_id):
         file_path = finished_download_path(info)
         file_size = validated_file_size(file_path)
 
-        if not _publish_download(queue_id, claim_token, info, file_path, out_ext, file_size):
+        if not _publish_download(queue_id, claim_token, info, file_path, _stored_format(file_path), file_size):
             logger.info("download_audio_task: claim on %s was lost; not publishing", queue_id)
             # Cancelled rather than taken over: nobody is coming for these bytes.
             if not DownloadQueue.objects.filter(pk=queue_id).exists():

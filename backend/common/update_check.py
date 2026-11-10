@@ -9,6 +9,7 @@ update" rather than raising into the request.
 import logging
 
 import requests
+from django.conf import settings
 from django.core.cache import cache
 
 from config.version import APP_VERSION, GITHUB_REPO, GITHUB_REPO_URL
@@ -58,6 +59,16 @@ def _fetch_github():
     }
 
 
+# What is reported when GitHub was not asked, or could not be: no update, and say so.
+_NOT_CHECKED = {
+    "latest_version": "",
+    "release_url": GITHUB_REPO_URL,
+    "release_notes": "",
+    "published_at": None,
+    "checked": False,
+}
+
+
 def get_update_info(force=False):
     """Return current/latest version and whether an update is available.
 
@@ -66,6 +77,9 @@ def get_update_info(force=False):
     image upgrade keep reporting the old version until the cache expired, since Redis
     outlives the app container.) Never raises.
     """
+    if not settings.UPDATE_CHECK_ENABLED:
+        return _update_info(_NOT_CHECKED)
+
     github = None if force else cache.get(_CACHE_KEY)
     if github is None:
         try:
@@ -73,15 +87,13 @@ def get_update_info(force=False):
             cache.set(_CACHE_KEY, github, _CACHE_TTL)
         except Exception as exc:  # noqa: BLE001 - fail closed, never break the page
             logger.info("Update check skipped: %s", exc)
-            github = {
-                "latest_version": "",
-                "release_url": GITHUB_REPO_URL,
-                "release_notes": "",
-                "published_at": None,
-                "checked": False,
-            }
+            github = _NOT_CHECKED
             cache.set(_CACHE_KEY, github, _CACHE_TTL_ERROR)
 
+    return _update_info(github)
+
+
+def _update_info(github):
     latest = github.get("latest_version") or APP_VERSION
     return {
         "current_version": APP_VERSION,

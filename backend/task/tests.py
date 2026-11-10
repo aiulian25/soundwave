@@ -9,9 +9,15 @@ run would re-enqueue the same tracks indefinitely.
 
 Run: python manage.py test task --settings=config.settings_test
 """
+import shutil
+import subprocess
 import tempfile
+import unittest
 import wave
+from pathlib import Path
 from unittest import mock
+
+from yt_dlp.postprocessor.ffmpeg import FFmpegExtractAudioPP
 
 from django.core.cache import cache
 from django.conf import settings
@@ -42,6 +48,9 @@ from task.tasks import (
     PERMANENT_ERROR_PATTERNS,
     PLAYLIST_YTIDS_CACHE_PREFIX,
     _cache_playlist_video_ids,
+    _postprocessor_for_quality,
+    _resolve_download_quality,
+    _stored_format,
     backfill_missing_features_task,
     download_audio_task,
     download_playlist_task,
@@ -51,7 +60,8 @@ from task.tasks import (
     prune_radio_feedback_task,
     retry_failed_downloads,
 )
-from user.models import Account
+from channel.models import Channel
+from user.models import Account, UserConfig
 
 BACKFILL_TASK_NAME = 'task.tasks.backfill_missing_features_task'
 PRUNE_TASK_NAME = 'task.tasks.prune_radio_feedback_task'
@@ -404,7 +414,6 @@ class RedownloadRepairsInPlaceTests(TestCase):
                 mock.patch('common.url_security.check_public_http_url', return_value=(True, None)), \
                 mock.patch('audio.storage_service.shutil.disk_usage', return_value=mock.Mock(free=10 ** 12)), \
                 mock.patch('task.tasks._resolve_download_quality', return_value='opus'), \
-                mock.patch('task.tasks._ext_for_quality', return_value='opus'), \
                 mock.patch('task.tasks._postprocessor_for_quality', return_value={}), \
                 mock.patch('task.tasks.link_audio_to_playlists.delay'), \
                 mock.patch('task.tasks.measure_loudness_task.delay') as loudness:
@@ -413,7 +422,7 @@ class RedownloadRepairsInPlaceTests(TestCase):
         self.audio.refresh_from_db()
         self.assertEqual(self.audio.file_path, _RedownloadYDL.NEW_PATH)
         self.assertEqual(self.audio.file_size, absolute_media_path(_RedownloadYDL.NEW_PATH).stat().st_size)
-        self.assertEqual(self.audio.audio_format, 'opus')
+        self.assertEqual(self.audio.audio_format, 'wav')
         self.assertEqual(Audio.objects.filter(owner=self.owner).count(), 1)
         self.assertEqual(AudioProgress.objects.get(pk=self.progress.pk).audio_id, self.audio.pk)
         loudness.assert_not_called()
@@ -724,3 +733,117 @@ class DormantTaskApiTests(TestCase):
 
         self.assertEqual(response.status_code, 501)
         self.assertNotIn('data', response.data)
+
+
+class DownloadQualityTests(SimpleTestCase):
+    """YouTube audio is already lossy: converting it costs CPU and disk and adds nothing (SW-112)."""
+
+    def test_original_asks_for_the_source_codec_and_no_bitrate(self):
+        self.assertEqual(_postprocessor_for_quality('original'), {'preferredcodec': 'best'})
+
+    def test_an_unset_or_unknown_setting_means_original(self):
+        for quality in (None, '', 'auto', 'no-such-tier', ' Original '):
+            with self.subTest(quality):
+                self.assertEqual(_postprocessor_for_quality(quality), _postprocessor_for_quality('original'))
+
+    def test_the_converting_tiers_still_convert(self):
+        self.assertEqual(_postprocessor_for_quality('high'), {'preferredcodec': 'm4a', 'preferredquality': '320'})
+        self.assertEqual(_postprocessor_for_quality('low'), {'preferredcodec': 'opus', 'preferredquality': '96'})
+        for lossless_alias in ('best', 'ultra', 'flac'):
+            self.assertEqual(_postprocessor_for_quality(lossless_alias), {'preferredcodec': 'flac'})
+
+    def test_the_stored_format_is_what_the_finished_file_is(self):
+        self.assertEqual(_stored_format('users/1/Track-abc.opus'), 'opus')
+        self.assertEqual(_stored_format('users/1/Track.with.dots-abc.M4A'), 'm4a')
+
+
+@unittest.skipUnless(shutil.which('ffmpeg'), 'needs ffmpeg')
+class OriginalQualityKeepsTheStreamTests(SimpleTestCase):
+    """Runs yt-dlp's real extraction step on a real file, the way a download would."""
+
+    SECONDS = 20
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.folder, ignore_errors=True)
+
+    def _source(self, name, encoder):
+        path = self.folder / name
+        subprocess.run(
+            ['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', f'sine=frequency=440:duration={self.SECONDS}',
+             '-c:a', encoder, str(path)],
+            check=True, timeout=60,
+        )
+        return path
+
+    def _extract(self, source, quality):
+        step = FFmpegExtractAudioPP(None, **_postprocessor_for_quality(quality))
+        with mock.patch.object(step, 'run_ffmpeg', wraps=step.run_ffmpeg) as ffmpeg_run:
+            _leftovers, result = step.run({'filepath': str(source), 'ext': source.suffix.lstrip('.')})
+        return Path(result['filepath']), ffmpeg_run
+
+    def test_opus_from_youtubes_container_is_moved_not_re_encoded(self):
+        source = self._source('track.webm', 'libopus')
+        source_bytes = source.stat().st_size
+
+        finished, ffmpeg_run = self._extract(source, 'original')
+
+        self.assertEqual(_stored_format(finished), 'opus')
+        self.assertEqual(ffmpeg_run.call_args.args[2], 'copy')
+        self.assertLessEqual(finished.stat().st_size, source_bytes * 1.05)
+
+    def test_audio_already_in_a_playable_file_is_left_alone(self):
+        source = self._source('track.m4a', 'aac')
+
+        finished, ffmpeg_run = self._extract(source, 'original')
+
+        self.assertEqual(finished, source)
+        ffmpeg_run.assert_not_called()
+
+    def test_a_converting_tier_re_encodes_the_same_source(self):
+        """The control: this is the work 'original' no longer does."""
+        source = self._source('track.webm', 'libopus')
+
+        finished, ffmpeg_run = self._extract(source, 'high')
+
+        self.assertEqual(_stored_format(finished), 'm4a')
+        self.assertNotEqual(ffmpeg_run.call_args.args[2], 'copy')
+
+
+class DownloadQualitySettingTests(TestCase):
+    CONFIG_URL = '/api/user/config/'
+
+    def setUp(self):
+        self.owner = Account.objects.create_user('quality_u', 'quality_u@test.local', 'Qualitypw_2026!')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.owner)
+
+    def _queued(self, **fields):
+        return DownloadQueue.objects.create(owner=self.owner, url='https://www.youtube.com/watch?v=QUALITY_001', **fields)
+
+    def test_a_new_account_downloads_in_original_quality(self):
+        self.assertEqual(self.client.get(self.CONFIG_URL).json()['audio_quality'], 'original')
+        self.assertEqual(_resolve_download_quality(self._queued()), 'original')
+
+    def test_original_can_be_chosen_and_an_unknown_tier_cannot(self):
+        UserConfig.objects.create(user=self.owner, audio_quality='high')
+
+        chosen = self.client.post(self.CONFIG_URL, {'audio_quality': 'original'}, format='json')
+        unknown = self.client.post(self.CONFIG_URL, {'audio_quality': 'studio-master'}, format='json')
+
+        self.assertEqual(chosen.status_code, 200)
+        self.assertEqual(unknown.status_code, 400)
+        self.assertEqual(UserConfig.objects.get(user=self.owner).audio_quality, 'original')
+
+    def test_an_account_that_chose_a_conversion_keeps_it(self):
+        UserConfig.objects.create(user=self.owner, audio_quality='high')
+
+        self.assertEqual(_resolve_download_quality(self._queued()), 'high')
+
+    def test_a_channel_set_to_original_overrides_the_account(self):
+        UserConfig.objects.create(user=self.owner, audio_quality='high')
+        Channel.objects.create(
+            owner=self.owner, channel_id='UC_QUALITY', channel_name='Talks', subscribed=True, download_quality='original',
+        )
+
+        self.assertEqual(_resolve_download_quality(self._queued(channel_name='Talks')), 'original')

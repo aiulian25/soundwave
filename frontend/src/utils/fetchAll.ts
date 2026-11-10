@@ -6,6 +6,8 @@ const SMART_PLAYLIST_PAGE_SIZE = 100;
 
 type RequestConfig = { signal?: AbortSignal };
 type ListRequest = (params: Record<string, any>, config: RequestConfig) => Promise<AxiosResponse<any>>;
+/** Told after every page what has arrived so far, so a long list can show before it is complete. */
+type PageListener = (itemsSoFar: any[]) => void;
 
 export class MalformedPaginationError extends Error {
   constructor(reason: string) {
@@ -15,7 +17,12 @@ export class MalformedPaginationError extends Error {
 }
 
 /** Follows the server's `next` to its end; anything that could not terminate is an error. */
-async function fetchAllPages(request: ListRequest, params: Record<string, any>, signal?: AbortSignal): Promise<any[]> {
+async function fetchAllPages(
+  request: ListRequest,
+  params: Record<string, any>,
+  signal?: AbortSignal,
+  onPage?: PageListener,
+): Promise<any[]> {
   const allItems: any[] = [];
   let page: number | null = FIRST_PAGE;
 
@@ -31,6 +38,7 @@ async function fetchAllPages(request: ListRequest, params: Record<string, any>, 
     if (next !== null && items.length === 0) throw new MalformedPaginationError('an empty page claims more');
 
     allItems.push(...items);
+    onPage?.(allItems);
     page = next;
   }
 
@@ -39,6 +47,11 @@ async function fetchAllPages(request: ListRequest, params: Record<string, any>, 
 
 export function fetchAllAudio(params: Record<string, any> = {}, signal?: AbortSignal): Promise<any[]> {
   return fetchAllPages(audioAPI.list, params, signal);
+}
+
+/** A playlist's tracks in its own order, a page at a time; `onPage` lets the first ones show at once. */
+export function fetchPlaylistItems(playlistId: string, signal?: AbortSignal, onPage?: PageListener): Promise<any[]> {
+  return fetchAllPages((params, config) => playlistAPI.getItems(playlistId, params, config), {}, signal, onPage);
 }
 
 export function fetchAllChannels(params: Record<string, any> = {}, signal?: AbortSignal): Promise<any[]> {

@@ -228,7 +228,7 @@ class LastFMClient:
         
         try:
             # Use direct API call for more control
-            url = 'http://ws.audioscrobbler.com/2.0/'
+            url = 'https://ws.audioscrobbler.com/2.0/'
             params = {
                 'method': 'artist.getinfo',
                 'artist': artist_name,

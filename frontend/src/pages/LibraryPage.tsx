@@ -8,6 +8,7 @@ import {
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import AddIcon from '@mui/icons-material/Add';
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +17,7 @@ import { fetchAllAudio } from '../utils/fetchAll';
 import ScrollToTop from '../components/ScrollToTop';
 import TrackActionsMenu from '../components/TrackActionsMenu';
 import TrackTable from '../components/TrackTable';
+import { useAddMusic } from '../context/AddMusicContext';
 import type { Audio } from '../types';
 
 interface LibraryPageProps {
@@ -24,8 +26,9 @@ interface LibraryPageProps {
 
 export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
   const { t } = useTranslation();
+  const openAddMusic = useAddMusic();
   const [audioList, setAudioList] = useState<Audio[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -84,6 +87,8 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
     setSnackbarMessage(t('library.messages.shuffledTracks', { count: shuffled.length }));
     setSnackbarOpen(true);
   };
+
+  const isEmpty = !loading && audioList.length === 0;
 
   return (
     <Box>
@@ -149,6 +154,21 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
         {t('library.trackCount', { count: audioList.length })}
       </Typography>
 
+      {isEmpty && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 10, color: 'text.secondary', textAlign: 'center' }} data-testid="library-empty">
+          <Typography variant="h6" sx={{ mb: 1 }}>
+            {t('library.empty.title')}
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 3 }}>
+            {t('library.empty.description')}
+          </Typography>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => openAddMusic()} data-testid="empty-add-music">
+            {t('addMusic.title')}
+          </Button>
+        </Box>
+      )}
+
+      {!isEmpty && (
       <TrackTable
         items={audioList}
         rowKey={(audio) => audio.id}
@@ -172,9 +192,13 @@ export default function LibraryPage({ setCurrentAudio }: LibraryPageProps) {
             onTrackUpdate={(updatedTrack) => {
               setAudioList(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
             }}
+            onTrackDeleted={(deletedTrack) => {
+              setAudioList(prev => prev.filter(a => a.id !== deletedTrack.id));
+            }}
           />
         )}
       />
+      )}
 
       {/* Snackbar for notifications */}
       <Snackbar

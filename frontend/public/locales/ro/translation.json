@@ -1,67 +1,73 @@
 {
   "activity": {
     "title": "Activitate",
-    "tooltip": "Activitate descarcari",
-    "empty": "Nicio activitate de descarcare",
-    "retry": "Reincearca",
-    "retryAll": "Reincearca toate esuate",
-    "dismiss": "Ignora (nu mai arata)",
-    "dismissAll": "Ignora toate esuate",
-    "refresh": "Reimprospateaza",
-    "error": "Activitatea nu a putut fi incarcata",
+    "tooltip": "Activitate descărcări",
+    "empty": "Nicio activitate de descărcare",
+    "retry": "Reîncearcă",
+    "retryAll": "Reîncearcă toate eșuate",
+    "dismiss": "Ignoră (nu mai arăta)",
+    "dismissAll": "Ignoră toate eșuate",
+    "refresh": "Reîmprospătează",
+    "error": "Activitatea nu a putut fi încărcată",
     "status": {
-      "pending": "In asteptare",
-      "downloading": "Se descarca",
+      "pending": "În așteptare",
+      "downloading": "Se descarcă",
       "completed": "Finalizat",
-      "failed": "Esuat"
+      "failed": "Eșuat"
     }
   },
   "login": {
     "logoAlt": "Sigla SoundWave",
-    "tagline": "Centrul tau personal de muzica",
+    "tagline": "Centrul tău personal de muzică",
     "welcomeBack": "Bine ai revenit",
     "username": "Nume utilizator",
-    "password": "Parola",
-    "twoFactorCode": "Cod de autentificare in doi pasi",
-    "rememberPassword": "Retine parola",
-    "showPassword": "Afiseaza parola",
+    "password": "Parolă",
+    "twoFactorCode": "Cod de autentificare în doi pași",
+    "rememberPassword": "Reține parola",
+    "showPassword": "Afișează parola",
     "hidePassword": "Ascunde parola",
     "loginButton": "Autentificare",
     "lockedCountdown": "Blocat ({{time}})",
     "accountTemporarilyLocked": "Cont blocat temporar",
-    "lockoutWait": "Prea multe incercari esuate de autentificare. Asteapta {{time}} inainte sa incerci din nou.",
-    "lastAttempt": "Ultima incercare!",
-    "invalidCredentials": "Credentiale invalide",
-    "accountWillLockNext": "Contul va fi blocat la urmatoarea incercare esuata.",
-    "attemptsRemainingOne": "A mai ramas 1 incercare inainte ca acest cont sa fie blocat timp de 60 de minute.",
-    "attemptsRemainingOther": "Au mai ramas {{count}} incercari inainte ca acest cont sa fie blocat timp de 60 de minute.",
+    "lockoutWait": "Prea multe încercări eșuate de autentificare. Așteaptă {{time}} înainte să încerci din nou.",
+    "lastAttempt": "Ultima încercare!",
+    "invalidCredentials": "Credențiale invalide",
+    "accountWillLockNext": "Contul va fi blocat la următoarea încercare eșuată.",
+    "attemptsRemainingOne": "A mai rămas 1 încercare înainte ca acest cont să fie blocat timp de 60 de minute.",
+    "attemptsRemainingOther": "Au mai rămas {{count}} încercări înainte ca acest cont să fie blocat timp de 60 de minute.",
     "errors": {
-      "enter2fa": "Te rugam sa introduci codul de autentificare in doi pasi",
+      "enter2fa": "Te rugăm să introduci codul de autentificare în doi pași",
       "accountLocked": "Cont blocat temporar",
-      "invalidCredentials": "Credentiale invalide",
-      "invalidCredentialsOrCode": "Credentiale sau cod de verificare invalide",
-      "passkeyFailed": "Aceasta cheie de acces nu te-a putut conecta"
+      "invalidCredentials": "Credențiale invalide",
+      "invalidCredentialsOrCode": "Credențiale sau cod de verificare invalide",
+      "passkeyFailed": "Această cheie de acces nu te-a putut conecta"
     },
-    "passkeyButton": "Conecteaza-te cu o cheie de acces"
+    "passkeyButton": "Conectează-te cu o cheie de acces"
   },
   "topbar": {
     "greeting": {
-      "morning": "Buna dimineata",
-      "afternoon": "Buna ziua",
-      "evening": "Buna seara"
+      "morning": "Bună dimineața",
+      "afternoon": "Bună ziua",
+      "evening": "Bună seara"
     },
-    "musicLover": "Iubitor de muzica",
+    "musicLover": "Iubitor de muzică",
     "logout": "Deconectare",
-    "openDrawer": "Deschide meniul de navigare"
+    "openDrawer": "Deschide meniul de navigare",
+    "logoutConfirm": {
+      "title": "Te deconectezi?",
+      "message_one": "{{count}} piesă salvată pentru ascultare offline va fi ștearsă de pe acest dispozitiv.",
+      "message_few": "{{count}} piese salvate pentru ascultare offline vor fi șterse de pe acest dispozitiv.",
+      "message_other": "{{count}} de piese salvate pentru ascultare offline vor fi șterse de pe acest dispozitiv."
+    }
   },
   "player": {
     "unknownArtist": "Artist necunoscut",
-    "toggleLyrics": "Apasa pentru a afisa/ascunde versurile",
-    "lyricsNotAvailableLocal": "Versurile nu sunt disponibile pentru fisiere locale",
+    "toggleLyrics": "Apasă pentru a afișa/ascunde versurile",
+    "lyricsNotAvailableLocal": "Versurile nu sunt disponibile pentru fișiere locale",
     "playingFromCache": "Redare din cache",
     "chapters": {
       "title": "Capitole",
-      "none": "Fara capitole",
+      "none": "Fără capitole",
       "current": "Capitol: {{title}}"
     },
     "segment": {
@@ -69,105 +75,116 @@
     },
     "details": {
       "title": "Detalii",
-      "views": "{{count}} vizualizari",
-      "likes": "{{count}} aprecieri",
-      "showMore": "Afiseaza mai mult",
-      "showLess": "Afiseaza mai putin",
-      "published": "Publicat pe {{date}}"
+      "showMore": "Afișează mai mult",
+      "showLess": "Afișează mai puțin",
+      "published": "Publicat pe {{date}}",
+      "views_one": "{{count}} vizualizare",
+      "views_few": "{{count}} vizualizări",
+      "views_other": "{{count}} de vizualizări",
+      "likes_one": "{{count}} apreciere",
+      "likes_few": "{{count}} aprecieri",
+      "likes_other": "{{count}} de aprecieri"
     },
-    "trackOptions": "Optiuni melodie",
-    "addToPlaylist": "Adauga in playlist",
-    "removeFromFavorites": "Elimina din favorite",
-    "addToFavorites": "Adauga la favorite",
-    "exportTrack": "Exporta melodia",
-    "editMetadata": "Editeaza metadatele",
+    "trackOptions": "Opțiuni melodie",
+    "addToPlaylist": "Adaugă în playlist",
+    "removeFromFavorites": "Elimină din favorite",
+    "addToFavorites": "Adaugă la favorite",
+    "exportTrack": "Exportă melodia",
+    "editMetadata": "Editează metadatele",
     "relatedTracks": "Melodii similare",
-    "startRadio": "Porneste radio",
-    "stopRadio": "Apasa pentru a opri radioul",
+    "startRadio": "Pornește radio",
+    "stopRadio": "Apasă pentru a opri radioul",
     "radio": "RADIO",
     "sleepTimer": "Cronometru oprire",
     "sleepTimerActive": "Cronometru oprire activ",
-    "queueCount": "Coada ({{count}} melodii)",
     "equalizer": "Egalizator",
     "equalizerOn": "Egalizator (activ)",
     "classicBars": "Bare clasice",
-    "visualizerThemeHint": "Apasa pentru a schimba tema vizualizatorului (Curenta: {{themeName}})",
+    "visualizerThemeHint": "Apasă pentru a schimba tema vizualizatorului (Curentă: {{themeName}})",
     "a11y": {
       "shuffle": "Amestecare",
-      "previous": "Melodia anterioara",
-      "play": "Reda",
-      "pause": "Pauza",
-      "next": "Melodia urmatoare",
+      "previous": "Melodia anterioară",
+      "play": "Redă",
+      "pause": "Pauză",
+      "next": "Melodia următoare",
       "repeat": {
-        "none": "Repetare: oprita",
+        "none": "Repetare: oprită",
         "all": "Repetare: toate melodiile",
-        "one": "Repetare: aceasta melodie"
+        "one": "Repetare: această melodie"
       },
-      "mute": "Fara sunet",
+      "mute": "Fără sunet",
       "unmute": "Cu sunet",
       "volume": "Volum",
       "restore": "Deschide playerul: {{title}}",
-      "moveUp": "Muta mai sus: {{title}}",
-      "moveDown": "Muta mai jos: {{title}}",
-      "minimize": "Minimizeaza playerul"
-    }
+      "moveUp": "Mută mai sus: {{title}}",
+      "moveDown": "Mută mai jos: {{title}}",
+      "minimize": "Minimizează playerul"
+    },
+    "errors": {
+      "cannotPlaySkipping": "„{{title}}” nu a putut fi redată. Se trece la piesa următoare.",
+      "cannotPlay": "„{{title}}” nu a putut fi redată.",
+      "stoppedAfterSeveral": "Redarea s-a oprit: mai multe piese la rând nu au putut fi redate. Verifică conexiunea, apoi încearcă din nou."
+    },
+    "queueCount_one": "Coadă ({{count}} melodie)",
+    "queueCount_few": "Coadă ({{count}} melodii)",
+    "queueCount_other": "Coadă ({{count}} de melodii)"
   },
   "home": {
     "sections": {
-      "continueListening": "Continua auditia",
+      "continueListening": "Continuă audiția",
       "madeForYou": "Alese pentru tine",
       "recentlyPlayed": "Ascultate recent",
-      "recentlyAdded": "Adaugate recent"
+      "recentlyAdded": "Adăugate recent"
     },
     "actions": {
-      "clear": "Sterge",
+      "clear": "Șterge",
       "seeAll": "Vezi tot",
-      "refreshRecommendations": "Actualizeaza recomandarile"
+      "refreshRecommendations": "Actualizează recomandările"
     },
     "tags": {
       "FOR_YOU": "PENTRU TINE",
-      "DISCOVER": "DESCOPERA",
+      "DISCOVER": "DESCOPERĂ",
       "OTHER": "ALTELE",
       "THROWBACK": "RETRO"
     },
     "reasons": {
-      "forYou": "Pentru ca iti place {{artist}}",
-      "discover": "O piesa ascunsa in biblioteca ta",
-      "other": "Mai multa muzica pe gustul tau",
-      "throwback": "Din colectia ta"
+      "forYou": "Pentru că îți place {{artist}}",
+      "discover": "O piesă ascunsă în biblioteca ta",
+      "other": "Mai multă muzică pe gustul tău",
+      "throwback": "Din colecția ta"
     },
-    "timeLeft": "{{minutes}}m {{seconds}}s ramase",
+    "timeLeft": "{{minutes}}m {{seconds}}s rămase",
     "empty": {
-      "title": "Bine ai venit in SoundWave!",
-      "description": "Incepe prin a descarca muzica sau prin a explora biblioteca ta."
+      "title": "Bine ai venit în SoundWave!",
+      "description": "Lipește un link de pe YouTube pentru a descărca o piesă sau pentru a te abona la un playlist ori la un canal."
     },
     "pullToRefresh": {
       "pull": "Trage pentru actualizare",
-      "release": "Elibereaza pentru actualizare",
-      "updating": "Se actualizeaza…"
+      "release": "Eliberează pentru actualizare",
+      "updating": "Se actualizează…"
     }
   },
   "search": {
-    "title": "Cauta",
-    "placeholder": "Cauta melodii, artisti, playlisturi sau canale...",
+    "title": "Caută",
+    "placeholder": "Caută melodii, artiști, playlisturi sau canale...",
     "popularSearches": [
       "hip hop",
-      "muzica rock",
+      "muzică rock",
       "jazz",
-      "clasica",
-      "electronica",
+      "clasică",
+      "electronică",
       "blues"
     ],
     "actions": {
-      "clearAll": "Sterge tot"
+      "clearAll": "Șterge tot"
     },
     "suggestions": {
-      "recentSearches": "Cautari recente",
-      "artists": "Artisti",
+      "recentSearches": "Căutări recente",
+      "artists": "Artiști",
       "songs": "Melodii",
       "recent": "Recente",
       "popular": "Populare",
-      "startTyping": "Incepe sa tastezi pentru a cauta"
+      "startTyping": "Începe să tastezi pentru a căuta"
     },
     "tabs": {
       "all": "Toate ({{count}})",
@@ -181,264 +198,296 @@
       "channels": "Canale"
     },
     "status": {
-      "notDownloaded": "Nedescarcata",
+      "notDownloaded": "Nedescărcată",
       "subscribed": "Abonat",
       "notSubscribed": "Neabonat"
     },
     "noResults": {
-      "title": "Nu au fost gasite rezultate",
-      "description": "Incearca sa cauti folosind alte cuvinte cheie"
+      "title": "Nu au fost găsite rezultate",
+      "description": "Încearcă să cauți folosind alte cuvinte cheie"
     },
     "libraryTrackCount": "{{downloaded}}/{{total}} melodii",
     "empty": {
-      "title": "Cauta in biblioteca ta",
-      "description": "Gaseste melodii, playlisturi si canale din colectia ta"
+      "title": "Caută în biblioteca ta",
+      "description": "Găsește melodii, playlisturi și canale din colecția ta"
     },
-    "failed": "Cautarea a esuat. Verifica conexiunea si incearca din nou.",
-    "loadMore": "Incarca mai multe"
+    "failed": "Căutarea a eșuat. Verifică conexiunea și încearcă din nou.",
+    "loadMore": "Încarcă mai multe"
   },
   "library": {
     "title": "Biblioteca",
     "actions": {
-      "playAll": "Reda tot",
-      "shuffle": "Amesteca",
-      "refresh": "Actualizeaza biblioteca"
+      "playAll": "Redă tot",
+      "shuffle": "Amestecă",
+      "refresh": "Actualizează biblioteca"
     },
     "columns": {
       "title": "Titlu",
       "channel": "Canal",
-      "duration": "Durata",
+      "duration": "Durată",
       "size": "Dimensiune",
-      "plays": "Redari",
-      "actions": "Actiuni"
+      "plays": "Redări",
+      "actions": "Acțiuni"
     },
-    "trackCount": "{{count}} melodii in biblioteca ta",
     "messages": {
-      "playingTracks": "Se redau {{count}} melodii",
-      "shuffledTracks": "Au fost amestecate {{count}} melodii"
+      "playingTracks_one": "Se redă {{count}} melodie",
+      "playingTracks_few": "Se redau {{count}} melodii",
+      "playingTracks_other": "Se redau {{count}} de melodii",
+      "shuffledTracks_one": "A fost amestecată {{count}} melodie",
+      "shuffledTracks_few": "Au fost amestecate {{count}} melodii",
+      "shuffledTracks_other": "Au fost amestecate {{count}} de melodii"
     },
     "errors": {
-      "noTracks": "Nu exista melodii in biblioteca",
-      "noTracksToShuffle": "Nu exista melodii de amestecat"
-    }
+      "noTracks": "Nu există melodii în bibliotecă",
+      "noTracksToShuffle": "Nu există melodii de amestecat"
+    },
+    "empty": {
+      "title": "Biblioteca ta este goală",
+      "description": "Lipește un link de pe YouTube pentru a descărca o piesă sau pentru a te abona la un playlist ori la un canal."
+    },
+    "trackCount_one": "{{count}} melodie în biblioteca ta",
+    "trackCount_few": "{{count}} melodii în biblioteca ta",
+    "trackCount_other": "{{count}} de melodii în biblioteca ta"
   },
   "favorites": {
     "title": "Favorite",
-    "loading": "Se incarca favoritele...",
+    "loading": "Se încarcă favoritele...",
     "actions": {
-      "playAll": "Reda tot",
-      "shuffle": "Amesteca"
+      "playAll": "Redă tot",
+      "shuffle": "Amestecă"
     },
     "columns": {
       "title": "Titlu",
       "channel": "Canal",
-      "duration": "Durata",
+      "duration": "Durată",
       "size": "Dimensiune",
-      "plays": "Redari",
-      "actions": "Actiuni"
+      "plays": "Redări",
+      "actions": "Acțiuni"
     },
     "empty": {
-      "title": "Nu exista favorite inca",
-      "description": "Incepe sa adaugi melodii la favorite"
+      "title": "Nu există favorite încă",
+      "description": "Începe să adaugi melodii la favorite"
     },
     "messages": {
-      "removed": "Eliminata din favorite",
-      "playingTracks": "Se redau {{count}} melodii favorite",
-      "shuffledTracks": "Au fost amestecate {{count}} melodii favorite"
+      "removed": "Eliminată din favorite",
+      "playingTracks_one": "Se redă {{count}} melodie favorită",
+      "playingTracks_few": "Se redau {{count}} melodii favorite",
+      "playingTracks_other": "Se redau {{count}} de melodii favorite",
+      "shuffledTracks_one": "A fost amestecată {{count}} melodie favorită",
+      "shuffledTracks_few": "Au fost amestecate {{count}} melodii favorite",
+      "shuffledTracks_other": "Au fost amestecate {{count}} de melodii favorite"
     },
     "errors": {
-      "noFavoritesToPlay": "Nu exista favorite de redat",
-      "noFavoritesToShuffle": "Nu exista favorite de amestecat"
+      "noFavoritesToPlay": "Nu există favorite de redat",
+      "noFavoritesToShuffle": "Nu există favorite de amestecat"
     }
   },
   "channels": {
     "title": "Canale YouTube",
     "genericChannelName": "canal",
     "actions": {
-      "resetOrder": "Reseteaza ordinea implicita",
-      "cancel": "Anuleaza",
-      "select": "Selecteaza",
-      "subscribeToChannel": "Aboneaza-te la canal",
-      "deselectAll": "Deselecteaza tot",
-      "selectAll": "Selecteaza tot",
-      "deleteSelected": "Dezaboneaza selectia",
-      "subscribe": "Aboneaza-te",
-      "subscribing": "Se aboneaza..."
+      "resetOrder": "Resetează ordinea implicită",
+      "cancel": "Anulează",
+      "select": "Selectează",
+      "subscribeToChannel": "Abonează-te la canal",
+      "deselectAll": "Deselectează tot",
+      "selectAll": "Selectează tot",
+      "deleteSelected": "Dezabonează selecția",
+      "subscribe": "Abonează-te",
+      "subscribing": "Se abonează...",
+      "unsubscribe": "Dezabonează-te"
     },
     "pending": {
-      "processing": "Se proceseaza {{count}} abonare la canal...",
-      "processing_other": "Se proceseaza {{count}} abonari la canale...",
-      "description": "Serverul descarca in fundal - pagina se va actualiza automat"
+      "description": "Serverul descarcă în fundal - pagina se va actualiza automat",
+      "processing_one": "Se procesează {{count}} abonare la canal...",
+      "processing_few": "Se procesează {{count}} abonări la canale...",
+      "processing_other": "Se procesează {{count}} de abonări la canale..."
     },
     "selection": {
       "selectedCount": "{{selected}} din {{total}} selectate"
     },
     "empty": {
-      "title": "Nu exista canale abonate",
-      "description": "Aboneaza-te la canale YouTube pentru a le descarca automat continutul"
+      "title": "Nu există canale abonate",
+      "description": "Abonează-te la canale YouTube pentru a le descarcă automat conținutul"
     },
     "dialog": {
-      "title": "Aboneaza-te la un canal YouTube",
+      "title": "Abonează-te la un canal YouTube",
       "channelUrlLabel": "URL canal",
       "channelUrlPlaceholder": "https://www.youtube.com/@numelecanalului sau ID-ul canalului",
       "channelUrlHelp": "Introdu un URL de canal YouTube sau ID-ul canalului"
     },
     "confirm": {
-      "unsubscribeOne": "Te dezabonezi de la acest canal? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai raman in biblioteca ta.",
-      "unsubscribeMany": "Te dezabonezi de la {{count}} canal(e)? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai raman in biblioteca ta."
+      "unsubscribeOne": "Te dezabonezi de la acest canal? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai rămân în biblioteca ta.",
+      "unsubscribeMany_one": "Te dezabonezi de la {{count}} canal? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai rămân în biblioteca ta.",
+      "unsubscribeMany_few": "Te dezabonezi de la {{count}} canale? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai rămân în biblioteca ta.",
+      "unsubscribeMany_other": "Te dezabonezi de la {{count}} de canale? Videoclipurile noi nu se vor mai sincroniza. Melodiile pe care le ai rămân în biblioteca ta."
     },
     "messages": {
-      "subscriptionStarted": "Abonarea la canal a inceput",
-      "subscribingToChannel": "✓ Te abonezi la {{channelName}}... Informatiile canalului si videoclipurile se descarca in fundal."
+      "subscriptionStarted": "Abonarea la canal a început",
+      "subscribingToChannel": "✓ Te abonezi la {{channelName}}... Informațiile canalului și videoclipurile se descarcă în fundal."
     },
     "errors": {
-      "subscribeFailed": "Abonarea la canal a esuat"
+      "subscribeFailed": "Abonarea la canal a eșuat"
     }
   },
   "playlists": {
     "title": "Playlisturi YouTube",
     "offlineChannelName": "Offline",
     "actions": {
-      "resetOrder": "Reseteaza ordinea implicita",
-      "addPlaylist": "Adauga playlist"
+      "resetOrder": "Resetează ordinea implicită",
+      "addPlaylist": "Adaugă playlist"
     },
     "status": {
       "offline": "Offline"
     },
     "empty": {
-      "title": "Nu exista playlisturi adaugate",
-      "description": "Adauga playlisturi YouTube pentru a descarca automat toate videoclipurile lor"
+      "title": "Nu există playlisturi adăugate",
+      "description": "Adaugă playlisturi YouTube pentru a descărca automat toate videoclipurile lor"
     },
     "dialog": {
-      "title": "Adauga un playlist YouTube",
+      "title": "Adaugă un playlist YouTube",
       "urlLabel": "URL playlist",
       "urlPlaceholder": "https://www.youtube.com/playlist?list=...",
       "urlHelp": "Introdu URL-ul unui playlist YouTube"
     },
     "confirm": {
-      "delete": "Elimini acest playlist? Melodiile sale raman in biblioteca ta si in celelalte playlisturi."
+      "delete": "Elimini acest playlist? Melodiile sale rămân în biblioteca ta și în celelalte playlisturi."
     },
     "messages": {
-      "subscriptionStarted": "✅ Abonarea la playlist a inceput! Se preiau metadatele si se descarca audio in fundal...",
-      "syncStarted": "🔄 Sincronizarea a inceput! Serverul proceseaza in fundal...",
-      "syncComplete": "✅ Sincronizare finalizata! {{downloaded}}/{{total}} melodii disponibile",
-      "syncFailed": "❌ Sincronizarea a esuat: {{error}}",
-      "syncStartFailed": "❌ Pornirea sincronizarii a esuat: {{error}}",
-      "forceRecheckStarted": "🔍 Reverificarea fortata a inceput — se redescarca fisierele lipsa...",
-      "forceRecheckFailed": "❌ Pornirea reverificarii a esuat: {{error}}"
+      "subscriptionStarted": "✅ Abonarea la playlist a început! Se preiau metadatele și se descarcă audio în fundal...",
+      "syncStarted": "🔄 Sincronizarea a început! Serverul procesează în fundal...",
+      "syncComplete": "✅ Sincronizare finalizată! {{downloaded}}/{{total}} melodii disponibile",
+      "syncFailed": "❌ Sincronizarea a eșuat: {{error}}",
+      "syncStartFailed": "❌ Pornirea sincronizării a eșuat: {{error}}",
+      "forceRecheckStarted": "🔍 Reverificarea forțată a început — se redescarcă fișierele lipsă...",
+      "forceRecheckFailed": "❌ Pornirea reverificării a eșuat: {{error}}"
     },
     "errors": {
-      "subscribeFailed": "Abonarea la playlist a esuat",
-      "unknownError": "Eroare necunoscuta"
+      "subscribeFailed": "Abonarea la playlist a eșuat",
+      "unknownError": "Eroare necunoscută"
     }
   },
   "playlistDetail": {
     "status": {
-      "partiallyCached": "Partial salvata",
+      "partiallyCached": "Parțial salvată",
       "offline": "Offline",
-      "cached": "In cache",
+      "cached": "În cache",
       "availableOffline": "Disponibil offline",
-      "notDownloaded": "Nedescarcata"
+      "notDownloaded": "Nedescărcată"
     },
     "export": {
-      "action": "Exporta playlist",
-      "summary": "{{count}} melodii descarcate vor fi exportate.",
-      "preparing": "Se pregateste exportul…",
-      "progress": "Se exporta {{count}} melodii…",
+      "action": "Exportă playlist",
+      "preparing": "Se pregătește exportul…",
       "done": "Export gata",
-      "failed": "Exportul a esuat",
+      "failed": "Exportul a eșuat",
       "partial": "ZIP salvat. {{omitted}} melodii nu au putut fi incluse, iar la {{warned}} lipsesc etichete sau coperta. Vezi export-summary.json din ZIP.",
-      "jobProgress": "Export in fundal: {{done}} din {{total}} melodii",
-      "jobContinues": "Poti inchide. Exportul continua, iar fisierul ramane disponibil o ora.",
-      "cancelJob": "Anuleaza exportul",
-      "downloadReady": "Descarca ZIP"
+      "jobProgress": "Export în fundal: {{done}} din {{total}} melodii",
+      "jobContinues": "Poți închide. Exportul continuă, iar fișierul rămâne disponibil o oră.",
+      "cancelJob": "Anulează exportul",
+      "downloadReady": "Descarcă ZIP",
+      "summary_one": "{{count}} melodie descărcată va fi exportată.",
+      "summary_few": "{{count}} melodii descărcate vor fi exportate.",
+      "summary_other": "{{count}} de melodii descărcate vor fi exportate.",
+      "progress_one": "Se exportă {{count}} melodie…",
+      "progress_few": "Se exportă {{count}} melodii…",
+      "progress_other": "Se exportă {{count}} de melodii…"
     },
     "actions": {
-      "cancelCaching": "Anuleaza",
-      "downloadMissing": "Descarca ce lipseste",
-      "playAll": "Reda tot",
-      "shuffle": "Amesteca",
-      "saveAll": "Salveaza tot",
-      "downloadAllTitle": "Descarca toate melodiile pe dispozitiv",
-      "forceRecheck": "Reverifica fortat",
-      "forceRecheckTitle": "Reverifica toate melodiile si redescarca fisierele lipsa",
-      "caching": "Se pune in cache...",
-      "makeAvailableOffline": "Fa disponibil offline",
-      "removeOffline": "Elimina offline",
-      "removeOfflineTitle": "Elimina cache-ul offline pentru a elibera spatiu",
-      "play": "Reda",
-      "downloadToDevice": "Descarca pe dispozitiv"
+      "cancelCaching": "Anulează",
+      "downloadMissing": "Descarcă ce lipsește",
+      "playAll": "Redă tot",
+      "shuffle": "Amestecă",
+      "saveAll": "Salvează tot",
+      "downloadAllTitle": "Descarcă toate melodiile pe dispozitiv",
+      "forceRecheck": "Reverifică forțat",
+      "forceRecheckTitle": "Reverifică toate melodiile și redescarcă fișierele lipsă",
+      "caching": "Se pune în cache...",
+      "makeAvailableOffline": "Fă disponibil offline",
+      "removeOffline": "Elimină offline",
+      "removeOfflineTitle": "Elimină cache-ul offline pentru a elibera spațiu",
+      "play": "Redă",
+      "downloadToDevice": "Descarcă pe dispozitiv"
     },
     "offlineMode": {
       "title": "Mod offline",
       "available": "Acest playlist este disponibil offline",
-      "unavailableHint": "Esti offline. Pune playlisturile in cache atunci cand esti online pentru acces offline."
+      "unavailableHint": "Ești offline. Pune playlisturile în cache atunci când ești online pentru acces offline."
     },
     "cacheCard": {
       "partialDescription": "{{available}} melodii sunt disponibile offline, {{missing}} lipsesc",
-      "partialTitle": "⚠️ Partial offline",
+      "partialTitle": "⚠️ Parțial offline",
       "readyTitle": "📱 Gata pentru offline",
-      "cacheTitle": "💾 Pune in cache pentru offline",
-      "readyDescription": "{{count}} melodii in cache si disponibile fara internet",
-      "cacheDescription": "Descarca acest playlist ca sa poti asculta fara conexiune la internet",
-      "storageUsed": "Spatiu folosit"
+      "cacheTitle": "💾 Pune în cache pentru offline",
+      "cacheDescription": "Descarcă acest playlist ca să poți asculta fără conexiune la internet",
+      "storageUsed": "Spațiu folosit",
+      "readyDescription_one": "{{count}} melodie în cache și disponibilă fără internet",
+      "readyDescription_few": "{{count}} melodii în cache și disponibile fără internet",
+      "readyDescription_other": "{{count}} de melodii în cache și disponibile fără internet"
     },
     "progress": {
-      "title": "Progres descarcare",
+      "title": "Progres descărcare",
       "count": "{{downloaded}} / {{total}} melodii",
-      "cachingForOffline": "Se pune in cache pentru offline"
+      "cachingForOffline": "Se pune în cache pentru offline"
     },
     "stats": {
       "totalTracks": "Total melodii",
-      "downloaded": "Descarcate",
-      "pending": "In asteptare",
-      "failed": "Esuate",
+      "downloaded": "Descărcate",
+      "pending": "În așteptare",
+      "failed": "Eșuate",
       "unavailable": "Indisponibile pe YouTube",
       "lastUpdated": "Ultima actualizare"
     },
     "columns": {
       "title": "Titlu",
       "channel": "Canal",
-      "duration": "Durata",
-      "actions": "Actiuni"
+      "duration": "Durată",
+      "actions": "Acțiuni"
     },
     "empty": {
-      "noTracks": "Nu au fost gasite melodii in acest playlist"
+      "noTracks": "Nu au fost găsite melodii în acest playlist"
     },
     "messages": {
-      "cacheCanceled": "Descarcarea offline a fost anulata",
-      "downloadingTracks": "Se descarca {{count}} melodii pe dispozitiv",
-      "forceRecheckStarted": "Reverificarea fortata a inceput — toate melodiile sunt verificate si fisierele lipsa se redescarca...",
-      "forceRecheckFailed": "Pornirea reverificarii a esuat: {{error}}",
-      "starting": "Se porneste...",
-      "cachePartial": "✅ {{cached}} melodii in cache, {{failed}} au esuat",
-      "cacheSuccess": "✅ {{count}} melodii disponibile offline!",
+      "cacheCanceled": "Descărcarea offline a fost anulată",
+      "forceRecheckStarted": "Reverificarea forțată a început — toate melodiile sunt verificate și fișierele lipsă se redescarcă...",
+      "forceRecheckFailed": "Pornirea reverificării a eșuat: {{error}}",
+      "starting": "Se pornește...",
+      "cachePartial": "✅ {{cached}} melodii în cache, {{failed}} au eșuat",
       "offlineDataRemoved": "Datele offline au fost eliminate",
-      "downloadingTrack": "Se descarca \"{{title}}\" pe dispozitiv",
-      "playingTracks": "Se redau {{count}} melodii",
-      "shuffledTracks": "Au fost amestecate {{count}} melodii"
+      "downloadingTrack": "Se descarcă \"{{title}}\" pe dispozitiv",
+      "playingTracks_one": "Se redă {{count}} melodie",
+      "playingTracks_few": "Se redau {{count}} melodii",
+      "playingTracks_other": "Se redau {{count}} de melodii",
+      "shuffledTracks_one": "A fost amestecată {{count}} melodie",
+      "shuffledTracks_few": "Au fost amestecate {{count}} melodii",
+      "shuffledTracks_other": "Au fost amestecate {{count}} de melodii",
+      "downloadingTracks_one": "Se descarcă {{count}} melodie pe dispozitiv",
+      "downloadingTracks_few": "Se descarcă {{count}} melodii pe dispozitiv",
+      "downloadingTracks_other": "Se descarcă {{count}} de melodii pe dispozitiv",
+      "cacheSuccess_one": "✅ {{count}} melodie disponibilă offline!",
+      "cacheSuccess_few": "✅ {{count}} melodii disponibile offline!",
+      "cacheSuccess_other": "✅ {{count}} de melodii disponibile offline!"
     },
     "errors": {
       "notAvailableOffline": "Playlistul nu este disponibil offline",
-      "loadFailed": "Incarcarea playlistului a esuat",
-      "notFound": "Playlistul nu a fost gasit",
-      "noDownloadedTracksToSave": "Nu exista melodii descarcate de salvat",
-      "noTracksToCache": "Nu exista melodii de pus in cache",
-      "mustBeOnline": "Trebuie sa fii online pentru a descarca in vederea utilizarii offline",
-      "noTracksDownloadedYet": "Nu exista melodii descarcate inca. Descarca melodiile mai intai.",
-      "cacheFailed": "Punerea playlistului in cache a esuat",
-      "offlineCachingFailed": "Punerea in cache offline a esuat",
-      "removeOfflineFailed": "Eliminarea datelor offline a esuat",
-      "downloadFailed": "Descarcarea a esuat",
-      "noDownloadedTracksToPlay": "Nu exista melodii descarcate de redat",
-      "noDownloadedTracksToShuffle": "Nu exista melodii descarcate de amestecat"
-    }
+      "loadFailed": "Încărcarea playlistului a eșuat",
+      "notFound": "Playlistul nu a fost găsit",
+      "noDownloadedTracksToSave": "Nu există melodii descărcate de salvat",
+      "noTracksToCache": "Nu există melodii de pus în cache",
+      "mustBeOnline": "Trebuie să fii online pentru a descărca în vederea utilizării offline",
+      "noTracksDownloadedYet": "Nu există melodii descărcate încă. Descarcă melodiile mai întâi.",
+      "cacheFailed": "Punerea playlistului în cache a eșuat",
+      "offlineCachingFailed": "Punerea în cache offline a eșuat",
+      "removeOfflineFailed": "Eliminarea datelor offline a eșuat",
+      "downloadFailed": "Descărcarea a eșuat",
+      "noDownloadedTracksToPlay": "Nu există melodii descărcate de redat",
+      "noDownloadedTracksToShuffle": "Nu există melodii descărcate de amestecat"
+    },
+    "loadingTracks": "Se încarcă piesele: {{loaded}} din {{total}}"
   },
   "analytics": {
-    "title": "Statistici de auditie",
-    "description": "Statisticile si obiceiurile tale personale de auditie",
+    "title": "Statistici de audiție",
+    "description": "Statisticile și obiceiurile tale personale de audiție",
     "notAvailable": "N/A",
-    "days": "{{count}} zile",
     "duration": {
       "minutesShort": "{{count}}m",
       "hoursShort": "{{count}}h",
@@ -458,53 +507,64 @@
       "lastYear": "Ultimul an"
     },
     "cards": {
-      "totalListeningTime": "Timp total de auditie",
+      "totalListeningTime": "Timp total de audiție",
       "tracksPlayed": "Melodii redate",
       "uniqueTracks": "{{count}} unice",
-      "uniqueArtists": "Artisti unici",
-      "dailyAverage": "Media zilnica",
-      "currentStreak": "Serie curenta",
-      "longestStreak": "Cea mai lunga serie",
-      "peakHour": "Ora de varf",
-      "favoriteDay": "Ziua preferata"
+      "uniqueArtists": "Artiști unici",
+      "dailyAverage": "Media zilnică",
+      "currentStreak": "Serie curentă",
+      "longestStreak": "Cea mai lungă serie",
+      "peakHour": "Ora de vârf",
+      "favoriteDay": "Ziua preferată"
     },
     "sections": {
       "activityByHour": {
-        "title": "Activitate de auditie pe ore",
-        "description": "Cand asculti muzica de-a lungul zilei"
+        "title": "Activitate de audiție pe ore",
+        "description": "Când asculți muzică de-a lungul zilei"
       },
-      "topArtists": "Artisti de top",
+      "topArtists": "Artiști de top",
       "topChannels": "Canale de top",
       "mostPlayedTracks": "Cele mai redate melodii",
-      "recentListeningHistory": "Istoric recent de auditie",
-      "genreDistribution": "Distributia genurilor"
+      "recentListeningHistory": "Istoric recent de audiție",
+      "genreDistribution": "Distribuția genurilor"
     },
     "hourlyChart": {
-      "tooltip": "{{hour}}: {{count}} redari ({{duration}})"
+      "tooltip_one": "{{hour}}: {{count}} redare ({{duration}})",
+      "tooltip_few": "{{hour}}: {{count}} redări ({{duration}})",
+      "tooltip_other": "{{hour}}: {{count}} de redări ({{duration}})"
     },
     "listItem": {
-      "playsDuration": "{{count}} redari • {{duration}}"
+      "playsDuration_one": "{{count}} redare • {{duration}}",
+      "playsDuration_few": "{{count}} redări • {{duration}}",
+      "playsDuration_other": "{{count}} de redări • {{duration}}"
     },
     "status": {
       "completed": "Complet"
     },
     "empty": {
-      "noListeningData": "Nu exista inca date de auditie",
-      "noRecentHistory": "Nu exista istoric recent de auditie"
+      "noListeningData": "Nu există încă date de audiție",
+      "noRecentHistory": "Nu există istoric recent de audiție"
     },
     "errors": {
-      "unableToLoad": "Datele de statistica nu au putut fi incarcate"
-    }
+      "unableToLoad": "Datele de statistică nu au putut fi încărcate"
+    },
+    "days_one": "{{count}} zi",
+    "days_few": "{{count}} zile",
+    "days_other": "{{count}} de zile"
   },
   "yearlyWrapped": {
     "title": "🎁 Retrospectiva ta {{year}}",
-    "description": "O privire inapoi asupra calatoriei tale de auditie",
+    "description": "O privire înapoi asupra călătoriei tale de audiție",
     "year": "An",
     "notAvailable": "N/A",
     "time": {
-      "minutes": "{{count}} minute",
-      "hours": "{{count}} ore",
-      "daysHours": "{{days}} zile, {{hours}} ore"
+      "daysHours": "{{days}} zile, {{hours}} ore",
+      "minutes_one": "{{count}} minut",
+      "minutes_few": "{{count}} minute",
+      "minutes_other": "{{count}} de minute",
+      "hours_one": "{{count}} oră",
+      "hours_few": "{{count}} ore",
+      "hours_other": "{{count}} de ore"
     },
     "hours": {
       "midnight": "12 AM",
@@ -513,79 +573,97 @@
       "pm": "{{hour}} PM"
     },
     "personality": {
-      "title": "Personalitatea ta de auditie",
-      "streakMaster": "🔥 Maestrul seriei - Consecventa ta este legendara!",
-      "nightOwl": "🦉 Bufnita de noapte - Noaptea este simfonia ta",
-      "earlyBird": "🐦 Pasarea matinala - Muzica iti incepe ziua",
-      "musicalExplorer": "🌍 Exploratorul muzical - Iti place sa descoperi sunete noi",
-      "devotedFan": "💖 Fan devotat - Loialitatea este prenumele tau",
-      "audioAddict": "🎵 Dependent de muzica - Muzica este tovarasul tau constant",
-      "dedicatedListener": "🎧 Ascultator dedicat - Muzica este o parte importanta din viata ta",
-      "risingStar": "🌱 Stea in ascensiune - Calatoria ta muzicala abia incepe"
+      "title": "Personalitatea ta de audiție",
+      "streakMaster": "🔥 Maestrul seriei - Consecvența ta este legendară!",
+      "nightOwl": "🦉 Bufnița de noapte - Noaptea este simfonia ta",
+      "earlyBird": "🐦 Pasărea matinală - Muzica îți începe ziua",
+      "musicalExplorer": "🌍 Exploratorul muzical - Îți place să descoperi sunete noi",
+      "devotedFan": "💖 Fan devotat - Loialitatea este prenumele tău",
+      "audioAddict": "🎵 Dependent de muzică - Muzica este tovarășul tău constant",
+      "dedicatedListener": "🎧 Ascultător dedicat - Muzica este o parte importantă din viața ta",
+      "risingStar": "🌱 Stea în ascensiune - Călătoria ta muzicală abia începe"
     },
     "stats": {
       "minutesListened": "Minute ascultate",
       "tracksPlayed": "Melodii redate",
       "uniqueTracks": "{{count}} unice",
-      "artistsDiscovered": "Artisti descoperiti",
-      "longestStreak": "Cea mai lunga serie",
-      "days": "{{count}} zile",
-      "daysActive": "{{count}} zile active"
+      "artistsDiscovered": "Artiști descoperiți",
+      "longestStreak": "Cea mai lungă serie",
+      "days_one": "{{count}} zi",
+      "days_few": "{{count}} zile",
+      "days_other": "{{count}} de zile",
+      "daysActive_one": "{{count}} zi activă",
+      "daysActive_few": "{{count}} zile active",
+      "daysActive_other": "{{count}} de zile active"
     },
     "sections": {
       "numberOneArtist": "Artistul #1",
       "numberOneTrack": "Melodia #1",
-      "top5Artists": "🎤 Top 5 artisti",
+      "top5Artists": "🎤 Top 5 artiști",
       "top5Tracks": "🎵 Top 5 melodii",
-      "monthlyListening": "📅 Auditie lunara"
+      "monthlyListening": "📅 Audiție lunară"
     },
-    "artistSummary": "{{count}} redari • {{minutes}} minute",
-    "playCount": "{{count}} redari",
-    "trackSummary": "{{artist}} • {{count}} redari",
+    "artistSummary": "{{count}} redări • {{minutes}} minute",
     "highlights": {
-      "peakMonth": "Luna de varf: {{month}}",
-      "peakTime": "Ora de varf: {{time}}",
-      "favoriteDay": "Ziua preferata: {{day}}"
+      "peakMonth": "Luna de vârf: {{month}}",
+      "peakTime": "Ora de vârf: {{time}}",
+      "favoriteDay": "Ziua preferată: {{day}}"
     },
     "achievements": {
-      "unlocked": "{{count}} realizari deblocate",
-      "inYear": "in {{year}}"
+      "inYear": "în {{year}}",
+      "unlocked_one": "{{count}} realizare deblocată",
+      "unlocked_few": "{{count}} realizări deblocate",
+      "unlocked_other": "{{count}} de realizări deblocate"
     },
     "errors": {
-      "loadFailed": "Incarcarea retrospectivei anuale a esuat",
-      "noDataForYear": "Nu au fost gasite date de auditie pentru {{year}}",
-      "withHint": "{{error}}. Incepe sa asculti pentru a-ti construi retrospectiva!"
-    }
+      "loadFailed": "Încărcarea retrospectivei anuale a eșuat",
+      "noDataForYear": "Nu au fost găsite date de audiție pentru {{year}}",
+      "withHint": "{{error}}. Începe să asculți pentru a-ți construi retrospectiva!"
+    },
+    "playCount_one": "{{count}} redare",
+    "playCount_few": "{{count}} redări",
+    "playCount_other": "{{count}} de redări",
+    "trackSummary_one": "{{artist}} • {{count}} redare",
+    "trackSummary_few": "{{artist}} • {{count}} redări",
+    "trackSummary_other": "{{artist}} • {{count}} de redări"
   },
   "achievements": {
-    "title": "🏆 Realizari",
-    "description": "Urmareste-ti bornele de auditie si castiga insigne",
+    "title": "🏆 Realizări",
+    "description": "Urmărește-ți bornele de audiție și câștigă insigne",
     "actions": {
-      "checkForNew": "Verifica noutatile"
+      "checkForNew": "Verifică noutățile"
     },
     "messages": {
-      "newUnlocked": "🎉 Au fost deblocate {{count}} realizari noi!",
-      "noneYet": "Nu exista realizari noi inca. Continua sa asculti!"
+      "noneYet": "Nu există realizări noi încă. Continuă să asculți!",
+      "newUnlocked_one": "🎉 A fost deblocată {{count}} realizare nouă!",
+      "newUnlocked_few": "🎉 Au fost deblocate {{count}} realizări noi!",
+      "newUnlocked_other": "🎉 Au fost deblocate {{count}} de realizări noi!"
     },
     "errors": {
-      "loadFailed": "Incarcarea datelor despre realizari a esuat",
-      "checkFailed": "Verificarea realizarilor a esuat"
+      "loadFailed": "Încărcarea datelor despre realizări a eșuat",
+      "checkFailed": "Verificarea realizărilor a eșuat"
     },
     "streak": {
-      "currentStreak": "Serie de {{count}} zile",
-      "atRisk": "⚠️ In pericol!",
-      "onFire": "🔥 In forta!",
-      "listenedToday": "Foarte bine! Ai ascultat astazi. Continua asa!",
-      "listenToday": "Asculta o melodie astazi ca sa-ti mentii seria!",
-      "bestStreak": "Cea mai buna serie",
+      "atRisk": "⚠️ În pericol!",
+      "onFire": "🔥 În forță!",
+      "listenedToday": "Foarte bine! Ai ascultat astăzi. Continuă așa!",
+      "listenToday": "Ascultă o melodie astăzi ca să-ți menții seria!",
+      "bestStreak": "Cea mai bună serie",
       "days": "zile",
-      "thisWeek": "Saptamana aceasta",
-      "dayTooltip": "{{day}}: {{count}} melodii redate",
-      "nextMilestone": "Urmatorul prag: serie de {{count}} zile",
-      "daysToGo": "inca {{count}} zile"
+      "thisWeek": "Săptămâna aceasta",
+      "nextMilestone": "Următorul prag: serie de {{count}} zile",
+      "currentStreak_one": "Serie de {{count}} zi",
+      "currentStreak_few": "Serie de {{count}} zile",
+      "currentStreak_other": "Serie de {{count}} de zile",
+      "daysToGo_one": "încă {{count}} zi",
+      "daysToGo_few": "încă {{count}} zile",
+      "daysToGo_other": "încă {{count}} de zile",
+      "dayTooltip_one": "{{day}}: {{count}} melodie redată",
+      "dayTooltip_few": "{{day}}: {{count}} melodii redate",
+      "dayTooltip_other": "{{day}}: {{count}} de melodii redate"
     },
     "progress": {
-      "unlockedOfTotal": "{{unlocked}} din {{total}} realizari deblocate"
+      "unlockedOfTotal": "{{unlocked}} din {{total}} realizări deblocate"
     },
     "tabs": {
       "all": "Toate ({{unlocked}}/{{total}})",
@@ -596,7 +674,7 @@
       "special": "Speciale ({{count}})"
     },
     "empty": {
-      "noAchievementsInCategory": "Nu exista realizari in aceasta categorie"
+      "noAchievementsInCategory": "Nu există realizări în această categorie"
     },
     "card": {
       "completed": "Completat!",
@@ -604,148 +682,148 @@
     },
     "items": {
       "tracks_10": {
-        "name": "Primii pasi",
-        "description": "Asculta 10 melodii"
+        "name": "Primii pași",
+        "description": "Ascultă 10 melodii"
       },
       "tracks_50": {
         "name": "Explorator muzical",
-        "description": "Asculta 50 de melodii"
+        "description": "Ascultă 50 de melodii"
       },
       "tracks_100": {
-        "name": "Ascultator dedicat",
-        "description": "Asculta 100 de melodii"
+        "name": "Ascultător dedicat",
+        "description": "Ascultă 100 de melodii"
       },
       "tracks_500": {
         "name": "Entuziast muzical",
-        "description": "Asculta 500 de melodii"
+        "description": "Ascultă 500 de melodii"
       },
       "tracks_1000": {
         "name": "Audiofil",
-        "description": "Asculta 1.000 de melodii"
+        "description": "Ascultă 1.000 de melodii"
       },
       "tracks_5000": {
         "name": "Legenda muzicii",
-        "description": "Asculta 5.000 de melodii"
+        "description": "Ascultă 5.000 de melodii"
       },
       "tracks_10000": {
         "name": "Maestru al sunetului",
-        "description": "Asculta 10.000 de melodii"
+        "description": "Ascultă 10.000 de melodii"
       },
       "hours_1": {
-        "name": "Prima ora",
-        "description": "Asculta timp de 1 ora"
+        "name": "Prima oră",
+        "description": "Ascultă timp de 1 oră"
       },
       "hours_10": {
-        "name": "La inceput",
-        "description": "Asculta timp de 10 ore"
+        "name": "La început",
+        "description": "Ascultă timp de 10 ore"
       },
       "hours_24": {
-        "name": "O zi intreaga",
-        "description": "Asculta timp de 24 de ore"
+        "name": "O zi întreaga",
+        "description": "Ascultă timp de 24 de ore"
       },
       "hours_100": {
         "name": "Fan dedicat",
-        "description": "Asculta timp de 100 de ore"
+        "description": "Ascultă timp de 100 de ore"
       },
       "hours_500": {
-        "name": "Calator in timp",
-        "description": "Asculta timp de 500 de ore"
+        "name": "Călător în timp",
+        "description": "Ascultă timp de 500 de ore"
       },
       "hours_1000": {
-        "name": "Ascultator maraton",
-        "description": "Asculta timp de 1.000 de ore"
+        "name": "Ascultător maraton",
+        "description": "Ascultă timp de 1.000 de ore"
       },
       "streak_3": {
         "name": "Serie de 3 zile",
-        "description": "Asculta 3 zile la rand"
+        "description": "Ascultă 3 zile la rând"
       },
       "streak_7": {
-        "name": "Razboinicul saptamanii",
-        "description": "Asculta 7 zile la rand"
+        "name": "Războinicul săptămânii",
+        "description": "Ascultă 7 zile la rând"
       },
       "streak_14": {
-        "name": "Campion de doua saptamani",
-        "description": "Asculta 14 zile la rand"
+        "name": "Campion de două săptămâni",
+        "description": "Ascultă 14 zile la rând"
       },
       "streak_30": {
         "name": "Maestru lunar",
-        "description": "Asculta 30 de zile la rand"
+        "description": "Ascultă 30 de zile la rând"
       },
       "streak_60": {
-        "name": "Erou de doua luni",
-        "description": "Asculta 60 de zile la rand"
+        "name": "Erou de două luni",
+        "description": "Ascultă 60 de zile la rând"
       },
       "streak_90": {
         "name": "Regele trimestrului",
-        "description": "Asculta 90 de zile la rand"
+        "description": "Ascultă 90 de zile la rând"
       },
       "streak_180": {
-        "name": "Legenda jumatate de an",
-        "description": "Asculta 180 de zile la rand"
+        "name": "Legenda jumătate de an",
+        "description": "Ascultă 180 de zile la rând"
       },
       "streak_365": {
         "name": "Dedicare de un an",
-        "description": "Asculta 365 de zile la rand"
+        "description": "Ascultă 365 de zile la rând"
       },
       "artists_10": {
-        "name": "Explorator de artisti",
-        "description": "Asculta 10 artisti diferiti"
+        "name": "Explorator de artiști",
+        "description": "Ascultă 10 artiști diferiți"
       },
       "artists_50": {
-        "name": "Saritor de genuri",
-        "description": "Asculta 50 de artisti diferiti"
+        "name": "Săritor de genuri",
+        "description": "Ascultă 50 de artiști diferiți"
       },
       "artists_100": {
-        "name": "Ratacitor muzical",
-        "description": "Asculta 100 de artisti diferiti"
+        "name": "Rătăcitor muzical",
+        "description": "Ascultă 100 de artiști diferiți"
       },
       "artists_500": {
         "name": "Gust eclectic",
-        "description": "Asculta 500 de artisti diferiti"
+        "description": "Ascultă 500 de artiști diferiți"
       },
       "channels_5": {
         "name": "Surfer de canale",
-        "description": "Asculta din 5 canale diferite"
+        "description": "Ascultă din 5 canale diferite"
       },
       "channels_25": {
-        "name": "Explorator de continut",
-        "description": "Asculta din 25 de canale diferite"
+        "name": "Explorator de conținut",
+        "description": "Ascultă din 25 de canale diferite"
       },
       "channels_50": {
         "name": "Curator",
-        "description": "Asculta din 50 de canale diferite"
+        "description": "Ascultă din 50 de canale diferite"
       },
       "channels_100": {
-        "name": "Constructor de biblioteca",
-        "description": "Asculta din 100 de canale diferite"
+        "name": "Constructor de bibliotecă",
+        "description": "Ascultă din 100 de canale diferite"
       },
       "night_owl": {
-        "name": "Bufnita de noapte",
-        "description": "Asculta muzica dupa miezul noptii"
+        "name": "Bufnița de noapte",
+        "description": "Ascultă muzică după miezul nopții"
       },
       "early_bird": {
-        "name": "Pasarea de dimineata",
-        "description": "Asculta muzica inainte de ora 6"
+        "name": "Pasărea de dimineața",
+        "description": "Ascultă muzică înainte de ora 6"
       },
       "weekend_warrior": {
-        "name": "Razboinicul de weekend",
-        "description": "Asculta 50+ melodii intr-un weekend"
+        "name": "Războinicul de weekend",
+        "description": "Ascultă 50+ melodii într-un weekend"
       },
       "genre_master": {
         "name": "Maestru al genurilor",
-        "description": "Asculta 10+ genuri diferite"
+        "description": "Ascultă 10+ genuri diferite"
       },
       "completionist": {
-        "name": "Perfectionist",
-        "description": "Finalizeaza complet 100 de melodii"
+        "name": "Perfecționist",
+        "description": "Finalizează complet 100 de melodii"
       },
       "collector": {
-        "name": "Colectionar",
-        "description": "Ai 500+ melodii in biblioteca"
+        "name": "Colecționar",
+        "description": "Ai 500+ melodii în bibliotecă"
       },
       "superfan": {
         "name": "Superfan",
-        "description": "50+ redari ale aceluiasi artist"
+        "description": "50+ redări ale aceluiași artist"
       }
     }
   },
@@ -753,7 +831,7 @@
     "title": "Detalii canal",
     "notAvailable": "N/A",
     "syncDepth": {
-      "label": "Adancime sincronizare",
+      "label": "Adâncime sincronizare",
       "options": {
         "25": "Ultimele 25",
         "50": "Ultimele 50",
@@ -761,99 +839,111 @@
         "200": "Ultimele 200",
         "all": "Toate"
       },
-      "backfill": "Sincronizare profunda acum",
-      "saved": "Adancimea de sincronizare a fost actualizata",
-      "saveFailed": "Adancimea de sincronizare nu a putut fi actualizata",
+      "backfill": "Sincronizare profundă acum",
+      "saved": "Adâncimea de sincronizare a fost actualizată",
+      "saveFailed": "Adâncimea de sincronizare nu a putut fi actualizată",
       "backfillStarted": "Sincronizarea a pornit",
       "backfillFailed": "Sincronizarea nu a putut porni"
     },
     "actions": {
-      "playAll": "Reda tot",
-      "shuffle": "Amesteca",
-      "downloadAll": "Descarca tot",
-      "download": "Descarca"
+      "playAll": "Redă tot",
+      "shuffle": "Amestecă",
+      "downloadAll": "Descarcă tot",
+      "download": "Descarcă"
     },
     "columns": {
       "title": "Titlu",
-      "duration": "Durata",
+      "duration": "Durată",
       "published": "Publicat",
-      "plays": "Redari",
-      "actions": "Actiuni"
+      "plays": "Redări",
+      "actions": "Acțiuni"
     },
     "stats": {
-      "subscribers": "{{count}} abonati",
-      "tracks": "{{count}} melodii",
-      "downloaded": "{{count}} descarcate",
-      "pending": "{{count}} in asteptare",
-      "failed": "{{count}} esuate",
-      "views": "{{count}} vizualizari"
+      "downloaded": "{{count}} descărcate",
+      "pending": "{{count}} în așteptare",
+      "failed": "{{count}} eșuate",
+      "tracks_one": "{{count}} melodie",
+      "tracks_few": "{{count}} melodii",
+      "tracks_other": "{{count}} de melodii",
+      "subscribers_one": "{{count}} abonat",
+      "subscribers_few": "{{count}} abonați",
+      "subscribers_other": "{{count}} de abonați",
+      "views_one": "{{count}} vizualizare",
+      "views_few": "{{count}} vizualizări",
+      "views_other": "{{count}} de vizualizări"
     },
     "messages": {
-      "playingAll": "Se redau toate cele {{count}} melodii din {{channel}}",
-      "shuffling": "Se amesteca {{count}} melodii din {{channel}}",
-      "downloadingTracks": "Se descarca {{count}} melodii pe dispozitiv"
+      "playingAll_one": "Se redă singura melodie din {{channel}}",
+      "playingAll_few": "Se redau toate cele {{count}} melodii din {{channel}}",
+      "playingAll_other": "Se redau toate cele {{count}} de melodii din {{channel}}",
+      "shuffling_one": "Se amestecă {{count}} melodie din {{channel}}",
+      "shuffling_few": "Se amestecă {{count}} melodii din {{channel}}",
+      "shuffling_other": "Se amestecă {{count}} de melodii din {{channel}}",
+      "downloadingTracks_one": "Se descarcă {{count}} melodie pe dispozitiv",
+      "downloadingTracks_few": "Se descarcă {{count}} melodii pe dispozitiv",
+      "downloadingTracks_other": "Se descarcă {{count}} de melodii pe dispozitiv"
     },
     "errors": {
-      "loadFailed": "Incarcarea canalului a esuat",
-      "notFound": "Canalul nu a fost gasit",
-      "noDownloadedTracks": "Nu exista melodii descarcate de salvat"
+      "loadFailed": "Încărcarea canalului a eșuat",
+      "notFound": "Canalul nu a fost găsit",
+      "noDownloadedTracks": "Nu există melodii descărcate de salvat"
     },
     "empty": {
-      "noAudioTitle": "Nu au fost gasite fisiere audio",
-      "noAudioDescription": "Fisierele audio vor aparea aici dupa ce sunt descarcate din acest canal."
+      "noAudioTitle": "Nu au fost găsite fișiere audio",
+      "noAudioDescription": "Fișierele audio vor apărea aici după ce sunt descărcate din acest canal."
     },
     "fallback": {
       "audioFilename": "audio"
     }
   },
   "downloadDialog": {
-    "title": "Exporta melodia",
+    "title": "Exportă melodia",
     "format": {
-      "mp3": "MP3 (comprimat, fisier mai mic)",
-      "flac": "FLAC (fara pierderi, fisier mai mare)",
-      "mp3Description": "Comprimat, compatibilitate universala, versuri sincronizate integrate (SYLT)",
-      "flacDescription": "Calitate fara pierderi, fisier mai mare, LRC integrat in metadate"
+      "mp3": "MP3 (comprimat, fișier mai mic)",
+      "flac": "FLAC (fără pierderi, fișier mai mare)",
+      "mp3Description": "Comprimat, compatibilitate universală, versuri sincronizate integrate (SYLT)",
+      "flacDescription": "Calitate fără pierderi, fișier mai mare, LRC integrat în metadate"
     },
     "quality": {
-      "high": "Ridicata (320 kbps)",
+      "high": "Ridicată (320 kbps)",
       "medium": "Medie (192 kbps)",
-      "low": "Scazuta (128 kbps)",
-      "original": "Original (fara re-codare)"
+      "low": "Scăzută (128 kbps)",
+      "original": "Original (fără re-codare)"
     },
     "sections": {
-      "outputFormat": "Format iesire",
+      "outputFormat": "Format ieșire",
       "quality": "Calitate",
       "lyrics": "Versuri",
-      "artwork": "Coperta album"
+      "artwork": "Copertă album"
     },
     "lyrics": {
-      "embed": "Integreaza versurile in fisier",
+      "embed": "Integrează versurile în fișier",
       "syncedEmbedded": "Versurile sincronizate vor fi integrate ({{tag}})",
       "plainEmbedded": "Versurile simple vor fi integrate",
-      "none": "Nu exista versuri de integrat"
+      "none": "Nu există versuri de integrat"
     },
     "artwork": {
-      "embed": "Integreaza coperta albumului",
-      "source": "Sursa coperta"
+      "embed": "Integrează coperta albumului",
+      "source": "Sursă copertă"
     },
     "actions": {
-      "exporting": "Se exporta...",
-      "exportAs": "Exporta ca {{format}}"
+      "exporting": "Se exportă...",
+      "exportAs": "Exportă ca {{format}}"
     },
     "errors": {
-      "loadOptionsFailed": "Incarcarea optiunilor de export a esuat",
-      "exportFailed": "Exportul a esuat. Incearca din nou."
+      "loadOptionsFailed": "Încărcarea opțiunilor de export a eșuat",
+      "exportFailed": "Exportul a eșuat. Încearcă din nou."
     },
     "fallback": {
       "audioFilename": "audio"
     },
     "qualityHelp": {
-      "mp3": "Alegerea unui bitrate re-codeaza melodia, iar un bitrate mai mare nu poate reface calitatea pe care sursa nu a avut-o.",
-      "flac": "FLAC pastreaza ce are sursa fara alte pierderi, dar nu poate reface calitatea pe care sursa nu a avut-o."
+      "mp3": "Alegerea unui bitrate re-codează melodia, iar un bitrate mai mare nu poate reface calitatea pe care sursa nu a avut-o.",
+      "flac": "FLAC păstrează ce are sursa fără alte pierderi, dar nu poate reface calitatea pe care sursa nu a avut-o."
     },
     "warnings": {
-      "tags_failed": "Fisierul a fost salvat, dar etichetele nu au putut fi scrise.",
-      "artwork_unavailable": "Fisierul a fost salvat fara coperta, pentru ca aceasta nu a putut fi descarcata."
+      "tags_failed": "Fișierul a fost salvat, dar etichetele nu au putut fi scrise.",
+      "artwork_unavailable": "Fișierul a fost salvat fără copertă, pentru că aceasta nu a putut fi descărcată."
     }
   },
   "equalizer": {
@@ -862,46 +952,52 @@
     "off": "Oprit",
     "preset": "Presetare",
     "custom": "Personalizat",
-    "builtIn": "Incorporate",
+    "builtIn": "Încorporate",
     "customSection": "Personalizate",
     "actions": {
-      "resetToFlat": "Reseteaza la plat",
-      "saveCustomPreset": "Salveaza ca presetare personalizata",
-      "deleteCustomPreset": "Sterge presetarea personalizata"
+      "resetToFlat": "Resetează la plat",
+      "saveCustomPreset": "Salvează ca presetare personalizată",
+      "deleteCustomPreset": "Șterge presetarea personalizată"
     },
     "saveDialog": {
-      "title": "Salveaza presetarea personalizata",
+      "title": "Salvează presetarea personalizată",
       "presetName": "Nume presetare"
     }
   },
   "lyrics": {
     "title": "Versuri",
     "source": {
-      "label": "Sursa",
+      "label": "Sursă",
       "lrclib": "LRCLIB",
-      "captions": "din subtitrari",
-      "captionsHint": "Generat automat din subtitrarile acestui clip - sincronizarea si formularea pot fi aproximative."
+      "captions": "din subtitrări",
+      "captionsHint": "Generat automat din subtitrările acestui clip - sincronizarea și formularea pot fi aproximative."
     },
-    "autoScroll": "Derulare automata",
+    "autoScroll": "Derulare automată",
     "lastFetchError": "Ultima eroare la preluare: {{error}}",
     "instrumental": {
-      "title": "Piesa instrumentala",
-      "description": "Aceasta piesa este marcata ca instrumentala. Daca are versuri, poti cauta sau incarca un fisier LRC."
+      "title": "Piesă instrumentală",
+      "description": "Această piesă este marcată ca instrumentală. Dacă are versuri, poți căuta sau încărca un fișier LRC."
     },
     "empty": {
-      "noLyrics": "Nu au fost gasite versuri pentru aceasta piesa",
-      "attemptedTimes": "Incercat de {{count}} ori"
+      "noLyrics": "Nu au fost găsite versuri pentru această piesă",
+      "attemptedTimes_one": "Încercat o dată",
+      "attemptedTimes_few": "Încercat de {{count}} ori",
+      "attemptedTimes_other": "Încercat de {{count}} de ori"
     },
     "tabs": {
       "synced": "Sincronizate",
       "plainText": "Text simplu"
     },
     "search": {
-      "placeholder": "Cauta dupa titlul piesei sau artist...",
-      "foundSuggestions": "Au fost gasite {{count}} sugestii:",
+      "placeholder": "Caută după titlul piesei sau artist...",
       "byArtist": "de {{artist}}",
-      "suggestionsFoundReplace": "{{count}} sugestii gasite - selecteaza una pentru a inlocui versurile curente:",
-      "noSuggestionsLoaded": "Nu sunt sugestii incarcate inca. Introdu un termen sau apasa Cauta pentru a gasi versuri."
+      "noSuggestionsLoaded": "Nu sunt sugestii încărcate încă. Introdu un termen sau apasă Caută pentru a găsi versuri.",
+      "foundSuggestions_one": "A fost găsită {{count}} sugestie:",
+      "foundSuggestions_few": "Au fost găsite {{count}} sugestii:",
+      "foundSuggestions_other": "Au fost găsite {{count}} de sugestii:",
+      "suggestionsFoundReplace_one": "{{count}} sugestie găsită - selecteaz-o pentru a înlocui versurile curente:",
+      "suggestionsFoundReplace_few": "{{count}} sugestii găsite - selectează una pentru a înlocui versurile curente:",
+      "suggestionsFoundReplace_other": "{{count}} de sugestii găsite - selectează una pentru a înlocui versurile curente:"
     },
     "tags": {
       "synced": "Sincronizate",
@@ -909,68 +1005,68 @@
       "instrumental": "Instrumental"
     },
     "messages": {
-      "uploadSuccess": "Fisierul LRC a fost incarcat cu succes!",
+      "uploadSuccess": "Fișierul LRC a fost încărcat cu succes!",
       "offlineSaveFailed": "Versurile nu au putut fi salvate pentru utilizare offline"
     },
     "actions": {
-      "tryFetchLyrics": "Incearca preluarea versurilor",
-      "retryFetch": "Reincearca preluarea",
-      "searchForLyrics": "Cauta versuri",
-      "findSuggestions": "Gaseste sugestii",
-      "findDifferentLyrics": "Gaseste alte versuri",
-      "downloadLyrics": "Descarca versuri",
-      "downloadLrcSynced": "Descarca .LRC (sincronizat)",
-      "downloadTxtPlain": "Descarca .TXT (text simplu)",
-      "uploadLrc": "Incarca .LRC",
-      "uploadLrcFile": "Incarca fisier .LRC",
-      "refreshLyrics": "Actualizeaza versurile",
-      "clearAndSearch": "Sterge si cauta",
-      "search": "Cauta",
-      "searching": "Se cauta...",
-      "use": "Foloseste",
-      "applying": "Se aplica...",
-      "clearing": "Se sterge...",
-      "uploading": "Se incarca..."
+      "tryFetchLyrics": "Încearcă preluarea versurilor",
+      "retryFetch": "Reîncearcă preluarea",
+      "searchForLyrics": "Caută versuri",
+      "findSuggestions": "Găsește sugestii",
+      "findDifferentLyrics": "Găsește alte versuri",
+      "downloadLyrics": "Descarcă versuri",
+      "downloadLrcSynced": "Descarcă .LRC (sincronizat)",
+      "downloadTxtPlain": "Descarcă .TXT (text simplu)",
+      "uploadLrc": "Încarcă .LRC",
+      "uploadLrcFile": "Încarcă fișier .LRC",
+      "refreshLyrics": "Actualizează versurile",
+      "clearAndSearch": "Șterge și caută",
+      "search": "Caută",
+      "searching": "Se caută...",
+      "use": "Folosește",
+      "applying": "Se aplică...",
+      "clearing": "Se șterge...",
+      "uploading": "Se încarcă..."
     },
     "errors": {
       "notAvailableOffline": "Versurile nu sunt disponibile offline",
-      "loadFailed": "Incarcarea versurilor a esuat",
-      "fetchFailed": "Preluarea versurilor a esuat",
-      "applyFailed": "Aplicarea versurilor a esuat",
-      "deleteFailed": "Stergerea versurilor a esuat",
-      "downloadFailed": "Descarcarea versurilor a esuat",
-      "invalidLrcFile": "Selecteaza un fisier .lrc valid",
-      "lrcTooLarge": "Fisierul LRC trebuie sa fie mai mic de 1MB",
-      "uploadFailed": "Incarcarea fisierului LRC a esuat"
+      "loadFailed": "Încărcarea versurilor a eșuat",
+      "fetchFailed": "Preluarea versurilor a eșuat",
+      "applyFailed": "Aplicarea versurilor a eșuat",
+      "deleteFailed": "Ștergerea versurilor a eșuat",
+      "downloadFailed": "Descărcarea versurilor a eșuat",
+      "invalidLrcFile": "Selectează un fișier .lrc valid",
+      "lrcTooLarge": "Fișierul LRC trebuie să fie mai mic de 1MB",
+      "uploadFailed": "Încărcarea fișierului LRC a eșuat"
     },
     "timing": {
-      "open": "Ajusteaza sincronizarea",
-      "title": "Ajusteaza sincronizarea",
-      "help": "Muta toate liniile sau reda piesa si marcheaza fiecare linie cand incepe. Nimic nu se schimba pana nu salvezi.",
-      "shiftAll": "Muta toate liniile",
+      "open": "Ajustează sincronizarea",
+      "title": "Ajustează sincronizarea",
+      "help": "Mută toate liniile sau redă piesa și marchează fiecare linie când începe. Nimic nu se schimbă până nu salvezi.",
+      "shiftAll": "Mută toate liniile",
       "earlierSecond": "Cu 1 s mai devreme",
       "earlierTenth": "Cu 0,1 s mai devreme",
-      "laterTenth": "Cu 0,1 s mai tarziu",
-      "laterSecond": "Cu 1 s mai tarziu",
-      "stampNext": "Marcheaza linia urmatoare (T)",
-      "undo": "Anuleaza",
-      "restoreOriginal": "Restabileste sincronizarea originala",
-      "reset": "Renunta la modificari",
-      "downloadLrc": "Descarca LRC modificat",
-      "save": "Salveaza sincronizarea",
-      "draftRestored": "Ciorna nesalvata a fost restabilita de pe acest dispozitiv.",
-      "offlineDraft": "Esti offline. Modificarile raman pe acest dispozitiv; salveaza din nou cand revii online.",
-      "saveFailed": "Sincronizarea nu a putut fi salvata. Modificarile raman pe acest dispozitiv.",
-      "stampLine": "Marcheaza aceasta linie la pozitia curenta",
-      "nudgeEarlier": "Muta aceasta linie cu 0,1 s mai devreme",
-      "nudgeLater": "Muta aceasta linie cu 0,1 s mai tarziu",
-      "seekLine": "Reda de la {{time}}",
-      "outOfOrder": "Incepe inaintea liniei anterioare",
-      "pastEnd": "Incepe dupa sfarsitul piesei",
-      "conflictTitle": "Versurile s-au schimbat de cand ai inceput editarea",
-      "conflictKeep": "Pastreaza versiunea mea",
-      "conflictTextChanged": "S-au schimbat si cuvintele, deci sincronizarea ta nu li se poate aplica. O poti descarca in continuare.",
-      "useLatest": "Foloseste ultima versiune"
+      "laterTenth": "Cu 0,1 s mai târziu",
+      "laterSecond": "Cu 1 s mai târziu",
+      "stampNext": "Marchează linia următoare (T)",
+      "undo": "Anulează",
+      "restoreOriginal": "Restabilește sincronizarea originală",
+      "reset": "Renunță la modificări",
+      "downloadLrc": "Descarcă LRC modificat",
+      "save": "Salvează sincronizarea",
+      "draftRestored": "Ciorna nesalvată a fost restabilită de pe acest dispozitiv.",
+      "offlineDraft": "Ești offline. Modificările rămân pe acest dispozitiv; salvează din nou când revii online.",
+      "saveFailed": "Sincronizarea nu a putut fi salvată. Modificările rămân pe acest dispozitiv.",
+      "stampLine": "Marchează această linie la poziția curentă",
+      "nudgeEarlier": "Mută această linie cu 0,1 s mai devreme",
+      "nudgeLater": "Mută această linie cu 0,1 s mai târziu",
+      "seekLine": "Redă de la {{time}}",
+      "outOfOrder": "Începe înaintea liniei anterioare",
+      "pastEnd": "Începe după sfârșitul piesei",
+      "conflictTitle": "Versurile s-au schimbat de când ai început editarea",
+      "conflictKeep": "Păstrează versiunea mea",
+      "conflictTextChanged": "S-au schimbat și cuvintele, deci sincronizarea ta nu li se poate aplica. O poți descărca în continuare.",
+      "useLatest": "Folosește ultima versiune"
     }
   },
   "pwaSettings": {
@@ -981,12 +1077,12 @@
       "offline": "Offline"
     },
     "installation": "Instalare",
-    "installedReady": "Aplicatia este instalata si gata de utilizare",
-    "installFor": "Instaleaza SoundWave pentru:",
+    "installedReady": "Aplicația este instalată și gata de utilizare",
+    "installFor": "Instalează SoundWave pentru:",
     "installBenefits": {
-      "fasterStartup": "Pornire mai rapida si performanta mai buna",
-      "offlineAccess": "Acces offline la continutul din cache",
-      "nativeExperience": "Experienta de aplicatie nativa",
+      "fasterStartup": "Pornire mai rapidă și performanță mai bună",
+      "offlineAccess": "Acces offline la conținutul din cache",
+      "nativeExperience": "Experiență de aplicație nativă",
       "desktopShortcut": "Acces rapid prin shortcut pe desktop"
     },
     "installHelp": {
@@ -994,75 +1090,75 @@
       "secureContext": "Context securizat",
       "notHttps": "Nu este HTTPS",
       "swSupported": "SW suportat",
-      "noSwSupport": "Fara suport SW",
+      "noSwSupport": "Fără suport SW",
       "ios": {
         "title": "Instalare pe iPhone/iPad:",
-        "step1": "1. Apasa butonul Share din partea de jos a Safari",
-        "step2": "2. Deruleaza si apasa Add to Home Screen",
-        "step3": "3. Apasa Add in coltul dreapta sus",
+        "step1": "1. Apasă butonul Share din partea de jos a Safari",
+        "step2": "2. Derulează și apasă Add to Home Screen",
+        "step3": "3. Apasă Add în colțul dreapta sus",
         "hint": "Pe iOS 26+, orice site poate fi instalat ca PWA complet!"
       },
       "generic": {
         "title": "Pentru a instala SoundWave:",
-        "chromeEdge": "Chrome/Edge: Apasa pictograma de instalare din bara de adrese sau Menu > Install SoundWave",
+        "chromeEdge": "Chrome/Edge: Apasă pictograma de instalare din bara de adrese sau Menu > Install SoundWave",
         "safariMac": "Safari (Mac): File > Add to Dock...",
-        "firefox": "Firefox: Menu > Install (daca este disponibil)"
+        "firefox": "Firefox: Menu > Install (dacă este disponibil)"
       }
     },
-    "requirements": "Cerinte: conexiune HTTPS, manifest valid, service worker",
+    "requirements": "Cerințe: conexiune HTTPS, manifest valid, service worker",
     "cacheStorage": "Stocare cache",
-    "cacheDescription": "Datele din cache permit accesul offline la continutul vazut anterior si imbunatatesc timpii de incarcare.",
+    "cacheDescription": "Datele din cache permit accesul offline la conținutul văzut anterior și îmbunătățesc timpii de încărcare.",
     "actions": {
-      "clearCache": "Goleste cache-ul",
-      "clearingCache": "Se goleste cache-ul..."
+      "clearCache": "Golește cache-ul",
+      "clearingCache": "Se golește cache-ul..."
     },
     "notifications": {
-      "title": "Notificari",
-      "enable": "Activeaza notificarile push",
-      "description": "Primeste notificari despre descarcari, actualizari si altele"
+      "title": "Notificări",
+      "enable": "Activează notificările push",
+      "description": "Primește notificări despre descărcări, actualizări și altele"
     },
     "features": {
-      "title": "Functii PWA",
-      "offlineMode": "Acceseaza continutul din cache fara internet",
-      "backgroundSyncTitle": "Sincronizare in fundal",
-      "backgroundSync": "Sincronizeaza datele cand conexiunea revine",
+      "title": "Funcții PWA",
+      "offlineMode": "Accesează conținutul din cache fără internet",
+      "backgroundSyncTitle": "Sincronizare în fundal",
+      "backgroundSync": "Sincronizează datele când conexiunea revine",
       "audioCachingTitle": "Cache audio",
-      "audioCaching": "Pune fisierele audio in cache pentru redare offline",
+      "audioCaching": "Pune fișierele audio în cache pentru redare offline",
       "active": "Activ"
     },
     "alerts": {
-      "installed": "Aplicatia a fost instalata cu succes!",
-      "installCancelled": "Instalarea a fost anulata sau nu este disponibila",
+      "installed": "Aplicația a fost instalată cu succes!",
+      "installCancelled": "Instalarea a fost anulată sau nu este disponibilă",
       "cacheCleared": "Cache-ul a fost golit cu succes",
-      "cacheClearFailed": "Golirea cache-ului a esuat",
+      "cacheClearFailed": "Golirea cache-ului a eșuat",
       "cacheClearError": "Eroare la golirea cache-ului",
-      "notificationsEnabled": "Notificarile au fost activate",
-      "notificationsDenied": "Permisiunea pentru notificari a fost refuzata"
+      "notificationsEnabled": "Notificările au fost activate",
+      "notificationsDenied": "Permisiunea pentru notificări a fost refuzată"
     }
   },
   "userProfile": {
-    "title": "Informatii profil",
+    "title": "Informații profil",
     "sections": {
-      "updateProfile": "Actualizeaza profilul",
-      "changePassword": "Schimba parola"
+      "updateProfile": "Actualizează profilul",
+      "changePassword": "Schimbă parola"
     },
     "fields": {
       "username": "Nume utilizator (ID login)",
       "firstName": "Prenume",
       "lastName": "Nume",
-      "email": "Adresa email",
-      "currentPassword": "Parola curenta",
-      "newPassword": "Parola noua",
-      "confirmNewPassword": "Confirma parola noua"
+      "email": "Adresă email",
+      "currentPassword": "Parola curentă",
+      "newPassword": "Parola nouă",
+      "confirmNewPassword": "Confirmă parola nouă"
     },
     "helpers": {
-      "username": "Folosit pentru autentificare - necesita parola pentru modificare",
+      "username": "Folosit pentru autentificare - necesită parola pentru modificare",
       "currentPasswordForIdentity": "Necesar pentru modificarea numelui de utilizator sau emailului",
       "newPassword": "Minimum 8 caractere"
     },
     "actions": {
-      "updateProfile": "Actualizeaza profilul",
-      "changePassword": "Schimba parola"
+      "updateProfile": "Actualizează profilul",
+      "changePassword": "Schimbă parola"
     },
     "info": {
       "username": "Nume utilizator",
@@ -1074,67 +1170,19 @@
     },
     "success": {
       "profileUpdated": "Profilul a fost actualizat cu succes!",
-      "passwordChanged": "Parola a fost schimbata cu succes!"
+      "passwordChanged": "Parola a fost schimbată cu succes!"
     },
     "errors": {
-      "loadFailed": "Incarcarea datelor utilizatorului a esuat",
-      "noChanges": "Nu au fost detectate modificari",
-      "passwordRequiredForIdentity": "Parola curenta este necesara pentru schimbarea numelui de utilizator sau emailului",
-      "usernameMinLength": "Numele de utilizator trebuie sa aiba cel putin 3 caractere",
-      "usernamePattern": "Numele de utilizator poate contine doar litere, cifre si underscore",
-      "updateFailed": "Actualizarea profilului a esuat",
-      "fillAllPasswordFields": "Completeaza toate campurile de parola",
+      "loadFailed": "Încărcarea datelor utilizatorului a eșuat",
+      "noChanges": "Nu au fost detectate modificări",
+      "passwordRequiredForIdentity": "Parola curentă este necesară pentru schimbarea numelui de utilizator sau emailului",
+      "usernameMinLength": "Numele de utilizator trebuie să aibă cel puțin 3 caractere",
+      "usernamePattern": "Numele de utilizator poate conține doar litere, cifre și underscore",
+      "updateFailed": "Actualizarea profilului a eșuat",
+      "fillAllPasswordFields": "Completează toate câmpurile de parolă",
       "passwordsDoNotMatch": "Parolele noi nu se potrivesc",
-      "passwordMinLength": "Parola trebuie sa aiba cel putin 8 caractere",
-      "changePasswordFailed": "Schimbarea parolei a esuat"
-    }
-  },
-  "quickSync": {
-    "title": "Quick Sync - streaming adaptiv",
-    "currentStatus": "Stare curenta",
-    "networkSpeed": "Viteza retea",
-    "systemResources": "Resurse sistem",
-    "cpuUsage": "Utilizare CPU",
-    "memoryUsage": "Utilizare memorie",
-    "activeQuality": "Calitate activa",
-    "autoSelected": "Selectata automat",
-    "qualitySettings": "Setari calitate",
-    "qualityMode": "Mod calitate",
-    "bufferSettings": "Setari buffer",
-    "bufferSize": "Dimensiune buffer",
-    "maxBuffer": "Buffer maxim",
-    "preload": "Preincarcare",
-    "rebufferThreshold": "Prag rebuffer",
-    "modes": {
-      "auto": "Auto (recomandat)",
-      "autoDescription": "Se adapteaza la conexiune si sistem",
-      "ultra": "Ultra (320 kbps)",
-      "ultraDescription": "Fidelitate maxima - necesita 5+ Mbps",
-      "high": "Ridicat (256 kbps)",
-      "highDescription": "Experienta optima - necesita 2+ Mbps",
-      "medium": "Mediu (128 kbps)",
-      "mediumDescription": "Echilibrat - necesita 1+ Mbps",
-      "low": "Scazut (64 kbps)",
-      "lowDescription": "Economiseste banda - necesita 0.5+ Mbps"
-    },
-    "tooltips": {
-      "preferHigherQuality": "Cand resursele sistemului permit, creste automat calitatea",
-      "adaptToSystemLoad": "Ajusteaza automat calitatea in functie de CPU si memorie",
-      "applyToDownloads": "Foloseste setarile Quick Sync la descarcarea audio"
-    },
-    "actions": {
-      "runSpeedTest": "Ruleaza test de viteza",
-      "testingConnection": "Se testeaza conexiunea..."
-    },
-    "messages": {
-      "qualityModeUpdated": "Modul de calitate a fost actualizat cu succes",
-      "preferencesUpdated": "Preferintele au fost actualizate cu succes",
-      "speedTestCompleted": "Testul de viteza s-a incheiat"
-    },
-    "errors": {
-      "updateQualityModeFailed": "Actualizarea modului de calitate a esuat",
-      "updatePreferencesFailed": "Actualizarea preferintelor a esuat",
-      "speedTestFailed": "Testul de viteza a esuat"
+      "passwordMinLength": "Parola trebuie să aibă cel puțin 8 caractere",
+      "changePasswordFailed": "Schimbarea parolei a eșuat"
     }
   },
   "avatarDialog": {
@@ -1144,28 +1192,28 @@
       "custom": "Avatar personalizat"
     },
     "actions": {
-      "uploadImage": "Incarca imagine",
-      "removeAvatar": "Elimina avatarul"
+      "uploadImage": "Încarcă imagine",
+      "removeAvatar": "Elimină avatarul"
     },
     "helpers": {
       "fileTypes": "Maxim 20MB - JPEG, PNG, GIF, WebP"
     },
     "success": {
       "updated": "Avatarul a fost actualizat cu succes!",
-      "uploaded": "Avatarul a fost incarcat cu succes!",
+      "uploaded": "Avatarul a fost încărcat cu succes!",
       "removed": "Avatarul a fost eliminat cu succes!"
     },
     "errors": {
-      "setPresetFailed": "Setarea avatarului presetat a esuat",
-      "fileTooLarge": "Fisier prea mare. Dimensiunea maxima este 20MB",
-      "invalidFileType": "Tip de fisier invalid. Incarca JPEG, PNG, GIF sau WebP",
-      "invalidImage": "Acest fisier nu este o imagine valida. Incarca un JPEG, PNG, GIF sau WebP real.",
-      "uploadFailed": "Incarcarea avatarului a esuat",
-      "removeFailed": "Eliminarea avatarului a esuat"
+      "setPresetFailed": "Setarea avatarului presetat a eșuat",
+      "fileTooLarge": "Fișier prea mare. Dimensiunea maximă este 20MB",
+      "invalidFileType": "Tip de fișier invalid. Încarcă JPEG, PNG, GIF sau WebP",
+      "invalidImage": "Acest fișier nu este o imagine validă. Încarcă un JPEG, PNG, GIF sau WebP real.",
+      "uploadFailed": "Încărcarea avatarului a eșuat",
+      "removeFailed": "Eliminarea avatarului a eșuat"
     }
   },
   "resumePlayback": {
-    "title": "Continui auditia?",
+    "title": "Continui audiția?",
     "lastPlayed": "Ultima redare {{time}}",
     "onDevice": "pe {{device}}",
     "actions": {
@@ -1174,64 +1222,82 @@
     },
     "relative": {
       "justNow": "chiar acum",
-      "minutesAgo": "acum {{count}} minute",
-      "hoursAgo": "acum {{count}} ore",
-      "daysAgo": "acum {{count}} zile"
+      "minutesAgo_one": "acum {{count}} minut",
+      "minutesAgo_few": "acum {{count}} minute",
+      "minutesAgo_other": "acum {{count}} de minute",
+      "hoursAgo_one": "acum {{count}} oră",
+      "hoursAgo_few": "acum {{count}} ore",
+      "hoursAgo_other": "acum {{count}} de ore",
+      "daysAgo_one": "acum {{count}} zi",
+      "daysAgo_few": "acum {{count}} zile",
+      "daysAgo_other": "acum {{count}} de zile"
     },
-    "tracksUnavailable": "{{count}} melodie(i) din coada ta nu mai sunt disponibile"
+    "tracksUnavailable_one": "{{count}} melodie din coada ta nu mai este disponibilă",
+    "tracksUnavailable_few": "{{count}} melodii din coada ta nu mai sunt disponibile",
+    "tracksUnavailable_other": "{{count}} de melodii din coada ta nu mai sunt disponibile"
   },
   "sleepTimer": {
     "title": "Cronometru oprire",
     "timerActive": "Cronometru activ",
     "fadingOut": "Se reduce volumul...",
-    "stopPlaybackAfter": "Opreste redarea dupa",
+    "stopPlaybackAfter": "Oprește redarea după",
     "modes": {
       "time": "Timp",
       "songs": "Melodii",
-      "thisTrack": "Aceasta melodie"
+      "thisTrack": "Această melodie"
     },
     "minutesShort": "{{count}} min",
     "hoursShort": "{{count}} h",
     "hoursMinutesShort": "{{hours}} h {{minutes}} min",
-    "songsCount": "{{count}} melodii",
-    "endOfTrackDescription": "Redarea se va opri cand se termina melodia curenta.",
-    "fadeOutBeforeStopping": "Reduce volumul inainte de oprire",
+    "endOfTrackDescription": "Redarea se va opri când se termină melodia curentă.",
+    "fadeOutBeforeStopping": "Reduce volumul înainte de oprire",
     "fadeOutDescription": "Reduce treptat volumul pentru un final mai lin",
-    "fadeDuration": "Durata estompare: {{count}} secunde",
     "remaining": {
-      "seconds": "{{count}} secunde ramase",
-      "time": "{{time}} ramase",
-      "songs": "{{count}} melodii ramase",
-      "afterThisTrack": "Se opreste dupa aceasta melodie"
+      "time": "{{time}} rămase",
+      "afterThisTrack": "Se oprește după această melodie",
+      "songs_one": "{{count}} melodie rămasă",
+      "songs_few": "{{count}} melodii rămase",
+      "songs_other": "{{count}} de melodii rămase",
+      "seconds_one": "{{count}} secundă rămasă",
+      "seconds_few": "{{count}} secunde rămase",
+      "seconds_other": "{{count}} de secunde rămase"
     },
     "actions": {
-      "cancelTimer": "Anuleaza cronometrul",
-      "updateTimer": "Actualizeaza cronometrul",
-      "startSleepTimer": "Porneste cronometrul"
-    }
+      "cancelTimer": "Anulează cronometrul",
+      "updateTimer": "Actualizează cronometrul",
+      "startSleepTimer": "Pornește cronometrul"
+    },
+    "songsCount_one": "{{count}} melodie",
+    "songsCount_few": "{{count}} melodii",
+    "songsCount_other": "{{count}} de melodii",
+    "fadeDuration_one": "Durată estompare: {{count}} secundă",
+    "fadeDuration_few": "Durată estompare: {{count}} secunde",
+    "fadeDuration_other": "Durată estompare: {{count}} de secunde"
   },
   "addToPlaylist": {
-    "title": "Adauga in playlist",
+    "title": "Adaugă în playlist",
     "fields": {
       "playlistName": "Nume playlist"
     },
     "actions": {
-      "creating": "Se creeaza...",
-      "createAndAdd": "Creeaza si adauga",
-      "createNewPlaylist": "Creeaza playlist nou"
+      "creating": "Se creează...",
+      "createAndAdd": "Creează și adaugă",
+      "createNewPlaylist": "Creează playlist nou"
     },
     "messages": {
-      "addedTo": "Adaugat in \"{{playlist}}\"",
-      "createdAndAdded": "S-a creat \"{{playlist}}\" si s-a adaugat melodia"
+      "addedTo": "Adăugat în \"{{playlist}}\"",
+      "createdAndAdded": "S-a creat \"{{playlist}}\" și s-a adăugat melodia"
     },
     "errors": {
-      "addFailed": "Adaugarea in playlist a esuat",
-      "createFailed": "Crearea playlistului a esuat"
+      "addFailed": "Adăugarea în playlist a eșuat",
+      "createFailed": "Crearea playlistului a eșuat"
     },
     "empty": {
-      "noCustomPlaylists": "Nu exista playlisturi personalizate inca. Creeaza unul!"
+      "noCustomPlaylists": "Nu există playlisturi personalizate încă. Creează unul!"
     },
-    "trackCount": "{{count}} melodii"
+    "trackCount_one": "{{count}} melodie",
+    "trackCount_few": "{{count}} melodii",
+    "trackCount_other": "{{count}} de melodii"
   },
   "playlistCard": {
     "status": {
@@ -1239,37 +1305,37 @@
       "unavailable": "Indisponibil"
     },
     "lastRefresh": {
-      "never": "Niciodata sincronizat",
+      "never": "Niciodată sincronizat",
       "justNow": "Chiar acum",
       "minutesAgo": "acum {{count}}m",
       "hoursAgo": "acum {{count}}h",
       "daysAgo": "acum {{count}}z"
     },
     "actions": {
-      "syncing": "Se sincronizeaza...",
-      "syncPlaylist": "Sincronizeaza playlistul",
-      "rechecking": "Se reverifica...",
-      "forceRecheck": "Forteaza reverificarea fisierelor lipsa",
-      "removePlaylist": "Elimina playlistul"
+      "syncing": "Se sincronizează...",
+      "syncPlaylist": "Sincronizează playlistul",
+      "rechecking": "Se reverifică...",
+      "forceRecheck": "Forțează reverificarea fișierelor lipsă",
+      "removePlaylist": "Elimină playlistul"
     }
   },
   "channelCard": {
     "updatedPrefix": "Actualizat",
     "stats": {
-      "subs": "Abonati",
+      "subs": "Abonați",
       "videos": "Video-uri",
-      "downloaded": "Descarcate"
+      "downloaded": "Descărcate"
     },
-    "downloadProgress": "Progres descarcare",
+    "downloadProgress": "Progres descărcare",
     "actions": {
-      "syncChannel": "Sincronizeaza canalul",
-      "removeChannel": "Elimina canalul"
+      "syncChannel": "Sincronizează canalul",
+      "removeChannel": "Elimină canalul"
     },
     "status": {
       "inactive": "Inactiv"
     },
     "lastRefresh": {
-      "never": "Niciodata sincronizat",
+      "never": "Niciodată sincronizat",
       "justNow": "Chiar acum",
       "minutesAgo": "acum {{count}}m",
       "hoursAgo": "acum {{count}}h",
@@ -1282,19 +1348,19 @@
       "artist": "Radio pe artist",
       "favorites": "Mix favorite",
       "discovery": "Mod descoperire",
-      "recent": "Adaugari noi",
-      "sonic": "Similaritate sonica",
+      "recent": "Adăugări noi",
+      "sonic": "Similaritate sonică",
       "autodj": "Auto-DJ"
     },
-    "sessionStats": "{{played}} redate • {{skipped}} sarite",
+    "sessionStats": "{{played}} redate • {{skipped}} sărite",
     "actions": {
-      "settings": "Setari radio",
-      "stop": "Opreste radioul"
+      "settings": "Setări radio",
+      "stop": "Oprește radioul"
     },
     "settings": {
       "varietyLevel": "Nivel varietate",
-      "varietyHelp": "Mai jos = piese similare, Mai sus = mai multa varietate",
-      "resetLearningData": "Reseteaza datele de invatare",
+      "varietyHelp": "Mai jos = piese similare, Mai sus = mai multă varietate",
+      "resetLearningData": "Resetează datele de învățare",
       "marks": {
         "similar": "Similar",
         "balanced": "Echilibrat",
@@ -1303,63 +1369,50 @@
     }
   },
   "downloadStatus": {
-    "title": "Descarcari",
-    "offline": "Offline",
-    "tooltip": {
-      "online": "Stare descarcari",
-      "offline": "Offline - Starea descarcarilor se actualizeaza cand revii online"
-    },
-    "actions": {
-      "refresh": "Actualizeaza"
-    },
-    "sections": {
-      "activeDownloads": "Descarcari active ({{count}})"
-    },
-    "empty": {
-      "title": "Nu exista descarcari active",
-      "online": "Descarcarile pornite vor aparea aici",
-      "offline": "Esti offline. Starea descarcarilor se actualizeaza cand revii online."
-    },
     "errors": {
-      "blockedUrl": "Acest link de descarcare este invalid sau indica o adresa blocata.",
-      "cookiesRefresh": "YouTube cere autentificare: inlocuieste cookies.txt cu un export nou, apoi reincearca (vezi README).",
-      "cookiesFileAccess": "SoundWave nu poate accesa cookies.txt: chown 1000:1000, chmod 600, elimina :ro, apoi reincearca.",
-      "quotaExceeded": "Spatiul tau de stocare este plin. Sterge cateva melodii, apoi incearca din nou.",
-      "downloadTooLarge": "Aceasta melodie depaseste limita de dimensiune sau durata.",
-      "notSingleItem": "Acesta este un playlist, un canal sau un live. Aboneaza-te la playlisturi si canale.",
-      "diskFull": "Serverul are putin spatiu pe disc. Roaga un administrator sa elibereze spatiu.",
-      "invalidOutput": "Descarcarea nu a produs un fisier audio valid. Incearca din nou mai tarziu."
+      "blockedUrl": "Acest link de descărcare este invalid sau indică o adresă blocată.",
+      "cookiesRefresh": "YouTube cere autentificare: înlocuiește cookies.txt cu un export nou, apoi reîncearcă (vezi README).",
+      "cookiesFileAccess": "SoundWave nu poate accesa cookies.txt: chown 1000:1000, chmod 600, elimină :ro, apoi reîncearcă.",
+      "quotaExceeded": "Spațiul tău de stocare este plin. Șterge câteva melodii, apoi încearcă din nou.",
+      "downloadTooLarge": "Această melodie depășește limita de dimensiune sau durată.",
+      "notSingleItem": "Acesta este un playlist, un canal sau un live. Abonează-te la playlisturi și canale.",
+      "diskFull": "Serverul are puțin spațiu pe disc. Roagă un administrator să elibereze spațiu.",
+      "invalidOutput": "Descărcarea nu a produs un fișier audio valid. Încearcă din nou mai târziu."
     }
   },
   "relatedTracks": {
     "title": "Melodii similare",
-    "trackCount": "{{count}} melodii",
-    "moreTracks": "+{{count}} melodii in plus",
-    "algorithmHint": "Bazat pe tiparele de ascultare, favorite si melodii populare",
+    "algorithmHint": "Bazat pe tiparele de ascultare, favorite și melodii populare",
     "sections": {
       "recommendedForYou": "Recomandate pentru tine",
       "moreFrom": "Mai multe de la {{channel}}"
     },
     "actions": {
-      "removeFromFavorites": "Elimina din favorite",
-      "addToFavorites": "Adauga la favorite",
-      "play": "Reda"
+      "removeFromFavorites": "Elimină din favorite",
+      "addToFavorites": "Adaugă la favorite",
+      "play": "Redă"
     },
     "errors": {
-      "notAvailableForLocalFiles": "Recomandarile nu sunt disponibile pentru fisiere locale",
-      "loadFailed": "Incarcarea recomandarilor a esuat"
+      "notAvailableForLocalFiles": "Recomandările nu sunt disponibile pentru fișiere locale",
+      "loadFailed": "Încărcarea recomandărilor a eșuat"
     },
     "empty": {
-      "description": "Nu au fost gasite melodii similare. Asculta mai multa muzica pentru recomandari personalizate!"
-    }
+      "description": "Nu au fost găsite melodii similare. Ascultă mai multă muzică pentru recomandări personalizate!"
+    },
+    "trackCount_one": "{{count}} melodie",
+    "trackCount_few": "{{count}} melodii",
+    "trackCount_other": "{{count}} de melodii",
+    "moreTracks_one": "+{{count}} melodie în plus",
+    "moreTracks_few": "+{{count}} melodii în plus",
+    "moreTracks_other": "+{{count}} de melodii în plus"
   },
   "metadataEditor": {
-    "title": "Editeaza metadatele",
-    "sourceLabel": "Sursa",
+    "title": "Editează metadatele",
+    "sourceLabel": "Sursă",
     "sections": {
       "track": "Melodie",
       "currentMetadata": "Metadate curente",
-      "searchMusicBrainz": "Cauta in MusicBrainz"
+      "searchMusicBrainz": "Caută în MusicBrainz"
     },
     "fields": {
       "title": "Titlu",
@@ -1373,32 +1426,32 @@
       "album": "Album"
     },
     "actions": {
-      "cancelEdit": "Anuleaza editarea",
-      "editManually": "Editeaza manual",
-      "saveChanges": "Salveaza modificarile",
-      "autoFetchBestMatch": "Preia automat cea mai buna potrivire",
-      "searching": "Se cauta...",
-      "search": "Cauta",
-      "applyThisMetadata": "Aplica aceste metadate"
+      "cancelEdit": "Anulează editarea",
+      "editManually": "Editează manual",
+      "saveChanges": "Salvează modificările",
+      "autoFetchBestMatch": "Preia automat cea mai bună potrivire",
+      "searching": "Se caută...",
+      "search": "Caută",
+      "applyThisMetadata": "Aplică aceste metadate"
     },
     "helpers": {
-      "autoFetchDescription": "Gaseste si aplica automat cele mai potrivite metadate din MusicBrainz"
+      "autoFetchDescription": "Găsește și aplică automat cele mai potrivite metadate din MusicBrainz"
     },
     "messages": {
       "saved": "Metadate salvate",
-      "foundMatch": "✓ Gasit: {{artist}} - {{album}} ({{year}})",
+      "foundMatch": "✓ Găsit: {{artist}} - {{album}} ({{year}})",
       "applied": "✓ Aplicat: {{artist}} - {{album}} ({{year}})"
     },
     "errors": {
-      "noMatches": "Nu au fost gasite potriviri. Incearca sa ajustezi termenii de cautare.",
-      "searchFailed": "Cautarea metadatelor a esuat",
-      "noMetadataFound": "Nu au fost gasite metadate",
-      "autoFetchFailed": "Preluarea automata a metadatelor a esuat",
-      "applyFailed": "Aplicarea metadatelor a esuat",
-      "saveFailed": "Salvarea metadatelor a esuat"
+      "noMatches": "Nu au fost găsite potriviri. Încearcă să ajustezi termenii de căutare.",
+      "searchFailed": "Căutarea metadatelor a eșuat",
+      "noMetadataFound": "Nu au fost găsite metadate",
+      "autoFetchFailed": "Preluarea automată a metadatelor a eșuat",
+      "applyFailed": "Aplicarea metadatelor a eșuat",
+      "saveFailed": "Salvarea metadatelor a eșuat"
     },
     "empty": {
-      "noMetadata": "Nu exista metadate disponibile"
+      "noMetadata": "Nu există metadate disponibile"
     },
     "unknown": {
       "artist": "Necunoscut",
@@ -1408,48 +1461,61 @@
   },
   "trackActionsMenu": {
     "actions": {
-      "playNext": "Reda urmatoarea",
-      "addToQueue": "Adauga in coada",
-      "startRadio": "Porneste radio",
-      "removeFromFavorites": "Elimina din favorite",
-      "addToFavorites": "Adauga la favorite",
-      "addToPlaylist": "Adauga in playlist",
-      "download": "Descarca",
+      "playNext": "Redă următoarea",
+      "addToQueue": "Adaugă în coadă",
+      "startRadio": "Pornește radio",
+      "removeFromFavorites": "Elimină din favorite",
+      "addToFavorites": "Adaugă la favorite",
+      "addToPlaylist": "Adaugă în playlist",
+      "download": "Descarcă",
       "goToChannel": "Mergi la canal",
-      "findInPlaylists": "Gaseste in playlisturi"
+      "findInPlaylists": "Găsește în playlisturi",
+      "removeFromPlaylist": "Elimină din acest playlist",
+      "deleteFromLibrary": "Șterge din bibliotecă"
     },
     "split": {
-      "action": "Imparte in piese",
-      "success": "Impartit in {{count}} parti",
-      "noTracklist": "Nu s-a gasit o lista de piese in capitolele sau descrierea acestei piese.",
-      "error": "Nu s-a putut imparti aceasta piesa. Incearca din nou."
+      "action": "Împarte în piese",
+      "noTracklist": "Nu s-a găsit o listă de piese în capitolele sau descrierea acestei piese.",
+      "error": "Nu s-a putut împărți această piesă. Încearcă din nou.",
+      "success_one": "Împărțit în {{count}} parte",
+      "success_few": "Împărțit în {{count}} părți",
+      "success_other": "Împărțit în {{count}} de părți"
     },
     "findInPlaylists": {
-      "title": "Playlisturi care contin aceasta melodie",
-      "empty": "Aceasta melodie nu este in niciun playlist inca.",
-      "secondary": "{{count}} melodii • Pozitia #{{position}}"
+      "title": "Playlisturi care conțin această melodie",
+      "empty": "Această melodie nu este în niciun playlist încă.",
+      "secondary_one": "{{count}} melodie • Poziția #{{position}}",
+      "secondary_few": "{{count}} melodii • Poziția #{{position}}",
+      "secondary_other": "{{count}} de melodii • Poziția #{{position}}"
+    },
+    "delete": {
+      "title": "Ștergi această piesă?",
+      "message": "„{{title}}” va fi eliminată din biblioteca ta, împreună cu fișierul, versurile și istoricul de ascultare. Playlisturile și canalele la care ești abonat nu o vor mai descărca. Acțiunea nu poate fi anulată.",
+      "error": "Această piesă nu a putut fi ștearsă. Încearcă din nou."
+    },
+    "removeFromPlaylist": {
+      "error": "Această piesă nu a putut fi eliminată din playlist. Încearcă din nou."
     }
   },
   "achievementNotification": {
     "counter": "Realizare {{current}} din {{total}}",
-    "unlocked": "Realizare deblocata!",
+    "unlocked": "Realizare deblocată!",
     "contextArtist": "Artist: {{artist}}",
     "actions": {
-      "viewAll": "Vezi toate realizarile",
-      "next": "Urmatoarea",
+      "viewAll": "Vezi toate realizările",
+      "next": "Următoarea",
       "awesome": "Excelent!"
     }
   },
   "listeningHistory": {
     "title": "Istoric de ascultare",
-    "trackCount": "{{count}} melodii in istoric",
     "groups": {
-      "today": "Astazi",
+      "today": "Astăzi",
       "yesterday": "Ieri",
-      "thisWeek": "Saptamana aceasta",
-      "lastWeek": "Saptamana trecuta",
+      "thisWeek": "Săptămâna aceasta",
+      "lastWeek": "Săptămâna trecută",
       "thisMonth": "Luna aceasta",
-      "lastMonth": "Luna trecuta"
+      "lastMonth": "Luna trecută"
     },
     "timeAgo": {
       "justNow": "Chiar acum",
@@ -1458,105 +1524,114 @@
       "daysAgo": "acum {{count}}z"
     },
     "onThisDay": {
-      "title": "In aceasta zi",
-      "memoriesCount": "{{count}} amintiri"
+      "title": "În această zi",
+      "memoriesCount_one": "{{count}} amintire",
+      "memoriesCount_few": "{{count}} amintiri",
+      "memoriesCount_other": "{{count}} de amintiri"
     },
-    "moreTracks": "+{{count}} melodii in plus",
-    "showingFirst50": "Se afiseaza primele 50 din {{count}} melodii",
+    "showingFirst50": "Se afișează primele 50 din {{count}} melodii",
     "actions": {
-      "refresh": "Actualizeaza",
-      "clear": "Sterge",
-      "retry": "Incearca din nou",
-      "loading": "Se incarca...",
-      "loadMore": "Incarca mai multe",
-      "scrollToTop": "deruleaza sus",
-      "play": "Reda"
+      "refresh": "Actualizează",
+      "clear": "Șterge",
+      "retry": "Încearcă din nou",
+      "loading": "Se încarcă...",
+      "loadMore": "Încarcă mai multe",
+      "scrollToTop": "derulează sus",
+      "play": "Redă"
     },
     "clearDialog": {
-      "title": "Sterge istoricul de ascultare",
-      "chooseAmount": "Alege cat istoric vrei sa stergi:",
-      "olderThan1Week": "Sterge mai vechi de 1 saptamana",
-      "olderThan1Month": "Sterge mai vechi de 1 luna",
-      "olderThan3Months": "Sterge mai vechi de 3 luni",
-      "clearAll": "Sterge tot istoricul"
+      "title": "Șterge istoricul de ascultare",
+      "chooseAmount": "Alege cât istoric vrei să ștergi:",
+      "olderThan1Week": "Șterge mai vechi de 1 săptămână",
+      "olderThan1Month": "Șterge mai vechi de 1 lună",
+      "olderThan3Months": "Șterge mai vechi de 3 luni",
+      "clearAll": "Șterge tot istoricul"
     },
     "errors": {
-      "loadFailed": "Incarcarea istoricului a esuat"
+      "loadFailed": "Încărcarea istoricului a eșuat"
     },
     "empty": {
-      "title": "Nu exista istoric de ascultare inca",
-      "description": "Incepe sa asculti muzica pentru a-ti construi istoricul!"
+      "title": "Nu există istoric de ascultare încă",
+      "description": "Începe să asculți muzică pentru a-ți construi istoricul!"
     },
-    "completed": "Ascultat complet"
+    "completed": "Ascultat complet",
+    "trackCount_one": "{{count}} melodie în istoric",
+    "trackCount_few": "{{count}} melodii în istoric",
+    "trackCount_other": "{{count}} de melodii în istoric",
+    "moreTracks_one": "+{{count}} melodie în plus",
+    "moreTracks_few": "+{{count}} melodii în plus",
+    "moreTracks_other": "+{{count}} de melodii în plus"
   },
   "offlineManager": {
     "partialTrackCount": "{{available}} din {{total}} melodii se pot reda offline",
     "title": "Stocare offline",
-    "subtitle": "Gestioneaza playlisturile puse in cache pentru redare offline",
-    "offlineWarning": "Esti offline. Poti reda doar continutul din cache.",
+    "subtitle": "Gestionează playlisturile puse în cache pentru redare offline",
+    "offlineWarning": "Ești offline. Poți reda doar conținutul din cache.",
     "sections": {
       "offlinePlaylists": "Playlisturi offline"
     },
     "storage": {
-      "used": "Spatiu folosit",
+      "used": "Spațiu folosit",
       "available": "Disponibil",
       "usageOfQuota": "{{percent}}% din {{quota}} folosit"
     },
     "actions": {
-      "refresh": "Actualizeaza",
-      "clearAll": "Sterge tot",
-      "browsePlaylists": "Rasfoieste playlisturile",
-      "remove": "Elimina"
+      "refresh": "Actualizează",
+      "clearAll": "Șterge tot",
+      "browsePlaylists": "Răsfoiește playlisturile",
+      "remove": "Elimină"
     },
-    "trackCount": "{{count}} melodii",
-    "cachedAt": "In cache {{date}}",
+    "cachedAt": "În cache {{date}}",
     "removeDialog": {
       "title": "Elimini playlistul offline?",
-      "description": "Sigur vrei sa elimini \"{{title}}\" din stocarea offline? Va trebui sa-l descarci din nou pentru redare offline."
+      "description": "Sigur vrei să elimini \"{{title}}\" din stocarea offline? Va trebui să-l descarci din nou pentru redare offline."
     },
     "clearAllDialog": {
-      "title": "Stergi toate datele offline?",
-      "description": "Aceasta actiune elimina toate playlisturile din cache si elibereaza spatiu. Va trebui sa le descarci din nou pentru uz offline.",
-      "warning": "Aceasta actiune nu poate fi anulata."
+      "title": "Ștergi toate datele offline?",
+      "description": "Această acțiune elimină toate playlisturile din cache și eliberează spațiu. Va trebui să le descarci din nou pentru uz offline.",
+      "warning": "Această acțiune nu poate fi anulată."
     },
     "errors": {
-      "removeOfflineDataFailed": "Eliminarea datelor offline a esuat",
-      "clearAllFailed": "Stergerea tuturor datelor offline a esuat"
+      "removeOfflineDataFailed": "Eliminarea datelor offline a eșuat",
+      "clearAllFailed": "Ștergerea tuturor datelor offline a eșuat"
     },
     "empty": {
-      "title": "Nu exista playlisturi in cache pentru offline"
-    }
+      "title": "Nu există playlisturi în cache pentru offline"
+    },
+    "trackCount_one": "{{count}} melodie",
+    "trackCount_few": "{{count}} melodii",
+    "trackCount_other": "{{count}} de melodii"
   },
   "adminUsers": {
     "title": "Administrare utilizatori",
     "actions": {
-      "createUser": "Creeaza utilizator",
+      "createUser": "Creează utilizator",
       "userDetails": "Detalii utilizator",
-      "editUser": "Editeaza utilizator",
-      "deactivate": "Dezactiveaza",
-      "activate": "Activeaza",
-      "deleteUser": "Sterge utilizator",
-      "resetStorage": "Reseteaza stocarea",
-      "reset2fa": "Reseteaza 2FA",
-      "saveChanges": "Salveaza modificarile",
-      "deletePermanently": "Sterge permanent"
+      "editUser": "Editează utilizator",
+      "deactivate": "Dezactivează",
+      "activate": "Activează",
+      "deleteUser": "Șterge utilizator",
+      "resetStorage": "Resetează stocarea",
+      "reset2fa": "Resetează 2FA",
+      "saveChanges": "Salvează modificările",
+      "deletePermanently": "Șterge permanent"
     },
     "table": {
       "username": "Nume utilizator",
       "email": "Email",
       "status": "Stare",
       "storage": "Stocare",
-      "content": "Continut",
-      "joined": "Data inscrierii",
-      "actions": "Actiuni"
+      "content": "Conținut",
+      "joined": "Data înscrierii",
+      "actions": "Acțiuni"
     },
     "stats": {
       "users": "Utilizatori",
       "usersSummary": "{{active}} activi, {{admins}} administratori",
-      "content": "Continut",
+      "content": "Conținut",
       "contentSummary": "{{playlists}} playlisturi, {{audio}} audio",
       "storage": "Stocare",
-      "storageAllocated": "/ {{quota}} GB alocati"
+      "storageAllocated": "/ {{quota}} GB alocați"
     },
     "status": {
       "active": "Activ",
@@ -1569,9 +1644,9 @@
     "fields": {
       "username": "Nume utilizator",
       "email": "Email",
-      "password": "Parola",
-      "confirmPassword": "Confirma parola",
-      "storageQuotaGb": "Cota stocare (GB)",
+      "password": "Parolă",
+      "confirmPassword": "Confirmă parola",
+      "storageQuotaGb": "Cotă stocare (GB)",
       "maxChannels": "Max canale",
       "maxPlaylists": "Max playlisturi",
       "notes": "Note",
@@ -1582,96 +1657,98 @@
       "storageUsage": "Utilizare stocare",
       "channels": "Canale",
       "playlists": "Playlisturi",
-      "audioFiles": "Fisiere audio",
-      "dateJoined": "Data inregistrarii",
+      "audioFiles": "Fișiere audio",
+      "dateJoined": "Data înregistrării",
       "lastLogin": "Ultima autentificare"
     },
     "values": {
-      "never": "Niciodata"
+      "never": "Niciodată"
     },
     "content": {
-      "channelsCount": "{{count}} canale",
-      "summary": "{{playlists}} playlisturi, {{audio}} audio"
+      "summary": "{{playlists}} playlisturi, {{audio}} audio",
+      "channelsCount_one": "{{count}} canal",
+      "channelsCount_few": "{{count}} canale",
+      "channelsCount_other": "{{count}} de canale"
     },
     "empty": {
-      "noUsers": "Nu au fost gasiti utilizatori"
+      "noUsers": "Nu au fost găsiți utilizatori"
     },
     "dialogs": {
       "create": {
-        "title": "Creeaza utilizator nou"
+        "title": "Creează utilizator nou"
       },
       "edit": {
-        "title": "Editeaza utilizator: {{username}}"
+        "title": "Editează utilizator: {{username}}"
       },
       "details": {
         "title": "Detalii utilizator: {{username}}"
       },
       "delete": {
-        "title": "Stergi utilizatorul?",
-        "warning": "Aceasta actiune este permanenta si nu poate fi anulata! Urmatoarele vor fi sterse:",
+        "title": "Ștergi utilizatorul?",
+        "warning": "Această acțiune este permanentă și nu poate fi anulată! Următoarele vor fi șterse:",
         "bullets": {
-          "audio": "• Toate fisierele audio",
+          "audio": "• Toate fișierele audio",
           "playlists": "• Toate playlisturile",
           "channels": "• Toate canalele",
-          "downloads": "• Toate descarcarile",
+          "downloads": "• Toate descărcările",
           "history": "• Istoricul de ascultare",
           "account": "• Contul utilizatorului"
         },
-        "confirmPrompt": "Scrie \"{{username}}\" pentru a confirma stergerea:"
+        "confirmPrompt": "Scrie \"{{username}}\" pentru a confirma ștergerea:"
       }
     },
     "messages": {
       "userCreated": "Utilizator creat cu succes",
       "userUpdated": "Utilizator actualizat cu succes",
       "userActivated": "Utilizator activat",
-      "userDeactivated": "Utilizator dezactivat. Autentificarile si cheile API sunt blocate; vor functiona din nou daca utilizatorul este reactivat.",
-      "storageReset": "Stocarea a fost resetata cu succes",
+      "userDeactivated": "Utilizator dezactivat. Autentificările și cheile API sunt blocate; vor funcționa din nou dacă utilizatorul este reactivat.",
+      "storageReset": "Stocarea a fost resetată cu succes",
       "twoFaReset": "2FA a fost resetat cu succes",
-      "userDeleted": "Utilizator sters cu succes"
+      "userDeleted": "Utilizator șters cu succes"
     },
     "errors": {
-      "loadUsersFailed": "Incarcarea utilizatorilor a esuat",
-      "createUserFailed": "Crearea utilizatorului a esuat",
-      "updateUserFailed": "Actualizarea utilizatorului a esuat",
-      "toggleStatusFailed": "Schimbarea starii utilizatorului a esuat",
-      "resetStorageFailed": "Resetarea stocarii a esuat",
-      "resetTwoFaFailed": "Resetarea 2FA a esuat",
-      "deleteUserFailed": "Stergerea utilizatorului a esuat"
+      "loadUsersFailed": "Încărcarea utilizatorilor a eșuat",
+      "createUserFailed": "Crearea utilizatorului a eșuat",
+      "updateUserFailed": "Actualizarea utilizatorului a eșuat",
+      "toggleStatusFailed": "Schimbarea stării utilizatorului a eșuat",
+      "resetStorageFailed": "Resetarea stocării a eșuat",
+      "resetTwoFaFailed": "Resetarea 2FA a eșuat",
+      "deleteUserFailed": "Ștergerea utilizatorului a eșuat"
     }
   },
   "smartPlaylists": {
     "ruleErrors": {
-      "unsupportedField": "Acest camp nu poate fi folosit intr-o regula",
-      "unsupportedOperator": "Aceasta conditie nu se aplica acestui camp",
+      "unsupportedField": "Acest câmp nu poate fi folosit într-o regulă",
+      "unsupportedOperator": "Această condiție nu se aplică acestui câmp",
       "valueRequired": "Introdu o valoare",
-      "wholeNumberRequired": "Introdu un numar intreg",
-      "numberOutOfRange": "Acest numar este in afara intervalului",
-      "reversedRange": "A doua valoare nu poate fi mai mica decat prima",
-      "dateRequired": "Introdu o data in formatul AAAA-LL-ZZ",
-      "dateOutOfRange": "Aceasta data este in afara intervalului",
-      "invalid": "Aceasta regula nu este valida"
+      "wholeNumberRequired": "Introdu un număr întreg",
+      "numberOutOfRange": "Acest număr este în afară intervalului",
+      "reversedRange": "A doua valoare nu poate fi mai mică decât prima",
+      "dateRequired": "Introdu o dată în formatul AAAA-LL-ZZ",
+      "dateOutOfRange": "Această dată este în afară intervalului",
+      "invalid": "Această regulă nu este validă"
     },
     "title": "Playlisturi inteligente",
-    "description": "Playlisturi dinamice care se actualizeaza automat pe baza regulilor. Biblioteca ta se schimba, ele se actualizeaza instant.",
-    "trackCount": "{{count}} melodii",
+    "description": "Playlisturi dinamice care se actualizează automat pe baza regulilor. Biblioteca ta se schimbă, ele se actualizează instant.",
     "sections": {
       "autoPlaylists": "Playlisturi automate",
       "customSmartPlaylists": "Playlisturi inteligente personalizate"
     },
     "actions": {
-      "create": "Creeaza",
-      "createSmartPlaylist": "Creeaza playlist inteligent",
-      "play": "Reda",
-      "shuffle": "Amesteca",
-      "delete": "Sterge",
-      "addRule": "Adauga regula"
+      "create": "Creează",
+      "createSmartPlaylist": "Creează playlist inteligent",
+      "play": "Redă",
+      "shuffle": "Amestecă",
+      "delete": "Șterge",
+      "addRule": "Adaugă regulă"
     },
     "presets": {
       "mostPlayedTop50": "Cele mai ascultate (Top 50)",
-      "recentlyAdded30Days": "Adaugate recent (ultimele 30 zile)",
+      "recentlyAdded30Days": "Adăugate recent (ultimele 30 zile)",
       "favorites": "Favorite",
-      "byGenre": "Dupa gen...",
-      "byArtist": "Dupa artist...",
+      "topRated": "Cele mai apreciate (4 stele sau mai mult)",
+      "byGenre": "După gen...",
+      "byArtist": "După artist...",
       "shortTracks": "Piese scurte (sub 3 min)",
       "customRules": "Reguli personalizate..."
     },
@@ -1680,35 +1757,39 @@
       "artist": "ex: Nume artist"
     },
     "customRules": {
-      "field": "Camp",
+      "field": "Câmp",
       "operator": "Operator",
       "value": "Valoare"
     },
     "createDialog": {
-      "title": "Creeaza playlist inteligent",
+      "title": "Creează playlist inteligent",
       "name": "Nume",
-      "descriptionOptional": "Descriere (optional)",
-      "chooseTracks": "Alege ce melodii sa includa:",
-      "info": "Playlisturile inteligente se actualizeaza automat cand biblioteca se schimba. Poti rafina regulile dupa creare."
+      "descriptionOptional": "Descriere (opțional)",
+      "chooseTracks": "Alege ce melodii să includă:",
+      "info": "Playlisturile inteligente se actualizează automat când biblioteca se schimbă. Poți rafina regulile după creare."
     },
     "confirm": {
-      "delete": "Stergi \"{{name}}\"?"
+      "delete": "Ștergi \"{{name}}\"?"
     },
     "messages": {
       "created": "Playlist inteligent creat!",
-      "deleted": "Playlist inteligent sters",
-      "noTracks": "Nu exista melodii in acest playlist",
-      "playing": "Se redau {{count}} melodii",
-      "playingShuffled": "Se redau {{count}} melodii (amestecate)",
-      "noRulesWarning": "Nu sunt reguli setate - playlistul va include toate melodiile. Adauga reguli dupa creare pentru filtrare."
+      "deleted": "Playlist inteligent șters",
+      "noTracks": "Nu există melodii în acest playlist",
+      "noRulesWarning": "Nu sunt reguli setate - playlistul va include toate melodiile. Adaugă reguli după creare pentru filtrare.",
+      "playing_one": "Se redă {{count}} melodie",
+      "playing_few": "Se redau {{count}} melodii",
+      "playing_other": "Se redau {{count}} de melodii",
+      "playingShuffled_one": "Se redă {{count}} melodie (amestecat)",
+      "playingShuffled_few": "Se redau {{count}} melodii (amestecate)",
+      "playingShuffled_other": "Se redau {{count}} de melodii (amestecate)"
     },
     "errors": {
-      "loadFailed": "Incarcarea playlisturilor inteligente a esuat",
-      "enterName": "Te rugam sa introduci un nume",
-      "createFailed": "Crearea playlistului inteligent a esuat",
-      "cannotDeleteSystem": "Playlisturile de sistem nu pot fi sterse",
-      "deleteFailed": "Stergerea playlistului inteligent a esuat",
-      "loadTracksFailed": "Incarcarea melodiilor a esuat"
+      "loadFailed": "Încărcarea playlisturilor inteligente a eșuat",
+      "enterName": "Te rugăm să introduci un nume",
+      "createFailed": "Crearea playlistului inteligent a eșuat",
+      "cannotDeleteSystem": "Playlisturile de sistem nu pot fi șterse",
+      "deleteFailed": "Ștergerea playlistului inteligent a eșuat",
+      "loadTracksFailed": "Încărcarea melodiilor a eșuat"
     },
     "system": {
       "most_played": {
@@ -1716,16 +1797,16 @@
         "description": "Top 50 melodii cele mai redate"
       },
       "recently_added": {
-        "name": "✨ Adaugate recent",
-        "description": "Melodii adaugate in ultimele 30 de zile"
+        "name": "✨ Adăugate recent",
+        "description": "Melodii adăugate în ultimele 30 de zile"
       },
       "not_played_recently": {
         "name": "🕰️ Redescoperire",
-        "description": "Melodii pe care nu le-ai ascultat in ultimele 60 de zile"
+        "description": "Melodii pe care nu le-ai ascultat în ultimele 60 de zile"
       },
       "never_played": {
         "name": "🆕 Neascultate",
-        "description": "Melodii pe care nu le-ai ascultat inca"
+        "description": "Melodii pe care nu le-ai ascultat încă"
       },
       "short_tracks": {
         "name": "⚡ Hituri scurte",
@@ -1737,67 +1818,74 @@
       }
     },
     "empty": {
-      "title": "Nu exista playlisturi inteligente personalizate",
-      "description": "Creeaza playlisturi bazate pe reguli",
-      "noDescription": "Fara descriere"
-    }
+      "title": "Nu există playlisturi inteligente personalizate",
+      "description": "Creează playlisturi bazate pe reguli",
+      "noDescription": "Fără descriere"
+    },
+    "trackCount_one": "{{count}} melodie",
+    "trackCount_few": "{{count}} melodii",
+    "trackCount_other": "{{count}} de melodii"
   },
   "smartPlaylistDetail": {
-    "invalidRulesWarning": "O regula din aceasta lista trebuie corectata, asa ca nu se potriveste nicio melodie pana cand editezi regulile.",
-    "trackCount": "{{count}} melodii",
+    "invalidRulesWarning": "O regulă din această listă trebuie corectată, așa că nu se potrivește nicio melodie până când editezi regulile.",
     "badges": {
       "auto": "Auto"
     },
     "actions": {
-      "backToSmartPlaylists": "Inapoi la playlisturi inteligente",
-      "playAll": "Reda tot",
-      "shuffle": "Amesteca",
-      "editRules": "Editeaza regulile",
-      "saveRules": "Salveaza regulile"
+      "backToSmartPlaylists": "Înapoi la playlisturi inteligente",
+      "playAll": "Redă tot",
+      "shuffle": "Amestecă",
+      "editRules": "Editează regulile",
+      "saveRules": "Salvează regulile"
     },
     "messages": {
       "rulesUpdated": "Regulile au fost actualizate!"
     },
     "dialog": {
-      "editRulesTitle": "Editeaza regulile",
+      "editRulesTitle": "Editează regulile",
       "matchMode": "Mod potrivire",
-      "matchAllRules": "Potriveste TOATE regulile (SI)",
-      "matchAnyRules": "Potriveste ORICARE regula (SAU)",
+      "matchAllRules": "Potrivește TOATE regulile (ȘI)",
+      "matchAnyRules": "Potrivește ORICARE regulă (SAU)",
       "rules": "Reguli",
       "noRulesDefined": "Nu sunt reguli definite. Toate melodiile vor fi incluse.",
-      "field": "Camp",
+      "field": "Câmp",
       "operator": "Operator",
       "value": "Valoare",
-      "to": "Pana la",
-      "addRule": "Adauga regula",
-      "orderBy": "Ordoneaza dupa",
-      "limit": "Limita (gol = nelimitat)",
+      "to": "Până la",
+      "addRule": "Adaugă regulă",
+      "orderBy": "Ordonează după",
+      "limit": "Limită (gol = nelimitat)",
       "preview": "Previzualizare",
-      "previewMatchCount": "{{count}} melodii se potrivesc"
+      "previewMatchCount_one": "{{count}} melodie se potrivește",
+      "previewMatchCount_few": "{{count}} melodii se potrivesc",
+      "previewMatchCount_other": "{{count}} de melodii se potrivesc"
     },
     "errors": {
-      "loadFailed": "Incarcarea playlistului a esuat",
-      "saveRulesFailed": "Salvarea regulilor a esuat"
+      "loadFailed": "Încărcarea playlistului a eșuat",
+      "saveRulesFailed": "Salvarea regulilor a eșuat"
     },
     "empty": {
       "noTracksMatchRules": "Nicio melodie nu corespunde regulilor"
-    }
+    },
+    "trackCount_one": "{{count}} melodie",
+    "trackCount_few": "{{count}} melodii",
+    "trackCount_other": "{{count}} de melodii"
   },
   "common": {
-    "cancel": "Anuleaza",
-    "close": "Inchide",
-    "save": "Salveaza",
-    "back": "Inapoi",
-    "delete": "Sterge",
-    "unknownError": "Eroare necunoscuta",
+    "cancel": "Anulează",
+    "close": "Închide",
+    "save": "Salvează",
+    "back": "Înapoi",
+    "delete": "Șterge",
+    "unknownError": "Eroare necunoscută",
     "days": {
       "monday": "Luni",
-      "tuesday": "Marti",
+      "tuesday": "Marți",
       "wednesday": "Miercuri",
       "thursday": "Joi",
       "friday": "Vineri",
-      "saturday": "Sambata",
-      "sunday": "Duminica"
+      "saturday": "Sâmbătă",
+      "sunday": "Duminică"
     },
     "months": {
       "january": "Ianuarie",
@@ -1814,19 +1902,19 @@
       "december": "Decembrie"
     },
     "lazyLoadError": {
-      "title": "Pagina nu a putut fi incarcata",
-      "description": "Posibil sa fii offline sau aplicatia tocmai s-a actualizat. Incearca din nou.",
-      "retry": "Incearca din nou"
+      "title": "Pagina nu a putut fi încărcată",
+      "description": "Posibil să fii offline sau aplicația tocmai s-a actualizat. Încearcă din nou.",
+      "retry": "Încearcă din nou"
     },
-    "refresh": "Reimprospateaza",
-    "remove": "Elimina",
-    "moreActions": "Mai multe actiuni",
-    "copy": "Copiaza",
-    "clear": "Sterge"
+    "refresh": "Reîmprospătează",
+    "remove": "Elimină",
+    "moreActions": "Mai multe acțiuni",
+    "copy": "Copiază",
+    "clear": "Șterge"
   },
   "sidebar": {
-    "home": "Acasa",
-    "search": "Cauta",
+    "home": "Acasă",
+    "search": "Caută",
     "library": "Biblioteca",
     "favorites": "Favorite",
     "history": "Istoric",
@@ -1834,43 +1922,49 @@
     "playlists": "Liste de redare",
     "smartPlaylists": "Liste inteligente",
     "analytics": "Statistici",
-    "achievements": "Realizari",
+    "achievements": "Realizări",
     "yearlyWrapped": "Rezumatul anual",
-    "localFiles": "Fisiere locale",
+    "localFiles": "Fișiere locale",
     "offline": "Offline",
-    "settings": "Setari",
-    "pwaBadge": "PWA"
+    "settings": "Setări",
+    "pwaBadge": "PWA",
+    "groups": {
+      "listen": "Ascultă",
+      "sources": "Surse",
+      "more": "Mai mult"
+    },
+    "stats": "Statistici"
   },
   "queueDrawer": {
     "title": "Coada de redare",
     "tooltips": {
-      "play": "Reda",
-      "removeFromQueue": "Elimina din coada",
-      "clearQueueExceptCurrent": "Goleste coada (exceptand piesa curenta)"
+      "play": "Redă",
+      "removeFromQueue": "Elimină din coadă",
+      "clearQueueExceptCurrent": "Golește coada (exceptând piesa curentă)"
     },
     "empty": {
-      "title": "Coada este goala",
-      "description": "Adauga melodii pentru a incepe o coada"
+      "title": "Coada este goală",
+      "description": "Adaugă melodii pentru a începe o coadă"
     },
     "sections": {
-      "nowPlaying": "Se reda acum",
-      "upNext": "Urmatoarele ({{count}})",
+      "nowPlaying": "Se redă acum",
+      "upNext": "Următoarele ({{count}})",
       "previouslyPlayed": "Redate anterior ({{count}})"
     },
     "footer": {
-      "remainingTracks": "{{count}} ramase",
-      "unknownDuration": "Durata necunoscuta",
+      "remainingTracks": "{{count}} rămase",
+      "unknownDuration": "Durată necunoscută",
       "durationHoursMinutes": "{{hours}}h {{minutes}}m",
       "durationMinutes": "{{minutes}} min"
     }
   },
   "startRadioMenu": {
-    "title": "Porneste Radio",
-    "orStartMix": "Sau porneste un mix",
+    "title": "Pornește Radio",
+    "orStartMix": "Sau pornește un mix",
     "modes": {
       "track": {
-        "label": "Radio piesa",
-        "description": "Similar cu aceasta melodie"
+        "label": "Radio piesă",
+        "description": "Similar cu această melodie"
       },
       "artist": {
         "label": "Radio artist",
@@ -1882,19 +1976,19 @@
       },
       "discovery": {
         "label": "Mod descoperire",
-        "description": "Exploreaza melodiile neascultate"
+        "description": "Explorează melodiile neascultate"
       },
       "recent": {
-        "label": "Adaugiri recente",
-        "description": "Melodii adaugate recent"
+        "label": "Adăugiri recente",
+        "description": "Melodii adăugate recent"
       },
       "sonic": {
-        "label": "Similaritate sonica",
+        "label": "Similaritate sonică",
         "description": "Melodii similare acustic"
       },
       "autodj": {
         "label": "Auto-DJ",
-        "description": "O sesiune secventiata dupa energie"
+        "description": "O sesiune secvențiată după energie"
       }
     }
   },
@@ -1907,244 +2001,242 @@
       }
     },
     "sonic": {
-      "featuresPending": "Analiza acustica inca ruleaza — folosim similaritate dupa artist/titlu deocamdata"
+      "featuresPending": "Analiza acustică încă rulează — folosim similaritate după artist/titlu deocamdată"
     }
   },
   "pwa": {
-    "offlineTitle": "Esti offline",
-    "offlineDescription": "Continutul din cache este inca disponibil",
+    "offlineTitle": "Ești offline",
+    "offlineDescription": "Conținutul din cache este încă disponibil",
     "onlineBack": "Ai revenit online!",
-    "installAction": "Instaleaza",
-    "installTitle": "Instaleaza SoundWave",
-    "installDescription": "Instaleaza aplicatia pentru acces mai rapid si redare offline",
-    "updateAction": "Actualizeaza",
-    "updateTitle": "Actualizare disponibila",
-    "updateDescription": "O versiune noua SoundWave este gata de instalare",
+    "installAction": "Instalează",
+    "installTitle": "Instalează SoundWave",
+    "installDescription": "Instalează aplicația pentru acces mai rapid și redare offline",
+    "updateAction": "Actualizează",
+    "updateTitle": "Actualizare disponibilă",
+    "updateDescription": "O versiune nouă SoundWave este gata de instalare",
     "offlineModeBadge": "Mod offline"
   },
   "settings": {
-    "title": "Setari",
+    "title": "Setări",
     "backup": {
-      "title": "Backup si restaurare",
-      "description": "Exporta definitia bibliotecii (melodii, playlist-uri, reguli de playlist inteligent, favorite si abonari la canale) intr-un fisier JSON sau restaureaz-o in acest cont. Audio se descarca din nou pe baza ID-urilor video salvate, asa ca videoclipurile sterse sau devenite private intre timp nu mai pot fi recuperate, iar versurile tale, istoricul de ascultare si fisierele audio nu sunt incluse. Pentru o copie completa, vezi docs/BACKUP_RESTORE.md.",
-      "create": "Creeaza backup",
-      "restore": "Restaureaza din fisier",
+      "title": "Backup și restaurare",
+      "description": "Exportă definiția bibliotecii (melodii, playlist-uri, reguli de playlist inteligent, favorite și abonări la canale) într-un fișier JSON sau restaureaz-o în acest cont. Audio se descarcă din nou pe baza ID-urilor video salvate, așa că videoclipurile șterse sau devenite private între timp nu mai pot fi recuperate, iar versurile tale, istoricul de ascultare și fișierele audio nu sunt incluse. Pentru o copie completă, vezi docs/BACKUP_RESTORE.md.",
+      "create": "Creează backup",
+      "restore": "Restaurează din fișier",
       "summary": "Previzualizare restaurare",
-      "confirm": "Aplica restaurarea",
-      "created": "Backup descarcat",
+      "confirm": "Aplică restaurarea",
+      "created": "Backup descărcat",
       "createFailed": "Backup-ul nu a putut fi creat",
       "restored": "Restaurarea a pornit",
-      "restoreFailed": "Restaurarea a esuat",
-      "invalidFile": "Alege un fisier de backup SoundWave valid (.json)",
+      "restoreFailed": "Restaurarea a eșuat",
+      "invalidFile": "Alege un fișier de backup SoundWave valid (.json)",
       "counts": {
         "playlists": "Playlist-uri: {{count}} noi din {{total}}",
         "smartPlaylists": "Playlist-uri inteligente: {{count}} noi din {{total}}",
-        "channels": "Abonari la canale: {{count}} noi din {{total}}",
+        "channels": "Abonări la canale: {{count}} noi din {{total}}",
         "tracks": "Melodii: {{count}} noi din {{total}}",
-        "downloads": "Melodii de descarcat: {{count}}"
+        "downloads": "Melodii de descărcat: {{count}}"
       }
     },
     "appearance": {
       "title": "Aspect",
-      "description": "Personalizeaza aspectul SoundWave cu diferite teme de culori.",
-      "themeLabel": "Tema"
+      "description": "Personalizează aspectul SoundWave cu diferite teme de culori.",
+      "themeLabel": "Temă"
     },
     "visualizer": {
       "title": "Vizualizator audio",
-      "description": "Alege un stil de vizualizare pentru playerul audio. Temele diferite ofera animatii si scheme de culori unice.",
-      "enableLabel": "Activeaza vizualizatorul",
-      "glowLabel": "Activeaza efectul de stralucire",
+      "description": "Alege un stil de vizualizare pentru playerul audio. Temele diferite oferă animații și scheme de culori unice.",
+      "enableLabel": "Activează vizualizatorul",
+      "glowLabel": "Activează efectul de strălucire",
       "themeSection": "Tema vizualizatorului",
       "glowHint": "Ignorat pe ecrane mici, unde efectul consumă mult din procesorul grafic și baterie."
     },
     "twoFactor": {
-      "title": "Autentificare in doi pasi",
-      "description": "Adauga un nivel suplimentar de securitate contului tau. Va trebui sa introduci un cod din aplicatia de autentificare la conectare.",
+      "title": "Autentificare în doi pași",
+      "description": "Adaugă un nivel suplimentar de securitate contului tău. Va trebui să introduci un cod din aplicația de autentificare la conectare.",
       "enabled": "Activat",
       "disabled": "Dezactivat",
-      "backupCodesRemaining": "{{count}} coduri de rezerva ramase",
-      "enableButton": "Activeaza autentificarea in doi pasi",
-      "disableButton": "Dezactiveaza autentificarea in doi pasi",
-      "backupCodesTitle": "Coduri de rezerva",
-      "downloadCodesButton": "Descarca codurile de rezerva",
-      "regenerateCodesButton": "Regenereaza codurile",
+      "enableButton": "Activează autentificarea în doi pași",
+      "disableButton": "Dezactivează autentificarea în doi pași",
+      "backupCodesTitle": "Coduri de rezervă",
+      "downloadCodesButton": "Descarcă codurile de rezervă",
+      "regenerateCodesButton": "Regenerează codurile",
       "setupDialog": {
-        "title": "Activeaza autentificarea in doi pasi",
-        "scanQrCode": "Scaneaza acest cod QR cu aplicatia de autentificare (Google Authenticator, Authy, etc.)",
+        "title": "Activează autentificarea în doi pași",
+        "scanQrCode": "Scanează acest cod QR cu aplicația de autentificare (Google Authenticator, Authy, etc.)",
         "orEnterManually": "Sau introdu acest cod manual:",
-        "enterCodeToVerify": "Introdu codul de 6 cifre din aplicatie pentru verificare:",
-        "viewBackupCodes": "Vezi codurile de rezerva",
-        "saveBackupCodesWarning": "Salveaza aceste coduri de rezerva intr-un loc sigur. Fiecare cod poate fi folosit o singura data.",
-        "backToSetup": "Inapoi la configurare",
-        "verifyAndEnable": "Verifica si activeaza"
+        "enterCodeToVerify": "Introdu codul de 6 cifre din aplicație pentru verificare:",
+        "viewBackupCodes": "Vezi codurile de rezervă",
+        "saveBackupCodesWarning": "Salvează aceste coduri de rezervă într-un loc sigur. Fiecare cod poate fi folosit o singură dată.",
+        "backToSetup": "Înapoi la configurare",
+        "verifyAndEnable": "Verifică și activează"
       },
       "disableDialog": {
-        "title": "Dezactiveaza autentificarea in doi pasi",
-        "warning": "Dezactivarea autentificarii in doi pasi va face contul tau mai putin sigur.",
-        "enterCode": "Introdu un cod de verificare din aplicatia de autentificare sau foloseste un cod de rezerva:",
-        "disableButton": "Dezactiveaza 2FA"
-      }
+        "title": "Dezactivează autentificarea în doi pași",
+        "warning": "Dezactivarea autentificării în doi pași va face contul tău mai puțin sigur.",
+        "enterCode": "Introdu un cod de verificare din aplicația de autentificare sau folosește un cod de rezervă:",
+        "disableButton": "Dezactivează 2FA"
+      },
+      "backupCodesRemaining_one": "{{count}} cod de rezervă rămas",
+      "backupCodesRemaining_few": "{{count}} coduri de rezervă rămase",
+      "backupCodesRemaining_other": "{{count}} de coduri de rezervă rămase"
     },
     "apiKeys": {
       "title": "Chei API",
-      "createKeyButton": "Creeaza cheie",
-      "description": "Creeaza chei API pentru widgeturi externe de tablou de bord (cum ar fi Homepage). Cheile sunt compatibile cu formatul widget TubeArchivist.",
-      "saveKeyWarning": "Salveaza cheia API acum!",
-      "saveKeyCaption": "Aceasta cheie va fi afisata o singura data. Copiaz-o acum!",
-      "noKeysYet": "Nu au fost create chei API inca",
-      "deleteKeyTooltip": "Sterge cheia",
+      "createKeyButton": "Creează cheie",
+      "description": "Creează chei API pentru widgeturi externe de tablou de bord (cum ar fi Homepage). Cheile sunt compatibile cu formatul widget TubeArchivist.",
+      "saveKeyWarning": "Salvează cheia API acum!",
+      "saveKeyCaption": "Această cheie va fi afișată o singură dată. Copiaz-o acum!",
+      "noKeysYet": "Nu au fost create chei API încă",
+      "deleteKeyTooltip": "Șterge cheia",
       "widgetConfig": "Configurare widget Homepage",
       "table": {
         "name": "Nume",
         "key": "Cheie",
         "lastUsed": "Ultima utilizare",
-        "actions": "Actiuni"
+        "actions": "Acțiuni"
       },
       "createDialog": {
-        "title": "Creeaza cheie API",
-        "description": "Creeaza o cheie API pentru widgeturi externe de tablou de bord. Aceasta cheie va permite acces doar pentru citire la statisticile tale.",
+        "title": "Creează cheie API",
+        "description": "Creează o cheie API pentru widgeturi externe de tablou de bord. Această cheie va permite acces doar pentru citire la statisticile tale.",
         "keyNameLabel": "Nume cheie",
         "keyNamePlaceholder": "ex: Widget Homepage",
-        "copyWarning": "Cheia API va fi afisata o singura data dupa creare. Asigura-te ca o copiezi!",
-        "createButton": "Creeaza cheia"
+        "copyWarning": "Cheia API va fi afișată o singură dată după creare. Asigură-te că o copiezi!",
+        "createButton": "Creează cheia"
       },
       "deleteDialog": {
-        "title": "Stergi cheia API?",
-        "description": "Esti sigur ca vrei sa stergi aceasta cheie API? Orice aplicatie care foloseste aceasta cheie va pierde accesul."
+        "title": "Ștergi cheia API?",
+        "description": "Ești sigur că vrei să ștergi această cheie API? Orice aplicație care folosește această cheie va pierde accesul."
       }
     },
     "playback": {
       "title": "Redare",
-      "autoplayLabel": "Redare automata",
-      "normalizeLabel": "Normalizeaza sunetul",
       "smartShuffle": {
-        "title": "Amestecare inteligenta",
-        "description": "Cand este activata, modul amestecare va evita redarea melodiilor ascultate recent, creand o experienta de ascultare mai variata.",
-        "enableLabel": "Activeaza amestecarea inteligenta",
-        "historySize": "Dimensiune istoric: {{count}} melodii",
-        "historySizeHelp": "Numarul de melodii redate recent pe care sa le evite la amestecare"
+        "title": "Amestecare inteligentă",
+        "description": "Când este activată, modul amestecare va evita redarea melodiilor ascultate recent, creând o experiență de ascultare mai variată.",
+        "enableLabel": "Activează amestecarea inteligentă",
+        "historySizeHelp": "Numărul de melodii redate recent pe care să le evite la amestecare",
+        "historySize_one": "Dimensiune istoric: {{count}} melodie",
+        "historySize_few": "Dimensiune istoric: {{count}} melodii",
+        "historySize_other": "Dimensiune istoric: {{count}} de melodii"
       },
       "normalization": {
         "title": "Normalizare volum",
-        "enable": "Normalizeaza volumul redarii",
-        "target": "Tinta: {{value}} LUFS",
-        "hint": "Aduce piesele la un volum constant, ca melodiile line si cele puternice sa se auda la fel. Afecteaza doar piesele analizate."
+        "enable": "Normalizează volumul redării",
+        "target": "Țintă: {{value}} LUFS",
+        "hint": "Aduce piesele la un volum constant, ca melodiile line și cele puternice să se audă la fel. Afectează doar piesele analizate."
       },
       "audioQuality": {
-        "title": "Calitate audio la descarcare",
-        "description": "Calitatea folosita cand descarci piese noi de pe YouTube. Piesele deja descarcate raman neschimbate.",
-        "flac": "FLAC (Fara pierderi)",
-        "high": "Inalta (320 kbps)",
-        "medium": "Medie (192 kbps)",
-        "low": "Scazuta (Opus 96 kbps)",
-        "storageWarning": "FLAC este fara pierderi si ocupa considerabil mai mult spatiu."
+        "title": "Calitate audio la descărcare",
+        "description": "Cum sunt păstrate piesele noi de pe YouTube. Original păstrează sunetul exact așa cum îl oferă YouTube: cea mai bună calitate posibilă și cea mai rapidă descărcare. Celelalte opțiuni îl convertesc, ceea ce durează mai mult și nu poate îmbunătăți sunetul. Piesele deja descărcate rămân neschimbate.",
+        "original": "Original (cea mai bună calitate, fără conversie)",
+        "flac": "Conversie în FLAC (fișiere mult mai mari)",
+        "high": "Conversie în AAC 320 kbps",
+        "medium": "Conversie în AAC 192 kbps",
+        "low": "Conversie în Opus 96 kbps (cele mai mici fișiere)",
+        "storageWarning": "FLAC nu poate reface ce sunetul de pe YouTube nu a avut niciodată. Sunetul rămâne același, iar fișierele sunt de câteva ori mai mari."
       },
       "seekDuration": {
-        "title": "Durata cautare",
-        "description": "Alege cate secunde sa sariti inainte sau inapoi cand folositi controalele de cautare (taste media, casti, etc.).",
+        "title": "Durată căutare",
+        "description": "Alege câte secunde să săriți înainte sau înapoi când folosiți controalele de căutare (taste media, căști, etc.).",
         "seconds": "{{count}} secunde"
       },
       "prefetch": {
-        "title": "Prefetch inteligent si Cache",
-        "description": "Descarca automat piesele urmatoare pentru redare instantanee. Piesele din cache se redau fara intarziere.",
-        "enableLabel": "Activeaza prefetch-ul inteligent"
+        "title": "Prefetch inteligent și Cache",
+        "description": "Descarcă automat piesele următoare pentru redare instantanee. Piesele din cache se redau fără întârziere.",
+        "enableLabel": "Activează prefetch-ul inteligent"
       },
       "sync": {
         "title": "Sincronizare redare inter-dispozitive",
-        "description": "Sincronizeaza pozitia de redare intre dispozitive. Dezactiveaza pentru a reduce consumul de baterie si date pe mobil.",
-        "enableLabel": "Activeaza sincronizarea redarii"
+        "description": "Sincronizează poziția de redare între dispozitive. Dezactivează pentru a reduce consumul de baterie și date pe mobil.",
+        "enableLabel": "Activează sincronizarea redării"
       },
       "cacheStats": {
         "title": "Statistici cache",
-        "cachedTracks": "Melodii in cache",
+        "cachedTracks": "Melodii în cache",
         "cacheSize": "Dimensiune cache",
-        "maxSize": "Dimensiune maxima",
-        "clearing": "Se goleste...",
-        "clearButton": "Goleste cache-ul"
+        "maxSize": "Dimensiune maximă",
+        "clearing": "Se golește...",
+        "clearButton": "Golește cache-ul"
       },
       "keepScreenOn": "Menține ecranul aprins în timpul redării",
       "keepScreenOnHint": "Consumă mai multă baterie. Dezactivat implicit; ecranul se poate stinge și muzica continuă."
     },
-    "downloadQuality": {
-      "title": "Calitate descarcare",
-      "bestQualityLabel": "Descarca la cea mai buna calitate"
-    },
-    "lyrics": {
-      "title": "Versuri",
-      "description": "Preia si memoreaza automat versurile sincronizate pentru fisierele audio folosind API-ul LRCLIB.",
-      "autoFetchLabel": "Preia automat versurile pentru descarcarile noi",
-      "showInPlayerLabel": "Afiseaza versurile sincronizate in player"
-    },
-    "quickSync": {
-      "title": "Sincronizare rapida - Streaming adaptiv"
-    },
     "userManagement": {
-      "description": "Gestioneaza toti utilizatorii din sistem. Creeaza, editeaza sau sterge conturi de utilizatori si monitorizeaza statisticile sistemului.",
+      "description": "Gestionează toți utilizatorii din sistem. Creează, editează sau șterge conturi de utilizatori și monitorizează statisticile sistemului.",
       "openButton": "Deschide administrarea utilizatorilor"
     },
     "alerts": {
-      "apiKeyCreated": "Cheie API creata! Copiaz-o acum - va fi afisata o singura data.",
-      "apiKeyCreateFailed": "Crearea cheii API a esuat",
-      "apiKeyDeleted": "Cheie API stearsa",
-      "apiKeyDeleteFailed": "Stergerea cheii API a esuat",
-      "copiedToClipboard": "Copiat in clipboard!",
+      "apiKeyCreated": "Cheie API creată! Copiaz-o acum - va fi afișată o singură dată.",
+      "apiKeyCreateFailed": "Crearea cheii API a eșuat",
+      "apiKeyDeleted": "Cheie API ștearsă",
+      "apiKeyDeleteFailed": "Ștergerea cheii API a eșuat",
+      "copiedToClipboard": "Copiat în clipboard!",
       "audioCacheCleared": "Cache-ul audio a fost golit cu succes",
-      "audioCacheClearFailed": "Golirea cache-ului a esuat",
-      "setup2faFailed": "Configurarea 2FA a esuat",
-      "twoFactorEnabled": "Autentificarea in doi pasi a fost activata cu succes!",
+      "audioCacheClearFailed": "Golirea cache-ului a eșuat",
+      "setup2faFailed": "Configurarea 2FA a eșuat",
+      "twoFactorEnabled": "Autentificarea în doi pași a fost activată cu succes!",
       "invalidVerificationCode": "Cod de verificare invalid",
-      "twoFactorDisabled": "Autentificarea in doi pasi a fost dezactivata",
-      "backupCodesRegenerated": "Codurile de rezerva au fost regenerate cu succes!",
-      "regenerateBackupCodesFailed": "Regenerarea codurilor de rezerva a esuat",
-      "downloadBackupCodesFailed": "Descarcarea codurilor de rezerva a esuat",
-      "backupCodesUnavailable": "Pentru securitatea ta, codurile de rezerva pot fi salvate doar la generare. Foloseste \"Regenereaza codurile\" pentru a crea si descarca un set nou."
+      "twoFactorDisabled": "Autentificarea în doi pași a fost dezactivată",
+      "backupCodesRegenerated": "Codurile de rezervă au fost regenerate cu succes!",
+      "regenerateBackupCodesFailed": "Regenerarea codurilor de rezervă a eșuat",
+      "downloadBackupCodesFailed": "Descărcarea codurilor de rezervă a eșuat",
+      "backupCodesUnavailable": "Pentru securitatea ta, codurile de rezervă pot fi salvate doar la generare. Folosește \"Regenerează codurile\" pentru a crea și descărca un set nou."
     },
     "language": {
-      "title": "Limba",
-      "description": "Alege limba aplicatiei. Functionalitatile noi sunt traduse, iar alegerea este memorata pe acest dispozitiv.",
-      "label": "Limba aplicatiei",
+      "title": "Limbă",
+      "description": "Alege limba aplicației. Funcționalitățile noi sunt traduse, iar alegerea este memorată pe acest dispozitiv.",
+      "label": "Limba aplicației",
       "options": {
-        "en": "Engleza",
-        "ro": "Romana"
+        "en": "Engleză",
+        "ro": "Română"
       }
     }
   },
   "localFilesNew": {
-    "title": "Fisierele mele locale",
+    "title": "Fișierele mele locale",
     "buttons": {
-      "refresh": "Actualizeaza",
-      "clearAll": "Sterge tot",
-      "selectFiles": "Selecteaza fisiere",
-      "selectFolder": "Selecteaza folder"
+      "refresh": "Actualizează",
+      "clearAll": "Șterge tot",
+      "selectFiles": "Selectează fișiere",
+      "selectFolder": "Selectează folder"
     },
     "tooltips": {
-      "selectFilesHint": "Selecteaza fisiere audio individuale de pe dispozitiv",
-      "selectFolderHttps": "Selectia folderului necesita HTTPS sau localhost. In prezent se vizualizeaza prin HTTP. Foloseste \"Selecteaza fisiere\" in schimb, sau acceseaza prin HTTPS.",
-      "selectFolderHint": "Selecteaza un folder pentru a scana recursiv inclusiv toate subfolderele"
+      "selectFilesHint": "Selectează fișiere audio individuale de pe dispozitiv",
+      "selectFolderHttps": "Selecția folderului necesită HTTPS sau localhost. În prezent se vizualizează prin HTTP. Folosește \"Selectează fișiere\" în schimb, sau accesează prin HTTPS.",
+      "selectFolderHint": "Selectează un folder pentru a scana recursiv inclusiv toate subfolderele"
     },
     "alerts": {
-      "noFilesTitle": "Nu exista fisiere locale inca",
-      "noFilesDescription": "Apasa \"Selecteaza fisiere\" pentru a alege fisiere audio individuale (functioneaza peste tot), sau \"Selecteaza folder\" pentru a scana un intreg folder inclusiv subfolderele (necesita HTTPS sau localhost). Fisierele sunt stocate in browser si se redau local fara a fi incarcate.",
-      "processingFiles": "Se proceseaza {{count}} fisiere...",
-      "addedFiles": "Au fost adaugate {{count}} fisiere cu succes!",
-      "failedSelectFiles": "Selectia fisierelor a esuat",
-      "folderNotSupported": "Selectia folderului nu este acceptata in acest browser. Foloseste Chrome, Edge sau Opera.",
-      "folderRequiresHttps": "Selectia folderului necesita HTTPS sau localhost. Pentru accesul pe reteaua locala, foloseste \"Selecteaza fisiere\" in schimb sau acceseaza prin HTTPS.",
-      "scanningFolder": "Se scaneaza folderul si subfolderele...",
-      "noAudioFiles": "Nu s-au gasit fisiere audio in folderul selectat",
-      "processingAudioFiles": "Se proceseaza {{count}} fisiere audio...",
-      "successfullyAdded": "Au fost adaugate cu succes {{count}} fisiere din folder!",
-      "failedReadFolder": "Citirea folderului a esuat",
-      "folderCancelled": "Selectia folderului a fost anulata",
-      "failedPlayFile": "Redarea fisierului a esuat",
-      "fileRemoved": "Fisier eliminat",
-      "failedRemoveFile": "Eliminarea fisierului a esuat",
-      "allFilesRemoved": "Toate fisierele au fost eliminate",
-      "failedClearLibrary": "Golirea bibliotecii a esuat"
+      "noFilesTitle": "Nu există fișiere locale încă",
+      "noFilesDescription": "Apasă \"Selectează fișiere\" pentru a alege fișiere audio individuale (funcționează peste tot), sau \"Selectează folder\" pentru a scana un întreg folder inclusiv subfolderele (necesită HTTPS sau localhost). Fișierele sunt stocate în browser și se redau local fără a fi încărcate.",
+      "failedSelectFiles": "Selecția fișierelor a eșuat",
+      "folderNotSupported": "Selecția folderului nu este acceptată în acest browser. Folosește Chrome, Edge sau Opera.",
+      "folderRequiresHttps": "Selecția folderului necesită HTTPS sau localhost. Pentru accesul pe rețeaua locală, folosește \"Selectează fișiere\" în schimb sau accesează prin HTTPS.",
+      "scanningFolder": "Se scanează folderul și subfolderele...",
+      "noAudioFiles": "Nu s-au găsit fișiere audio în folderul selectat",
+      "failedReadFolder": "Citirea folderului a eșuat",
+      "folderCancelled": "Selecția folderului a fost anulată",
+      "failedPlayFile": "Redarea fișierului a eșuat",
+      "fileRemoved": "Fișier eliminat",
+      "failedRemoveFile": "Eliminarea fișierului a eșuat",
+      "allFilesRemoved": "Toate fișierele au fost eliminate",
+      "failedClearLibrary": "Golirea bibliotecii a eșuat",
+      "processingFiles_one": "Se procesează {{count}} fișier...",
+      "processingFiles_few": "Se procesează {{count}} fișiere...",
+      "processingFiles_other": "Se procesează {{count}} de fișiere...",
+      "addedFiles_one": "A fost adăugat {{count}} fișier!",
+      "addedFiles_few": "Au fost adăugate {{count}} fișiere!",
+      "addedFiles_other": "Au fost adăugate {{count}} de fișiere!",
+      "processingAudioFiles_one": "Se procesează {{count}} fișier audio...",
+      "processingAudioFiles_few": "Se procesează {{count}} fișiere audio...",
+      "processingAudioFiles_other": "Se procesează {{count}} de fișiere audio...",
+      "successfullyAdded_one": "A fost adăugat {{count}} fișier din folder!",
+      "successfullyAdded_few": "Au fost adăugate {{count}} fișiere din folder!",
+      "successfullyAdded_other": "Au fost adăugate {{count}} de fișiere din folder!"
     },
     "confirmations": {
-      "removeFile": "Elimini acest fisier din biblioteca?",
-      "removeAllFiles": "Elimini TOATE fisierele din biblioteca? Aceasta actiune nu poate fi anulata."
+      "removeFile": "Elimini acest fișier din bibliotecă?",
+      "removeAllFiles": "Elimini TOATE fișierele din bibliotecă? Această acțiune nu poate fi anulată."
     },
     "table": {
       "columnNumber": "#",
@@ -2152,119 +2244,167 @@
       "columnAlbum": "Album"
     },
     "unclaimed": {
-      "description": "{{count}} fisier(e) au fost importate inainte ca fiecare cont sa aiba propria biblioteca. Pot apartine altcuiva care foloseste acest browser.",
-      "claim": "Adauga in biblioteca mea",
-      "failed": "Fisierele nu au putut fi adaugate in biblioteca ta"
+      "claim": "Adaugă în biblioteca mea",
+      "failed": "Fișierele nu au putut fi adăugate în biblioteca ta",
+      "description_one": "{{count}} fișier a fost importat înainte ca fiecare cont să aibă propria bibliotecă. Poate aparține altcuiva care folosește acest browser.",
+      "description_few": "{{count}} fișiere au fost importate înainte ca fiecare cont să aibă propria bibliotecă. Pot aparține altcuiva care folosește acest browser.",
+      "description_other": "{{count}} de fișiere au fost importate înainte ca fiecare cont să aibă propria bibliotecă. Pot aparține altcuiva care folosește acest browser."
     }
   },
   "forcePasswordChange": {
-    "title": "Seteaza o parola noua",
-    "subtitle": "Pentru securitatea ta, trebuie sa schimbi parola implicita inainte de a continua.",
-    "currentPassword": "Parola actuala",
-    "newPassword": "Parola noua",
-    "confirmPassword": "Confirma parola noua",
-    "showPassword": "Arata parola",
+    "title": "Setează o parolă nouă",
+    "subtitle": "Pentru securitatea ta, trebuie să schimbi parola implicită înainte de a continua.",
+    "currentPassword": "Parola actuală",
+    "newPassword": "Parola nouă",
+    "confirmPassword": "Confirmă parola nouă",
+    "showPassword": "Arată parola",
     "hidePassword": "Ascunde parola",
-    "hint": "Foloseste cel putin {{count}} caractere. Evita parolele comune sau refolosite.",
-    "submit": "Schimba parola",
-    "signOut": "Deconecteaza-te",
-    "success": "Parola a fost schimbata cu succes. Se continua…",
+    "hint": "Folosește cel puțin {{count}} caractere. Evită parolele comune sau refolosite.",
+    "submit": "Schimbă parola",
+    "signOut": "Deconectează-te",
+    "success": "Parola a fost schimbată cu succes. Se continuă…",
     "errors": {
-      "fillAllFields": "Te rugam sa completezi toate campurile de parola",
-      "tooShort": "Parola trebuie sa aiba cel putin {{count}} caractere",
+      "fillAllFields": "Te rugăm să completezi toate câmpurile de parolă",
+      "tooShort": "Parola trebuie să aibă cel puțin {{count}} caractere",
       "mismatch": "Parolele noi nu coincid",
-      "sameAsCurrent": "Parola noua trebuie sa fie diferita de parola actuala",
-      "failed": "Schimbarea parolei a esuat"
+      "sameAsCurrent": "Parola nouă trebuie să fie diferită de parolă actuală",
+      "failed": "Schimbarea parolei a eșuat"
     }
   },
   "passwordPolicy": {
-    "tooShort": "Parola este prea scurta. Foloseste cel putin 8 caractere.",
-    "tooCommon": "Aceasta parola este prea comuna. Alege una mai putin previzibila.",
-    "entirelyNumeric": "Parola nu poate fi formata doar din cifre.",
-    "tooSimilar": "Parola este prea asemanatoare cu numele de utilizator sau emailul.",
-    "sameAsCurrent": "Parola noua trebuie sa fie diferita de parola actuala.",
+    "tooShort": "Parola este prea scurtă. Folosește cel puțin 8 caractere.",
+    "tooCommon": "Această parolă este prea comună. Alege una mai puțin previzibilă.",
+    "entirelyNumeric": "Parola nu poate fi formată doar din cifre.",
+    "tooSimilar": "Parola este prea asemănătoare cu numele de utilizator sau emailul.",
+    "sameAsCurrent": "Parola nouă trebuie să fie diferită de parolă actuală.",
     "mismatch": "Parolele nu coincid.",
-    "invalid": "Parola nu indeplineste cerintele de securitate."
+    "invalid": "Parola nu îndeplinește cerințele de securitate."
   },
   "emailVerification": {
-    "confirmTitle": "Confirma emailul",
-    "confirming": "Se confirma noua adresa de email…",
-    "success": "Adresa ta de email a fost confirmata.",
+    "confirmTitle": "Confirmă emailul",
+    "confirming": "Se confirmă noua adresă de email…",
+    "success": "Adresa ta de email a fost confirmată.",
     "goToApp": "Mergi la SoundWave",
-    "pendingNotice": "Am trimis un link de confirmare catre {{email}}. Adresa se va schimba dupa ce o confirmi.",
+    "pendingNotice": "Am trimis un link de confirmare către {{email}}. Adresa se va schimba după ce o confirmi.",
     "errors": {
-      "expired": "Acest link de confirmare a expirat. Te rugam sa soliciti din nou schimbarea.",
+      "expired": "Acest link de confirmare a expirat. Te rugăm să soliciți din nou schimbarea.",
       "invalid": "Acest link de confirmare este invalid sau a fost deja folosit.",
-      "emailTaken": "Aceasta adresa de email este deja folosita.",
-      "generic": "Nu am putut confirma emailul. Te rugam sa incerci din nou."
+      "emailTaken": "Această adresă de email este deja folosită.",
+      "generic": "Nu am putut confirma emailul. Te rugăm să încerci din nou."
     }
   },
   "appVersion": {
     "label": "SoundWave",
     "updateButton": "Actualizare",
-    "tooltip": "Actualizare disponibila",
+    "tooltip": "Actualizare disponibilă",
     "dialog": {
-      "title": "Actualizare disponibila",
+      "title": "Actualizare disponibilă",
       "running": "Rulezi v{{version}}",
-      "latest": "Cea mai recenta: v{{version}}",
-      "whatsNew": "Noutati",
+      "latest": "Cea mai recentă: v{{version}}",
+      "whatsNew": "Noutăți",
       "noNotes": "Vezi notele de lansare pe GitHub.",
-      "howToTitle": "Pentru a actualiza containerul tau self-hosted:",
-      "copy": "Copiaza",
+      "howToTitle": "Pentru a actualiza containerul tău self-hosted:",
+      "copy": "Copiază",
       "copied": "Copiat!",
       "viewOnGithub": "Vezi lansarea pe GitHub",
-      "dismiss": "Inchide",
-      "upToDateTitle": "Esti la zi"
+      "dismiss": "Închide",
+      "upToDateTitle": "Ești la zi"
     },
     "upToDate": "La zi"
   },
   "nowPlaying": {
-    "label": "Se reda acum"
+    "label": "Se redă acum"
   },
   "passkeys": {
     "title": "Chei de acces",
-    "description": "Conecteaza-te cu amprenta, fata sau PIN-ul dispozitivului in loc de parola. O cheie de acces inlocuieste atat parola, cat si codul de autentificare in doi pasi.",
-    "add": "Adauga o cheie de acces",
-    "added": "Cheie de acces adaugata",
-    "removed": "Cheie de acces stearsa",
-    "addedOn": "Adaugata {{date}}",
-    "lastUsed": "Folosita ultima data {{date}}",
-    "neverUsed": "Nefolosita inca",
-    "otherAddress": "Creata pentru {{address}}",
-    "removeLabel": "Sterge cheia de acces {{name}}",
-    "unavailableBrowser": "Acest browser nu suporta chei de acces.",
-    "unavailableHere": "Cheile de acces necesita deschiderea aplicatiei de la o adresa HTTPS cu nume de domeniu sau de pe localhost, iar adresa trebuie sa fie in SW_HOST sau CORS_ALLOWED_ORIGINS.",
+    "description": "Conectează-te cu amprenta, fața sau PIN-ul dispozitivului în loc de parolă. O cheie de acces înlocuiește atât parola, cât și codul de autentificare în doi pași.",
+    "add": "Adaugă o cheie de acces",
+    "added": "Cheie de acces adăugată",
+    "removed": "Cheie de acces ștearsă",
+    "addedOn": "Adăugată {{date}}",
+    "lastUsed": "Folosită ultima dată {{date}}",
+    "neverUsed": "Nefolosită încă",
+    "otherAddress": "Creată pentru {{address}}",
+    "removeLabel": "Șterge cheia de acces {{name}}",
+    "unavailableBrowser": "Acest browser nu suportă chei de acces.",
+    "unavailableHere": "Cheile de acces necesită deschiderea aplicației de la o adresă HTTPS cu nume de domeniu sau de pe localhost, iar adresa trebuie să fie în SW_HOST sau CORS_ALLOWED_ORIGINS.",
     "addDialog": {
-      "title": "Adauga o cheie de acces",
-      "description": "Mai intai confirma ca esti tu, apoi urmeaza instructiunile browserului.",
-      "password": "Parola curenta",
-      "twoFactorCode": "Cod in doi pasi sau de rezerva",
-      "name": "Nume (optional)",
+      "title": "Adaugă o cheie de acces",
+      "description": "Mai întâi confirmă că ești tu, apoi urmează instrucțiunile browserului.",
+      "password": "Parola curentă",
+      "twoFactorCode": "Cod în doi pași sau de rezervă",
+      "name": "Nume (opțional)",
       "namePlaceholder": "Telefonul meu",
-      "continue": "Continua"
+      "continue": "Continuă"
     },
     "removeDialog": {
-      "title": "Stergi cheia de acces?",
-      "message": "\"{{name}}\" nu se va mai putea conecta. Sterge-o si de pe dispozitiv sau din managerul de parole."
+      "title": "Ștergi cheia de acces?",
+      "message": "\"{{name}}\" nu se va mai putea conecta. Șterge-o și de pe dispozitiv sau din managerul de parole."
     },
     "errors": {
-      "generic": "Ceva nu a mers cu cheia de acces. Te rugam sa incerci din nou.",
+      "generic": "Ceva nu a mers cu cheia de acces. Te rugăm să încerci din nou.",
       "passkey_step_up_failed": "Parola sau codul este incorect.",
-      "passkey_locked": "Prea multe incercari esuate. Te rugam sa incerci mai tarziu.",
-      "passkey_refused": "Cheia de acces nu a fost acceptata.",
-      "passkey_unavailable": "Cheile de acces nu pot fi folosite de la aceasta adresa.",
-      "passkey_limit_reached": "Ai atins numarul maxim de chei de acces. Sterge una mai intai.",
-      "passkey_already_registered": "Acest dispozitiv are deja o cheie de acces pentru contul tau.",
-      "passkey_invalid_request": "Te rugam sa verifici datele si sa incerci din nou."
+      "passkey_locked": "Prea multe încercări eșuate. Te rugăm să încerci mai târziu.",
+      "passkey_refused": "Cheia de acces nu a fost acceptată.",
+      "passkey_unavailable": "Cheile de acces nu pot fi folosite de la această adresă.",
+      "passkey_limit_reached": "Ai atins numărul maxim de chei de acces. Șterge una mai întâi.",
+      "passkey_already_registered": "Acest dispozitiv are deja o cheie de acces pentru contul tău.",
+      "passkey_invalid_request": "Te rugăm să verifici datele și să încerci din nou."
     }
   },
   "remotePlayback": {
-    "playingOn": "Se reda pe {{device}}",
-    "playHere": "Reda aici"
+    "playingOn": "Se redă pe {{device}}",
+    "playHere": "Redă aici"
   },
   "trackView": {
-    "label": "Mod de afisare",
-    "list": "Afisare lista",
-    "cards": "Afisare carduri"
+    "label": "Mod de afișare",
+    "list": "Afișare listă",
+    "cards": "Afișare carduri"
+  },
+  "addMusic": {
+    "title": "Adaugă muzică",
+    "linkLabel": "Lipește un link",
+    "hint": {
+      "empty": "Un link către un video, un playlist sau un canal de pe YouTube.",
+      "invalid": "Acesta nu pare să fie un link.",
+      "track": "O piesă. Se descarcă în biblioteca ta.",
+      "playlist": "Un playlist. Te vei abona, iar piesele lui se descarcă pe măsură ce sunt găsite.",
+      "channel": "Un canal. Te vei abona, iar videoclipurile noi se descarcă automat.",
+      "trackInPlaylist": "Acest video face parte dintr-un playlist. Descarcă doar această piesă sau abonează-te la tot playlistul."
+    },
+    "actions": {
+      "download": "Descarcă",
+      "subscribe": "Abonează-te",
+      "subscribeToPlaylist": "Abonează-te la playlist"
+    },
+    "outcome": {
+      "downloadStarted": "Adăugat. Va fi în bibliotecă atunci când descărcarea se termină.",
+      "alreadyInLibrary": "Această piesă este deja în biblioteca ta.",
+      "subscribedToPlaylist": "Te-ai abonat. Playlistul apare în scurt timp, iar piesele se descarcă în fundal.",
+      "subscribedToChannel": "Te-ai abonat. Canalul apare în scurt timp, iar piesele se descarcă în fundal."
+    },
+    "errors": {
+      "refused": "Acest link nu a putut fi adăugat. Verifică dacă se deschide într-un browser, apoi încearcă din nou."
+    }
+  },
+  "cookieHealth": {
+    "title": {
+      "working": "Autentificare YouTube: funcționează",
+      "unknown": "Autentificare YouTube: încă necunoscută",
+      "needs_new_cookies": "Autentificare YouTube: sunt necesare cookie-uri noi",
+      "file_not_accessible": "Autentificare YouTube: cookies.txt nu poate fi folosit"
+    },
+    "detail": {
+      "working": "Ultima descărcare a reușit.",
+      "unknown": "Apare aici după prima descărcare.",
+      "needs_new_cookies": "YouTube cere din nou autentificarea, așa că descărcările eșuează. Înlocuiește cookies.txt de pe server cu un export nou, apoi reîncearcă descărcările eșuate. Pașii sunt în README, la „YouTube Cookies”.",
+      "file_not_accessible": "Serverul nu poate citi sau actualiza cookies.txt, așa că descărcările eșuează. Pe server: chown 1000:1000, chmod 600 și elimină :ro din montare. Apoi reîncearcă descărcările eșuate."
+    }
+  },
+  "trackRating": {
+    "label": "Evaluare",
+    "stars_one": "{{count}} stea",
+    "stars_few": "{{count}} stele",
+    "stars_other": "{{count}} de stele"
   }
 }

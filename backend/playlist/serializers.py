@@ -1,6 +1,7 @@
 """Playlist serializers"""
 
 from rest_framework import serializers
+from audio.serializers import AudioSerializer
 from download.models import DownloadQueue, outstanding_counts
 from playlist.models import Playlist, PlaylistItem
 import re
@@ -55,7 +56,20 @@ class PlaylistSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         queue_rows = DownloadQueue.objects.filter(owner_id=instance.owner_id, youtube_id__in=instance.remote_video_ids)
-        return {**super().to_representation(instance), **outstanding_counts(queue_rows)}
+        return {
+            **super().to_representation(instance),
+            'thumbnail_url': instance.artwork_url,
+            **outstanding_counts(queue_rows),
+        }
+
+
+class PlaylistTrackSerializer(serializers.ModelSerializer):
+    """One row of a playlist as its page shows it: the place in the list and the track itself"""
+    audio = AudioSerializer(read_only=True)
+
+    class Meta:
+        model = PlaylistItem
+        fields = ['id', 'position', 'added_date', 'audio']
 
 
 class PlaylistItemSerializer(serializers.ModelSerializer):

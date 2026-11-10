@@ -10,9 +10,13 @@ and widget/API clients send the header with no cookie. The two modes never overl
 
 Run: python manage.py test common.tests --settings=config.settings_test
 """
+from base64 import b64encode
+
 from django.conf import settings
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
+from django.urls import URLPattern, URLResolver, get_resolver
+from rest_framework.authentication import BasicAuthentication
 from rest_framework.authtoken.models import Token
 
 from user.models import Account
@@ -138,3 +142,59 @@ class LoginFromAnotherSiteTests(TestCase):
         response, _client = self._login()
 
         self.assertEqual(response.status_code, 200)
+
+
+def _routed_view_classes(patterns):
+    for entry in patterns:
+        if isinstance(entry, URLResolver):
+            yield from _routed_view_classes(entry.url_patterns)
+        if isinstance(entry, URLPattern):
+            yield getattr(entry.callback, 'view_class', None) or getattr(entry.callback, 'cls', None)
+
+
+class BasicAuthenticationRefusedTests(TestCase):
+    """A password in a Basic header skipped the login lockout, two-factor sign-in and CSRF (SW-101)."""
+
+    USERNAME = 'basic_u'
+    PASSWORD = 'Basicpw_2026!'
+    # One view per module that declares no authentication classes of its own.
+    DEFAULT_AUTHENTICATION_ENDPOINTS = (
+        '/api/audio/lyrics/stats/',
+        '/api/audio/local-audio/',
+        '/api/user/avatar/file/missing.png/',
+        '/api/ready/',
+    )
+    STATE_CHANGING_ENDPOINT = '/api/audio/lyrics/fetch_all_missing/'
+
+    @classmethod
+    def setUpTestData(cls):
+        Account.objects.create_superuser(cls.USERNAME, 'basic@test.local', cls.PASSWORD)
+
+    def _basic_header(self):
+        credentials = b64encode(f'{self.USERNAME}:{self.PASSWORD}'.encode()).decode()
+        return {'HTTP_AUTHORIZATION': f'Basic {credentials}'}
+
+    def test_the_correct_password_in_a_basic_header_is_refused(self):
+        for endpoint in self.DEFAULT_AUTHENTICATION_ENDPOINTS:
+            with self.subTest(endpoint):
+                response = Client().get(endpoint, **self._basic_header())
+
+                self.assertIn(response.status_code, (401, 403))
+
+    def test_a_basic_header_cannot_change_state_without_a_csrf_token(self):
+        client = Client(enforce_csrf_checks=True)
+
+        response = client.post(
+            self.STATE_CHANGING_ENDPOINT, {}, content_type='application/json', **self._basic_header(),
+        )
+
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_no_routed_view_accepts_basic_authentication(self):
+        accepting = sorted(
+            view_class.__name__
+            for view_class in set(_routed_view_classes(get_resolver().url_patterns))
+            if view_class and BasicAuthentication in getattr(view_class, 'authentication_classes', [])
+        )
+
+        self.assertEqual(accepting, [])

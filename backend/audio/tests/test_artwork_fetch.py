@@ -10,6 +10,7 @@ from unittest import mock
 
 import requests
 from celery.exceptions import Retry
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from PIL import Image
@@ -19,7 +20,7 @@ from audio.export import _fetch_cover_art
 from audio.models import Audio
 from audio.models_artwork import Artwork
 from audio.tag_writer import download_cover_art
-from audio.tasks_artwork import download_artwork
+from audio.tasks_artwork import archive_artwork_task, download_artwork
 from common.tests.test_safe_http import fake_network, image_response, redirect_to
 from user.models import Account
 
@@ -52,6 +53,8 @@ class ArtworkFetchTestCase(TestCase):
         settings_override = override_settings(MEDIA_ROOT=str(self.media_root))
         settings_override.enable()
         self.addCleanup(settings_override.disable)
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.owner = Account.objects.create_user('fetch_u', 'fetch_u@test.local', 'Fetchpw_2026!')
         self.audio = Audio.objects.create(
             owner=self.owner, youtube_id='FETCH_YT_01', title='T', channel_id='UC', channel_name='C',
@@ -137,7 +140,8 @@ class ArtworkProxyRedirectTests(ArtworkFetchTestCase):
     def test_proxy_refuses_redirect_to_private_address(self):
         client = APIClient()
         client.force_authenticate(self.owner)
-        with public_network({COVER_URL: redirect_to(PRIVATE_URL)}) as transport:
+        worker = mock.patch('audio.tasks_artwork.archive_artwork_task.delay', side_effect=archive_artwork_task)
+        with worker, public_network({COVER_URL: redirect_to(PRIVATE_URL)}) as transport:
             response = client.get('/api/audio/FETCH_YT_01/artwork/')
         self.assertEqual(response.status_code, 404)
         self.assertEqual(transport.requested, [COVER_URL])

@@ -5,6 +5,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
 
+export type AudioQuality = 'original' | 'low' | 'medium' | 'high' | 'best';
+
 export interface UserSettings {
   theme: string;
   volume: number;
@@ -12,7 +14,7 @@ export interface UserSettings {
   shuffle_enabled: boolean;
   smart_shuffle_enabled: boolean;
   smart_shuffle_history_size: number;
-  audio_quality: 'low' | 'medium' | 'high' | 'best';
+  audio_quality: AudioQuality;
   items_per_page: number;
   // Visualizer settings
   visualizer_theme: string;
@@ -35,7 +37,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   shuffle_enabled: false,
   smart_shuffle_enabled: true,
   smart_shuffle_history_size: 10,
-  audio_quality: 'high',
+  audio_quality: 'original',
   items_per_page: 50,
   // Visualizer defaults - rounded-bars is user favorite
   visualizer_theme: 'rounded-bars',

@@ -9,6 +9,9 @@ const ORIGIN = 'https://soundwave.test';
 const API_CACHE = 'soundwave-api-v3';
 const AUDIO_CACHE = 'soundwave-audio-v3';
 const SHELL_CACHE = 'soundwave-v20';
+const IMAGE_CACHE = 'soundwave-images-v5';
+const IMAGE_CACHE_MAX_ENTRIES = Number(WORKER_SOURCE.match(/IMAGE_CACHE_MAX_ENTRIES = (\d+)/)?.[1]);
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function fakeCaches(fetchImplementation: (...args: any[]) => Promise<any>) {
   const stores = new Map<string, Map<string, unknown>>();
@@ -60,14 +63,18 @@ function loadWorker(fetchImplementation: (...args: any[]) => Promise<any>) {
     { log: () => undefined, warn: () => undefined, error: () => undefined },
   );
 
+  const background: Promise<unknown>[] = [];
   const get = (path: string) => {
     let responded: Promise<unknown> | undefined;
     listeners.fetch({
       request: { url: `${ORIGIN}${path}`, method: 'GET', headers: new Map(), destination: '', mode: 'cors' },
       respondWith: (promise: Promise<unknown>) => { responded = promise; },
+      waitUntil: (work: Promise<unknown>) => { background.push(work); },
     });
     return responded;
   };
+  /** Work a fetch handler asked the browser to keep the worker alive for. */
+  const backgroundWork = () => Promise.all(background);
   const message = (data: object) => {
     const pending: Promise<unknown>[] = [];
     const reply = vi.fn();
@@ -84,7 +91,7 @@ function loadWorker(fetchImplementation: (...args: any[]) => Promise<any>) {
     listeners.install({ waitUntil: (work: Promise<unknown>) => pending.push(work) });
     return Promise.all(pending);
   };
-  return { caches, get, message, activate, install, self };
+  return { caches, get, backgroundWork, message, activate, install, self };
 }
 
 const settle = () => new Promise((done) => setTimeout(done, 0));
@@ -329,7 +336,7 @@ describe('service worker offline playlists', () => {
   it('removal deletes the metadata under its real key and only the audio it was given', async () => {
     const worker = loadWorker(vi.fn(async () => okResponse()));
     await worker.message(fill([X, Y]));
-    expect(worker.caches.stores.get(API_CACHE)!.has(`${ORIGIN}/api/playlist/A/?include_items=true`)).toBe(true);
+    expect(worker.caches.stores.get(API_CACHE)!.has(`${ORIGIN}/api/playlist/A/`)).toBe(true);
 
     const reply = await worker.message({ type: 'REMOVE_PLAYLIST_CACHE', playlistId: 'A', audioUrls: [X] });
 
@@ -384,3 +391,88 @@ describe('service worker install', () => {
     expect(response).toBe(shellEntry(worker, '/locales/ro/translation.json'));
   });
 });
+
+describe('service worker artwork', () => {
+  const imageFetchedAt = (when: number) => ({
+    status: 200, ok: true, headers: new Map([['date', new Date(when).toUTCString()]]), clone() { return this; },
+  });
+  const keptImages = (worker: ReturnType<typeof loadWorker>) => [...(worker.caches.stores.get(IMAGE_CACHE)?.keys() ?? [])];
+
+  it('one track keeps one image, however many tickets ask for it', async () => {
+    const fetchMock = vi.fn(async () => imageFetchedAt(Date.now()));
+    const worker = loadWorker(fetchMock);
+
+    await worker.get('/api/audio/A/artwork/?t=ticket-one');
+    await worker.get('/api/audio/A/artwork/?t=ticket-two');
+    await worker.get('/api/audio/A/artwork/');
+
+    expect(keptImages(worker)).toEqual([`${ORIGIN}/api/audio/A/artwork/`]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('playlist and channel pictures are kept the same way', async () => {
+    const worker = loadWorker(vi.fn(async () => imageFetchedAt(Date.now())));
+
+    await worker.get('/api/playlist/PL1/artwork/');
+    await worker.get('/api/v1/channel/UC1/artwork/');
+
+    expect(keptImages(worker)).toEqual([`${ORIGIN}/api/playlist/PL1/artwork/`, `${ORIGIN}/api/v1/channel/UC1/artwork/`]);
+    expect(worker.caches.stores.get(API_CACHE)).toBeUndefined();
+  });
+
+  it('the image cache drops its oldest entries instead of growing without limit', async () => {
+    const worker = loadWorker(vi.fn(async () => imageFetchedAt(Date.now())));
+    const extra = 3;
+
+    for (let track = 0; track < IMAGE_CACHE_MAX_ENTRIES + extra; track += 1) {
+      await worker.get(`/api/audio/T${track}/artwork/`);
+    }
+
+    const kept = keptImages(worker);
+    expect(kept).toHaveLength(IMAGE_CACHE_MAX_ENTRIES);
+    expect(kept[0]).toBe(`${ORIGIN}/api/audio/T${extra}/artwork/`);
+  });
+
+  it('a copy over a day old is served at once and replaced in the background', async () => {
+    const replacement = imageFetchedAt(Date.now());
+    const fetchMock = vi.fn(async () => replacement);
+    const worker = loadWorker(fetchMock);
+    const oldCopy = imageFetchedAt(Date.now() - 2 * DAY_MS);
+    await (await worker.caches.api.open(IMAGE_CACHE)).put('/api/audio/A/artwork/', oldCopy);
+
+    const served = await worker.get('/api/audio/A/artwork/');
+    await worker.backgroundWork();
+
+    expect(served).toBe(oldCopy);
+    expect(worker.caches.stores.get(IMAGE_CACHE)!.get(`${ORIGIN}/api/audio/A/artwork/`)).toBe(replacement);
+  });
+
+  it('a recent copy is served without asking the server again', async () => {
+    const fetchMock = vi.fn(async () => imageFetchedAt(Date.now()));
+    const worker = loadWorker(fetchMock);
+    const recentCopy = imageFetchedAt(Date.now() - DAY_MS / 2);
+    await (await worker.caches.api.open(IMAGE_CACHE)).put('/api/audio/A/artwork/', recentCopy);
+
+    const served = await worker.get('/api/audio/A/artwork/');
+    await worker.backgroundWork();
+
+    expect(served).toBe(recentCopy);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('an old copy survives when the refresh fails, and nothing is kept for a missing image', async () => {
+    const notFound = { status: 404, ok: false, clone() { return this; } };
+    const worker = loadWorker(vi.fn(async () => notFound));
+    const oldCopy = imageFetchedAt(Date.now() - 2 * DAY_MS);
+    await (await worker.caches.api.open(IMAGE_CACHE)).put('/api/audio/A/artwork/', oldCopy);
+
+    await worker.get('/api/audio/A/artwork/');
+    const missing = await worker.get('/api/audio/B/artwork/');
+    await worker.backgroundWork();
+
+    expect(missing).toBe(notFound);
+    expect(keptImages(worker)).toEqual([`${ORIGIN}/api/audio/A/artwork/`]);
+    expect(worker.caches.stores.get(IMAGE_CACHE)!.get(`${ORIGIN}/api/audio/A/artwork/`)).toBe(oldCopy);
+  });
+});
+

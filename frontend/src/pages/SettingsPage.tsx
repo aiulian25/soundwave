@@ -20,26 +20,13 @@ import {
   Select,
   MenuItem,
   Grid,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Slider,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Tooltip,
 } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
 import DownloadIcon from '@mui/icons-material/Download';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PaletteIcon from '@mui/icons-material/Palette';
 import SpeedIcon from '@mui/icons-material/Speed';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GroupIcon from '@mui/icons-material/Group';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
@@ -49,10 +36,6 @@ import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CachedIcon from '@mui/icons-material/Cached';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import SyncIcon from '@mui/icons-material/Sync';
-import VpnKeyIcon from '@mui/icons-material/VpnKey';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI } from '../api/client';
@@ -61,12 +44,15 @@ import { useThemeContext } from '../AppWithTheme';
 import { ThemeMode, themeNames } from '../theme/theme';
 import ThemePreview from '../components/ThemePreview';
 import VisualizerThemePreview from '../components/VisualizerThemePreview';
-import QuickSyncSettings from '../components/QuickSyncSettings';
 import PWASettingsCard from '../components/PWASettingsCard';
 import PasskeySettings from '../components/PasskeySettings';
 import UserProfileCard from '../components/UserProfileCard';
 import BackupRestoreCard from '../components/BackupRestoreCard';
+import ApiKeysCard from '../components/ApiKeysCard';
+import CookieHealthNotice from '../components/CookieHealthNotice';
+import { useCookieHealth } from '../hooks/useCookieHealth';
 import { useSettings } from '../context/SettingsContext';
+import type { AudioQuality } from '../hooks/useUserSettings';
 import { visualizerThemes } from '../config/visualizerThemes';
 import { useTranslation } from 'react-i18next';
 
@@ -79,26 +65,6 @@ interface TwoFactorSetup {
   secret: string;
   qr_code: string;
   backup_codes: string[];
-}
-
-interface APIKey {
-  id: number;
-  name: string;
-  key_prefix: string;
-  permission: string;
-  scope_stats: boolean;
-  scope_audio: boolean;
-  scope_channels: boolean;
-  scope_playlists: boolean;
-  scope_downloads: boolean;
-  is_active: boolean;
-  created_at: string;
-  last_used: string | null;
-  expires_at: string | null;
-}
-
-interface NewAPIKey extends APIKey {
-  key: string; // Full key, only available when created
 }
 
 export default function SettingsPage() {
@@ -121,64 +87,18 @@ export default function SettingsPage() {
   const [cacheStats, setCacheStats] = useState<{ count: number; totalSize: number } | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
   
-  // API Keys state
-  const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
-  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
-  const [newApiKeyName, setNewApiKeyName] = useState('Widget API Key');
-  const [newApiKey, setNewApiKey] = useState<NewAPIKey | null>(null);
-  const [deleteKeyId, setDeleteKeyId] = useState<number | null>(null);
+  const cookieHealth = useCookieHealth();
+
+  const showSuccessFor = (message: string, visibleMs: number) => {
+    setSuccess(message);
+    setTimeout(() => setSuccess(''), visibleMs);
+  };
 
   useEffect(() => {
     loadTwoFactorStatus();
     checkAdminStatus();
     loadCacheStats();
-    loadApiKeys();
   }, []);
-  
-  const loadApiKeys = async () => {
-    try {
-      const response = await userAPI.listApiKeys();
-      setApiKeys(response.data);
-    } catch (err) {
-      console.error('Failed to load API keys:', err);
-    }
-  };
-  
-  const handleCreateApiKey = async () => {
-    try {
-      setError('');
-      const response = await userAPI.createApiKey({ 
-        name: newApiKeyName,
-        permission: 'read',
-        scope_stats: true,
-      });
-      setNewApiKey(response.data);
-      setApiKeyDialogOpen(false);
-      loadApiKeys();
-      setSuccess(t('settings.alerts.apiKeyCreated'));
-      setTimeout(() => setSuccess(''), 10000);
-    } catch (err) {
-      setError(t('settings.alerts.apiKeyCreateFailed'));
-    }
-  };
-  
-  const handleDeleteApiKey = async (keyId: number) => {
-    try {
-      await userAPI.deleteApiKey(keyId);
-      setDeleteKeyId(null);
-      loadApiKeys();
-      setSuccess(t('settings.alerts.apiKeyDeleted'));
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(t('settings.alerts.apiKeyDeleteFailed'));
-    }
-  };
-  
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setSuccess(t('settings.alerts.copiedToClipboard'));
-    setTimeout(() => setSuccess(''), 2000);
-  };
   
   const loadCacheStats = async () => {
     try {
@@ -533,142 +453,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* API Keys Section */}
-      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <VpnKeyIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
-              <Typography variant="subtitle1" fontWeight={600}>
-                {t('settings.apiKeys.title')}
-              </Typography>
-            </Box>
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() => setApiKeyDialogOpen(true)}
-            >
-              {t('settings.apiKeys.createKeyButton')}
-            </Button>
-          </Box>
-
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-            {t('settings.apiKeys.description')}
-          </Typography>
-
-          {newApiKey && (
-            <Alert 
-              severity="warning" 
-              sx={{ mb: 2 }}
-              action={
-                <IconButton aria-label={t('common.copy')} size="small" onClick={() => copyToClipboard(newApiKey.key)}>
-                  <ContentCopyIcon fontSize="small" />
-                </IconButton>
-              }
-            >
-              <Typography variant="body2" fontWeight={600}>{t('settings.apiKeys.saveKeyWarning')}</Typography>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  fontFamily: 'monospace', 
-                  bgcolor: 'action.hover', 
-                  p: 0.5, 
-                  borderRadius: 1,
-                  mt: 0.5,
-                  wordBreak: 'break-all'
-                }}
-              >
-                {newApiKey.key}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {t('settings.apiKeys.saveKeyCaption')}
-              </Typography>
-            </Alert>
-          )}
-
-          {apiKeys.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-              {t('settings.apiKeys.noKeysYet')}
-            </Typography>
-          ) : (
-            <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t('settings.apiKeys.table.name')}</TableCell>
-                    <TableCell>{t('settings.apiKeys.table.key')}</TableCell>
-                    <TableCell>{t('settings.apiKeys.table.lastUsed')}</TableCell>
-                    <TableCell align="right">{t('settings.apiKeys.table.actions')}</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {apiKeys.map((key) => (
-                    <TableRow key={key.id}>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body2">{key.name}</Typography>
-                          <Chip 
-                            label={key.is_active ? t('adminUsers.status.active') : t('adminUsers.status.inactive')} 
-                            size="small" 
-                            color={key.is_active ? 'success' : 'default'}
-                            sx={{ height: 20, fontSize: '0.7rem' }}
-                          />
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {key.key_prefix}...
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {key.last_used 
-                            ? new Date(key.last_used).toLocaleDateString() 
-                            : t('adminUsers.values.never')}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Tooltip title={t('settings.apiKeys.deleteKeyTooltip')}>
-                          <IconButton 
-                            size="small" 
-                            color="error"
-                            onClick={() => setDeleteKeyId(key.id)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-
-          <Box sx={{ mt: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
-            <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 0.5 }}>
-              {t('settings.apiKeys.widgetConfig')}
-            </Typography>
-            <Typography 
-              variant="caption" 
-              component="pre"
-              sx={{ 
-                fontFamily: 'monospace', 
-                whiteSpace: 'pre-wrap',
-                m: 0,
-                fontSize: '0.7rem'
-              }}
-            >
-{`widget:
-  type: tubearchivist
-  url: ${window.location.origin}
-  key: YOUR_API_KEY_HERE
-  fields: ["downloads", "videos", "channels", "playlists"]`}
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+      <ApiKeysCard onSuccess={showSuccessFor} onError={setError} />
 
       {/* Playback Settings */}
       <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
@@ -679,12 +464,6 @@ export default function SettingsPage() {
               {t('settings.playback.title')}
             </Typography>
           </Box>
-
-          <FormControlLabel
-            control={<Switch defaultChecked size="small" />}
-            label={<Typography variant="body2">{t('settings.playback.autoplayLabel')}</Typography>}
-            sx={{ mb: 2, display: 'block' }}
-          />
 
           <FormControlLabel
             control={
@@ -794,6 +573,11 @@ export default function SettingsPage() {
 
           <Divider sx={{ my: 2 }} />
 
+          {/* Whether downloads can still sign in to YouTube */}
+          <Box sx={{ mb: 3 }}>
+            <CookieHealthNotice state={cookieHealth} showWhenFine />
+          </Box>
+
           {/* Download Audio Quality Section */}
           <Box sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -807,9 +591,11 @@ export default function SettingsPage() {
             </Typography>
             <FormControl size="small" sx={{ minWidth: 200, maxWidth: '100%' }}>
               <Select
-                value={settings.audio_quality || 'high'}
-                onChange={(e) => updateSetting('audio_quality', e.target.value as 'low' | 'medium' | 'high' | 'best')}
+                value={settings.audio_quality || 'original'}
+                onChange={(e) => updateSetting('audio_quality', e.target.value as AudioQuality)}
+                data-testid="download-quality"
               >
+                <MenuItem value="original">{t('settings.playback.audioQuality.original')}</MenuItem>
                 <MenuItem value="best">{t('settings.playback.audioQuality.flac')}</MenuItem>
                 <MenuItem value="high">{t('settings.playback.audioQuality.high')}</MenuItem>
                 <MenuItem value="medium">{t('settings.playback.audioQuality.medium')}</MenuItem>
@@ -948,54 +734,6 @@ export default function SettingsPage() {
               </Box>
             )}
           </Box>
-
-          <Divider sx={{ my: 2 }} />
-
-          <FormControlLabel
-            control={<Switch defaultChecked size="small" />}
-            label={<Typography variant="body2">{t('settings.playback.normalizeLabel')}</Typography>}
-            sx={{ display: 'block' }}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Download Quality */}
-      <Card sx={{ bgcolor: 'background.paper', mb: 1.5 }}>
-        <CardContent>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
-            {t('settings.downloadQuality.title')}
-          </Typography>
-
-          <FormControlLabel
-            control={<Switch defaultChecked size="small" />}
-            label={<Typography variant="body2">{t('settings.downloadQuality.bestQualityLabel')}</Typography>}
-            sx={{ display: 'block' }}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Lyrics Settings */}
-      <Card sx={{ bgcolor: 'background.paper' }}>
-        <CardContent>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
-            {t('settings.lyrics.title')}
-          </Typography>
-
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-            {t('settings.lyrics.description')}
-          </Typography>
-
-          <FormControlLabel
-            control={<Switch defaultChecked />}
-            label={t('settings.lyrics.autoFetchLabel')}
-            sx={{ mb: 2, display: 'block' }}
-          />
-
-          <FormControlLabel
-            control={<Switch defaultChecked />}
-            label={t('settings.lyrics.showInPlayerLabel')}
-            sx={{ display: 'block' }}
-          />
         </CardContent>
       </Card>
 
@@ -1143,87 +881,6 @@ export default function SettingsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Create API Key Dialog */}
-      <Dialog 
-        open={apiKeyDialogOpen} 
-        onClose={() => {
-          setApiKeyDialogOpen(false);
-          setNewApiKeyName('Widget API Key');
-        }}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{t('settings.apiKeys.createDialog.title')}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t('settings.apiKeys.createDialog.description')}
-          </Typography>
-          <TextField
-            autoFocus
-            label={t('settings.apiKeys.createDialog.keyNameLabel')}
-            fullWidth
-            value={newApiKeyName}
-            onChange={(e) => setNewApiKeyName(e.target.value)}
-            placeholder={t('settings.apiKeys.createDialog.keyNamePlaceholder')}
-            size="small"
-            sx={{ mb: 2 }}
-          />
-          <Alert severity="info" sx={{ mb: 1 }}>
-            {t('settings.apiKeys.createDialog.copyWarning')}
-          </Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setApiKeyDialogOpen(false)}>{t('common.cancel')}</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleCreateApiKey}
-            disabled={!newApiKeyName.trim()}
-          >
-            {t('settings.apiKeys.createDialog.createButton')}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete API Key Confirmation Dialog */}
-      <Dialog
-        open={deleteKeyId !== null}
-        onClose={() => setDeleteKeyId(null)}
-      >
-        <DialogTitle>{t('settings.apiKeys.deleteDialog.title')}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {t('settings.apiKeys.deleteDialog.description')}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteKeyId(null)}>{t('common.cancel')}</Button>
-          <Button 
-            variant="contained" 
-            color="error"
-            onClick={() => deleteKeyId && handleDeleteApiKey(deleteKeyId)}
-          >
-            {t('common.delete')}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Quick Sync Settings */}
-      <Card sx={{ bgcolor: 'background.paper', mb: 2 }}>
-        <Accordion defaultExpanded>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <SpeedIcon sx={{ mr: 1, color: 'primary.main' }} />
-              <Typography variant="h6">
-                {t('settings.quickSync.title')}
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <QuickSyncSettings />
-          </AccordionDetails>
-        </Accordion>
-      </Card>
 
       {/* Library Backup & Restore */}
       <BackupRestoreCard />

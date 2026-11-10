@@ -1,38 +1,34 @@
-import { Box, IconButton, Slider, Typography, Fade, CircularProgress, useMediaQuery, useTheme, Tooltip, Chip, Menu, MenuItem, ListItemIcon, ListItemText, Divider, Collapse, List, ListItemButton } from '@mui/material';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
-import SkipNextIcon from '@mui/icons-material/SkipNext';
-import ShuffleIcon from '@mui/icons-material/Shuffle';
-import RepeatIcon from '@mui/icons-material/Repeat';
-import RepeatOneIcon from '@mui/icons-material/RepeatOne';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import {
+  Box,
+  Typography,
+  Fade,
+  useMediaQuery,
+  useTheme,
+  Tooltip,
+  Chip,
+  ListItemText,
+  Collapse,
+  List,
+  ListItemButton,
+} from '@mui/material';
 import CachedIcon from '@mui/icons-material/Cached';
-import CloseIcon from '@mui/icons-material/Close';
-import MusicNoteIcon from '@mui/icons-material/MusicNote';
-import EditIcon from '@mui/icons-material/Edit';
-import DownloadIcon from '@mui/icons-material/Download';
-import RadioIcon from '@mui/icons-material/Radio';
-import BedtimeIcon from '@mui/icons-material/Bedtime';
 import QueueMusicIcon from '@mui/icons-material/QueueMusic';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import EqualizerIcon from '@mui/icons-material/Equalizer';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { Audio, Chapter } from '../types';
 import { useSettings } from '../context/SettingsContext';
-import { useRadio } from '../context/RadioContext';
 import { useSleepTimer } from '../context/SleepTimerContext';
-import { useEqualizer } from '../context/EqualizerContext';
 import { useAchievementNotification } from '../context/AchievementNotificationContext';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { useStreamUrl } from '../hooks/useStreamUrl';
-import { audioAPI, getCsrfToken } from '../api/client';
+import PlayerActionButtons from './player/PlayerActionButtons';
+import PlayerArtwork from './player/PlayerArtwork';
+import RelatedTracksOverlay from './player/RelatedTracksOverlay';
+import PlayerTransportControls from './player/PlayerTransportControls';
+import { usePlayerAudioGraph } from '../hooks/usePlayerAudioGraph';
+import { usePlaybackProgressSaving } from '../hooks/usePlaybackProgressSaving';
+import { usePlayerMediaSession } from '../hooks/usePlayerMediaSession';
+import { useTrackRating } from '../hooks/useTrackRating';
+import { audioAPI } from '../api/client';
 import { ListeningTracker } from '../utils/listeningTracker';
 import { recordListeningEvent } from '../utils/listeningOutbox';
 // Code-split: the visualizer (17 theme renderers) loads only when the player is shown.
@@ -50,18 +46,9 @@ import { useTranslation } from 'react-i18next';
 
 // Import LyricsPlayer directly instead of lazy to avoid offline loading issues
 import LyricsPlayer from './LyricsPlayer';
-const RelatedTracks = lazy(() => import('./RelatedTracks'));
-import {
-  setMediaMetadata,
-  setMediaActionHandlers,
-  setPlaybackState,
-  setPositionState,
-  clearMediaSession,
-} from '../utils/mediaSession';
-import { requestWakeLock, releaseWakeLock } from '../utils/wakeLock';
+import { setPlaybackState, setPositionState } from '../utils/mediaSession';
 
 // Below this position a track is treated as "not really started", so no progress is stored.
-const MINIMUM_SAVEABLE_POSITION_SECONDS = 10;
 
 interface PlayerProps {
   audio: Audio;
@@ -72,10 +59,13 @@ interface PlayerProps {
   onNext?: () => void;
   /** Moving on because the track finished, which is not a skip. Falls back to onNext. */
   onTrackEnded?: () => void;
+  /** The track cannot be played: its file failed to load, or no address for it could be found. */
+  onPlaybackError?: () => void;
   onPrevious?: () => void;
   hasNext?: boolean;
   hasPrevious?: boolean;
   onFavoriteToggle?: (audioId: number, isFavorite: boolean) => void;
+  onRatingChange?: (audioId: number, rating: number) => void;
   onTrackSelect?: (audio: Audio) => void;
   onTimeUpdate?: (time: number) => void;  // Callback for cross-device sync
   initialSeek?: number;  // Initial seek position for resuming playback
@@ -89,16 +79,25 @@ interface PlayerProps {
   onClearQueue?: () => void;
 }
 
-export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onTrackEnded, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onTrackSelect, onTimeUpdate, initialSeek, queue = [], currentQueueIndex = 0, onQueueReorder, onRemoveFromQueue, onPlayQueueTrack, onClearQueue }: PlayerProps) {
+export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMinimize, onNext, onTrackEnded, onPlaybackError, onPrevious, hasNext = false, hasPrevious = false, onFavoriteToggle, onRatingChange, onTrackSelect, onTimeUpdate, initialSeek, queue = [], currentQueueIndex = 0, onQueueReorder, onRemoveFromQueue, onPlayQueueTrack, onClearQueue }: PlayerProps) {
   const { t } = useTranslation();
-  const { settings, updateSetting, getExtraSetting } = useSettings();
-  const { isRadioMode: radioActive, stopRadio } = useRadio();
+  const { settings, updateSetting } = useSettings();
   const { timerState: sleepTimerState, getFadeVolume, shouldStop: shouldSleepStop, onSongEnded } = useSleepTimer();
-  const { enabled: eqEnabled, gains: eqGains } = useEqualizer();
   const { showAchievements } = useAchievementNotification();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { streamUrl, loadingStream, isCachedPlayback } = useStreamUrl(audio, settings.prefetch_enabled !== false);
+
+  // No address to play from (offline with nothing cached, or the server refused) is as much a
+  // failure as a file that will not load, and must not look like a player that is just idle.
+  // The callback is read through a ref so that a new function from the parent is not mistaken
+  // for a new failure.
+  const reportPlaybackError = useRef(onPlaybackError);
+  reportPlaybackError.current = onPlaybackError;
+  const hasNoStream = !loadingStream && !streamUrl;
+  useEffect(() => {
+    if (hasNoStream) reportPlaybackError.current?.();
+  }, [hasNoStream, audio.id]);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(settings.volume);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>(settings.repeat_mode);
@@ -112,35 +111,24 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   const [showSleepTimerDialog, setShowSleepTimerDialog] = useState(false);
   const [showQueueDrawer, setShowQueueDrawer] = useState(false);
   const [showEqualizerDialog, setShowEqualizerDialog] = useState(false);
-  const [trackActionsMenuAnchor, setTrackActionsMenuAnchor] = useState<HTMLElement | null>(null);
   const [showAddToPlaylistDialog, setShowAddToPlaylistDialog] = useState(false);
   const [currentAudioData, setCurrentAudioData] = useState<Audio>(audio);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isFavorite, setIsFavorite] = useState(audio.is_favorite || false);
-  const [imageLoadError, setImageLoadError] = useState(false);
-  const [lockScreenArtwork, setLockScreenArtwork] = useState('');
+  const { rating, rate } = useTrackRating(audio.youtube_id, currentAudioData.rating, (stars) => onRatingChange?.(audio.id, stars));
   const audioRef = useRef<HTMLAudioElement>(null);
   // Latest playback position without the re-render cost of state. Read this from
   // effects and callbacks that only need the value at the moment they run.
   const currentTimeRef = useRef(0);
   const playerContainerRef = useRef<HTMLDivElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const eqFiltersRef = useRef<BiquadFilterNode[]>([]);
-  const normGainRef = useRef<GainNode | null>(null);  // F9 loudness-normalization gain
-  const dataArrayRef = useRef<Uint8Array | null>(null);
   const isPlayingRef = useRef(isPlaying);
   const isSeeking = useRef(false);
   const currentAudioId = useRef(audio.id);
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [graphReady, setGraphReady] = useState(false);  // Web Audio graph built (F9)
   const listeningTracker = useRef(new ListeningTracker());
   const initialSeekApplied = useRef<boolean>(false);  // Track if initial seek was applied
   const advanceAfterEnd = onTrackEnded ?? onNext;
 
-  // EQ frequencies (10-band)
-  const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
   // Update currentAudioData when audio prop changes
   useEffect(() => {
@@ -258,7 +246,6 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
   if (currentAudioId.current !== audio.id) {
     currentAudioId.current = audio.id;
     setIsFavorite(audio.is_favorite || false);
-    setImageLoadError(false); // Reset image error state for new track
   }
 
   const showAchievementsRef = useRef(showAchievements);
@@ -289,205 +276,11 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     };
   }, [audio.id, audio.youtube_id, finishPlay]);
 
-  // Save playback progress for "Continue Listening" feature
-  // Saves position periodically and when pausing/changing tracks
-  // Only saves when online to reduce mobile data usage
-  const lastProgressSaveRef = useRef<number>(0);
-  const lastSavedPositionRef = useRef<number>(0);
-  
-  // The <audio> element is the source of truth while it is mounted; the ref covers unmount,
-  // when the element may already be detached. Seeks write the element but not the ref, so
-  // reading the element first keeps a save that lands after a seek from storing a stale spot.
-  const readPlaybackPosition = useCallback(
-    () => audioRef.current?.currentTime ?? currentTimeRef.current,
-    []
-  );
+  const saveProgress = usePlaybackProgressSaving({ audio, isPlaying, audioRef, currentTimeRef });
 
-  const saveProgress = useCallback(async (completed: boolean = false) => {
-    // Skip if offline - will sync when back online
-    if (!navigator.onLine) {
-      console.debug('[Player] Skipping progress save - offline');
-      return;
-    }
-    
-    if (!audio.youtube_id) return;
-    
-    const position = Math.floor(readPlaybackPosition());
-    // Only save if position has changed by at least 10 seconds (increased from 5s)
-    if (!completed && Math.abs(position - lastSavedPositionRef.current) < 10) return;
-    
-    try {
-      await audioAPI.updateProgress(audio.youtube_id, {
-        position,
-        completed,
-      });
-      lastSavedPositionRef.current = position;
-      lastProgressSaveRef.current = Date.now();
-    } catch (error) {
-      // Silently fail - progress save is best effort
-      console.debug('[Player] Progress save failed:', error);
-    }
-  }, [audio.youtube_id, readPlaybackPosition]);
-  
-  // Periodic progress save while playing
-  // Network-aware: only save when online and at reduced frequency
-  useEffect(() => {
-    if (!isPlaying || !audio.youtube_id) return;
-    
-    // Check every 30 seconds and save every 60 seconds (reduced frequency for mobile)
-    const interval = setInterval(() => {
-      if (navigator.onLine && Date.now() - lastProgressSaveRef.current > 60000) {
-        saveProgress(false);
-      }
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [isPlaying, audio.youtube_id, saveProgress]);
-  
-  // Save progress when pausing (only if online)
-  useEffect(() => {
-    if (!isPlaying && readPlaybackPosition() > MINIMUM_SAVEABLE_POSITION_SECONDS && audio.youtube_id && navigator.onLine) {
-      saveProgress(false);
-    }
-  }, [isPlaying, audio.youtube_id, saveProgress, readPlaybackPosition]);
-  
-  // Save progress when the track changes or the player unmounts (only if online).
-  // Deliberately does NOT depend on currentTime: a cleanup re-runs on every dependency
-  // change, so listing it here fired this request on every timeupdate event.
-  useEffect(() => {
-    return () => {
-      // Skip save if offline
-      if (!navigator.onLine) return;
-
-      // The element is ground truth while it is still attached; the ref covers unmount,
-      // when the element may already be gone.
-      const elapsedSeconds = audioRef.current?.currentTime ?? currentTimeRef.current;
-
-      if (elapsedSeconds > MINIMUM_SAVEABLE_POSITION_SECONDS && audio.youtube_id) {
-        // Raw fetch rather than the axios client: keepalive lets the request outlive the
-        // page, which is the whole point of saving here. That bypasses the client's
-        // interceptor, so the CSRF token has to be attached by hand.
-        fetch(`/api/audio/${audio.youtube_id}/progress/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken() || '',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ position: Math.floor(elapsedSeconds), completed: false }),
-          keepalive: true,
-        }).catch(() => {});
-      }
-    };
-  }, [audio.youtube_id]);
-
-
-  // The OS fetches lock-screen artwork without our session cookie, so a server track's artwork
-  // needs the short-lived ticketed address. Imported local files carry their own image.
-  useEffect(() => {
-    setLockScreenArtwork('');
-    if (!audio.youtube_id) return undefined;
-
-    let cancelled = false;
-    audioAPI
-      .getPlayer(audio.youtube_id)
-      .then((response) => {
-        if (!cancelled) setLockScreenArtwork(response.data.artwork_ticket_url ?? '');
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [audio.youtube_id]);
-
-  // Initialize Media Session API with artwork
-  useEffect(() => {
-    const artworkUrl = audio.youtube_id ? lockScreenArtwork : audio.cover_art_url || audio.thumbnail_url;
-    
-    // Function to set metadata with artwork
-    const updateMediaSession = (artworkArray?: Array<{src: string; sizes: string; type: string}>) => {
-      setMediaMetadata({
-        title: audio.title,
-        artist: audio.artist || audio.channel_name || t('player.unknownArtist'),
-        album: audio.album,
-        artwork: artworkArray,
-      });
-    };
-
-    if (artworkUrl) {
-      updateMediaSession([
-        { src: artworkUrl, sizes: '96x96', type: 'image/jpeg' },
-        { src: artworkUrl, sizes: '128x128', type: 'image/jpeg' },
-        { src: artworkUrl, sizes: '256x256', type: 'image/jpeg' },
-        { src: artworkUrl, sizes: '512x512', type: 'image/jpeg' },
-      ]);
-    } else {
-      updateMediaSession(undefined);
-    }
-
-    // Set action handlers
-    setMediaActionHandlers({
-      play: () => {
-        if (!isPlayingRef.current) {
-          setIsPlaying(true);
-        }
-      },
-      pause: () => {
-        if (isPlayingRef.current) {
-          setIsPlaying(false);
-        }
-      },
-      previoustrack: () => {
-        if (hasPrevious && onPrevious) {
-          onPrevious();
-        }
-      },
-      nexttrack: () => {
-        if (hasNext && onNext) {
-          onNext();
-        }
-      },
-      seekbackward: (details) => {
-        if (audioRef.current) {
-          isSeeking.current = true;
-          const seekAmount = details?.seekOffset || settings.seek_duration || 3;
-          audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - seekAmount);
-          setCurrentTime(audioRef.current.currentTime);
-          setTimeout(() => {
-            isSeeking.current = false;
-          }, 100);
-        }
-      },
-      seekforward: (details) => {
-        if (audioRef.current) {
-          isSeeking.current = true;
-          const seekAmount = details?.seekOffset || settings.seek_duration || 3;
-          audioRef.current.currentTime = Math.min(
-            audio.duration,
-            audioRef.current.currentTime + seekAmount
-          );
-          setCurrentTime(audioRef.current.currentTime);
-          setTimeout(() => {
-            isSeeking.current = false;
-          }, 100);
-        }
-      },
-      seekto: (details) => {
-        if (audioRef.current && details.seekTime !== undefined) {
-          isSeeking.current = true;
-          audioRef.current.currentTime = details.seekTime;
-          setTimeout(() => {
-            isSeeking.current = false;
-          }, 100);
-        }
-      },
-    });
-
-    // Cleanup on unmount
-    return () => {
-      clearMediaSession();
-    };
-  }, [audio, lockScreenArtwork, hasNext, hasPrevious, onNext, onPrevious, setIsPlaying, settings.seek_duration]);
+  usePlayerMediaSession({
+    audio, audioRef, isSeeking, isPlayingRef, setCurrentTime, setIsPlaying, hasNext, hasPrevious, onNext, onPrevious,
+  });
 
   useEffect(() => {
     if (audioRef.current) {
@@ -519,240 +312,9 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
     }
   }, [shouldSleepStop, setIsPlaying]);
 
-  // iOS Audio Context resume - Safari requires user interaction to start AudioContext
-  useEffect(() => {
-    const resumeAudioContext = () => {
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        if (import.meta.env.DEV) console.log('[Player] Resuming suspended AudioContext (iOS)');
-        audioContextRef.current.resume().catch(console.error);
-      }
-    };
-    
-    // Resume on user interaction
-    const events = ['touchstart', 'touchend', 'click', 'keydown'];
-    events.forEach(event => {
-      document.addEventListener(event, resumeAudioContext, { once: true, passive: true });
-    });
-    
-    return () => {
-      events.forEach(event => {
-        document.removeEventListener(event, resumeAudioContext);
-      });
-    };
-  }, []);
-
-  // Wake Lock — only while it is actually needed.
-  //
-  // Audio routed through Web Audio is suspended by the browser when the page is hidden, so a
-  // graph means the screen has to stay awake. Plain <audio> playback uses the OS media path and
-  // keeps going with the screen off, so holding the lock there just burns the display and GPU
-  // for the whole session.
-  //
-  // Gated on graphReady (a graph EXISTS) rather than wantsAudioGraph (the user wants one): after
-  // Step 5's lazy build those diverge when the visualizer is switched off mid-session, and the
-  // graph outlives the setting. Releasing the lock while the graph is live would stop playback
-  // as soon as the screen slept.
-  const keepScreenOn = getExtraSetting('keep_screen_on', false) === true;
-
-  useEffect(() => {
-    if (isPlaying && !loadingStream && (graphReady || keepScreenOn)) {
-      // Request wake lock when playing
-      requestWakeLock().catch(() => {
-        // Wake lock request can fail on some devices, but audio will still play
-        // (just might stop if screen turns off)
-      });
-    } else {
-      // Release wake lock when not needed
-      releaseWakeLock();
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      releaseWakeLock();
-    };
-  }, [isPlaying, loadingStream, graphReady, keepScreenOn]);
-
-  // Only the visualizer and the equalizer need the Web Audio graph. Routing audio through
-  // createMediaElementSource takes it off the platform's native media path — which costs
-  // continuous DSP (ten biquads, an analyser) and makes the browser suspend playback when the
-  // page is hidden. With both features off we never build it, and the <audio> element keeps
-  // using the OS pipeline.
-  //
-  // Built lazily rather than torn down on toggle: createMediaElementSource can only be called
-  // once per element and a connected element can never return to native output, so "off" after
-  // "on" would require remounting <audio> — an audible gap mid-track, and a rebuild hazard.
-  // Enabling either feature builds the graph at that moment; disabling it leaves the graph in
-  // place until the player is closed, and the next session starts native again.
-  const wantsAudioGraph = settings.visualizer_enabled || eqEnabled;
-
-  // Initialize Web Audio API for visualizer and EQ - optimized for performance
-  useEffect(() => {
-    if (!audioRef.current || !streamUrl || !wantsAudioGraph) return;
-    let cancelled = false;
-
-    // Create audio context, EQ filters, and analyser - deferred to avoid blocking
-    if (!audioContextRef.current) {
-      // Use requestIdleCallback or setTimeout to avoid blocking track start
-      const initAudioChain = () => {
-        if (cancelled || !audioRef.current) return; // don't build a graph after unmount
-        try {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current!);
-          
-          // Create 10-band EQ filters - all start at 0 gain (pass-through)
-          eqFiltersRef.current = EQ_FREQUENCIES.map((freq) => {
-            const filter = audioContextRef.current!.createBiquadFilter();
-            filter.type = 'peaking';
-            filter.frequency.value = freq;
-            filter.Q.value = 1.4; // Standard Q for 10-band EQ
-            filter.gain.value = 0; // Pass-through until EQ is enabled
-            return filter;
-          });
-          
-          // Create analyser for visualizer - optimized settings
-          analyserRef.current = audioContextRef.current.createAnalyser();
-          analyserRef.current.fftSize = 64; // 32 frequency bins (minimal for visualization)
-          analyserRef.current.smoothingTimeConstant = 0.85; // Slightly more smoothing = less CPU
-          analyserRef.current.minDecibels = -90;
-          analyserRef.current.maxDecibels = -10;
-          
-          // Connect chain: source -> EQ filters -> analyser -> destination
-          let lastNode: AudioNode = sourceNodeRef.current;
-          
-          // Connect EQ filters in series
-          eqFiltersRef.current.forEach((filter) => {
-            lastNode.connect(filter);
-            lastNode = filter;
-          });
-          
-          // Normalization gain (F9): make-up gain toward the target LUFS. Unity (1.0) by
-          // default; the effect below sets it from the track's measured loudness + the
-          // user's setting. Inserted between the EQ chain and the analyser so the
-          // visualizer reflects the normalized level.
-          normGainRef.current = audioContextRef.current.createGain();
-          normGainRef.current.gain.value = 1;
-          lastNode.connect(normGainRef.current);
-          lastNode = normGainRef.current;
-
-          // Connect to analyser and then to destination
-          lastNode.connect(analyserRef.current);
-          analyserRef.current.connect(audioContextRef.current.destination);
-
-          dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
-          setGraphReady(true);
-          if (import.meta.env.DEV) console.log('[Player] Audio chain initialized (optimized)');
-        } catch (error) {
-          console.error('Web Audio API not supported:', error);
-        }
-      };
-
-      // Defer initialization slightly to not block audio playback start. The
-      // `cancelled` guard stops a pending idle callback from building a graph on a
-      // detached element after the Player unmounts.
-      if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(initAudioChain, { timeout: 100 });
-      } else {
-        setTimeout(initAudioChain, 0);
-      }
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [streamUrl, wantsAudioGraph]);
-
-  // Read the latest 16 visualizer bars straight from the analyser. Passed to
-  // <AudioVisualizer>, which calls it inside its own canvas RAF — so the Player no
-  // longer pushes state ~60x/second (which forced a full re-render of this component).
-  const getBars = useCallback((): number[] => {
-    const analyser = analyserRef.current;
-    const arr = dataArrayRef.current;
-    if (!analyser || !arr) return Array(16).fill(0);
-    analyser.getByteFrequencyData(arr as any);
-    const bars: number[] = [];
-    const step = Math.floor(arr.length / 16) || 1;
-    for (let i = 0; i < 16; i++) {
-      const index = Math.min(i * step, arr.length - 1);
-      const value = arr[index] / 255;
-      const boost = i < 8 ? 1.3 : 1.0; // boost bass/mid
-      bars.push(Math.min(value * boost, 1));
-    }
-    return bars;
-  }, []);
-
-  // Drive the background glow via a CSS variable (no React re-render). The visualizer
-  // calls this each frame with the current peak (0–1).
-  const handleVizIntensity = useCallback((value: number) => {
-    playerContainerRef.current?.style.setProperty('--sw-viz-intensity', value.toFixed(3));
-  }, []);
-
-  // Reset the glow when the visualizer is turned off so it doesn't freeze mid-glow.
-  useEffect(() => {
-    if (!settings.visualizer_enabled) {
-      playerContainerRef.current?.style.setProperty('--sw-viz-intensity', '0');
-    }
-  }, [settings.visualizer_enabled]);
-
-  // Loudness normalization make-up gain (F9). Recomputes when the track, its measured
-  // loudness, the normalization setting, or graph readiness changes. Off (or unmeasured)
-  // => unity gain (bit-identical to no normalization).
-  useEffect(() => {
-    const g = normGainRef.current;
-    const ctx = audioContextRef.current;
-    if (!g) return;
-    const norm = getExtraSetting('normalization', { enabled: false, targetLufs: -14 }) || {};
-    let linear = 1;
-    if (norm.enabled && typeof audio.loudness_lufs === 'number') {
-      const target = typeof norm.targetLufs === 'number' ? norm.targetLufs : -14;
-      const dB = Math.max(-12, Math.min(12, target - audio.loudness_lufs));
-      linear = Math.pow(10, dB / 20);
-    }
-    try {
-      if (ctx) g.gain.setTargetAtTime(linear, ctx.currentTime, 0.05);  // smooth, click-free
-      else g.gain.value = linear;
-    } catch {
-      g.gain.value = linear;
-    }
-  }, [audio.id, audio.loudness_lufs, settings.extra_settings, graphReady, getExtraSetting]);
-
-  // Tear down the Web Audio graph on unmount — the effect above intentionally never
-  // closes it (the graph persists across track changes). Without this, every Player
-  // remount (breakpoint flip, stop, StrictMode) leaks an AudioContext + nodes, and
-  // browsers cap ~6 contexts before throwing.
-  useEffect(() => {
-    return () => {
-      eqFiltersRef.current.forEach((f) => {
-        try { f.disconnect(); } catch { /* already disconnected */ }
-      });
-      try { normGainRef.current?.disconnect(); } catch { /* noop */ }
-      try { analyserRef.current?.disconnect(); } catch { /* noop */ }
-      try { sourceNodeRef.current?.disconnect(); } catch { /* noop */ }
-      const ctx = audioContextRef.current;
-      if (ctx && ctx.state !== 'closed') {
-        ctx.close().catch(() => { /* already closing */ });
-      }
-      audioContextRef.current = null;
-      sourceNodeRef.current = null;
-      analyserRef.current = null;
-      normGainRef.current = null;
-      eqFiltersRef.current = [];
-      dataArrayRef.current = null;
-    };
-  }, []);
-
-  // Apply EQ gains when they change - optimized to set all gains at once
-  useEffect(() => {
-    if (eqFiltersRef.current.length > 0) {
-      // Batch update all filter gains - more efficient than individual updates
-      const targetGains = eqEnabled ? eqGains : Array(10).fill(0);
-      eqFiltersRef.current.forEach((filter, index) => {
-        // Only update if value actually changed
-        if (filter.gain.value !== targetGains[index]) {
-          filter.gain.value = targetGains[index];
-        }
-      });
-    }
-  }, [eqGains, eqEnabled]);
+  const { getBars, handleVizIntensity } = usePlayerAudioGraph({
+    audioRef, playerContainerRef, audio, streamUrl, loadingStream, isPlaying,
+  });
 
   // Handlers for settings changes with debouncing
   const handleVolumeChange = useCallback((_: Event, value: number | number[]) => {
@@ -1177,11 +739,7 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
                 setIsPlaying(false);
               }
             }}
-            onError={(e) => {
-              console.error('Audio playback error:', e);
-              console.error('Stream URL:', streamUrl);
-              console.error('Audio element:', audioRef.current);
-            }}
+            onError={() => onPlaybackError?.()}
           />
         ) : (
           <audio ref={audioRef} />
@@ -1192,134 +750,13 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
 
         {/* Middle: Album Art & Song Info */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4 }}>
-          {(audio.cover_art_url || audio.thumbnail_url) && !imageLoadError ? (
-            <Box
-              onClick={() => audio.youtube_id && setShowLyrics(!showLyrics)}
-              sx={{
-                width: 200,
-                height: 200,
-                borderRadius: 3,
-                bgcolor: 'background.paper',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                mb: 3,
-                boxShadow: isPlaying 
-                  ? '0 8px 32px rgba(19, 236, 106, 0.4), 0 0 60px rgba(19, 236, 106, 0.2)'
-                  : (theme) => theme.palette.mode === 'dark' 
-                    ? '0 8px 32px rgba(0, 0, 0, 0.4)'
-                    : '0 8px 24px rgba(0, 0, 0, 0.1)',
-                cursor: audio.youtube_id ? 'pointer' : 'default',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                '&:hover': audio.youtube_id ? {
-                  transform: 'scale(1.05) rotate(2deg)',
-                  boxShadow: (theme) => theme.palette.mode === 'dark'
-                    ? '0 12px 40px rgba(19, 236, 106, 0.5)'
-                    : `0 12px 40px ${theme.palette.primary.main}40`,
-                } : {},
-                '&::after': isBuffering ? {
-                  content: '""',
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'rgba(0, 0, 0, 0.5)',
-                  borderRadius: 3,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                } : {},
-                // Compositor-only pulse: both shadows are painted once and only this layer's
-                // opacity animates. Animating box-shadow itself repainted a large blurred
-                // region every frame.
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  inset: 0,
-                  borderRadius: 'inherit',
-                  boxShadow: '0 8px 32px rgba(19, 236, 106, 0.6), 0 0 80px rgba(19, 236, 106, 0.4)',
-                  opacity: 0,
-                  animation: isPlaying ? 'album-glow 2s ease-in-out infinite' : 'none',
-                  pointerEvents: 'none',
-                },
-                '@keyframes album-glow': {
-                  '0%, 100%': { opacity: 0 },
-                  '50%': { opacity: 1 },
-                },
-              }}
-              title={audio.youtube_id ? t('player.toggleLyrics') : t('player.lyricsNotAvailableLocal')}
-            >
-              {/* Hidden img to detect load errors */}
-              <img 
-                src={audio.cover_art_url || audio.thumbnail_url}
-                alt=""
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'cover',
-                  position: 'absolute',
-                  inset: 0,
-                  // The parent dropped overflow:hidden (it clipped the glow), so the artwork
-                  // rounds its own corners to match.
-                  borderRadius: 'inherit',
-                }}
-                onError={() => setImageLoadError(true)}
-              />
-              {isBuffering && (
-                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-                  <CircularProgress size={48} sx={{ color: 'primary.main' }} />
-                </Box>
-              )}
-            </Box>
-          ) : (
-            /* Fallback album art - show music icon */
-            <Box
-              onClick={() => audio.youtube_id && setShowLyrics(!showLyrics)}
-              sx={{
-                width: 200,
-                height: 200,
-                borderRadius: 3,
-                mb: 3,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: 'rgba(19, 236, 106, 0.1)',
-                border: '2px solid',
-                borderColor: 'primary.main',
-                cursor: audio.youtube_id ? 'pointer' : 'default',
-                boxShadow: isPlaying 
-                  ? '0 8px 32px rgba(19, 236, 106, 0.4), 0 0 60px rgba(19, 236, 106, 0.2)'
-                  : '0 8px 32px rgba(0, 0, 0, 0.4)',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                '&:hover': audio.youtube_id ? {
-                  transform: 'scale(1.05)',
-                  bgcolor: 'rgba(19, 236, 106, 0.2)',
-                } : {},
-                // Compositor-only pulse: both shadows are painted once and only this layer's
-                // opacity animates. Animating box-shadow itself repainted a large blurred
-                // region every frame.
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  inset: 0,
-                  borderRadius: 'inherit',
-                  boxShadow: '0 8px 32px rgba(19, 236, 106, 0.6), 0 0 80px rgba(19, 236, 106, 0.4)',
-                  opacity: 0,
-                  animation: isPlaying ? 'album-glow 2s ease-in-out infinite' : 'none',
-                  pointerEvents: 'none',
-                },
-                '@keyframes album-glow': {
-                  '0%, 100%': { opacity: 0 },
-                  '50%': { opacity: 1 },
-                },
-              }}
-              title={audio.youtube_id ? t('player.toggleLyrics') : t('player.lyricsNotAvailableLocal')}
-            >
-              <MusicNoteIcon sx={{ fontSize: 80, color: 'primary.main', opacity: 0.7 }} />
-            </Box>
-          )}
+          <PlayerArtwork
+            key={audio.id}
+            audio={audio}
+            isPlaying={isPlaying}
+            isBuffering={isBuffering}
+            onToggleLyrics={() => audio.youtube_id && setShowLyrics(!showLyrics)}
+          />
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5, textAlign: 'center', px: 2, color: 'text.primary' }}>
             {audio.title}
           </Typography>
@@ -1347,209 +784,23 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               </Tooltip>
             )}
           </Box>
-          {/* Track Actions & Related Tracks & Metadata Buttons */}
-          <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-            {onMinimize && (
-              <Tooltip title={t('player.a11y.minimize')}>
-                <IconButton onClick={onMinimize} data-testid="player-minimize" aria-label={t('player.a11y.minimize')} sx={{ color: 'text.secondary' }}>
-                  <ExpandMoreIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-            <Tooltip title={t('player.trackOptions')}>
-              <IconButton
-                onClick={(e) => setTrackActionsMenuAnchor(e.currentTarget)}
-                sx={{
-                  color: 'text.secondary',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    color: 'primary.main',
-                  },
-                }}
-              >
-                <MoreVertIcon />
-              </IconButton>
-            </Tooltip>
-            {/* Track Actions Menu */}
-            <Menu
-              anchorEl={trackActionsMenuAnchor}
-              open={Boolean(trackActionsMenuAnchor)}
-              onClose={() => setTrackActionsMenuAnchor(null)}
-            >
-              <MenuItem onClick={() => { setShowAddToPlaylistDialog(true); setTrackActionsMenuAnchor(null); }}>
-                <ListItemIcon>
-                  <PlaylistAddIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>{t('player.addToPlaylist')}</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { handleFavoriteToggle(); setTrackActionsMenuAnchor(null); }}>
-                <ListItemIcon>
-                  {isFavorite ? <FavoriteIcon fontSize="small" sx={{ color: 'error.main' }} /> : <FavoriteBorderIcon fontSize="small" />}
-                </ListItemIcon>
-                <ListItemText>{isFavorite ? t('player.removeFromFavorites') : t('player.addToFavorites')}</ListItemText>
-              </MenuItem>
-              {audio.youtube_id && (
-                <>
-                  <Divider />
-                  <MenuItem onClick={() => { setShowDownloadDialog(true); setTrackActionsMenuAnchor(null); }}>
-                    <ListItemIcon>
-                      <DownloadIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>{t('player.exportTrack')}</ListItemText>
-                  </MenuItem>
-                  <MenuItem onClick={() => { setShowMetadataEditor(true); setTrackActionsMenuAnchor(null); }}>
-                    <ListItemIcon>
-                      <EditIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>{t('player.editMetadata')}</ListItemText>
-                  </MenuItem>
-                </>
-              )}
-            </Menu>
-            {audio.youtube_id && onTrackSelect && (
-              <Tooltip title={t('player.relatedTracks')}>
-                <IconButton
-                  onClick={() => setShowRelatedTracks(!showRelatedTracks)}
-                  sx={{
-                    color: showRelatedTracks ? 'primary.main' : 'text.secondary',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'scale(1.1)',
-                      color: 'primary.main',
-                    },
-                  }}
-                >
-                  <AutoAwesomeIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-            {audio.youtube_id && !radioActive && (
-              <Tooltip title={t('player.startRadio')}>
-                <IconButton
-                  data-testid="player-start-radio"
-                  onClick={(e) => setRadioMenuAnchor(e.currentTarget)}
-                  sx={{
-                    color: 'text.secondary',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'scale(1.1)',
-                      color: 'secondary.main',
-                    },
-                  }}
-                >
-                  <RadioIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-            {radioActive && (
-              <Tooltip title={t('player.stopRadio')}>
-                <Chip
-                  icon={<RadioIcon sx={{ fontSize: 16 }} />}
-                  label={t('player.radio')}
-                  size="small"
-                  color="secondary"
-                  onClick={() => stopRadio()}
-                  sx={{
-                    cursor: 'pointer',
-                    animation: 'pulse 2s ease-in-out infinite',
-                    '@keyframes pulse': {
-                      '0%, 100%': { opacity: 1 },
-                      '50%': { opacity: 0.7 },
-                    },
-                    '&:hover': {
-                      opacity: 0.8,
-                    },
-                  }}
-                />
-              </Tooltip>
-            )}
-            {/* Sleep Timer Button */}
-            <Tooltip title={sleepTimerState.isActive ? t('player.sleepTimerActive') : t('player.sleepTimer')}>
-              <IconButton
-                onClick={() => setShowSleepTimerDialog(true)}
-                sx={{
-                  color: sleepTimerState.isActive ? 'warning.main' : 'text.secondary',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    color: 'warning.main',
-                  },
-                }}
-              >
-                <BedtimeIcon />
-                {sleepTimerState.isActive && (
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 4,
-                      right: 4,
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      bgcolor: 'warning.main',
-                      animation: 'pulse 2s ease-in-out infinite',
-                    }}
-                  />
-                )}
-              </IconButton>
-            </Tooltip>
-            {/* Queue Button */}
-            <Tooltip title={t('player.queueCount', { count: queue.length })}>
-              <IconButton
-                onClick={() => setShowQueueDrawer(true)}
-                sx={{
-                  color: queue.length > 1 ? 'primary.main' : 'text.secondary',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    color: 'primary.main',
-                  },
-                }}
-              >
-                <QueueMusicIcon />
-                {queue.length > 1 && (
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 2,
-                      right: 2,
-                      minWidth: 16,
-                      height: 16,
-                      borderRadius: '50%',
-                      bgcolor: 'primary.main',
-                      color: 'primary.contrastText',
-                      fontSize: 10,
-                      fontWeight: 'bold',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {queue.length > 99 ? '99+' : queue.length}
-                  </Box>
-                )}
-              </IconButton>
-            </Tooltip>
-            {/* Equalizer Button */}
-            <Tooltip title={eqEnabled ? t('player.equalizerOn') : t('player.equalizer')}>
-              <IconButton
-                onClick={() => setShowEqualizerDialog(true)}
-                sx={{
-                  color: eqEnabled ? 'secondary.main' : 'text.secondary',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    color: 'secondary.main',
-                  },
-                }}
-              >
-                <EqualizerIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
+          <PlayerActionButtons
+            audio={audio}
+            isFavorite={isFavorite}
+            relatedTracksAvailable={Boolean(onTrackSelect)}
+            showRelatedTracks={showRelatedTracks}
+            queueLength={queue.length}
+            onMinimize={onMinimize}
+            onFavoriteToggle={handleFavoriteToggle}
+            onToggleRelatedTracks={() => setShowRelatedTracks(!showRelatedTracks)}
+            onAddToPlaylist={() => setShowAddToPlaylistDialog(true)}
+            onExport={() => setShowDownloadDialog(true)}
+            onEditMetadata={() => setShowMetadataEditor(true)}
+            onOpenRadioMenu={setRadioMenuAnchor}
+            onOpenSleepTimer={() => setShowSleepTimerDialog(true)}
+            onOpenQueue={() => setShowQueueDrawer(true)}
+            onOpenEqualizer={() => setShowEqualizerDialog(true)}
+          />
         </Box>
 
         {/* Bottom: Player Controls */}
@@ -1598,264 +849,35 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
             </Box>
           )}
 
-          {/* Buttons */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
-            <Box sx={{ position: 'relative' }}>
-              <IconButton
-                size="small"
-                onClick={handleShuffleToggle}
-                aria-label={t('player.a11y.shuffle')}
-                aria-pressed={shuffleEnabled}
-                sx={{
-                  color: shuffleEnabled ? 'primary.main' : 'text.secondary',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { 
-                    color: 'primary.main',
-                    transform: 'scale(1.1)',
-                  },
-                  '&:active': {
-                    transform: 'scale(0.95)',
-                  },
-                }}
-              >
-                <ShuffleIcon />
-              </IconButton>
-              {shuffleEnabled && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    bottom: 8,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 4,
-                    height: 4,
-                    borderRadius: '50%',
-                    bgcolor: 'primary.main',
-                    boxShadow: '0 0 4px rgba(19, 236, 106, 0.8)',
-                  }}
-                />
-              )}
-            </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <IconButton
-                onClick={onPrevious}
-                aria-label={t('player.a11y.previous')}
-                disabled={!hasPrevious}
-                sx={{
-                  color: 'text.primary',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { 
-                    color: 'primary.main',
-                    transform: 'scale(1.1)',
-                  },
-                  '&:active': {
-                    transform: 'scale(0.95)',
-                  },
-                  '&:disabled': { color: 'text.disabled' },
-                }}
-              >
-                <SkipPreviousIcon sx={{ fontSize: 30 }} />
-              </IconButton>
-              <IconButton
-                onClick={() => setIsPlaying(!isPlaying)}
-                aria-label={isPlaying ? t('player.a11y.pause') : t('player.a11y.play')}
-                disabled={loadingStream}
-                data-testid="player-playpause"
-                data-playing={isPlaying ? 'true' : 'false'}
-                sx={{
-                  width: 64,
-                  height: 64,
-                  bgcolor: 'primary.main',
-                  color: 'background.dark',
-                  boxShadow: '0 0 20px rgba(19, 236, 106, 0.4)',
-                  '&:hover': {
-                    bgcolor: 'primary.main',
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 0 30px rgba(19, 236, 106, 0.6)',
-                  },
-                  '&:active': {
-                    transform: 'scale(0.95)',
-                  },
-                  '&:disabled': {
-                    bgcolor: 'rgba(19, 236, 106, 0.3)',
-                    color: 'rgba(0, 0, 0, 0.3)',
-                  },
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {loadingStream ? (
-                  <CircularProgress size={28} sx={{ color: 'background.dark' }} />
-                ) : isPlaying ? (
-                  <PauseIcon sx={{ fontSize: 36 }} />
-                ) : (
-                  <PlayArrowIcon sx={{ fontSize: 36 }} />
-                )}
-              </IconButton>
-              <IconButton
-                data-testid="player-next"
-                onClick={onNext}
-                aria-label={t('player.a11y.next')}
-                disabled={!hasNext}
-                sx={{
-                  color: 'text.primary',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { 
-                    color: 'primary.main',
-                    transform: 'scale(1.1)',
-                  },
-                  '&:active': {
-                    transform: 'scale(0.95)',
-                  },
-                  '&:disabled': { color: 'text.disabled' },
-                }}
-              >
-                <SkipNextIcon sx={{ fontSize: 30 }} />
-              </IconButton>
-            </Box>
-
-            <Box sx={{ position: 'relative' }}>
-              <IconButton
-                size="small"
-                onClick={handleRepeatToggle}
-                aria-label={t(`player.a11y.repeat.${repeatMode}`)}
-                sx={{
-                  color: repeatMode !== 'none' ? 'primary.main' : 'text.secondary',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { 
-                    color: 'primary.main',
-                    transform: 'scale(1.1)',
-                  },
-                  '&:active': {
-                    transform: 'scale(0.95)',
-                  },
-                }}
-              >
-                {repeatMode === 'one' ? <RepeatOneIcon /> : <RepeatIcon />}
-              </IconButton>
-              {repeatMode !== 'none' && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    bottom: 8,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 4,
-                    height: 4,
-                    borderRadius: '50%',
-                    bgcolor: 'primary.main',
-                    boxShadow: '0 0 4px rgba(19, 236, 106, 0.8)',
-                  }}
-                />
-              )}
-            </Box>
-          </Box>
-
-          {/* Volume Mini */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mt: 1 }}>
-            <IconButton 
-              onClick={toggleMute} 
-              aria-label={isMuted ? t('player.a11y.unmute') : t('player.a11y.mute')}
-              aria-pressed={isMuted}
-              size="small" 
-              sx={{ 
-                color: isMuted ? 'text.disabled' : 'primary.main',
-                transition: 'color 0.2s ease',
-                '&:hover': {
-                  color: 'primary.main',
-                }
-              }}
-            >
-              {isMuted || volume === 0 ? <VolumeOffIcon sx={{ fontSize: 20 }} /> : <VolumeUpIcon sx={{ fontSize: 20 }} />}
-            </IconButton>
-            <Box sx={{ width: 120 }}>
-              <Slider
-                value={isMuted ? 0 : volume}
-                onChange={handleVolumeChange}
-                aria-label={t('player.a11y.volume')}
-                min={0}
-                max={100}
-                size="small"
-                sx={{
-                  color: 'primary.main',
-                  '& .MuiSlider-thumb': { 
-                    width: 10, 
-                    height: 10,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      boxShadow: '0 0 0 8px rgba(19, 236, 106, 0.16)',
-                    }
-                  },
-                  '& .MuiSlider-track': { border: 'none', height: 3 },
-                  '& .MuiSlider-rail': { 
-                    opacity: 0.3,
-                    height: 3,
-                  },
-                }}
-              />
-            </Box>
-            <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 32, textAlign: 'right', fontWeight: 500 }}>
-              {Math.round(isMuted ? 0 : volume)}%
-            </Typography>
-          </Box>
+          <PlayerTransportControls
+            isPlaying={isPlaying}
+            loadingStream={loadingStream}
+            hasNext={hasNext}
+            hasPrevious={hasPrevious}
+            shuffleEnabled={shuffleEnabled}
+            repeatMode={repeatMode}
+            isMuted={isMuted}
+            volume={volume}
+            onPlayPause={() => setIsPlaying(!isPlaying)}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            onShuffleToggle={handleShuffleToggle}
+            onRepeatToggle={handleRepeatToggle}
+            onToggleMute={toggleMute}
+            onVolumeChange={handleVolumeChange}
+          />
 
         </Box>
       </Box>
 
       {/* Related Tracks Overlay */}
       {showRelatedTracks && audio.youtube_id && onTrackSelect && (
-        <Suspense fallback={
-          <Box sx={{ 
-            position: 'absolute', 
-            inset: 0, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            bgcolor: 'rgba(0, 0, 0, 0.95)',
-            zIndex: 20,
-          }}>
-            <CircularProgress size={60} sx={{ color: 'primary.main' }} />
-          </Box>
-        }>
-          <Fade in={showRelatedTracks}>
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                // No backdropFilter: at this opacity the blur is invisible, but it would be
-                // recomputed every frame because the visualizer behind it repaints continuously.
-                bgcolor: (theme) => theme.palette.mode === 'dark' 
-                  ? 'rgba(0, 0, 0, 0.95)' 
-                  : 'rgba(255, 255, 255, 0.98)',
-                zIndex: 20,
-                overflow: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <AutoAwesomeIcon sx={{ color: 'primary.main' }} />
-                  {t('player.relatedTracks')}
-                </Typography>
-                <IconButton aria-label={t('common.close')} onClick={() => setShowRelatedTracks(false)} size="small">
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-              <Box sx={{ flex: 1, overflow: 'auto', p: 1 }}>
-                <RelatedTracks
-                  currentAudio={audio}
-                  onTrackSelect={(track) => {
-                    setShowRelatedTracks(false);
-                    onTrackSelect(track);
-                  }}
-                  onFavoriteToggle={onFavoriteToggle ? (track) => onFavoriteToggle(track.id, !track.is_favorite) : undefined}
-                  compact={true}
-                />
-              </Box>
-            </Box>
-          </Fade>
-        </Suspense>
+        <RelatedTracksOverlay
+          audio={audio}
+          onClose={() => setShowRelatedTracks(false)}
+          onTrackSelect={onTrackSelect}
+          onFavoriteToggle={onFavoriteToggle}
+        />
       )}
 
       {/* Lyrics Overlay */}
@@ -1884,6 +906,8 @@ export default function Player({ audio, isPlaying, setIsPlaying, onClose, onMini
               viewCount={currentAudioData.view_count}
               likeCount={currentAudioData.like_count}
               publishedDate={currentAudioData.published_date}
+              rating={rating}
+              onRate={rate}
               onSeek={handleLyricsSeek}
             />
           </Box>

@@ -19,7 +19,6 @@ HEARTBEAT_STALE_SECONDS = 3 * HEARTBEAT_INTERVAL_SECONDS
 HEARTBEAT_LIFETIME_SECONDS = 24 * 60 * 60
 CHECK_TIMEOUT_SECONDS = 2
 WORKER_PING_TIMEOUT_SECONDS = 1
-CELERY_QUEUE_NAME = 'celery'
 REDIS_PRESSURE_RATIO = 0.8
 
 
@@ -37,6 +36,8 @@ def _check_database():
 
 
 def _check_redis():
+    from config.celery import DEFAULT_QUEUE_NAME, DOWNLOAD_QUEUE_NAME
+
     client = Redis.from_url(
         settings.CELERY_BROKER_URL,
         socket_connect_timeout=CHECK_TIMEOUT_SECONDS,
@@ -44,7 +45,8 @@ def _check_redis():
     )
     try:
         memory = client.info('memory')
-        queued_tasks = client.llen(CELERY_QUEUE_NAME)
+        queued_tasks = client.llen(DEFAULT_QUEUE_NAME)
+        queued_downloads = client.llen(DOWNLOAD_QUEUE_NAME)
     except (RedisError, OSError) as error:
         return {'ok': False, 'detail': type(error).__name__}
     finally:
@@ -54,6 +56,7 @@ def _check_redis():
     return {
         'ok': True,
         'queued_tasks': queued_tasks,
+        'queued_downloads': queued_downloads,
         'used_memory_bytes': used,
         'max_memory_bytes': limit,
         'under_pressure': bool(limit) and used / limit >= REDIS_PRESSURE_RATIO,
@@ -61,13 +64,14 @@ def _check_redis():
 
 
 def _check_worker():
-    from config.celery import app
+    """One worker per queue: with either missing, that queue's work would only pile up."""
+    from config.celery import WORKERS_EXPECTED, app
 
     try:
         replies = app.control.ping(timeout=WORKER_PING_TIMEOUT_SECONDS)
     except (BrokerError, RedisError, OSError) as error:
         return {'ok': False, 'detail': type(error).__name__}
-    return {'ok': bool(replies), 'workers': len(replies)}
+    return {'ok': len(replies) >= WORKERS_EXPECTED, 'workers': len(replies)}
 
 
 def _check_scheduler():

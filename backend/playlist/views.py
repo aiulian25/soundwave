@@ -7,10 +7,13 @@ from django.db.models import Max
 from rest_framework import status
 from rest_framework.response import Response
 from playlist.models import Playlist, PlaylistItem
-from playlist.serializers import PlaylistSerializer, PlaylistItemSerializer
+from playlist.serializers import PlaylistSerializer, PlaylistItemSerializer, PlaylistTrackSerializer
+from common.pagination import paginated_response
 from common.search import matching, search_term
 from common.views import ApiBaseView, AuthenticatedOwnerAccess
+from audio.artwork_archive import PLAYLIST
 from audio.models import Audio
+from audio.views import kept_artwork_response
 from download.claims import cancel_unfinished_downloads
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,16 @@ logger = logging.getLogger(__name__)
 PLAYLIST_SEARCH_FIELDS = ('title', 'channel_name')
 # This list has no pages, so a search bounds it instead.
 PLAYLIST_SEARCH_LIMIT = 50
+
+
+# What `include_items=true` on the playlist itself still returns. Items are paged at
+# `<playlist>/items/`; this keeps an app that was loaded before that change from showing nothing.
+LEGACY_INCLUDED_ITEMS_LIMIT = 100
+
+
+def _ordered_items(playlist):
+    """`id` breaks ties, so two items sharing a position cannot swap between pages."""
+    return PlaylistItem.objects.filter(playlist=playlist).select_related('audio').order_by('position', 'id')
 
 
 class PlaylistListView(ApiBaseView):
@@ -102,15 +115,9 @@ class PlaylistDetailView(ApiBaseView):
         response_data = serializer.data
         
         if include_items:
-            # Get all playlist items with audio details
-            items = PlaylistItem.objects.filter(playlist=playlist).select_related('audio').order_by('position')
-            from audio.serializers import AudioSerializer
-            response_data['items'] = [{
-                'id': item.id,
-                'position': item.position,
-                'added_date': item.added_date,
-                'audio': AudioSerializer(item.audio).data
-            } for item in items]
+            # Only an app version loaded before items were paged still asks for this.
+            first_items = _ordered_items(playlist)[:LEGACY_INCLUDED_ITEMS_LIMIT]
+            response_data['items'] = PlaylistTrackSerializer(first_items, many=True).data
         
         return Response(response_data)
 
@@ -143,21 +150,22 @@ class PlaylistDetailView(ApiBaseView):
         }, status=status.HTTP_200_OK)
 
 
+class PlaylistArtworkView(ApiBaseView):
+    """A playlist's cover, served from this server"""
+    permission_classes = [AuthenticatedOwnerAccess]
+
+    def get(self, request, playlist_id):
+        playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
+        return kept_artwork_response(PLAYLIST, playlist)
+
+
 class PlaylistItemsView(ApiBaseView):
     """Manage items in a playlist"""
     
     def get(self, request, playlist_id):
-        """Get all items in a playlist"""
+        """One page of the playlist's tracks, in playlist order"""
         playlist = get_object_or_404(Playlist, playlist_id=playlist_id, owner=request.user)
-        items = PlaylistItem.objects.filter(playlist=playlist).select_related('audio').order_by('position')
-        from audio.serializers import AudioSerializer
-        response_data = [{
-            'id': item.id,
-            'position': item.position,
-            'added_date': item.added_date,
-            'audio': AudioSerializer(item.audio).data
-        } for item in items]
-        return Response({'data': response_data})
+        return paginated_response(request, _ordered_items(playlist), PlaylistTrackSerializer)
     
     def post(self, request, playlist_id):
         """Add a track to a playlist"""
@@ -243,7 +251,7 @@ class TrackPlaylistsView(ApiBaseView):
                     'playlist_id': item.playlist.playlist_id,
                     'title': item.playlist.title,
                     'playlist_type': item.playlist.playlist_type,
-                    'thumbnail_url': item.playlist.thumbnail_url,
+                    'thumbnail_url': item.playlist.artwork_url,
                     'item_count': item.playlist.item_count,
                     'position': item.position,
                 })

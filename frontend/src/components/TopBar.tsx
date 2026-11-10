@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Avatar, IconButton, Typography, Box, Tooltip } from '@mui/material';
+import { AppBar, Toolbar, Avatar, Button, IconButton, Typography, Box, Tooltip } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AvatarDialog from './AvatarDialog';
-import DownloadStatus from './DownloadStatus';
 import ActivityCenter from './ActivityCenter';
 import { userAPI } from '../api/client';
+import { useAddMusic } from '../context/AddMusicContext';
 import { useTranslation } from 'react-i18next';
 
 interface TopBarProps {
@@ -23,6 +24,7 @@ interface UserData {
 
 export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
   const { t } = useTranslation();
+  const openAddMusic = useAddMusic();
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
           <MenuIcon />
         </IconButton>
 
-        <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: { xs: 1.5, md: 2.5 } }}>
+        <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: { xs: 1.5, md: 2.5 } }}>
           <Box sx={{ position: 'relative' }}>
             <Avatar 
               src={avatarUrl || undefined}
@@ -108,8 +110,8 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
               }}
             />
           </Box>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '-0.02em', mb: 0.5, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h5" noWrap sx={{ fontWeight: 700, letterSpacing: '-0.02em', mb: 0.5, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
               {getGreeting()}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, display: { xs: 'none', sm: 'block' } }}>
@@ -120,11 +122,22 @@ export default function TopBar({ onLogout, onMenuClick }: TopBarProps) {
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-          {/* Download Status */}
-          <DownloadStatus />
+        <Box sx={{ display: 'flex', gap: { xs: 1, sm: 1.5 }, alignItems: 'center', flexShrink: 0 }}>
+          {/* The one way to add anything; the label gives way to the icon on a phone */}
+          <Button
+            variant="contained"
+            onClick={() => openAddMusic()}
+            aria-label={t('addMusic.title')}
+            data-testid="add-music"
+            sx={{ minWidth: { xs: 44, md: 48 }, height: { xs: 44, md: 48 }, px: { xs: 0, sm: 2 }, fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            <AddIcon />
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, ml: 0.5 }}>
+              {t('addMusic.title')}
+            </Box>
+          </Button>
 
-          {/* Download & task activity center */}
+          {/* Everything that is downloading, waiting or failed, in one place */}
           <ActivityCenter />
 
           <Tooltip title={t('topbar.logout')} arrow>

@@ -56,6 +56,7 @@ import {
   KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { formatDate, formatDateTime } from '../utils/formatDate';
 import { statsAPI } from '../api/client';
 import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
@@ -116,7 +117,7 @@ const formatTimeAgo = (dateStr: string, t: (key: string, options?: Record<string
   if (diffMins < 60) return t('listeningHistory.timeAgo.minutesAgo', { count: diffMins });
   if (diffHours < 24) return t('listeningHistory.timeAgo.hoursAgo', { count: diffHours });
   if (diffDays < 7) return t('listeningHistory.timeAgo.daysAgo', { count: diffDays });
-  return date.toLocaleDateString();
+  return formatDate(date);
 };
 
 // Memoized History Entry Component - defined OUTSIDE of main component
@@ -216,7 +217,7 @@ const HistoryEntryItem = memo(({
               />
             </Tooltip>
           )}
-          <Tooltip title={new Date(entry.listened_at).toLocaleString()}>
+          <Tooltip title={formatDateTime(entry.listened_at)}>
             <Typography variant="caption" color="text.secondary" noWrap>
               {formatTimeAgo(entry.listened_at, t)}
             </Typography>
@@ -425,7 +426,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
       } else if (date >= lastMonthStart) {
         groupKey = 'lastMonth';
       } else {
-        groupKey = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        groupKey = formatDate(date, { month: 'long', year: 'numeric' });
       }
 
       if (!groups[groupKey]) {
@@ -570,7 +571,7 @@ export default function ListeningHistoryPage({ onTrackSelect }: ListeningHistory
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                      {new Date(period.date).toLocaleDateString('en-US', { 
+                      {formatDate(period.date, { 
                         weekday: 'long', 
                         month: 'long', 
                         day: 'numeric',

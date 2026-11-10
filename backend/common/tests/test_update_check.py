@@ -10,7 +10,7 @@ Run: python manage.py test common.tests --settings=config.settings_test
 from unittest import mock
 
 from django.core.cache import cache
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 
 from config.version import APP_VERSION
 from common.update_check import _parse_semver, get_update_info
@@ -42,6 +42,17 @@ class GetUpdateInfoTests(TestCase):
     def setUp(self):
         cache.clear()
         self.addCleanup(cache.clear)
+
+    @override_settings(UPDATE_CHECK_ENABLED=False)
+    def test_an_instance_told_not_to_check_never_contacts_github(self):
+        """An operator can keep the server from telling GitHub it exists (SW-124)."""
+        with mock.patch('common.update_check.requests.get') as request:
+            info = get_update_info(force=True)
+
+        request.assert_not_called()
+        self.assertFalse(info['update_available'])
+        self.assertFalse(info['checked'])
+        self.assertEqual(info['current_version'], APP_VERSION)
 
     def test_reports_an_update_when_github_is_ahead(self):
         github_release = {

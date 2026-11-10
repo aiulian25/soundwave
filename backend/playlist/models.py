@@ -8,6 +8,9 @@ from audio.storage_service import count_files_on_disk
 User = get_user_model()
 
 
+ARTWORK_PATH_TEMPLATE = '/api/playlist/{playlist_id}/artwork/'
+
+
 class Playlist(models.Model):
     """Playlist model"""
     PLAYLIST_TYPE_CHOICES = [
@@ -75,6 +78,11 @@ class Playlist(models.Model):
             models.Index(fields=['owner', 'playlist_id']),
             models.Index(fields=['owner', 'subscribed']),
         ]
+
+    @property
+    def artwork_url(self):
+        """Where clients load the cover: always this server, never the host `thumbnail_url` names."""
+        return ARTWORK_PATH_TEMPLATE.format(playlist_id=self.playlist_id) if self.thumbnail_url else ''
 
     def __str__(self):
         return f"{self.owner.username} - {self.title}"

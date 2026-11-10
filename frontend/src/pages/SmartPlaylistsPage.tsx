@@ -46,6 +46,7 @@ import {
   Remove as RemoveIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../components/ConfirmDialog';
 import { smartPlaylistAPI } from '../api/client';
 import { fetchSmartPlaylistTracks } from '../utils/fetchAll';
 import { firstRuleError, ruleErrorsFromResponse } from '../utils/smartRuleErrors';
@@ -57,6 +58,7 @@ const RULE_PRESETS = [
   { key: 'mostPlayedTop50', rules: [{ field: 'play_count', operator: 'greater_than', value: '0' }], order_by: '-play_count', limit: 50 },
   { key: 'recentlyAdded30Days', rules: [{ field: 'downloaded_date', operator: 'in_last_days', value: '30' }], order_by: '-downloaded_date', limit: null },
   { key: 'favorites', rules: [{ field: 'is_favorite', operator: 'is_true', value: '' }], order_by: '-downloaded_date', limit: null },
+  { key: 'topRated', rules: [{ field: 'rating', operator: 'greater_equal', value: '4' }], order_by: '-rating', limit: null },
   { key: 'byGenre', rules: [{ field: 'genre', operator: 'contains', value: '' }], order_by: 'title', limit: null },
   { key: 'byArtist', rules: [{ field: 'artist', operator: 'contains', value: '' }], order_by: 'title', limit: null },
   { key: 'shortTracks', rules: [{ field: 'duration', operator: 'less_than', value: '180' }], order_by: 'duration', limit: null },
@@ -81,6 +83,7 @@ interface SmartPlaylistsPageProps {
 
 export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPageProps) {
   const { t } = useTranslation();
+  const { askToConfirm, confirmDialog } = useConfirm();
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<SmartPlaylist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,7 +206,8 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
       return;
     }
 
-    if (!confirm(t('smartPlaylists.confirm.delete', { name: playlist.name }))) return;
+    const deletion = { message: t('smartPlaylists.confirm.delete', { name: playlist.name }), confirmLabel: t('common.delete') };
+    if (!(await askToConfirm(deletion))) return;
 
     try {
       await smartPlaylistAPI.delete(playlist.id);
@@ -622,6 +626,7 @@ export default function SmartPlaylistsPage({ setCurrentAudio }: SmartPlaylistsPa
           {snackbar.message}
         </Alert>
       </Snackbar>
+      {confirmDialog}
     </Box>
   );
 }

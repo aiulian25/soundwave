@@ -41,6 +41,7 @@
 
 ### Core Features
 - **Audio-Only Downloads** - Extract high-quality audio from YouTube using yt-dlp
+- **Original Quality, No Conversion** - Downloads keep the audio exactly as YouTube supplies it (usually Opus), so they finish quickly and lose nothing. Converting to AAC, Opus 96 kbps or FLAC is a setting; it takes longer and cannot improve the sound. Opus plays in Chrome, Edge, Firefox and Safari 18.4 or newer
 - **Smart Organization** - Index audio files with full metadata (title, artist, duration, etc.)
 - **Fast Search** - Find tracks, playlists and channels by title, artist or channel, one page at a time
 - **Built-in Player** - Stream your collection directly in the browser
@@ -51,6 +52,7 @@
 - **Playlists** - Create custom playlists or sync YouTube playlists
 - **Force Recheck** - Per-playlist force recheck to verify and re-download missing files
 - **Smart Playlists** - Dynamic auto-updating playlists based on rules (Most Played, Recently Added, Genre filters, and more)
+- **Ratings** - Give a track one to five stars from its menu or from the player's details; smart playlists can use them ("rating is at least 4")
 - **Multi-Language UI** - Full English and Romanian translations across all pages
 
 ### Analytics & Achievements
@@ -71,14 +73,14 @@
 - **Export Dialog** - Export tracks as MP3 or FLAC with embedded metadata
 - **Embedded Lyrics** - Export with synced lyrics (SYLT for MP3, LRC for FLAC)
 - **Embedded Artwork** - Include album art in exported files
-- **Quality Selection** - Choose export quality (320kbps, 192kbps, 128kbps)
+- **Quality Selection** - Export the audio as it is stored, or re-encode MP3 at 320, 192 or 128 kbps
 
 ### PWA & Offline Features
 - **PWA Support** - Install as mobile/desktop app with rounded app icon
 - **Full Offline Playback** - Cache playlists with audio, lyrics, and metadata for offline use
 - **Background Caching** - Non-blocking progress indicator while caching
 - **Media Session Artwork** - Album art in system notifications (all browsers)
-- **Battery Efficient** - Lightweight frontend with no background polling; server handles all heavy work
+- **Battery Efficient** - The server does the heavy work, and the frontend asks only for what is on screen: playback position every 15 seconds while something is playing here or on another device, and download activity only while its panel is open
 - **Configurable Sync** - Optional cross-device playback sync (can be disabled in settings)
 
 ### Visual & UI
@@ -94,7 +96,7 @@
 - **Persistent Storage** - Data survives container rebuilds
 - **Smart Error Handling** - Automatically skips permanently unavailable videos (copyright blocked, private, removed)
 - **Deleted Video Detection** - Detects `[Deleted video]` / `[Private video]` entries from YouTube, skips download attempts, and preserves locally-kept copies
-- **Admin User Management** - Full user deletion with cascade cleanup of audio files, channels, playlists, and avatars
+- **Admin User Management** - Full user deletion with cascade cleanup of audio files, kept artwork, channels, playlists, and avatars
 
 ## Architecture
 
@@ -229,7 +231,7 @@ Secrets, cookies and your library are runtime inputs, passed as environment vari
 
 ## YouTube Cookies (Required for Downloads)
 
-YouTube blocks most anonymous downloads with *"Sign in to confirm you're not a bot"*. SoundWave downloads with the YouTube session stored in `cookies.txt`, so until that file holds real cookies, downloads and channel syncs fail. When YouTube rejects the cookies, the failed item says so and points back here.
+YouTube blocks most anonymous downloads with *"Sign in to confirm you're not a bot"*. SoundWave downloads with the YouTube session stored in `cookies.txt`, so until that file holds real cookies, downloads and channel syncs fail. When YouTube rejects the cookies, the failed item says so and points back here, the activity panel shows a notice, and Settings shows the state of the YouTube sign-in; all three clear after the next download that goes through.
 
 > **Treat `cookies.txt` like a password.** It gives access to the Google account it came from. Use a **secondary** Google account (YouTube can restrict accounts used for automated downloads), keep the file `chmod 600`, and never commit or share it.
 
@@ -283,7 +285,7 @@ Cookies expire, and YouTube can invalidate them at any time. When a failed downl
 | `ALLOW_LOCAL_NETWORK` | Allow access from 192.168.x.x local network IPs | `false` |
 | `SECURE_COOKIES` | Cookie security: `auto`, `true`, or `false` | `auto` |
 | `SSL_REDIRECT` | Redirect HTTP→HTTPS (set behind an HTTPS proxy) | `False` |
-| `NUM_PROXIES` | Trusted reverse-proxy hop count for real client IP (login lockout / rate limiting) | — (direct) |
+| `NUM_PROXIES` | Number of reverse proxies in front of the app, usually `1`. Unset, `X-Forwarded-For` is ignored and all clients behind a proxy share one address for login lockout and rate limiting | — (no proxy) |
 | `TOKEN_EXPIRY_HOURS` | API token lifetime in hours | `168` (7 days) |
 | `EMAIL_HOST` | SMTP host; enables verified email-address changes | — (off) |
 | `EMAIL_PORT` | SMTP port | `587` |
@@ -336,11 +338,32 @@ docker exec soundwave python manage.py reconcile_media_sizes          # dry run
 docker exec soundwave python manage.py reconcile_media_sizes --apply  # add --limit N to work in batches
 ```
 
-One download is limited by `MAX_DOWNLOAD_BYTES` (4 GiB), `MAX_DOWNLOAD_DURATION_SECONDS` (24 hours) and `MIN_FREE_DISK_BYTES` (1 GiB must stay free); all three can be set in the environment. Downloading and converting one track may take up to `DOWNLOAD_TASK_SOFT_LIMIT_SECONDS` (4 hours): converting a long mix is slow on a small server, about 30 minutes for three hours of audio.
+Deleting a track, playlist, channel or user removes the artwork kept for it. Images left behind by deletions made before that was so can be cleared once:
 
-## Outbound Artwork Fetching
+```bash
+docker exec soundwave python manage.py remove_orphan_artwork          # dry run: how many files, how much space
+docker exec soundwave python manage.py remove_orphan_artwork --apply
+```
 
-Artwork fetches validate every redirect, refuse private and internal addresses, and cap size and time. The compose files keep PostgreSQL, Redis and Elasticsearch on an internal network with no internet access, but the app must reach them, so it can still reach anything else on its own networks. If other private services share those networks or your LAN, restrict the app container's egress with a firewall as well. Environment proxies (`HTTP_PROXY`) are ignored for these fetches.
+One download is limited by `MAX_DOWNLOAD_BYTES` (4 GiB), `MAX_DOWNLOAD_DURATION_SECONDS` (24 hours) and `MIN_FREE_DISK_BYTES` (1 GiB must stay free); all three can be set in the environment. Downloading and converting one track may take up to `DOWNLOAD_TASK_SOFT_LIMIT_SECONDS` (4 hours): converting a long mix is slow on a small server, about 30 minutes for three hours of audio; the default Original quality does not convert. Downloads run in their own worker, `DOWNLOAD_WORKER_CONCURRENCY` (2) at a time, so lyrics, artwork and syncs never wait behind them.
+
+## What SoundWave contacts
+
+Your browser only ever talks to your own server: artwork, audio and lyrics are served from it. The server itself contacts these services, all over HTTPS.
+
+| Service | When | What is sent | How to turn it off |
+|---|---|---|---|
+| YouTube, through yt-dlp | When you add a link, and every 15 minutes for each playlist and channel you subscribe to | The video, playlist or channel address, with your `cookies.txt` | Unsubscribe; with no subscriptions nothing is sent |
+| YouTube and Google image hosts | Once per downloaded track, playlist and channel, to keep its picture | The image address | Cannot be turned off; nothing is sent once the picture is kept |
+| LRCLIB (`lrclib.net`) | Hourly for tracks without lyrics, weekly for earlier misses, and when you open or search lyrics | Track title, artist and length | `AUTO_FETCH_LYRICS=false` stops the hourly and weekly lookups |
+| GitHub (`api.github.com`) | At most every 6 hours, when someone opens the app | Nothing about you or your library | `UPDATE_CHECK_ENABLED=false` |
+| MusicBrainz and the Cover Art Archive | When you search metadata for a track in the editor | Track title and artist | Do not use the metadata search |
+| Last.fm | Every 2 hours for tracks without metadata, daily for channels | Track title and artist, with your API key | Leave `LASTFM_API_KEY` unset |
+| Fanart.tv | With the Last.fm lookups, for artist and album art | A MusicBrainz ID, with your API key | Leave `FANART_API_KEY` unset |
+
+With no subscriptions, no API keys and both switches off, an idle server contacts nothing.
+
+Artwork fetches validate every redirect, refuse private and internal addresses, and cap size and time. The compose files keep PostgreSQL and Redis on an internal network with no internet access, but the app must reach them, so it can still reach anything else on its own networks. If other private services share those networks or your LAN, restrict the app container's egress with a firewall as well. Environment proxies (`HTTP_PROXY`) are ignored for these fetches.
 
 ## Dashboard Integration (Homepage)
 
@@ -376,18 +399,20 @@ For detailed API documentation, see [docs/WIDGET_API.md](docs/WIDGET_API.md).
 
 ## Usage
 
-### Downloading Audio
+### Adding Music
 
-1. Navigate to the **Downloads** section
-2. Paste YouTube URLs (videos, playlists, or channels)
-3. Click **Add to Queue**
-4. SoundWave will download audio-only files automatically
+1. Click **Add music** at the top of any page
+2. Paste a YouTube link
+3. Click **Download** for a video, or **Subscribe** for a playlist or channel
+
+A video downloads as one audio-only track; progress shows in the activity panel beside the button. A playlist or channel is subscribed to: its tracks download in the background and SoundWave keeps checking it for new ones. A link to a video opened inside a playlist offers both.
+
+With the app installed on a phone, sharing a video from another app to SoundWave opens the same dialog with the link filled in.
 
 ### Subscribing to Channels
 
-1. Go to **Channels**
-2. Add a YouTube channel URL
-3. SoundWave will periodically check for new uploads
+1. Use **Add music** with a channel link, or go to **Channels** and add it there
+2. SoundWave will periodically check for new uploads
 
 ### Creating Playlists
 
@@ -409,7 +434,7 @@ Smart Playlists automatically update based on rules you define:
    - **Epic Tracks** - Tracks over 6 minutes
 3. **Create Custom Smart Playlists**:
    - Click "Create" to make a new smart playlist
-   - Add rules like "Genre contains Rock" or "Play count > 10"
+   - Add rules like "Genre contains Rock", "Play count > 10" or "Rating is at least 4" (the **Top Rated** preset)
    - Combine rules with AND/OR logic
    - Set ordering (most played, random, etc.) and track limits
    - Preview matches before saving
@@ -526,7 +551,7 @@ soundwave/
 │   │   ├── utils/         # Utilities (offline storage, caching)
 │   │   └── types/         # TypeScript types
 ├── docker_assets/         # Docker helper scripts
-├── docs/                  # Documentation
+├── docs/                  # Backup and restore guide, widget API, screenshots
 ├── docker-compose.yml     # Docker orchestration (development)
 ├── docker-compose.prod.yml # Docker orchestration (production)
 ├── Dockerfile            # Application container

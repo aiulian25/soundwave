@@ -18,6 +18,7 @@ import {
   DialogActions,
   Divider,
   CircularProgress,
+  Snackbar,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -47,12 +48,15 @@ interface CachedPlaylist {
   lastSync: number;
 }
 
+const FAILURE_NOTICE_MS = 6000;
+
 export default function OfflineManagerPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { isOnline, cacheSize, clearCache, removePlaylistCache } = usePWA();
   const [cachedPlaylists, setCachedPlaylists] = useState<CachedPlaylist[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failureNotice, setFailureNotice] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; playlistId?: string; title?: string }>({
     open: false,
   });
@@ -83,7 +87,7 @@ export default function OfflineManagerPage() {
       setConfirmDialog({ open: false });
     } catch (err) {
       console.error('Failed to remove playlist:', err);
-      alert(t('offlineManager.errors.removeOfflineDataFailed'));
+      setFailureNotice(t('offlineManager.errors.removeOfflineDataFailed'));
     }
   };
 
@@ -101,7 +105,7 @@ export default function OfflineManagerPage() {
       setClearAllDialog(false);
     } catch (err) {
       console.error('Failed to clear all:', err);
-      alert(t('offlineManager.errors.clearAllFailed'));
+      setFailureNotice(t('offlineManager.errors.clearAllFailed'));
     }
   };
 
@@ -364,6 +368,13 @@ export default function OfflineManagerPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={failureNotice !== ''}
+        autoHideDuration={FAILURE_NOTICE_MS}
+        onClose={() => setFailureNotice('')}
+        message={failureNotice}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 }

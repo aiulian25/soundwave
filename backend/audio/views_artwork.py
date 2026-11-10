@@ -1,5 +1,5 @@
 """Views for artwork and metadata management"""
-from rest_framework import viewsets, status
+from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -25,6 +25,16 @@ from audio.tasks_artwork import (
     embed_artwork_in_audio,
     update_id3_tags_from_metadata,
 )
+
+
+class FetchedRecordViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """For rows a background fetch makes, one per track or channel: read, edit, delete, never create"""
 
 
 class ArtworkViewSet(viewsets.ModelViewSet):
@@ -101,7 +111,7 @@ class ArtworkViewSet(viewsets.ModelViewSet):
         })
 
 
-class MusicMetadataViewSet(viewsets.ModelViewSet):
+class MusicMetadataViewSet(FetchedRecordViewSet):
     """ViewSet for managing music metadata"""
     
     queryset = MusicMetadata.objects.all()
@@ -140,7 +150,7 @@ class MusicMetadataViewSet(viewsets.ModelViewSet):
         })
 
 
-class ArtistInfoViewSet(viewsets.ModelViewSet):
+class ArtistInfoViewSet(FetchedRecordViewSet):
     """ViewSet for managing artist information"""
     
     queryset = ArtistInfo.objects.all()

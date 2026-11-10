@@ -14,14 +14,14 @@ from datetime import timedelta
 from unittest import mock
 
 from celery import current_app
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from user.models import Account
 from audio.models import Audio
 from audio.models_lyrics import Lyrics, LyricsCache
-from audio.serializers_lyrics import MAX_LYRICS_BATCH_SIZE
+from audio.serializers_lyrics import MAX_LRC_CHARACTERS, MAX_LYRICS_BATCH_SIZE
 from audio.tasks_lyrics import (
     auto_fetch_lyrics,
     fetch_lyrics_batch,
@@ -241,6 +241,25 @@ class LyricsTaskOwnershipTests(LyricsJobTestCase):
         self.assertTrue(self.lyrics_of(self.alice_audio).has_lyrics)
         self.assertTrue(self.lyrics_of(self.bob_audio).has_lyrics)
 
+    @override_settings(AUTO_FETCH_LYRICS=False)
+    def test_scheduled_jobs_ask_no_provider_when_automatic_lyrics_are_off(self):
+        """Both scheduled jobs contact LRCLIB on their own; an operator can turn that off (SW-124)."""
+        retry_due = timezone.now() - timedelta(days=30)
+        Lyrics.objects.create(audio=self.bob_audio, fetch_attempted=True, fetch_attempts=1)
+        Lyrics.objects.update(fetched_date=retry_due)
+
+        auto_fetch_lyrics(limit=10)
+        refetch_failed_lyrics(days_old=7)
+
+        self.assertIsNone(self.lyrics_of(self.alice_audio))
+        self.assertFalse(self.lyrics_of(self.bob_audio).has_lyrics)
+
+    @override_settings(AUTO_FETCH_LYRICS=False)
+    def test_a_person_asking_for_lyrics_still_gets_them_with_automatic_lyrics_off(self):
+        fetch_missing_lyrics_for_owner(self.alice.pk)
+
+        self.assertTrue(self.lyrics_of(self.alice_audio).has_lyrics)
+
     def test_old_global_task_names_are_gone(self):
         current_app.loader.import_default_modules()
         self.assertNotIn('audio.fetch_lyrics_for_audio', current_app.tasks)
@@ -358,3 +377,106 @@ class LyricsDispatchTests(LyricsJobTestCase):
         delay.assert_called_once_with(days_old=7)
         self.assertEqual(refused.status_code, 400)
 
+    def test_regular_user_cannot_read_what_others_looked_up(self):
+        """The cache holds every user's lookups, so reading it is instance maintenance (SW-106)."""
+        entry = LyricsCache.objects.create(title='Private Taste', artist_name='A', duration=1, not_found=True)
+        reader = self.client_for(self.alice)
+
+        for path in ('/api/audio/lyrics-cache/', f'/api/audio/lyrics-cache/{entry.pk}/', '/api/audio/lyrics-cache/stats/'):
+            with self.subTest(path):
+                response = reader.get(path)
+
+                self.assertEqual(response.status_code, 403)
+                self.assertNotIn('Private Taste', response.content.decode())
+
+    def test_admin_reads_the_cache(self):
+        LyricsCache.objects.create(title='Private Taste', artist_name='A', duration=1, not_found=True)
+        admin = Account.objects.create_superuser('admin_reader', 'admin_reader@test.local', 'Adminpw_2026!')
+
+        response = self.client_for(admin).get('/api/audio/lyrics-cache/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Private Taste', response.content.decode())
+
+
+
+class LyricsWriteValidationTests(TestCase):
+    """Both hand-written lyrics paths used to store whatever arrived (SW-107)."""
+
+    TRACK_ID = 'VALIDATE_YT_0'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = Account.objects.create_user('lyric_writer', 'writer@test.local', 'Writerpw_2026!')
+        cls.audio = _make_audio(cls.owner, cls.TRACK_ID, 'Validated')
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.owner)
+
+    def _apply(self, **suggestion):
+        return self.client.post(f'/api/audio/{self.TRACK_ID}/lyrics/apply/', suggestion, format='json')
+
+    def _stored(self):
+        return Lyrics.objects.get(audio=self.audio)
+
+    def test_a_suggestion_with_long_names_is_applied_with_a_source_that_fits(self):
+        response = self._apply(plain_lyrics='la la', track_name='T' * 60, artist_name='A' * 60)
+
+        self.assertEqual(response.status_code, 200)
+        source_limit = Lyrics._meta.get_field('source').max_length
+        self.assertEqual(len(self._stored().source), source_limit)
+        self.assertTrue(self._stored().source.startswith('lrclib (manual: TTT'))
+
+    def test_a_suggestion_the_provider_left_partly_empty_is_applied(self):
+        response = self._apply(synced_lyrics=None, plain_lyrics='la la', language=None, track_name='Song')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._stored().synced_lyrics, '')
+        self.assertEqual(self._stored().language, '')
+        self.assertEqual(self._stored().plain_lyrics, 'la la')
+
+    def test_a_suggestion_of_the_wrong_shape_is_refused(self):
+        malformed = (
+            {'language': 'x' * 30},
+            {'plain_lyrics': {'nested': 'object'}},
+            {'instrumental': 'perhaps'},
+            {'synced_lyrics': 'x' * (MAX_LRC_CHARACTERS + 1)},
+        )
+        for suggestion in malformed:
+            with self.subTest(list(suggestion)):
+                self.assertEqual(self._apply(**suggestion).status_code, 400)
+
+        self.assertFalse(Lyrics.objects.filter(audio=self.audio).exclude(plain_lyrics='').exists())
+
+    def test_an_oversized_manual_update_is_refused(self):
+        for field in ('plain_lyrics', 'synced_lyrics'):
+            with self.subTest(field):
+                response = self.client.put(
+                    f'/api/audio/{self.TRACK_ID}/lyrics/', {field: 'x' * (MAX_LRC_CHARACTERS + 1)}, format='json',
+                )
+
+                self.assertEqual(response.status_code, 400)
+
+    def test_a_manual_update_within_the_limit_is_stored(self):
+        response = self.client.put(
+            f'/api/audio/{self.TRACK_ID}/lyrics/', {'plain_lyrics': 'short and fine'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._stored().plain_lyrics, 'short and fine')
+        self.assertEqual(self._stored().source, 'manual')
+
+
+class MetadataProvidersUseEncryptionTests(SimpleTestCase):
+    """Both clients put their API key in the address, so the address must not travel in clear (SW-124)."""
+
+    def test_no_provider_address_is_plain_http(self):
+        import inspect
+
+        from audio import fanart_client, lastfm_client
+
+        for client in (fanart_client, lastfm_client):
+            with self.subTest(client.__name__):
+                self.assertNotIn("'http://", inspect.getsource(client))
+                self.assertNotIn('"http://', inspect.getsource(client))

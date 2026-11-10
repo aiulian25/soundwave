@@ -22,7 +22,9 @@ class SecurityHeadersMiddleware:
                 "default-src 'self'",
                 "script-src 'self' 'sha256-sWLrIVTUnFiy0N7x1NO1yKDmaTBJhrDRK/9XUbpDsFw='",
                 "style-src 'self' 'unsafe-inline'",
-                "img-src 'self' data: blob: https://i.ytimg.com https://i3.ytimg.com https://i9.ytimg.com https://img.youtube.com https://yt3.ggpht.com https://yt3.googleusercontent.com https://coverartarchive.org https://assets.fanart.tv https://lastfm.freetls.fastly.net",
+                # Every image is served from here: artwork is kept on this server, so the
+                # browser never tells another host what the library holds.
+                "img-src 'self' data: blob:",
                 "font-src 'self' data:",
                 "connect-src 'self'",
                 "media-src 'self' blob:",

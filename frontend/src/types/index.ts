@@ -26,6 +26,7 @@ export interface Audio {
   play_count: number;
   last_played?: string;
   is_favorite?: boolean;
+  rating?: number;
   // Enhanced metadata fields
   artist?: string;
   album?: string;
@@ -211,4 +212,24 @@ export interface YearlyWrapped {
     plays: number;
   }>;
   achievements_unlocked: number;
+}
+
+/** A track's lyrics as the server returns them, with where they came from and how fetching went. */
+export interface LyricsData {
+  audio_id: string;
+  audio_title: string;
+  synced_lyrics: string;
+  original_synced_lyrics?: string;
+  revision?: string;
+  plain_lyrics: string;
+  is_instrumental: boolean;
+  source: string;
+  uploaded_filename?: string;
+  language: string;
+  has_lyrics: boolean;
+  is_synced: boolean;
+  display_lyrics: string;
+  fetch_attempted: boolean;
+  fetch_attempts: number;
+  last_error: string;
 }

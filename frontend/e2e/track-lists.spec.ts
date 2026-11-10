@@ -105,9 +105,11 @@ async function open(browser: Browser, viewport: { width: number; height: number 
         id: 1, playlist_id: PLAYLIST_ID, title: 'Stub playlist', description: '', channel_name: 'x', thumbnail_url: '',
         subscribed: false, playlist_type: 'custom', item_count: TRACKS.length, remote_total: TRACKS.length,
         downloaded_count: TRACKS.length, progress_percent: 100, last_refresh: null, sync_status: 'success',
-        status_display: 'Success', error_message: '', active: true, items: playlistItems,
+        status_display: 'Success', error_message: '', active: true,
       });
     }
+    const isReadingPlaylistItems = url.pathname === `/api/playlist/${PLAYLIST_ID}/items/` && route.request().method() === 'GET';
+    if (isReadingPlaylistItems) return json({ data: playlistItems, next: null });
     if (url.pathname === `/api/playlist/smart/${SMART_PLAYLIST_ID}/tracks/`) {
       return json({ data: TRACKS, playlist: SMART_PLAYLIST, next: null });
     }
@@ -233,5 +235,140 @@ test('the chosen view is kept on this device, and playing from a card works', as
 
   await page.getByRole('button', { name: 'List view' }).click();
   await expect(page.getByTestId('track-row')).toHaveCount(TRACKS.length);
+  await context.close();
+});
+
+/** Every DELETE the page sends, as "path body". */
+function recordDeletes(page: Page): string[] {
+  const sent: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'DELETE') return;
+    sent.push(`${new URL(request.url()).pathname} ${request.postData() ?? ''}`.trim());
+  });
+  return sent;
+}
+
+async function openActionsOf(page: Page, title: string) {
+  const row = page.getByTestId('track-row').filter({ hasText: title });
+  await row.getByRole('button', { name: 'More actions' }).click();
+  return row;
+}
+
+test('a track is deleted from the library only after confirming', async ({ browser }) => {
+  const stubs: Stubs = { remoteSession: null, foreignImageRequests: [] };
+  const { context, page } = await open(browser, DESKTOP, '/library', stubs);
+  const sent = recordDeletes(page);
+
+  const row = await openActionsOf(page, 'Song 2');
+  await expect(page.getByTestId('track-remove-from-playlist')).toHaveCount(0);
+  await page.getByTestId('track-delete').click();
+  const question = page.getByTestId('confirm-dialog');
+  await expect(question).toContainText('“Song 2” will be removed from your library');
+  await expect(question).toContainText('This cannot be undone.');
+  await question.getByRole('button', { name: 'Cancel' }).click();
+  await expect(row).toBeVisible();
+  expect(sent).toEqual([]);
+
+  await openActionsOf(page, 'Song 2');
+  await page.getByTestId('track-delete').click();
+  await page.getByTestId('confirm-dialog-confirm').click();
+
+  await expect(row).toHaveCount(0);
+  await expect(page.getByTestId('track-row')).toHaveCount(TRACKS.length - 1);
+  expect(sent).toEqual(['/api/audio/yt2/']);
+  // Answering the question must not count as a click on the row behind it.
+  await expect(page.getByTestId('player-playpause')).toHaveCount(0);
+  await context.close();
+});
+
+test('a track leaves a hand-made playlist without being deleted', async ({ browser }) => {
+  const stubs: Stubs = { remoteSession: null, foreignImageRequests: [] };
+  const { context, page } = await open(browser, DESKTOP, `/playlists/${PLAYLIST_ID}`, stubs);
+  const sent = recordDeletes(page);
+
+  const row = await openActionsOf(page, 'Song 2');
+  await page.getByTestId('track-remove-from-playlist').click();
+
+  await expect(row).toHaveCount(0);
+  expect(sent).toEqual([`/api/playlist/${PLAYLIST_ID}/items/ {"youtube_id":"yt2"}`]);
+  await context.close();
+});
+
+// The player is loaded on first use, which on a freshly started server can take a few seconds.
+const PLAYER_READY = { timeout: 20_000 };
+
+/** Makes these tracks' files fail to load, as a deleted file or a lost connection would. */
+async function breakMedia(page: Page, trackIds: number[]) {
+  const brokenPaths = trackIds.map((id) => `/media/${id}.wav`);
+  await page.route((url) => brokenPaths.includes(url.pathname), (route) => route.fulfill({ status: 404, body: '' }));
+}
+
+test('a track that cannot be played says so, and the next one plays', async ({ browser }) => {
+  const stubs: Stubs = { remoteSession: null, foreignImageRequests: [] };
+  const { context, page } = await open(browser, DESKTOP, '/library', stubs);
+  await breakMedia(page, [2]);
+
+  await page.getByTestId('track-row').filter({ hasText: 'Song 2' }).click();
+
+  await expect(page.getByTestId('playback-notice')).toContainText('“Song 2” could not be played. Skipping to the next track.', PLAYER_READY);
+  const nextRow = page.getByTestId('track-row').filter({ hasText: 'Song 3' });
+  await expect(nextRow.getByRole('img', { name: 'Now playing' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('player-playpause')).toHaveAttribute('data-playing', 'true');
+  await context.close();
+});
+
+test('several tracks in a row that cannot be played stop playback with one explanation', async ({ browser }) => {
+  const stubs: Stubs = { remoteSession: null, foreignImageRequests: [] };
+  const { context, page } = await open(browser, DESKTOP, '/library', stubs);
+  await breakMedia(page, TRACKS.map((song) => song.id));
+
+  await page.getByTestId('track-row').filter({ hasText: LONG_TITLE }).click();
+
+  await expect(page.getByTestId('playback-notice')).toContainText('Playback stopped: several tracks in a row could not be played.', PLAYER_READY);
+  await expect(page.getByTestId('player-playpause')).toHaveAttribute('data-playing', 'false');
+  await context.close();
+});
+
+test('the only track in the queue failing is reported without skipping anywhere', async ({ browser }) => {
+  const stubs: Stubs = { remoteSession: remoteSession(true), foreignImageRequests: [] };
+  const { context, page } = await open(browser, DESKTOP, '/library', stubs);
+  await breakMedia(page, [1]);
+
+  await page.getByTestId('remote-playback').getByRole('button', { name: 'Play here' }).click();
+
+  await expect(page.getByTestId('playback-notice')).toContainText('could not be played.', PLAYER_READY);
+  await expect(page.getByTestId('playback-notice')).not.toContainText('Skipping');
+  await context.close();
+});
+
+
+test('a long playlist shows its first tracks while the rest are still arriving', async ({ browser }) => {
+  const stubs: Stubs = { remoteSession: null, foreignImageRequests: [] };
+  const { context, page } = await open(browser, DESKTOP, `/playlists/${PLAYLIST_ID}`, stubs);
+  const pageOfItems = (tracks: typeof TRACKS, next: number | null) => JSON.stringify({
+    data: tracks.map((audio) => ({ id: audio.id, position: audio.id, added_date: '', audio })),
+    next,
+  });
+  let releaseSecondPage = () => {};
+  const secondPageHeld = new Promise<void>((release) => { releaseSecondPage = release; });
+  await page.route((url) => url.pathname === `/api/playlist/${PLAYLIST_ID}/items/`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const isFirstPage = new URL(route.request().url()).searchParams.get('page') === '1';
+    if (!isFirstPage) await secondPageHeld;
+    const body = isFirstPage ? pageOfItems(TRACKS.slice(0, 2), 2) : pageOfItems(TRACKS.slice(2), null);
+    return route.fulfill({ status: 200, contentType: 'application/json', body });
+  });
+
+  await page.reload();
+
+  await expect(page.getByTestId('track-row')).toHaveCount(2);
+  await expect(page.getByTestId('playlist-loading-more')).toHaveText(`Loading tracks: 2 of ${TRACKS.length}`);
+  await expect(page.getByRole('button', { name: 'Play All' })).toBeDisabled();
+
+  releaseSecondPage();
+
+  await expect(page.getByTestId('track-row')).toHaveCount(TRACKS.length);
+  await expect(page.getByTestId('playlist-loading-more')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Play All' })).toBeEnabled();
   await context.close();
 });

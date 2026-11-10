@@ -3,6 +3,8 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
+from audio.artwork_archive import CHANNEL
+from audio.views import kept_artwork_response
 from channel.models import Channel
 from channel.serializers import ChannelSerializer, ChannelSyncDepthSerializer
 from download.claims import cancel_unfinished_downloads
@@ -110,6 +112,15 @@ class ChannelDetailView(ApiBaseView):
         return Response({
             'message': 'Unsubscribed from channel. Its tracks were kept.'
         }, status=status.HTTP_200_OK)
+
+
+class ChannelArtworkView(ApiBaseView):
+    """A channel's picture, served from this server"""
+    permission_classes = [AuthenticatedOwnerAccess]
+
+    def get(self, request, channel_id):
+        channel = get_object_or_404(Channel, channel_id=channel_id, owner=request.user)
+        return kept_artwork_response(CHANNEL, channel)
 
 
 class ChannelSyncView(ApiBaseView):

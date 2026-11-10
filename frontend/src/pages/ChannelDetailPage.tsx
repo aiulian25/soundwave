@@ -185,6 +185,13 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
     }
   };
 
+  const handleTrackGone = (goneTrack: Audio) => {
+    setChannel(prev => {
+      if (!prev?.audio_files) return prev;
+      return { ...prev, audio_files: prev.audio_files.filter(item => item.id !== goneTrack.id) };
+    });
+  };
+
   const handleTrackUpdate = (updatedTrack: Audio) => {
     // Update the local state when a track is updated (e.g., favorite toggled)
     setChannel(prev => {
@@ -403,7 +410,7 @@ export default function ChannelDetailPage({ setCurrentAudio }: ChannelDetailPage
                   <DownloadIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <TrackActionsMenu track={audio} onTrackUpdate={handleTrackUpdate} />
+              <TrackActionsMenu track={audio} onTrackUpdate={handleTrackUpdate} onTrackDeleted={handleTrackGone} />
             </>
           )}
         />

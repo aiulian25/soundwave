@@ -40,6 +40,7 @@ import {
   Warning as WarningIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { formatDate, formatDateTime } from '../utils/formatDate';
 import api from '../api/client';
 import { localizePasswordError } from '../utils/passwordErrors';
 
@@ -417,7 +418,7 @@ const AdminUsersPage = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {new Date(user.date_joined).toLocaleDateString()}
+                      {formatDate(user.date_joined)}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -693,7 +694,7 @@ const AdminUsersPage = () => {
                     {t('adminUsers.fields.dateJoined')}
                   </Typography>
                   <Typography variant="body1">
-                    {new Date(selectedUser.date_joined).toLocaleString()}
+                    {formatDateTime(selectedUser.date_joined)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -702,7 +703,7 @@ const AdminUsersPage = () => {
                   </Typography>
                   <Typography variant="body1">
                     {selectedUser.last_login
-                      ? new Date(selectedUser.last_login).toLocaleString()
+                      ? formatDateTime(selectedUser.last_login)
                       : t('adminUsers.values.never')}
                   </Typography>
                 </Grid>

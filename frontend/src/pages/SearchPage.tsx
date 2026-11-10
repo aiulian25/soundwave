@@ -648,6 +648,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                                   onTrackUpdate={(updatedTrack) => {
                                     setAudioResults(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
                                   }}
+                                  onTrackDeleted={(deletedTrack) => setAudioResults(prev => prev.filter(a => a.id !== deletedTrack.id))}
                                 />
                               </Box>
                             }
@@ -769,6 +770,7 @@ export default function SearchPage({ setCurrentAudio }: SearchPageProps) {
                             onTrackUpdate={(updatedTrack) => {
                               setAudioResults(prev => prev.map(a => a.id === updatedTrack.id ? updatedTrack : a));
                             }}
+                            onTrackDeleted={(deletedTrack) => setAudioResults(prev => prev.filter(a => a.id !== deletedTrack.id))}
                           />
                         </Box>
                       }

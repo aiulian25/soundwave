@@ -109,7 +109,7 @@ test('the names are translated', async ({ browser }) => {
   const { context, page } = await openLibrary(browser, { language: 'ro' });
   await startFirstTrack(page);
 
-  await expect(page.getByRole('button', { name: 'Melodia urmatoare' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Melodia următoare' }).first()).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Volum' }).first()).toBeVisible();
 
   await context.close();

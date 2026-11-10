@@ -23,9 +23,7 @@ def get_client_ip(request):
     ``NUM_PROXIES`` setting (same concept as DRF's NUM_PROXIES and Django's
     SECURE_PROXY_SSL_HEADER):
 
-      - NUM_PROXIES unset (None): backward-compatible default — use the first XFF
-        entry if present, else REMOTE_ADDR.
-      - NUM_PROXIES = 0: ignore XFF entirely, use REMOTE_ADDR.
+      - NUM_PROXIES unset or 0: ignore XFF entirely, use REMOTE_ADDR.
       - NUM_PROXIES = N: take the Nth entry from the right of XFF — the address our
         own trusted proxy observed, which the client cannot forge.
 
@@ -34,20 +32,12 @@ def get_client_ip(request):
     """
     remote_addr = request.META.get('REMOTE_ADDR', '')
     xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    num_proxies = getattr(settings, 'NUM_PROXIES', None)
+    trusted_proxies = getattr(settings, 'NUM_PROXIES', None)
+    forwarded_addresses = [address.strip() for address in xff.split(',') if address.strip()]
 
-    if num_proxies is not None:
-        if num_proxies == 0 or not xff:
-            return remote_addr
-        addrs = [addr.strip() for addr in xff.split(',') if addr.strip()]
-        if not addrs:
-            return remote_addr
-        return addrs[-min(num_proxies, len(addrs))]
-
-    # Default (no trusted-proxy configuration): preserve prior behavior.
-    if xff:
-        return xff.split(',')[0].strip()
-    return remote_addr
+    if not trusted_proxies or not forwarded_addresses:
+        return remote_addr
+    return forwarded_addresses[-min(trusted_proxies, len(forwarded_addresses))]
 
 
 def get_login_attempt_key(ip_address, username=None):

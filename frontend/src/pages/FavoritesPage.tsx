@@ -185,7 +185,13 @@ export default function FavoritesPage({ setCurrentAudio }: FavoritesPageProps) {
             { id: 'plays', header: t('favorites.columns.plays'), width: 72, align: 'right', showFrom: 'md', render: (audio) => audio.play_count },
           ]}
           actionsWidth={56}
-          renderActions={(audio) => <TrackActionsMenu track={audio} onTrackUpdate={handleTrackUpdate} />}
+          renderActions={(audio) => (
+            <TrackActionsMenu
+              track={audio}
+              onTrackUpdate={handleTrackUpdate}
+              onTrackDeleted={(deletedTrack) => setFavorites(prev => prev.filter(fav => fav.id !== deletedTrack.id))}
+            />
+          )}
         />
       )}
 

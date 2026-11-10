@@ -22,13 +22,24 @@ class LoginLockoutKeyingTests(TestCase):
         self.user = Account.objects.create_user('lockout_user', 'lo@test.local', self.password)
         self.client = Client()
 
-    def _login(self, password, ip):
+    def _login(self, password, ip, **headers):
         return self.client.post(
             '/api/user/login/',
             {'username': 'lockout_user', 'password': password},
             content_type='application/json',
             REMOTE_ADDR=ip,
+            **headers,
         )
+
+    @override_settings(NUM_PROXIES=None)
+    def test_a_forged_forwarded_address_does_not_evade_the_lockout(self):
+        """With no proxy declared the header is the client's own claim (SW-103)."""
+        for attempt in range(MAX_LOGIN_ATTEMPTS):
+            self._login('wrong-password', self.ATTACKER_IP, HTTP_X_FORWARDED_FOR=f'198.18.0.{attempt}')
+
+        response = self._login(self.password, self.ATTACKER_IP, HTTP_X_FORWARDED_FOR='198.18.0.99')
+
+        self.assertEqual(response.status_code, 429)
 
     def test_attacker_ip_lockout_does_not_block_victim_from_other_ip(self):
         # Attacker hammers the victim's username from their own IP until locked.
@@ -65,6 +76,11 @@ class ClientIpResolutionTests(TestCase):
     @override_settings(NUM_PROXIES=None)
     def test_default_uses_remote_addr_without_xff(self):
         self.assertEqual(get_client_ip(self._req('10.0.0.9')), '10.0.0.9')
+
+    @override_settings(NUM_PROXIES=None)
+    def test_default_ignores_xff(self):
+        ip = get_client_ip(self._req('10.0.0.9', xff='1.1.1.1, 2.2.2.2'))
+        self.assertEqual(ip, '10.0.0.9')
 
     @override_settings(NUM_PROXIES=0)
     def test_zero_proxies_ignores_xff(self):

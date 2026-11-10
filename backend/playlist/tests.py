@@ -12,7 +12,9 @@ from pathlib import Path
 from unittest import mock
 
 from django.core.cache import cache
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -142,3 +144,79 @@ class PlaylistDeleteKeepsMediaTests(TestCase):
         client.force_authenticate(user=bob)
         self.assertEqual(client.delete('/api/playlist/PL_first/').status_code, 404)
         self.assertTrue(Playlist.objects.filter(pk=self.first.pk).exists())
+
+
+class PlaylistItemPagesTests(TestCase):
+    """A big playlist used to arrive as one response: seconds of work and megabytes (SW-116)."""
+
+    TRACKS = 120
+    MAX_QUERIES_PER_PAGE = 5
+    ITEMS_URL = '/api/playlist/PL_PAGES/items/'
+    DETAIL_URL = '/api/playlist/PL_PAGES/'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = Account.objects.create_user('pages_u', 'pages_u@test.local', 'Pagespw_2026!')
+        cls.playlist = Playlist.objects.create(owner=cls.owner, playlist_id='PL_PAGES', title='Long', playlist_type='custom')
+        PlaylistItem.objects.bulk_create(
+            PlaylistItem(
+                playlist=cls.playlist,
+                audio=_make_audio(cls.owner, f'PAGE_{number:04d}', f'Track {number}'),
+                # Stored out of order, so the test shows the playlist's own order is what is served.
+                position=cls.TRACKS - number,
+            )
+            for number in range(cls.TRACKS)
+        )
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(self.owner)
+
+    def _page(self, page):
+        return self.client.get(self.ITEMS_URL, {'page': page})
+
+    def test_items_arrive_a_page_at_a_time_in_playlist_order(self):
+        first = self._page(1).json()
+
+        self.assertEqual(first['count'], self.TRACKS)
+        self.assertEqual(len(first['data']), first['page_size'])
+        self.assertLess(first['page_size'], self.TRACKS)
+        self.assertEqual(first['next'], 2)
+        self.assertEqual([item['position'] for item in first['data']], list(range(1, first['page_size'] + 1)))
+        self.assertEqual(first['data'][0]['audio']['youtube_id'], f'PAGE_{self.TRACKS - 1:04d}')
+
+    def test_following_next_reaches_every_item_exactly_once(self):
+        seen, page = [], 1
+        while page is not None:
+            body = self._page(page).json()
+            seen.extend(item['audio']['youtube_id'] for item in body['data'])
+            page = body['next']
+
+        self.assertEqual(len(seen), self.TRACKS)
+        self.assertEqual(len(set(seen)), self.TRACKS)
+
+    def test_a_page_is_a_few_queries_not_one_per_track(self):
+        with CaptureQueriesContext(connection) as queries:
+            self._page(2)
+
+        self.assertLessEqual(len(queries), self.MAX_QUERIES_PER_PAGE)
+
+    def test_the_playlist_itself_no_longer_carries_its_items(self):
+        self.assertNotIn('items', self.client.get(self.DETAIL_URL).json())
+
+    def test_an_older_app_still_gets_items_but_a_bounded_number(self):
+        from playlist.views import LEGACY_INCLUDED_ITEMS_LIMIT
+
+        body = self.client.get(self.DETAIL_URL, {'include_items': 'true'}).json()
+
+        self.assertEqual(len(body['items']), min(self.TRACKS, LEGACY_INCLUDED_ITEMS_LIMIT))
+        self.assertLess(LEGACY_INCLUDED_ITEMS_LIMIT, self.TRACKS)
+
+    def test_another_users_playlist_has_no_pages(self):
+        stranger = APIClient()
+        stranger.force_authenticate(Account.objects.create_user('pages_v', 'pages_v@test.local', 'Pagespw_2026!'))
+
+        self.assertEqual(stranger.get(self.ITEMS_URL).status_code, 404)
+
+    def test_a_page_that_is_not_a_number_is_refused(self):
+        self.assertEqual(self._page('many').status_code, 400)

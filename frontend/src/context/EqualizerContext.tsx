@@ -8,7 +8,7 @@
  * - Bass boost and other effects
  */
 
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useSettings } from './SettingsContext';
 
 // EQ band frequencies (standard 10-band EQ frequencies)
@@ -153,7 +153,7 @@ export function EqualizerProvider({ children }: { children: React.ReactNode }) {
   const isConnectedRef = useRef(false);
   
   // All presets (built-in + custom)
-  const allPresets = [...BUILTIN_PRESETS, ...customPresets];
+  const allPresets = useMemo(() => [...BUILTIN_PRESETS, ...customPresets], [customPresets]);
   
   // Save state to settings
   const saveState = useCallback(async (state: Partial<EqualizerState>) => {

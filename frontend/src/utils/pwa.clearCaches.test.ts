@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pwaManager } from './pwa';
 
-const ACCOUNT_CACHES = ['soundwave-api-v3', 'soundwave-audio-v3', 'soundwave-stream-v1', 'soundwave-images-v4'];
+const ACCOUNT_CACHES = ['soundwave-api-v3', 'soundwave-audio-v3', 'soundwave-stream-v1', 'soundwave-images-v5'];
 const SHELL_CACHE = 'soundwave-v20';
 
 describe('clearing caches does not depend on a service worker', () => {

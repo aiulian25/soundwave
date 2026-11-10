@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next';
 import { formatDuration } from '../utils/formatDuration';
 import { useParams, useNavigate } from 'react-router-dom';
 import { playlistAPI, audioAPI } from '../api/client';
+import { fetchPlaylistItems } from '../utils/fetchAll';
 import PlaylistExportDialog from '../components/PlaylistExportDialog';
 import { usePWA, CacheProgress } from '../context/PWAContext';
 import { offlineStorage } from '../utils/offlineStorage';
@@ -46,6 +47,9 @@ interface PlaylistItem {
   audio: Audio;
 }
 
+// A playlist the user builds by hand; a subscribed one mirrors YouTube and would be refilled by sync.
+const CUSTOM_PLAYLIST_TYPE = 'custom';
+
 interface PlaylistDetail {
   id: number;
   playlist_id: string;
@@ -54,6 +58,7 @@ interface PlaylistDetail {
   channel_name: string;
   thumbnail_url: string;
   subscribed: boolean;
+  playlist_type?: 'youtube' | 'custom';
   item_count: number;
   remote_total?: number | null;
   remote_unavailable_count?: number;
@@ -80,6 +85,9 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   const { isOnline, cachePlaylist, cancelPlaylistCache, removePlaylistCache, cacheSize } = usePWA();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  // A long playlist shows its first tracks at once; what needs every track waits for this.
+  const [itemsComplete, setItemsComplete] = useState(false);
+  const latestLoad = useRef(0);
   const [error, setError] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -115,10 +123,10 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
 
   // Check offline tracks when playlist loads or offline status changes
   useEffect(() => {
-    if (playlist?.items) {
+    if (playlist?.items && itemsComplete) {
       checkOfflineTracks();
     }
-  }, [playlist?.items, isOfflineAvailable, checkOfflineTracks]);
+  }, [playlist?.items, itemsComplete, isOfflineAvailable, checkOfflineTracks]);
 
   const showOfflineCounts = (verified: { downloaded_count: number; missing_count: number } | null) => {
     const available = verified?.downloaded_count ?? 0;
@@ -136,7 +144,14 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
     }
   };
 
+  const showCachedPlaylist = (cachedPlaylist: PlaylistDetail) => {
+    setPlaylist(cachedPlaylist);
+    setItemsComplete(true);
+  };
+
   const loadPlaylist = async () => {
+    const thisLoad = ++latestLoad.current;
+    const isLatestLoad = () => latestLoad.current === thisLoad;
     try {
       setLoading(true);
       
@@ -144,8 +159,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       if (!isOnline) {
         const cachedPlaylist = await verifiedOfflinePlaylist(playlistId!);
         if (cachedPlaylist && cachedPlaylist.items) {
-          console.log('[Offline] Loading playlist from cache:', cachedPlaylist.title);
-          setPlaylist({
+          showCachedPlaylist({
             ...cachedPlaylist,
             sync_status: 'success',
             status_display: t('playlistDetail.status.offline'),
@@ -160,9 +174,16 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
         }
       }
       
-      // Online - fetch from API
-      const response = await playlistAPI.getWithItems(playlistId!);
-      setPlaylist(response.data);
+      // Online: the playlist first, then its tracks a page at a time
+      const response = await playlistAPI.get(playlistId!);
+      setItemsComplete(false);
+      await fetchPlaylistItems(playlistId!, undefined, (itemsSoFar) => {
+        if (!isLatestLoad()) return;
+        setPlaylist({ ...response.data, items: [...itemsSoFar] });
+        setLoading(false);
+      });
+      if (!isLatestLoad()) return;
+      setItemsComplete(true);
       setError('');
     } catch (err: any) {
       console.error('Failed to load playlist:', err);
@@ -171,8 +192,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       try {
         const cachedPlaylist = await verifiedOfflinePlaylist(playlistId!);
         if (cachedPlaylist && cachedPlaylist.items) {
-          console.log('[Fallback] Loading playlist from cache:', cachedPlaylist.title);
-          setPlaylist({
+          showCachedPlaylist({
             ...cachedPlaylist,
             sync_status: 'success',
             status_display: t('playlistDetail.status.cached'),
@@ -239,6 +259,14 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       setSnackbarMessage(t('playlistDetail.messages.forceRecheckFailed', { error: err.response?.data?.detail || err.message || t('common.unknownError') }));
       setSnackbarOpen(true);
     }
+  };
+
+  /** The track left this list: it was deleted from the library or removed from the playlist. */
+  const handleTrackGone = (goneTrack: Audio) => {
+    setPlaylist(prev => {
+      if (!prev?.items) return prev;
+      return { ...prev, items: prev.items.filter(item => item.audio.id !== goneTrack.id) };
+    });
   };
 
   const handleTrackUpdate = (updatedTrack: Audio) => {
@@ -481,6 +509,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
   ].filter(({ count }) => count > 0);
 
   const playlistItems = playlist.items ?? [];
+  const hasEveryDownloadedTrack = itemsComplete && Boolean(playlist.downloaded_count);
   const playableQueue = playlistItems.filter((item) => item.audio.file_path).map((item) => item.audio);
 
   return (
@@ -536,7 +565,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           variant="contained"
           startIcon={<PlayIcon />}
           onClick={handlePlayAll}
-          disabled={!playlist.downloaded_count}
+          disabled={!hasEveryDownloadedTrack}
           sx={{
             minWidth: { xs: '48px', sm: '120px' },
             bgcolor: 'primary.main',
@@ -552,7 +581,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           variant="outlined"
           startIcon={<ShuffleIcon />}
           onClick={handleShuffle}
-          disabled={!playlist.downloaded_count}
+          disabled={!hasEveryDownloadedTrack}
           sx={{
             minWidth: { xs: '48px', sm: '120px' },
             borderColor: 'primary.main',
@@ -574,7 +603,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           variant="outlined"
           startIcon={<CloudDownloadIcon />}
           onClick={handleDownloadPlaylist}
-          disabled={!playlist.downloaded_count}
+          disabled={!hasEveryDownloadedTrack}
           sx={{
             minWidth: { xs: '48px', sm: '150px' },
             borderColor: 'primary.main',
@@ -615,7 +644,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
           variant="outlined"
           startIcon={<FolderZipIcon />}
           onClick={() => setExportDialogOpen(true)}
-          disabled={!playlist.downloaded_count}
+          disabled={!hasEveryDownloadedTrack}
           sx={{
             minWidth: { xs: '48px', sm: '150px' },
             borderColor: 'primary.main',
@@ -682,7 +711,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                 variant="contained"
                 startIcon={<CloudDownloadIcon />}
                 onClick={handleCacheForOffline}
-                disabled={!isOnline || isDownloadingOffline}
+                disabled={!isOnline || isDownloadingOffline || !itemsComplete}
                 size="small"
               >
                 {t('playlistDetail.actions.downloadMissing')}
@@ -693,7 +722,7 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                 variant="contained"
                 startIcon={<CloudDownloadIcon />}
                 onClick={handleCacheForOffline}
-                disabled={!isOnline || isDownloadingOffline || !playlist.downloaded_count}
+                disabled={!isOnline || isDownloadingOffline || !hasEveryDownloadedTrack}
                 size="small"
                 sx={{
                   bgcolor: 'info.main',
@@ -809,6 +838,12 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
       </Box>
 
       {/* Tracks Table */}
+      {!itemsComplete && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }} data-testid="playlist-loading-more">
+          {t('playlistDetail.loadingTracks', { loaded: playlistItems.length, total: playlist.item_count })}
+        </Typography>
+      )}
+
       <TrackTable
         items={playlistItems}
         rowKey={(item) => item.id}
@@ -855,7 +890,13 @@ export default function PlaylistDetailPage({ setCurrentAudio }: PlaylistDetailPa
                 <DownloadIcon />
               </IconButton>
             )}
-            <TrackActionsMenu track={item.audio} onTrackUpdate={handleTrackUpdate} />
+            <TrackActionsMenu
+              track={item.audio}
+              onTrackUpdate={handleTrackUpdate}
+              onTrackDeleted={handleTrackGone}
+              editablePlaylistId={playlist.playlist_type === CUSTOM_PLAYLIST_TYPE ? playlist.playlist_id : undefined}
+              onRemovedFromPlaylist={handleTrackGone}
+            />
           </>
         )}
         emptyMessage={t('playlistDetail.empty.noTracks')}

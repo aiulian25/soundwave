@@ -24,6 +24,7 @@ async function openExportDialog(browser: import('@playwright/test').Browser, ans
     if (url.pathname === '/api/user/config/') return json({ extra_settings: {}, playback_sync_enabled: false });
     if (url.pathname === `/api/playlist/${PLAYLIST_ID}/export/`) return route.fulfill(answer);
     if (url.pathname === `/api/playlist/${PLAYLIST_ID}/`) return json(PLAYLIST);
+    if (url.pathname === `/api/playlist/${PLAYLIST_ID}/items/`) return json({ data: PLAYLIST.items, next: null });
     return json({ data: [] });
   });
   await page.goto(`/playlists/${PLAYLIST_ID}`);
@@ -136,6 +137,7 @@ test('a large export runs in the background, reports progress and can be collect
     if (url.pathname === '/api/export-jobs/') return json({ data: [] });
     if (url.pathname === `/api/export-jobs/${jobId}/`) return json({ id: jobId, ...(answers.length > 1 ? answers.shift() : answers[0]) });
     if (url.pathname === `/api/playlist/${PLAYLIST_ID}/`) return json(PLAYLIST);
+    if (url.pathname === `/api/playlist/${PLAYLIST_ID}/items/`) return json({ data: PLAYLIST.items, next: null });
     return json({ data: [] });
   });
   await page.goto(`/playlists/${PLAYLIST_ID}`);
@@ -175,6 +177,7 @@ test('canceling a background export asks the server and clears it, and reopening
       return json(running);
     }
     if (url.pathname === `/api/playlist/${PLAYLIST_ID}/`) return json(PLAYLIST);
+    if (url.pathname === `/api/playlist/${PLAYLIST_ID}/items/`) return json({ data: PLAYLIST.items, next: null });
     return json({ data: [] });
   });
   await page.goto(`/playlists/${PLAYLIST_ID}`);

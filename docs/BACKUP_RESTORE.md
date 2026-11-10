@@ -71,6 +71,8 @@ To go back after an upgrade has migrated the database, restore the backup from s
 
 Elasticsearch is no longer used. An old `es_data` volume can stay or go as you prefer, and nothing needs rebuilding.
 
+Releases before v1.21.0 shipped a default Elasticsearch password in the Compose files, and it remains in the repository's public history. If you ever reused that password for anything else, change it there.
+
 ## After a restore, on a phone or laptop
 
 Offline downloads and locally imported files live in each browser. They are not touched by a server restore, and offline status is re-checked against what is really on that device.

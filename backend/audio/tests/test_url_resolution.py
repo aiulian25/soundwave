@@ -24,7 +24,6 @@ from audio.views import AudioDetailView, AudioListView, AudioPlayerView, Artwork
 from audio.views_artwork import ArtworkViewSet, AudioArtworkViewSet, MusicMetadataViewSet
 from audio.views_local import LocalAudioPlaylistViewSet, LocalAudioViewSet
 from audio.views_lyrics import LyricsCacheViewSet, LyricsViewSet
-from audio.views_quick_sync import QuickSyncStatusView
 from user.models import Account
 
 API_ROOTS = ('/api/audio', '/api/v1/audio')
@@ -41,7 +40,6 @@ CONCRETE_ROUTES = {
     'lyrics/stats/': LyricsViewSet,
     'lyrics-cache/': LyricsCacheViewSet,
     'lyrics-cache/stats/': LyricsCacheViewSet,
-    'quick-sync/status/': QuickSyncStatusView,
     'api/artwork/': ArtworkViewSet,
     'api/artwork/5/': ArtworkViewSet,
     'api/metadata/': MusicMetadataViewSet,
@@ -80,7 +78,7 @@ class ResolutionTests(SimpleTestCase):
             for pattern in urlpatterns
             if str(pattern.pattern) and '<' not in str(pattern.pattern).split('/')[0]
         }
-        router_prefixes = {'lyrics', 'lyrics-cache', 'local-audio', 'local-playlists', 'quick-sync'}
+        router_prefixes = {'lyrics', 'lyrics-cache', 'local-audio', 'local-playlists'}
         self.assertLessEqual(literal_segments | router_prefixes, RESERVED_AUDIO_IDS)
 
     def test_a_source_with_a_reserved_id_is_refused(self):
@@ -208,9 +206,9 @@ class CollectionBehaviourTests(TestCase):
         self.assertEqual(response.status_code, 200)
         delay.assert_called_once()
 
-    def test_lyrics_cache_is_read_only_for_regular_users(self):
-        self.assertEqual(self.alice_client.get('/api/audio/lyrics-cache/').status_code, 200)
-        self.assertEqual(self.alice_client.post('/api/audio/lyrics-cache/', {}, format='json').status_code, 405)
+    def test_lyrics_cache_is_closed_to_regular_users(self):
+        self.assertEqual(self.alice_client.get('/api/audio/lyrics-cache/').status_code, 403)
+        self.assertEqual(self.alice_client.post('/api/audio/lyrics-cache/', {}, format='json').status_code, 403)
 
     def test_an_ordinary_track_is_still_served_and_still_private(self):
         self.assertEqual(self.alice_client.get('/api/audio/ROUTE_ALICE/').json()['youtube_id'], 'ROUTE_ALICE')

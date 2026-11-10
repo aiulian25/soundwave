@@ -19,7 +19,7 @@ from rest_framework.test import APIClient
 
 from user.models import Account
 from audio.models import Audio
-from audio.models_artwork import Artwork, MusicMetadata
+from audio.models_artwork import ArtistInfo, Artwork, MusicMetadata
 from channel.models import Channel
 
 
@@ -97,6 +97,29 @@ class ArtworkIsolationTests(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn(self.ALICE_ALBUM, resp.content.decode())
+
+    # --- rows the background jobs make cannot be created by hand (SW-108) -------
+    def test_metadata_and_artist_info_cannot_be_created_through_the_api(self):
+        owner = self.client_for(self.alice)
+        other_audio = _make_audio(self.alice, 'ART_ALICE_YT1', 'Second Track')
+        attempts = {
+            '/api/audio/api/metadata/': {'audio': other_audio.pk, 'album_name': 'By Hand'},
+            '/api/audio/api/artist-info/': {'channel': self.alice_channel.pk, 'bio': 'By Hand'},
+        }
+        for path, body in attempts.items():
+            with self.subTest(path):
+                self.assertEqual(owner.post(path, body, format='json').status_code, 405)
+
+        self.assertFalse(MusicMetadata.objects.filter(audio=other_audio).exists())
+        self.assertFalse(ArtistInfo.objects.exists())
+
+    def test_owner_still_reads_and_edits_existing_metadata(self):
+        owner = self.client_for(self.alice)
+        detail = f'/api/audio/api/metadata/{self.alice_audio.pk}/'
+
+        self.assertEqual(owner.get(detail).json()['album_name'], self.ALICE_ALBUM)
+        self.assertEqual(owner.patch(detail, {'album_name': 'Renamed'}, format='json').status_code, 200)
+        self.assertEqual(MusicMetadata.objects.get(audio=self.alice_audio).album_name, 'Renamed')
 
     # --- AudioArtworkViewSet: owner-scoped retrieve -----------------------------
     def test_bob_cannot_read_alice_audio_artwork(self):

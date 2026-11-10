@@ -222,9 +222,9 @@ class UserConfig(models.Model):
     # Audio Quality
     audio_quality = models.CharField(
         max_length=20,
-        default='high',
-        choices=[('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('best', 'Best')],
-        help_text="Preferred audio quality"
+        default='original',
+        choices=[('original', 'Original'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('best', 'Best')],
+        help_text="Download quality; 'original' keeps the source audio without converting it"
     )
     
     # Display Settings

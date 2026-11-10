@@ -38,8 +38,13 @@ import { useIntelligentPrefetch } from './hooks/useIntelligentPrefetch';
 import { useSettings } from './context/SettingsContext';
 import { useRadio } from './context/RadioContext';
 import { NowPlayingProvider, getTrackKey } from './context/NowPlayingContext';
+import { AddMusicProvider, SharedLinkRoute } from './context/AddMusicContext';
 import { checkPlaybackSession, deviceId, loadResumedQueue, usePlaybackSyncWriter, useRemotePlayback, type PlaybackSession } from './hooks/usePlaybackSync';
 import RemotePlaybackBanner from './components/RemotePlaybackBanner';
+import StatsTabs from './components/StatsTabs';
+import BottomNav, { BOTTOM_NAV_OFFSET } from './components/BottomNav';
+import ConfirmDialog from './components/ConfirmDialog';
+import { audioCache } from './utils/audioCache';
 import { useTranslation } from 'react-i18next';
 import { claimBrowserData, clearAccountData, watchDataOwner } from './utils/accountData';
 import { flushListeningEvents } from './utils/listeningOutbox';
@@ -47,6 +52,9 @@ import { audioAPI, playbackSyncAPI, userAPI, ensureCsrfCookie, setAuthEventsEnab
 import type { Audio } from './types';
 
 const UNAVAILABLE_NOTICE_MS = 6000;
+// One broken file should not end a listening session, but a dead connection should not skip
+// through a whole queue either.
+const MAX_CONSECUTIVE_PLAYBACK_FAILURES = 3;
 // Resuming starts a little early, so the listener hears where they were.
 const RESUME_REWIND_SECONDS = 5;
 
@@ -72,6 +80,9 @@ function App() {
   const [resumeSession, setResumeSession] = useState<PlaybackSession | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [unavailableOnResume, setUnavailableOnResume] = useState(0);
+  const [playbackNotice, setPlaybackNotice] = useState('');
+  const [offlineTracksAtLogout, setOfflineTracksAtLogout] = useState(0);
+  const consecutivePlaybackFailures = useRef(0);
   
   const settingsContext = useSettings();
   
@@ -184,6 +195,7 @@ function App() {
   // keeps the whole App tree from reconciling on every timeupdate event.
   const handleTimeUpdate = useCallback((time: number) => {
     currentTimeRef.current = time;
+    if (time > 0) consecutivePlaybackFailures.current = 0;
   }, []);
 
   // Handle favorite toggle from player
@@ -194,6 +206,11 @@ function App() {
         is_favorite: isFavorite
       });
     }
+  };
+
+  const handlePlayerRatingChange = (audioId: number, rating: number) => {
+    if (currentAudio?.id !== audioId) return;
+    setCurrentAudio({ ...currentAudio, rating });
   };
 
   // Handle track selection from related tracks
@@ -307,6 +324,16 @@ function App() {
     await clearAccountData(endServerSession);
   };
 
+  // Logging out clears what this device saved for offline listening, so that is asked first.
+  const requestLogout = async () => {
+    const savedForOffline = await audioCache.pinnedTrackIds().catch(() => new Set<string>());
+    if (savedForOffline.size === 0) {
+      handleLogout();
+      return;
+    }
+    setOfflineTracksAtLogout(savedForOffline.size);
+  };
+
   const toggleMobileDrawer = () => {
     setMobileDrawerOpen(!mobileDrawerOpen);
   };
@@ -410,6 +437,32 @@ function App() {
     await advanceToNext();
   }, [isRadioMode, currentAudio, reportPlayed, advanceToNext]);
 
+  const hasNextTrack = isRadioMode || queue.length > 1 && (
+    Boolean(settingsContext?.settings?.shuffle_enabled)
+    || settingsContext?.settings?.repeat_mode === 'all'
+    || currentQueueIndex < queue.length - 1
+  );
+
+  // The player could not play the current track: say which one, and move on if that can help.
+  const handlePlaybackError = useCallback(() => {
+    if (!currentAudio) return;
+
+    consecutivePlaybackFailures.current += 1;
+    const failedTooOften = consecutivePlaybackFailures.current >= MAX_CONSECUTIVE_PLAYBACK_FAILURES;
+    if (failedTooOften) {
+      setIsPlaying(false);
+      setPlaybackNotice(t('player.errors.stoppedAfterSeveral'));
+      return;
+    }
+    if (!hasNextTrack) {
+      setIsPlaying(false);
+      setPlaybackNotice(t('player.errors.cannotPlay', { title: currentAudio.title }));
+      return;
+    }
+    setPlaybackNotice(t('player.errors.cannotPlaySkipping', { title: currentAudio.title }));
+    advanceToNext();
+  }, [currentAudio, hasNextTrack, advanceToNext, t]);
+
   // Waiting plays go out when the app opens and when the connection returns.
   useEffect(() => {
     if (!accountId) return undefined;
@@ -506,6 +559,7 @@ function App() {
   }
 
   return (
+    <AddMusicProvider>
     <Box sx={{ display: 'flex', height: '100vh', backgroundColor: 'background.default' }}>
       {/* Sidebar - Desktop Permanent, Mobile Drawer */}
       <Sidebar mobileOpen={mobileDrawerOpen} onMobileClose={() => setMobileDrawerOpen(false)} />
@@ -528,7 +582,7 @@ function App() {
         />
         
         {/* Top Bar */}
-        <TopBar onLogout={handleLogout} onMenuClick={toggleMobileDrawer} />
+        <TopBar onLogout={requestLogout} onMenuClick={toggleMobileDrawer} />
 
         {/* Radio Indicator - Shows when radio mode is active */}
         {isRadioMode && (
@@ -578,13 +632,14 @@ function App() {
             <Route path="/playlists/:playlistId" element={<PlaylistDetailPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/smart-playlists" element={<SmartPlaylistsPage setCurrentAudio={setAudioWithQueue} />} />
             <Route path="/smart-playlist/:playlistId" element={<SmartPlaylistDetailPage setCurrentAudio={setAudioWithQueue} />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/achievements" element={<AchievementsPage />} />
-            <Route path="/wrapped" element={<YearlyWrappedPage />} />
-            <Route path="/history" element={<ListeningHistoryPage onTrackSelect={setAudioWithQueue} />} />
+            <Route path="/analytics" element={<><StatsTabs /><AnalyticsPage /></>} />
+            <Route path="/achievements" element={<><StatsTabs /><AchievementsPage /></>} />
+            <Route path="/wrapped" element={<><StatsTabs /><YearlyWrappedPage /></>} />
+            <Route path="/history" element={<><StatsTabs /><ListeningHistoryPage onTrackSelect={setAudioWithQueue} /></>} />
             <Route path="/local-files" element={accountId !== null && <LocalFilesPage setCurrentAudio={setAudioWithQueue} accountId={accountId} />} />
             <Route path="/offline" element={<OfflineManagerPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/share" element={<SharedLinkRoute />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -592,6 +647,8 @@ function App() {
           </Suspense>
           </LazyRouteBoundary>
         </Box>
+
+        <BottomNav />
       </Box>
 
       {/* Right Side Player - Desktop Only (Like Reference Design) */}
@@ -618,10 +675,12 @@ function App() {
             }}
             onNext={handleSkip}
             onTrackEnded={handleTrackEnded}
+            onPlaybackError={handlePlaybackError}
             onPrevious={playPrevious}
-            hasNext={isRadioMode || queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || settingsContext?.settings?.repeat_mode === 'all' || currentQueueIndex < queue.length - 1)}
+            hasNext={hasNextTrack}
             hasPrevious={currentQueueIndex > 0}
             onFavoriteToggle={handlePlayerFavoriteToggle}
+            onRatingChange={handlePlayerRatingChange}
             onTrackSelect={handleRelatedTrackSelect}
             onTimeUpdate={handleTimeUpdate}
             initialSeek={(currentAudio as any)._initialSeek}
@@ -682,10 +741,12 @@ function App() {
               onMinimize={() => setPlayerMinimized(true)}
               onNext={handleSkip}
               onTrackEnded={handleTrackEnded}
+              onPlaybackError={handlePlaybackError}
               onPrevious={playPrevious}
-              hasNext={isRadioMode || queue.length > 1 && (settingsContext?.settings?.shuffle_enabled || settingsContext?.settings?.repeat_mode === 'all' || currentQueueIndex < queue.length - 1)}
+              hasNext={hasNextTrack}
               hasPrevious={currentQueueIndex > 0}
               onFavoriteToggle={handlePlayerFavoriteToggle}
+              onRatingChange={handlePlayerRatingChange}
               onTrackSelect={handleRelatedTrackSelect}
               onTimeUpdate={handleTimeUpdate}
               initialSeek={(currentAudio as any)._initialSeek}
@@ -705,7 +766,7 @@ function App() {
               sx={{
                 display: { xs: 'flex', lg: 'none' },
                 position: 'fixed',
-                bottom: 0,
+                bottom: { xs: BOTTOM_NAV_OFFSET, md: 0 },
                 left: 0,
                 right: 0,
                 height: 72,
@@ -814,6 +875,14 @@ function App() {
         onClose={() => setUnavailableOnResume(0)}
         message={t('resumePlayback.tracksUnavailable', { count: unavailableOnResume })}
       />
+      <Snackbar
+        open={playbackNotice !== ''}
+        autoHideDuration={UNAVAILABLE_NOTICE_MS}
+        onClose={() => setPlaybackNotice('')}
+        message={playbackNotice}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        data-testid="playback-notice"
+      />
       <ResumePlaybackDialog
         open={showResumeDialog}
         session={resumeSession}
@@ -821,9 +890,22 @@ function App() {
         onDismiss={handleDismissResume}
       />
 
+      <ConfirmDialog
+        open={offlineTracksAtLogout > 0}
+        title={t('topbar.logoutConfirm.title')}
+        message={t('topbar.logoutConfirm.message', { count: offlineTracksAtLogout })}
+        confirmLabel={t('topbar.logout')}
+        onConfirm={() => {
+          setOfflineTracksAtLogout(0);
+          handleLogout();
+        }}
+        onCancel={() => setOfflineTracksAtLogout(0)}
+      />
+
       {/* PWA Prompts */}
       <PWAPrompts />
     </Box>
+    </AddMusicProvider>
   );
 }
 

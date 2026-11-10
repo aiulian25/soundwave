@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../components/ConfirmDialog';
 import { formatDuration } from '../utils/formatDuration';
 import {
   Box,
@@ -30,6 +31,7 @@ interface LocalFilesPageProps {
 
 export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFilesPageProps) {
   const { t } = useTranslation();
+  const { askToConfirm, confirmDialog } = useConfirm();
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
@@ -278,7 +280,8 @@ export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFile
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('localFilesNew.confirmations.removeFile'))) return;
+    const removal = { message: t('localFilesNew.confirmations.removeFile'), confirmLabel: t('common.remove') };
+    if (!(await askToConfirm(removal))) return;
     
     try {
       await localAudioDB.delete(id);
@@ -292,7 +295,8 @@ export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFile
   };
 
   const handleClearAll = async () => {
-    if (!confirm(t('localFilesNew.confirmations.removeAllFiles'))) return;
+    const removal = { message: t('localFilesNew.confirmations.removeAllFiles'), confirmLabel: t('common.remove') };
+    if (!(await askToConfirm(removal))) return;
 
     try {
       await localAudioDB.clear();
@@ -474,6 +478,7 @@ export default function LocalFilesPage({ setCurrentAudio, accountId }: LocalFile
           {alert?.message}
         </Alert>
       </Snackbar>
+      {confirmDialog}
     </Box>
   );
 }

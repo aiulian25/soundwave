@@ -33,11 +33,20 @@ class ArtworkSerializer(serializers.ModelSerializer):
     def get_fields(self):
         """Scope related objects to the requester, so a foreign id is simply "does not exist"."""
         fields = super().get_fields()
-        request = self.context.get('request')
-        owner = request.user if request else None
+        owner = self._signed_in_requester()
         fields['audio'].queryset = Audio.objects.filter(owner=owner)
         fields['channel'].queryset = Channel.objects.filter(owner=owner)
         return fields
+
+    def _signed_in_requester(self):
+        """The requesting account, or None, which owns nothing.
+
+        Schema generation runs with an anonymous user, and filtering on that object raises.
+        """
+        requester = getattr(self.context.get('request'), 'user', None)
+        if requester is None or not requester.is_authenticated:
+            return None
+        return requester
 
     def validate(self, attrs):
         if self.instance is not None:

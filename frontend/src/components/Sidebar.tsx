@@ -1,4 +1,4 @@
-import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Drawer, Chip } from '@mui/material';
+import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Drawer, Chip, Typography } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import HomeIcon from '@mui/icons-material/Home';
@@ -12,10 +12,8 @@ import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import InsightsIcon from '@mui/icons-material/Insights';
-import HistoryIcon from '@mui/icons-material/History';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
 import AppVersionStatus from './AppVersionStatus';
+import { STATS_HOME_PATH, isStatsPath } from './StatsTabs';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -47,26 +45,50 @@ const navButtonSx = {
   },
 } as const;
 
-const menuItems = [
-  { titleKey: 'sidebar.home', path: '/', icon: <HomeIcon /> },
-  { titleKey: 'sidebar.search', path: '/search', icon: <SearchIcon /> },
-  { titleKey: 'sidebar.library', path: '/library', icon: <LibraryMusicIcon /> },
-  { titleKey: 'sidebar.favorites', path: '/favorites', icon: <FavoriteIcon /> },
-  { titleKey: 'sidebar.history', path: '/history', icon: <HistoryIcon /> },
-  { titleKey: 'sidebar.channels', path: '/channels', icon: <YouTubeIcon /> },
-  { titleKey: 'sidebar.playlists', path: '/playlists', icon: <PlaylistPlayIcon /> },
-  { titleKey: 'sidebar.smartPlaylists', path: '/smart-playlists', icon: <AutoAwesomeIcon /> },
-  { titleKey: 'sidebar.analytics', path: '/analytics', icon: <InsightsIcon /> },
-  { titleKey: 'sidebar.achievements', path: '/achievements', icon: <EmojiEventsIcon /> },
-  { titleKey: 'sidebar.yearlyWrapped', path: '/wrapped', icon: <CardGiftcardIcon /> },
-  { titleKey: 'sidebar.localFiles', path: '/local-files', icon: <CloudUploadIcon /> },
-  { titleKey: 'sidebar.offline', path: '/offline', icon: <CloudDoneIcon />, isPWA: true },
+interface MenuItem {
+  titleKey: string;
+  path: string;
+  icon: JSX.Element;
+  isPWA?: boolean;
+  /** For an entry that stands for several pages: is this address one of them? */
+  covers?: (pathname: string) => boolean;
+}
+
+// Three short groups instead of one list of thirteen: fewer things to read before finding one.
+const menuSections: { titleKey: string; items: MenuItem[] }[] = [
+  {
+    titleKey: 'sidebar.groups.listen',
+    items: [
+      { titleKey: 'sidebar.home', path: '/', icon: <HomeIcon /> },
+      { titleKey: 'sidebar.search', path: '/search', icon: <SearchIcon /> },
+      { titleKey: 'sidebar.library', path: '/library', icon: <LibraryMusicIcon /> },
+      { titleKey: 'sidebar.favorites', path: '/favorites', icon: <FavoriteIcon /> },
+      { titleKey: 'sidebar.playlists', path: '/playlists', icon: <PlaylistPlayIcon /> },
+      { titleKey: 'sidebar.smartPlaylists', path: '/smart-playlists', icon: <AutoAwesomeIcon /> },
+    ],
+  },
+  {
+    titleKey: 'sidebar.groups.sources',
+    items: [
+      { titleKey: 'sidebar.channels', path: '/channels', icon: <YouTubeIcon /> },
+      { titleKey: 'sidebar.localFiles', path: '/local-files', icon: <CloudUploadIcon /> },
+    ],
+  },
+  {
+    titleKey: 'sidebar.groups.more',
+    items: [
+      { titleKey: 'sidebar.stats', path: STATS_HOME_PATH, icon: <InsightsIcon />, covers: isStatsPath },
+      { titleKey: 'sidebar.offline', path: '/offline', icon: <CloudDoneIcon />, isPWA: true },
+    ],
+  },
 ];
 
 export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const isCurrent = (item: MenuItem) => (item.covers ? item.covers(location.pathname) : location.pathname === item.path);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -117,10 +139,19 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           },
         }}
       >
-        {menuItems.map((item) => (
+        {menuSections.map((section) => (
+          <Box key={section.titleKey} component="li" sx={{ listStyle: 'none', mb: 1 }}>
+            <Typography
+              variant="overline"
+              sx={{ display: 'block', px: 2, pt: 0.5, color: 'text.disabled', letterSpacing: 1, lineHeight: 2 }}
+            >
+              {t(section.titleKey)}
+            </Typography>
+            <List disablePadding aria-label={t(section.titleKey)}>
+        {section.items.map((item) => (
           <ListItem key={item.path} disablePadding sx={{ mb: 'clamp(1px, 0.4vh, 6px)' }}>
             <ListItemButton
-              selected={location.pathname === item.path}
+              selected={isCurrent(item)}
               onClick={() => handleNavigate(item.path)}
               sx={navButtonSx}
             >
@@ -131,7 +162,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                 primary={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     {t(item.titleKey)}
-                    {(item as any).isPWA && (
+                    {item.isPWA && (
                       <Chip 
                         label={t('sidebar.pwaBadge')} 
                         size="small" 
@@ -148,12 +179,15 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                   </Box>
                 }
                 primaryTypographyProps={{ 
-                  fontWeight: location.pathname === item.path ? 600 : 500,
+                  fontWeight: isCurrent(item) ? 600 : 500,
                   fontSize: '0.875rem'
                 }} 
               />
             </ListItemButton>
           </ListItem>
+        ))}
+            </List>
+          </Box>
         ))}
       </List>
 

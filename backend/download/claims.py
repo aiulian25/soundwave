@@ -106,6 +106,52 @@ def requeue_if_failed(queue_item):
     queue_item.save(update_fields=['status'])
 
 
+IN_PROGRESS_STATUSES = ('pending', 'downloading')
+
+
+def _track_is_in_library(queue_item):
+    from audio.models import Audio  # audio's storage layer imports this app's models
+
+    downloaded = Audio.objects.filter(owner_id=queue_item.owner_id, youtube_id=queue_item.youtube_id)
+    return bool(queue_item.youtube_id) and downloaded.exclude(file_path='').exists()
+
+
+def requeue_for_explicit_request(queue_item):
+    """The owner asked for this link again. Returns True if the row was made pending.
+
+    A failed or dismissed row, or a finished one whose track has since gone, would otherwise
+    stay as it is and the request would silently do nothing.
+    """
+    if queue_item.status in IN_PROGRESS_STATUSES:
+        return False
+    if queue_item.status == 'completed' and _track_is_in_library(queue_item):
+        return False
+    queue_item.status = 'pending'
+    queue_item.error_message = ''
+    queue_item.retry_count = 0
+    queue_item.completed_date = None
+    queue_item.save(update_fields=['status', 'error_message', 'retry_count', 'completed_date'])
+    return True
+
+
+def keep_deleted_track_away(owner, youtube_id):
+    """The owner deleted this track: leave a tombstone so no sync downloads it again.
+
+    Without one, a sync finds a finished row with no track, or no row at all, and fetches it.
+    Adding the link again or a forced recheck still brings it back. Clearing the claim stops a
+    download of it that is running.
+    """
+    rows = DownloadQueue.objects.filter(owner=owner, youtube_id=youtube_id)
+    if rows.exists():
+        rows.update(status='ignored', error_message='', claim_token=None, lease_expires_at=None)
+        return
+    DownloadQueue.objects.update_or_create(
+        owner=owner,
+        url=f'https://www.youtube.com/watch?v={youtube_id}',
+        defaults={'youtube_id': youtube_id, 'status': 'ignored'},
+    )
+
+
 def cancel_unfinished_downloads(owner, **source):
     """Removing a subscription cancels work it started; deleting the row is what cancels it.
 

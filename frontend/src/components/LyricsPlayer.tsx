@@ -36,6 +36,8 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import TuneIcon from '@mui/icons-material/Tune';
 import { useTranslation } from 'react-i18next';
+import InstrumentalLyrics from './InstrumentalLyrics';
+import { saveLyricsFile } from '../utils/lyricsDownload';
 import api, { audioAPI } from '../api/client';
 import { offlineStorage } from '../utils/offlineStorage';
 import { removeOfflineLyrics, replaceOfflineLyrics } from '../utils/offlineLibrary';
@@ -44,30 +46,12 @@ import { useSettings } from '../context/SettingsContext';
 import TrackDetails, { hasTrackDetails } from './TrackDetails';
 import LyricsSuggestionList, { type LyricsSuggestion } from './LyricsSuggestionList';
 import { parseSyncedLyrics, type LyricsLine } from '../utils/lrc';
+import type { LyricsData } from '../types';
 import LyricsTimingEditor from './LyricsTimingEditor';
 
 const MAX_LRC_UPLOAD_BYTES = 1024 * 1024;
 const UPLOAD_SNACKBAR_DURATION_MS = 3000;
 const OFFLINE_ERROR_SNACKBAR_DURATION_MS = 4000;
-
-interface LyricsData {
-  audio_id: string;
-  audio_title: string;
-  synced_lyrics: string;
-  original_synced_lyrics?: string;
-  revision?: string;
-  plain_lyrics: string;
-  is_instrumental: boolean;
-  source: string;
-  uploaded_filename?: string;
-  language: string;
-  has_lyrics: boolean;
-  is_synced: boolean;
-  display_lyrics: string;
-  fetch_attempted: boolean;
-  fetch_attempts: number;
-  last_error: string;
-}
 
 interface LyricsPlayerProps {
   youtubeId: string;
@@ -82,9 +66,11 @@ interface LyricsPlayerProps {
   viewCount?: number;
   likeCount?: number;
   publishedDate?: string;
+  rating?: number;
+  onRate?: (stars: number) => void;
 }
 
-function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visualizerTheme, isLightMode, description, viewCount, likeCount, publishedDate }: LyricsPlayerProps) {
+function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visualizerTheme, isLightMode, description, viewCount, likeCount, publishedDate, rating, onRate }: LyricsPlayerProps) {
   const { t } = useTranslation();
   // Get settings and theme for automatic detection
   const { settings } = useSettings();
@@ -340,33 +326,7 @@ function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visua
   const handleDownload = async (format: 'lrc' | 'txt') => {
     setDownloadMenuAnchor(null);
     try {
-      // Use axios to get the file with auth headers
-      // Note: use 'type' param instead of 'format' to avoid DRF content negotiation conflict
-      const response = await api.get(`/audio/${youtubeId}/lyrics/download/?type=${format}`, {
-        responseType: 'blob',
-      });
-      
-      // Create download link
-      const blob = new Blob([response.data], { type: 'text/plain;charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Get filename from Content-Disposition header or generate one
-      const contentDisposition = response.headers['content-disposition'];
-      let filename = `lyrics.${format}`;
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="(.+)"/);
-        if (match) {
-          filename = match[1];
-        }
-      }
-      
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await saveLyricsFile(youtubeId, format);
     } catch (err: any) {
       console.error('Download failed:', err);
       setError(err.response?.data?.error || t('lyrics.errors.downloadFailed'));
@@ -432,7 +392,7 @@ function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visua
     setCurrentLineIndex(index);
   };
 
-  const trackHasDetails = hasTrackDetails({ description, viewCount, likeCount, publishedDate });
+  const trackHasDetails = hasTrackDetails({ description, viewCount, likeCount, publishedDate, onRate });
 
   // One hidden input + one set of feedback snackbars for all three lyrics states. They used to
   // be copy-pasted per branch, which is why offlineSaveError only ever surfaced on one of them.
@@ -506,6 +466,8 @@ function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visua
             viewCount={viewCount}
             likeCount={likeCount}
             publishedDate={publishedDate}
+            rating={rating}
+            onRate={onRate}
           />
         </Box>
       </Box>
@@ -557,8 +519,8 @@ function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visua
 
   if (lyrics.is_instrumental) {
     return (
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {onClose && (
+      <InstrumentalLyrics
+        header={onClose && (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', p: 1 }}>
             {renderDetailsToggleButton()}
             <IconButton aria-label={t('common.close')} size="small" onClick={onClose}>
@@ -566,38 +528,12 @@ function LyricsPlayer({ youtubeId, currentTime, duration, onClose, onSeek, visua
             </IconButton>
           </Box>
         )}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-          <MusicNoteIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            {t('lyrics.instrumental.title')}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-            {t('lyrics.instrumental.description')}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={deleting ? <CircularProgress size={16} /> : <SearchIcon />}
-              onClick={deleteLyrics}
-              disabled={deleting}
-            >
-              {deleting ? t('lyrics.actions.clearing') : t('lyrics.actions.searchForLyrics')}
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={uploading ? <CircularProgress size={16} /> : <UploadFileIcon />}
-              onClick={handleUploadClick}
-              disabled={uploading}
-              color="secondary"
-            >
-              {uploading ? t('lyrics.actions.uploading') : t('lyrics.actions.uploadLrc')}
-            </Button>
-          </Box>
-          {renderUploadControls()}
-        </Box>
-      </Box>
+        searching={deleting}
+        uploading={uploading}
+        onSearch={deleteLyrics}
+        onUpload={handleUploadClick}
+        uploadControls={renderUploadControls()}
+      />
     );
   }
 

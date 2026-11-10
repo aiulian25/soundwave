@@ -52,7 +52,12 @@
     },
     "musicLover": "Music Lover",
     "logout": "Logout",
-    "openDrawer": "Open navigation menu"
+    "openDrawer": "Open navigation menu",
+    "logoutConfirm": {
+      "title": "Log out?",
+      "message_one": "{{count}} track saved for offline listening will be removed from this device.",
+      "message_other": "{{count}} tracks saved for offline listening will be removed from this device."
+    }
   },
   "player": {
     "unknownArtist": "Unknown Artist",
@@ -69,11 +74,13 @@
     },
     "details": {
       "title": "Details",
-      "views": "{{count}} views",
-      "likes": "{{count}} likes",
       "showMore": "Show more",
       "showLess": "Show less",
-      "published": "Published {{date}}"
+      "published": "Published {{date}}",
+      "views_one": "{{count}} view",
+      "views_other": "{{count}} views",
+      "likes_one": "{{count}} like",
+      "likes_other": "{{count}} likes"
     },
     "trackOptions": "Track options",
     "addToPlaylist": "Add to Playlist",
@@ -87,7 +94,6 @@
     "radio": "RADIO",
     "sleepTimer": "Sleep timer",
     "sleepTimerActive": "Sleep timer active",
-    "queueCount": "Queue ({{count}} tracks)",
     "equalizer": "Equalizer",
     "equalizerOn": "Equalizer (on)",
     "classicBars": "Classic Bars",
@@ -110,7 +116,14 @@
       "moveUp": "Move up: {{title}}",
       "moveDown": "Move down: {{title}}",
       "minimize": "Minimize player"
-    }
+    },
+    "errors": {
+      "cannotPlaySkipping": "“{{title}}” could not be played. Skipping to the next track.",
+      "cannotPlay": "“{{title}}” could not be played.",
+      "stoppedAfterSeveral": "Playback stopped: several tracks in a row could not be played. Check your connection, then try again."
+    },
+    "queueCount_one": "Queue ({{count}} track)",
+    "queueCount_other": "Queue ({{count}} tracks)"
   },
   "home": {
     "sections": {
@@ -139,7 +152,7 @@
     "timeLeft": "{{minutes}}m {{seconds}}s left",
     "empty": {
       "title": "Welcome to SoundWave!",
-      "description": "Start by downloading some music or exploring your library."
+      "description": "Paste a YouTube link to download a track, or to subscribe to a playlist or channel."
     },
     "pullToRefresh": {
       "pull": "Pull to update",
@@ -212,15 +225,22 @@
       "plays": "Plays",
       "actions": "Actions"
     },
-    "trackCount": "{{count}} tracks in your library",
     "messages": {
-      "playingTracks": "Playing {{count}} tracks",
-      "shuffledTracks": "Shuffled {{count}} tracks"
+      "playingTracks_one": "Playing {{count}} track",
+      "playingTracks_other": "Playing {{count}} tracks",
+      "shuffledTracks_one": "Shuffled {{count}} track",
+      "shuffledTracks_other": "Shuffled {{count}} tracks"
     },
     "errors": {
       "noTracks": "No tracks in library",
       "noTracksToShuffle": "No tracks to shuffle"
-    }
+    },
+    "empty": {
+      "title": "Your library is empty",
+      "description": "Paste a YouTube link to download a track, or to subscribe to a playlist or channel."
+    },
+    "trackCount_one": "{{count}} track in your library",
+    "trackCount_other": "{{count}} tracks in your library"
   },
   "favorites": {
     "title": "Favorites",
@@ -243,8 +263,10 @@
     },
     "messages": {
       "removed": "Removed from favorites",
-      "playingTracks": "Playing {{count}} favorite tracks",
-      "shuffledTracks": "Shuffled {{count}} favorite tracks"
+      "playingTracks_one": "Playing {{count}} favorite track",
+      "playingTracks_other": "Playing {{count}} favorite tracks",
+      "shuffledTracks_one": "Shuffled {{count}} favorite track",
+      "shuffledTracks_other": "Shuffled {{count}} favorite tracks"
     },
     "errors": {
       "noFavoritesToPlay": "No favorites to play",
@@ -263,12 +285,13 @@
       "selectAll": "Select All",
       "deleteSelected": "Unsubscribe Selected",
       "subscribe": "Subscribe",
-      "subscribing": "Subscribing..."
+      "subscribing": "Subscribing...",
+      "unsubscribe": "Unsubscribe"
     },
     "pending": {
-      "processing": "Processing {{count}} channel subscription...",
-      "processing_other": "Processing {{count}} channel subscriptions...",
-      "description": "Server is downloading in background - will auto-refresh"
+      "description": "Server is downloading in background - will auto-refresh",
+      "processing_one": "Processing {{count}} channel subscription...",
+      "processing_other": "Processing {{count}} channel subscriptions..."
     },
     "selection": {
       "selectedCount": "{{selected}} of {{total}} selected"
@@ -285,7 +308,8 @@
     },
     "confirm": {
       "unsubscribeOne": "Unsubscribe from this channel? New videos will stop syncing. Tracks you already have stay in your library.",
-      "unsubscribeMany": "Unsubscribe from {{count}} channel(s)? New videos will stop syncing. Tracks you already have stay in your library."
+      "unsubscribeMany_one": "Unsubscribe from {{count}} channel? New videos will stop syncing. Tracks you already have stay in your library.",
+      "unsubscribeMany_other": "Unsubscribe from {{count}} channels? New videos will stop syncing. Tracks you already have stay in your library."
     },
     "messages": {
       "subscriptionStarted": "Channel subscription started",
@@ -342,16 +366,18 @@
     },
     "export": {
       "action": "Export playlist",
-      "summary": "{{count}} downloaded tracks will be exported.",
       "preparing": "Preparing export…",
-      "progress": "Exporting {{count}} tracks…",
       "done": "Export ready",
       "failed": "Export failed",
       "partial": "ZIP saved. {{omitted}} tracks could not be included and {{warned}} are missing some tags or artwork. See export-summary.json inside the ZIP.",
       "jobProgress": "Exporting in the background: {{done}} of {{total}} tracks",
       "jobContinues": "You can close this. The export keeps going, and the file stays available for an hour.",
       "cancelJob": "Cancel export",
-      "downloadReady": "Download ZIP"
+      "downloadReady": "Download ZIP",
+      "summary_one": "{{count}} downloaded track will be exported.",
+      "summary_other": "{{count}} downloaded tracks will be exported.",
+      "progress_one": "Exporting {{count}} track…",
+      "progress_other": "Exporting {{count}} tracks…"
     },
     "actions": {
       "cancelCaching": "Cancel",
@@ -379,9 +405,10 @@
       "partialTitle": "⚠️ Partly Offline",
       "readyTitle": "📱 Offline Ready",
       "cacheTitle": "💾 Cache for Offline",
-      "readyDescription": "{{count}} tracks cached and available without internet",
       "cacheDescription": "Download this playlist to listen without an internet connection",
-      "storageUsed": "Storage Used"
+      "storageUsed": "Storage Used",
+      "readyDescription_one": "{{count}} track cached and available without internet",
+      "readyDescription_other": "{{count}} tracks cached and available without internet"
     },
     "progress": {
       "title": "Download Progress",
@@ -407,16 +434,20 @@
     },
     "messages": {
       "cacheCanceled": "Offline download canceled",
-      "downloadingTracks": "Downloading {{count}} tracks to your device",
       "forceRecheckStarted": "Force recheck started — checking all tracks and re-downloading missing files...",
       "forceRecheckFailed": "Failed to start recheck: {{error}}",
       "starting": "Starting...",
       "cachePartial": "✅ {{cached}} tracks cached, {{failed}} failed",
-      "cacheSuccess": "✅ {{count}} tracks available offline!",
       "offlineDataRemoved": "Offline data removed",
       "downloadingTrack": "Downloading \"{{title}}\" to your device",
-      "playingTracks": "Playing {{count}} tracks",
-      "shuffledTracks": "Shuffled {{count}} tracks"
+      "playingTracks_one": "Playing {{count}} track",
+      "playingTracks_other": "Playing {{count}} tracks",
+      "shuffledTracks_one": "Shuffled {{count}} track",
+      "shuffledTracks_other": "Shuffled {{count}} tracks",
+      "downloadingTracks_one": "Downloading {{count}} track to your device",
+      "downloadingTracks_other": "Downloading {{count}} tracks to your device",
+      "cacheSuccess_one": "✅ {{count}} track available offline!",
+      "cacheSuccess_other": "✅ {{count}} tracks available offline!"
     },
     "errors": {
       "notAvailableOffline": "Playlist not available offline",
@@ -432,13 +463,13 @@
       "downloadFailed": "Download failed",
       "noDownloadedTracksToPlay": "No downloaded tracks to play",
       "noDownloadedTracksToShuffle": "No downloaded tracks to shuffle"
-    }
+    },
+    "loadingTracks": "Loading tracks: {{loaded}} of {{total}}"
   },
   "analytics": {
     "title": "Listening Insights",
     "description": "Your personal listening statistics and habits",
     "notAvailable": "N/A",
-    "days": "{{count}} days",
     "duration": {
       "minutesShort": "{{count}}m",
       "hoursShort": "{{count}}h",
@@ -480,10 +511,12 @@
       "genreDistribution": "Genre Distribution"
     },
     "hourlyChart": {
-      "tooltip": "{{hour}}: {{count}} plays ({{duration}})"
+      "tooltip_one": "{{hour}}: {{count}} play ({{duration}})",
+      "tooltip_other": "{{hour}}: {{count}} plays ({{duration}})"
     },
     "listItem": {
-      "playsDuration": "{{count}} plays • {{duration}}"
+      "playsDuration_one": "{{count}} play • {{duration}}",
+      "playsDuration_other": "{{count}} plays • {{duration}}"
     },
     "status": {
       "completed": "Completed"
@@ -494,7 +527,9 @@
     },
     "errors": {
       "unableToLoad": "Unable to load analytics data"
-    }
+    },
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
   },
   "yearlyWrapped": {
     "title": "🎁 Your {{year}} Wrapped",
@@ -502,9 +537,11 @@
     "year": "Year",
     "notAvailable": "N/A",
     "time": {
-      "minutes": "{{count}} minutes",
-      "hours": "{{count}} hours",
-      "daysHours": "{{days}} days, {{hours}} hours"
+      "daysHours": "{{days}} days, {{hours}} hours",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours"
     },
     "hours": {
       "midnight": "12 AM",
@@ -529,8 +566,10 @@
       "uniqueTracks": "{{count}} unique",
       "artistsDiscovered": "Artists Discovered",
       "longestStreak": "Longest Streak",
-      "days": "{{count}} days",
-      "daysActive": "{{count}} days active"
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "daysActive_one": "{{count}} day active",
+      "daysActive_other": "{{count}} days active"
     },
     "sections": {
       "numberOneArtist": "#1 Artist",
@@ -540,22 +579,25 @@
       "monthlyListening": "📅 Monthly Listening"
     },
     "artistSummary": "{{count}} plays • {{minutes}} minutes",
-    "playCount": "{{count}} plays",
-    "trackSummary": "{{artist}} • {{count}} plays",
     "highlights": {
       "peakMonth": "Peak Month: {{month}}",
       "peakTime": "Peak Time: {{time}}",
       "favoriteDay": "Favorite Day: {{day}}"
     },
     "achievements": {
-      "unlocked": "{{count}} Achievements Unlocked",
-      "inYear": "in {{year}}"
+      "inYear": "in {{year}}",
+      "unlocked_one": "{{count}} Achievement Unlocked",
+      "unlocked_other": "{{count}} Achievements Unlocked"
     },
     "errors": {
       "loadFailed": "Failed to load yearly wrapped",
       "noDataForYear": "No listening data found for {{year}}",
       "withHint": "{{error}}. Start listening to build your wrapped!"
-    }
+    },
+    "playCount_one": "{{count}} play",
+    "playCount_other": "{{count}} plays",
+    "trackSummary_one": "{{artist}} • {{count}} play",
+    "trackSummary_other": "{{artist}} • {{count}} plays"
   },
   "achievements": {
     "title": "🏆 Achievements",
@@ -564,15 +606,15 @@
       "checkForNew": "Check for New"
     },
     "messages": {
-      "newUnlocked": "🎉 {{count}} new achievement(s) unlocked!",
-      "noneYet": "No new achievements yet. Keep listening!"
+      "noneYet": "No new achievements yet. Keep listening!",
+      "newUnlocked_one": "🎉 {{count}} new achievement unlocked!",
+      "newUnlocked_other": "🎉 {{count}} new achievements unlocked!"
     },
     "errors": {
       "loadFailed": "Failed to load achievements data",
       "checkFailed": "Failed to check achievements"
     },
     "streak": {
-      "currentStreak": "{{count}} Day Streak",
       "atRisk": "⚠️ At Risk!",
       "onFire": "🔥 On Fire!",
       "listenedToday": "Great job! You've listened today. Keep it up!",
@@ -580,9 +622,13 @@
       "bestStreak": "Best Streak",
       "days": "days",
       "thisWeek": "This Week",
-      "dayTooltip": "{{day}}: {{count}} tracks played",
       "nextMilestone": "Next milestone: {{count}}-day streak",
-      "daysToGo": "{{count}} days to go"
+      "currentStreak_one": "{{count}} Day Streak",
+      "currentStreak_other": "{{count}} Day Streak",
+      "daysToGo_one": "{{count}} day to go",
+      "daysToGo_other": "{{count}} days to go",
+      "dayTooltip_one": "{{day}}: {{count}} track played",
+      "dayTooltip_other": "{{day}}: {{count}} tracks played"
     },
     "progress": {
       "unlockedOfTotal": "{{unlocked}} of {{total}} Achievements Unlocked"
@@ -781,17 +827,23 @@
       "actions": "Actions"
     },
     "stats": {
-      "subscribers": "{{count}} subscribers",
-      "tracks": "{{count}} tracks",
       "downloaded": "{{count}} downloaded",
       "pending": "{{count}} pending",
       "failed": "{{count}} failed",
-      "views": "{{count}} views"
+      "tracks_one": "{{count}} track",
+      "tracks_other": "{{count}} tracks",
+      "subscribers_one": "{{count}} subscriber",
+      "subscribers_other": "{{count}} subscribers",
+      "views_one": "{{count}} view",
+      "views_other": "{{count}} views"
     },
     "messages": {
-      "playingAll": "Playing all {{count}} tracks from {{channel}}",
-      "shuffling": "Shuffling {{count}} tracks from {{channel}}",
-      "downloadingTracks": "Downloading {{count}} tracks to your device"
+      "playingAll_one": "Playing the {{count}} track from {{channel}}",
+      "playingAll_other": "Playing all {{count}} tracks from {{channel}}",
+      "shuffling_one": "Shuffling {{count}} track from {{channel}}",
+      "shuffling_other": "Shuffling {{count}} tracks from {{channel}}",
+      "downloadingTracks_one": "Downloading {{count}} track to your device",
+      "downloadingTracks_other": "Downloading {{count}} tracks to your device"
     },
     "errors": {
       "loadFailed": "Failed to load channel",
@@ -890,7 +942,8 @@
     },
     "empty": {
       "noLyrics": "No lyrics found for this track",
-      "attemptedTimes": "Attempted {{count}} times"
+      "attemptedTimes_one": "Attempted {{count}} time",
+      "attemptedTimes_other": "Attempted {{count}} times"
     },
     "tabs": {
       "synced": "Synced",
@@ -898,10 +951,12 @@
     },
     "search": {
       "placeholder": "Search by song title or artist...",
-      "foundSuggestions": "Found {{count}} suggestions:",
       "byArtist": "by {{artist}}",
-      "suggestionsFoundReplace": "{{count}} suggestions found - select one to replace current lyrics:",
-      "noSuggestionsLoaded": "No suggestions loaded yet. Enter a search term or click Search to find lyrics."
+      "noSuggestionsLoaded": "No suggestions loaded yet. Enter a search term or click Search to find lyrics.",
+      "foundSuggestions_one": "Found {{count}} suggestion:",
+      "foundSuggestions_other": "Found {{count}} suggestions:",
+      "suggestionsFoundReplace_one": "{{count}} suggestion found - select it to replace current lyrics:",
+      "suggestionsFoundReplace_other": "{{count}} suggestions found - select one to replace current lyrics:"
     },
     "tags": {
       "synced": "Synced",
@@ -1089,54 +1144,6 @@
       "changePasswordFailed": "Failed to change password"
     }
   },
-  "quickSync": {
-    "title": "Quick Sync - Adaptive Streaming",
-    "currentStatus": "Current Status",
-    "networkSpeed": "Network Speed",
-    "systemResources": "System Resources",
-    "cpuUsage": "CPU Usage",
-    "memoryUsage": "Memory Usage",
-    "activeQuality": "Active Quality",
-    "autoSelected": "Auto-Selected",
-    "qualitySettings": "Quality Settings",
-    "qualityMode": "Quality Mode",
-    "bufferSettings": "Buffer Settings",
-    "bufferSize": "Buffer Size",
-    "maxBuffer": "Max Buffer",
-    "preload": "Preload",
-    "rebufferThreshold": "Rebuffer Threshold",
-    "modes": {
-      "auto": "Auto (Recommended)",
-      "autoDescription": "Adapts to your connection and system",
-      "ultra": "Ultra (320 kbps)",
-      "ultraDescription": "Maximum fidelity - requires 5+ Mbps",
-      "high": "High (256 kbps)",
-      "highDescription": "Best experience - requires 2+ Mbps",
-      "medium": "Medium (128 kbps)",
-      "mediumDescription": "Balanced - requires 1+ Mbps",
-      "low": "Low (64 kbps)",
-      "lowDescription": "Saves bandwidth - requires 0.5+ Mbps"
-    },
-    "tooltips": {
-      "preferHigherQuality": "When system resources allow, automatically upgrade to higher quality",
-      "adaptToSystemLoad": "Automatically adjust quality based on CPU and memory usage",
-      "applyToDownloads": "Use Quick Sync quality settings when downloading audio"
-    },
-    "actions": {
-      "runSpeedTest": "Run Speed Test",
-      "testingConnection": "Testing Connection..."
-    },
-    "messages": {
-      "qualityModeUpdated": "Quality mode updated successfully",
-      "preferencesUpdated": "Preferences updated successfully",
-      "speedTestCompleted": "Speed test completed"
-    },
-    "errors": {
-      "updateQualityModeFailed": "Failed to update quality mode",
-      "updatePreferencesFailed": "Failed to update preferences",
-      "speedTestFailed": "Speed test failed"
-    }
-  },
   "avatarDialog": {
     "title": "Choose Your Avatar",
     "sections": {
@@ -1174,11 +1181,15 @@
     },
     "relative": {
       "justNow": "just now",
-      "minutesAgo": "{{count}} minutes ago",
-      "hoursAgo": "{{count}} hours ago",
-      "daysAgo": "{{count}} days ago"
+      "minutesAgo_one": "{{count}} minute ago",
+      "minutesAgo_other": "{{count}} minutes ago",
+      "hoursAgo_one": "{{count}} hour ago",
+      "hoursAgo_other": "{{count}} hours ago",
+      "daysAgo_one": "{{count}} day ago",
+      "daysAgo_other": "{{count}} days ago"
     },
-    "tracksUnavailable": "{{count}} track(s) from your queue are no longer available"
+    "tracksUnavailable_one": "{{count}} track from your queue is no longer available",
+    "tracksUnavailable_other": "{{count}} tracks from your queue are no longer available"
   },
   "sleepTimer": {
     "title": "Sleep Timer",
@@ -1193,22 +1204,26 @@
     "minutesShort": "{{count}} min",
     "hoursShort": "{{count}} hr",
     "hoursMinutesShort": "{{hours}} hr {{minutes}} min",
-    "songsCount": "{{count}} songs",
     "endOfTrackDescription": "Playback will stop when the current track ends.",
     "fadeOutBeforeStopping": "Fade out before stopping",
     "fadeOutDescription": "Gradually reduce volume for a smoother ending",
-    "fadeDuration": "Fade duration: {{count}} seconds",
     "remaining": {
-      "seconds": "{{count}} seconds remaining",
       "time": "{{time}} remaining",
-      "songs": "{{count}} songs remaining",
-      "afterThisTrack": "Stopping after this track"
+      "afterThisTrack": "Stopping after this track",
+      "songs_one": "{{count}} song remaining",
+      "songs_other": "{{count}} songs remaining",
+      "seconds_one": "{{count}} second remaining",
+      "seconds_other": "{{count}} seconds remaining"
     },
     "actions": {
       "cancelTimer": "Cancel Timer",
       "updateTimer": "Update Timer",
       "startSleepTimer": "Start Sleep Timer"
-    }
+    },
+    "songsCount_one": "{{count}} song",
+    "songsCount_other": "{{count}} songs",
+    "fadeDuration_one": "Fade duration: {{count}} second",
+    "fadeDuration_other": "Fade duration: {{count}} seconds"
   },
   "addToPlaylist": {
     "title": "Add to Playlist",
@@ -1231,7 +1246,8 @@
     "empty": {
       "noCustomPlaylists": "No custom playlists yet. Create one!"
     },
-    "trackCount": "{{count}} tracks"
+    "trackCount_one": "{{count}} track",
+    "trackCount_other": "{{count}} tracks"
   },
   "playlistCard": {
     "status": {
@@ -1303,23 +1319,6 @@
     }
   },
   "downloadStatus": {
-    "title": "Downloads",
-    "offline": "Offline",
-    "tooltip": {
-      "online": "Download Status",
-      "offline": "Offline - Download status updates when you reconnect"
-    },
-    "actions": {
-      "refresh": "Refresh"
-    },
-    "sections": {
-      "activeDownloads": "Active Downloads ({{count}})"
-    },
-    "empty": {
-      "title": "No active downloads",
-      "online": "Downloads you start will appear here",
-      "offline": "You are offline. Download status updates when you reconnect."
-    },
     "errors": {
       "blockedUrl": "This download link is invalid or points to a blocked address.",
       "cookiesRefresh": "YouTube asked to sign in: replace cookies.txt with a fresh export, then retry (see README).",
@@ -1333,8 +1332,6 @@
   },
   "relatedTracks": {
     "title": "Related Tracks",
-    "trackCount": "{{count}} tracks",
-    "moreTracks": "+{{count}} more tracks",
     "algorithmHint": "Based on your listening patterns, favorites, and popular tracks",
     "sections": {
       "recommendedForYou": "Recommended for You",
@@ -1351,7 +1348,11 @@
     },
     "empty": {
       "description": "No related tracks found. Start listening to more music to get personalized recommendations!"
-    }
+    },
+    "trackCount_one": "{{count}} track",
+    "trackCount_other": "{{count}} tracks",
+    "moreTracks_one": "+{{count}} more track",
+    "moreTracks_other": "+{{count}} more tracks"
   },
   "metadataEditor": {
     "title": "Edit Metadata",
@@ -1416,18 +1417,30 @@
       "addToPlaylist": "Add to Playlist",
       "download": "Download",
       "goToChannel": "Go to Channel",
-      "findInPlaylists": "Find in Playlists"
+      "findInPlaylists": "Find in Playlists",
+      "removeFromPlaylist": "Remove from this playlist",
+      "deleteFromLibrary": "Delete from library"
     },
     "split": {
       "action": "Split into tracks",
-      "success": "Split into {{count}} parts",
       "noTracklist": "No tracklist found in this track's chapters or description.",
-      "error": "Couldn't split this track. Please try again."
+      "error": "Couldn't split this track. Please try again.",
+      "success_one": "Split into {{count}} part",
+      "success_other": "Split into {{count}} parts"
     },
     "findInPlaylists": {
       "title": "Playlists containing this track",
       "empty": "This track is not in any playlist yet.",
-      "secondary": "{{count}} tracks • Position #{{position}}"
+      "secondary_one": "{{count}} track • Position #{{position}}",
+      "secondary_other": "{{count}} tracks • Position #{{position}}"
+    },
+    "delete": {
+      "title": "Delete this track?",
+      "message": "“{{title}}” will be removed from your library, with its file, lyrics and listening history. Playlists and channels you subscribe to will not download it again. This cannot be undone.",
+      "error": "This track could not be deleted. Try again."
+    },
+    "removeFromPlaylist": {
+      "error": "This track could not be removed from the playlist. Try again."
     }
   },
   "achievementNotification": {
@@ -1442,7 +1455,6 @@
   },
   "listeningHistory": {
     "title": "Listening History",
-    "trackCount": "{{count}} tracks in your history",
     "groups": {
       "today": "Today",
       "yesterday": "Yesterday",
@@ -1459,9 +1471,9 @@
     },
     "onThisDay": {
       "title": "On This Day",
-      "memoriesCount": "{{count}} memories"
+      "memoriesCount_one": "{{count}} memory",
+      "memoriesCount_other": "{{count}} memories"
     },
-    "moreTracks": "+{{count}} more tracks",
     "showingFirst50": "Showing first 50 of {{count}} tracks",
     "actions": {
       "refresh": "Refresh",
@@ -1487,7 +1499,11 @@
       "title": "No listening history yet",
       "description": "Start playing some music to build your history!"
     },
-    "completed": "Listened to completion"
+    "completed": "Listened to completion",
+    "trackCount_one": "{{count}} track in your history",
+    "trackCount_other": "{{count}} tracks in your history",
+    "moreTracks_one": "+{{count}} more track",
+    "moreTracks_other": "+{{count}} more tracks"
   },
   "offlineManager": {
     "partialTrackCount": "{{available}} of {{total}} tracks playable offline",
@@ -1508,7 +1524,6 @@
       "browsePlaylists": "Browse Playlists",
       "remove": "Remove"
     },
-    "trackCount": "{{count}} tracks",
     "cachedAt": "Cached {{date}}",
     "removeDialog": {
       "title": "Remove Offline Playlist?",
@@ -1525,7 +1540,9 @@
     },
     "empty": {
       "title": "No playlists cached for offline use"
-    }
+    },
+    "trackCount_one": "{{count}} track",
+    "trackCount_other": "{{count}} tracks"
   },
   "adminUsers": {
     "title": "User Management",
@@ -1590,8 +1607,9 @@
       "never": "Never"
     },
     "content": {
-      "channelsCount": "{{count}} channels",
-      "summary": "{{playlists}} playlists, {{audio}} audio"
+      "summary": "{{playlists}} playlists, {{audio}} audio",
+      "channelsCount_one": "{{count}} channel",
+      "channelsCount_other": "{{count}} channels"
     },
     "empty": {
       "noUsers": "No users found"
@@ -1653,7 +1671,6 @@
     },
     "title": "Smart Playlists",
     "description": "Dynamic playlists that automatically update based on rules. Your library changes, they update instantly.",
-    "trackCount": "{{count}} tracks",
     "sections": {
       "autoPlaylists": "Auto Playlists",
       "customSmartPlaylists": "Custom Smart Playlists"
@@ -1670,6 +1687,7 @@
       "mostPlayedTop50": "Most Played (Top 50)",
       "recentlyAdded30Days": "Recently Added (Last 30 days)",
       "favorites": "Favorites",
+      "topRated": "Top Rated (4 stars and up)",
       "byGenre": "By Genre...",
       "byArtist": "By Artist...",
       "shortTracks": "Short Tracks (Under 3 min)",
@@ -1698,9 +1716,11 @@
       "created": "Smart playlist created!",
       "deleted": "Smart playlist deleted",
       "noTracks": "No tracks in this playlist",
-      "playing": "Playing {{count}} tracks",
-      "playingShuffled": "Playing {{count}} tracks (shuffled)",
-      "noRulesWarning": "No rules set - playlist will include all tracks. Add rules after creation to filter."
+      "noRulesWarning": "No rules set - playlist will include all tracks. Add rules after creation to filter.",
+      "playing_one": "Playing {{count}} track",
+      "playing_other": "Playing {{count}} tracks",
+      "playingShuffled_one": "Playing {{count}} track (shuffled)",
+      "playingShuffled_other": "Playing {{count}} tracks (shuffled)"
     },
     "errors": {
       "loadFailed": "Failed to load smart playlists",
@@ -1740,11 +1760,12 @@
       "title": "No custom smart playlists yet",
       "description": "Create your own rules-based playlists",
       "noDescription": "No description"
-    }
+    },
+    "trackCount_one": "{{count}} track",
+    "trackCount_other": "{{count}} tracks"
   },
   "smartPlaylistDetail": {
     "invalidRulesWarning": "A rule in this playlist needs fixing, so it matches no tracks until you edit the rules.",
-    "trackCount": "{{count}} tracks",
     "badges": {
       "auto": "Auto"
     },
@@ -1770,7 +1791,8 @@
       "orderBy": "Order By",
       "limit": "Limit (empty = unlimited)",
       "preview": "Preview",
-      "previewMatchCount": "{{count}} tracks match"
+      "previewMatchCount_one": "{{count}} track matches",
+      "previewMatchCount_other": "{{count}} tracks match"
     },
     "messages": {
       "rulesUpdated": "Rules updated!"
@@ -1781,7 +1803,9 @@
     },
     "empty": {
       "noTracksMatchRules": "No tracks match the rules"
-    }
+    },
+    "trackCount_one": "{{count}} track",
+    "trackCount_other": "{{count}} tracks"
   },
   "common": {
     "cancel": "Cancel",
@@ -1839,7 +1863,13 @@
     "localFiles": "Local Files",
     "offline": "Offline",
     "settings": "Settings",
-    "pwaBadge": "PWA"
+    "pwaBadge": "PWA",
+    "groups": {
+      "listen": "Listen",
+      "sources": "Sources",
+      "more": "More"
+    },
+    "stats": "Stats"
   },
   "queueDrawer": {
     "title": "Queue",
@@ -1962,7 +1992,6 @@
       "description": "Add an extra layer of security to your account. You'll need to enter a code from your authenticator app when you sign in.",
       "enabled": "Enabled",
       "disabled": "Disabled",
-      "backupCodesRemaining": "{{count}} backup codes remaining",
       "enableButton": "Enable Two-Factor Authentication",
       "disableButton": "Disable Two-Factor Authentication",
       "backupCodesTitle": "Backup Codes",
@@ -1983,7 +2012,9 @@
         "warning": "Disabling two-factor authentication will make your account less secure.",
         "enterCode": "Enter a verification code from your authenticator app or use a backup code:",
         "disableButton": "Disable 2FA"
-      }
+      },
+      "backupCodesRemaining_one": "{{count}} backup code remaining",
+      "backupCodesRemaining_other": "{{count}} backup codes remaining"
     },
     "apiKeys": {
       "title": "API Keys",
@@ -2015,14 +2046,13 @@
     },
     "playback": {
       "title": "Playback",
-      "autoplayLabel": "Autoplay",
-      "normalizeLabel": "Normalize audio",
       "smartShuffle": {
         "title": "Smart Shuffle",
         "description": "When enabled, shuffle mode will avoid playing recently heard songs, creating a more varied listening experience.",
         "enableLabel": "Enable smart shuffle",
-        "historySize": "History size: {{count}} tracks",
-        "historySizeHelp": "Number of recently played songs to avoid when shuffling"
+        "historySizeHelp": "Number of recently played songs to avoid when shuffling",
+        "historySize_one": "History size: {{count}} track",
+        "historySize_other": "History size: {{count}} tracks"
       },
       "normalization": {
         "title": "Volume Normalization",
@@ -2032,12 +2062,13 @@
       },
       "audioQuality": {
         "title": "Download Audio Quality",
-        "description": "Quality used when downloading new tracks from YouTube. Already-downloaded tracks are unchanged.",
-        "flac": "FLAC (Lossless)",
-        "high": "High (320 kbps)",
-        "medium": "Medium (192 kbps)",
-        "low": "Low (Opus 96 kbps)",
-        "storageWarning": "FLAC is lossless and uses considerably more storage."
+        "description": "How new tracks from YouTube are stored. Original keeps the audio exactly as YouTube supplies it: the best it can sound, and the fastest to download. The other choices convert it, which takes longer and cannot improve the sound. Already-downloaded tracks are unchanged.",
+        "original": "Original (best available, no conversion)",
+        "flac": "Convert to FLAC (much larger files)",
+        "high": "Convert to AAC 320 kbps",
+        "medium": "Convert to AAC 192 kbps",
+        "low": "Convert to Opus 96 kbps (smallest files)",
+        "storageWarning": "FLAC cannot restore what YouTube's audio never had. The sound stays the same and the files are several times larger."
       },
       "seekDuration": {
         "title": "Seek Duration",
@@ -2064,19 +2095,6 @@
       },
       "keepScreenOn": "Keep the screen on while playing",
       "keepScreenOnHint": "Uses more battery. Off by default; the screen can sleep and music keeps playing."
-    },
-    "downloadQuality": {
-      "title": "Download Quality",
-      "bestQualityLabel": "Download in best quality"
-    },
-    "lyrics": {
-      "title": "Lyrics",
-      "description": "Automatically fetch and cache synchronized lyrics for your audio files using LRCLIB API.",
-      "autoFetchLabel": "Auto-fetch lyrics for new downloads",
-      "showInPlayerLabel": "Show synchronized lyrics in player"
-    },
-    "quickSync": {
-      "title": "Quick Sync - Adaptive Streaming"
     },
     "userManagement": {
       "description": "Manage all users in the system. Create, edit, or delete user accounts and monitor system statistics.",
@@ -2125,22 +2143,26 @@
     "alerts": {
       "noFilesTitle": "No local files yet",
       "noFilesDescription": "Click \"Select Files\" to choose individual audio files (works everywhere), or \"Select Folder\" to scan an entire folder including subfolders (requires HTTPS or localhost). Files are stored in your browser and play locally without uploading.",
-      "processingFiles": "Processing {{count}} files...",
-      "addedFiles": "Added {{count}} files successfully!",
       "failedSelectFiles": "Failed to select files",
       "folderNotSupported": "Folder selection not supported in this browser. Use Chrome, Edge, or Opera.",
       "folderRequiresHttps": "Folder selection requires HTTPS or localhost. For local network access, use \"Select Files\" instead or access via HTTPS.",
       "scanningFolder": "Scanning folder and subfolders...",
       "noAudioFiles": "No audio files found in the selected folder",
-      "processingAudioFiles": "Processing {{count}} audio files...",
-      "successfullyAdded": "Successfully added {{count}} files from folder!",
       "failedReadFolder": "Failed to read folder",
       "folderCancelled": "Folder selection cancelled",
       "failedPlayFile": "Failed to play file",
       "fileRemoved": "File removed",
       "failedRemoveFile": "Failed to remove file",
       "allFilesRemoved": "All files removed",
-      "failedClearLibrary": "Failed to clear library"
+      "failedClearLibrary": "Failed to clear library",
+      "processingFiles_one": "Processing {{count}} file...",
+      "processingFiles_other": "Processing {{count}} files...",
+      "addedFiles_one": "Added {{count}} file successfully!",
+      "addedFiles_other": "Added {{count}} files successfully!",
+      "processingAudioFiles_one": "Processing {{count}} audio file...",
+      "processingAudioFiles_other": "Processing {{count}} audio files...",
+      "successfullyAdded_one": "Successfully added {{count}} file from folder!",
+      "successfullyAdded_other": "Successfully added {{count}} files from folder!"
     },
     "confirmations": {
       "removeFile": "Remove this file from your library?",
@@ -2152,9 +2174,10 @@
       "columnAlbum": "Album"
     },
     "unclaimed": {
-      "description": "{{count}} file(s) were imported before each account got its own library. They may belong to someone else using this browser.",
       "claim": "Add to my library",
-      "failed": "Could not add those files to your library"
+      "failed": "Could not add those files to your library",
+      "description_one": "{{count}} file was imported before each account got its own library. It may belong to someone else using this browser.",
+      "description_other": "{{count}} files were imported before each account got its own library. They may belong to someone else using this browser."
     }
   },
   "forcePasswordChange": {
@@ -2266,5 +2289,50 @@
     "label": "Track view",
     "list": "List view",
     "cards": "Card view"
+  },
+  "addMusic": {
+    "title": "Add music",
+    "linkLabel": "Paste a link",
+    "hint": {
+      "empty": "A video, playlist or channel link from YouTube.",
+      "invalid": "This does not look like a link.",
+      "track": "One track. It downloads to your library.",
+      "playlist": "A playlist. You will be subscribed, and its tracks download as they are found.",
+      "channel": "A channel. You will be subscribed, and new uploads download automatically.",
+      "trackInPlaylist": "This video is part of a playlist. Download just this track, or subscribe to the whole playlist."
+    },
+    "actions": {
+      "download": "Download",
+      "subscribe": "Subscribe",
+      "subscribeToPlaylist": "Subscribe to the playlist"
+    },
+    "outcome": {
+      "downloadStarted": "Added. It will be in your library when the download finishes.",
+      "alreadyInLibrary": "This track is already in your library.",
+      "subscribedToPlaylist": "Subscribed. The playlist appears shortly and its tracks download in the background.",
+      "subscribedToChannel": "Subscribed. The channel appears shortly and its tracks download in the background."
+    },
+    "errors": {
+      "refused": "This link could not be added. Check that it opens in a browser, then try again."
+    }
+  },
+  "cookieHealth": {
+    "title": {
+      "working": "YouTube sign-in: working",
+      "unknown": "YouTube sign-in: not known yet",
+      "needs_new_cookies": "YouTube sign-in: needs new cookies",
+      "file_not_accessible": "YouTube sign-in: cookies.txt cannot be used"
+    },
+    "detail": {
+      "working": "The last download went through.",
+      "unknown": "It shows here after the first download.",
+      "needs_new_cookies": "YouTube is asking to sign in again, so downloads are failing. Replace cookies.txt on the server with a fresh export, then retry the failed downloads. The README has the steps under “YouTube Cookies”.",
+      "file_not_accessible": "The server cannot read or update cookies.txt, so downloads are failing. On the server: chown 1000:1000, chmod 600, and remove :ro from its mount. Then retry the failed downloads."
+    }
+  },
+  "trackRating": {
+    "label": "Rating",
+    "stars_one": "{{count}} star",
+    "stars_other": "{{count}} stars"
   }
 }

@@ -23,13 +23,13 @@ from channel.models import Channel
 from download.models import DownloadQueue
 
 
-def _make_audio(owner, youtube_id, title, downloaded=False, favorite=False):
+def _make_audio(owner, youtube_id, title, downloaded=False, favorite=False, rating=0):
     return Audio.objects.create(
         owner=owner, youtube_id=youtube_id, title=title, channel_id='UC_c',
         channel_name='Chan', duration=100,
         file_path=(f'Chan/{youtube_id}.m4a' if downloaded else ''),
         file_size=(1000 if downloaded else 0),
-        published_date=timezone.now(), is_favorite=favorite,
+        published_date=timezone.now(), is_favorite=favorite, rating=rating,
     )
 
 
@@ -40,7 +40,7 @@ class BackupRestoreTests(TestCase):
         cls.bob = Account.objects.create_user('bob_bk', 'bob_bk@test.local', 'Bobpw_2026!')
 
     def _seed_alice_library(self):
-        a1 = _make_audio(self.alice, 'YT_track01', 'Track One', downloaded=True, favorite=True)
+        a1 = _make_audio(self.alice, 'YT_track01', 'Track One', downloaded=True, favorite=True, rating=4)
         a2 = _make_audio(self.alice, 'YT_track02', 'Track Two', downloaded=False)
         playlist = Playlist.objects.create(owner=self.alice, playlist_id='PL_mix', title='Mix', playlist_type='youtube')
         PlaylistItem.objects.create(playlist=playlist, audio=a1, position=0)
@@ -106,6 +106,26 @@ class BackupRestoreTests(TestCase):
         config = UserConfig.objects.get(user=self.bob)
         self.assertEqual(config.theme, 'blue')
         self.assertEqual(config.extra_settings.get('foo'), 'bar')
+
+    def test_ratings_travel_with_the_backup_without_replacing_existing_ones(self):
+        self._seed_alice_library()
+        backup = self._backup_as_alice()
+        self.assertEqual({entry['youtube_id']: entry['rating'] for entry in backup['audio']},
+                         {'YT_track01': 4, 'YT_track02': 0})
+        already_rated = _make_audio(self.bob, 'YT_track01', 'Track One', downloaded=True, rating=2)
+        not_rated_yet = _make_audio(self.bob, 'YT_track02', 'Track Two', downloaded=True)
+        second_track = next(entry for entry in backup['audio'] if entry['youtube_id'] == 'YT_track02')
+        second_track['rating'] = 5
+        backup['audio'].append({**second_track, 'youtube_id': 'YT_track03', 'rating': 99})
+
+        with mock.patch('task.tasks.download_audio_task.delay'):
+            self._client(self.bob).post('/api/appsettings/restore/', backup, format='json')
+
+        already_rated.refresh_from_db()
+        not_rated_yet.refresh_from_db()
+        self.assertEqual((already_rated.rating, already_rated.is_favorite), (2, True))
+        self.assertEqual(not_rated_yet.rating, 5)
+        self.assertEqual(Audio.objects.get(owner=self.bob, youtube_id='YT_track03').rating, 0)
 
     def test_restore_is_idempotent(self):
         self._seed_alice_library()

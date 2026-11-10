@@ -294,7 +294,6 @@ export class ExponentialBackoff {
 export const apiBackoffs = {
   playbackSync: new ExponentialBackoff(5000, 120000),  // 5s base, 2min max
   homepage: new ExponentialBackoff(2000, 60000),       // 2s base, 1min max
-  downloads: new ExponentialBackoff(3000, 90000),      // 3s base, 1.5min max
   prefetch: new ExponentialBackoff(5000, 300000),      // 5s base, 5min max
 };
 

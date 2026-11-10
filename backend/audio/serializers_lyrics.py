@@ -6,6 +6,9 @@ from audio.models_lyrics import Lyrics, LyricsCache, REVISION_LENGTH
 YOUTUBE_ID_MAX_LENGTH = 50
 MAX_LYRICS_BATCH_SIZE = 100
 MAX_LRC_CHARACTERS = 1024 * 1024
+LANGUAGE_MAX_LENGTH = Lyrics._meta.get_field('language').max_length
+SOURCE_MAX_LENGTH = Lyrics._meta.get_field('source').max_length
+SUGGESTION_NAME_MAX_LENGTH = 500
 MAX_MISSING_LYRICS_LIMIT = 200
 DEFAULT_MISSING_LYRICS_LIMIT = 50
 MAX_CACHE_RETENTION_DAYS = 3650
@@ -61,10 +64,40 @@ class LyricsSerializer(serializers.ModelSerializer):
 class LyricsUpdateSerializer(serializers.Serializer):
     """Serializer for manually updating lyrics"""
     
-    synced_lyrics = serializers.CharField(required=False, allow_blank=True)
-    plain_lyrics = serializers.CharField(required=False, allow_blank=True)
+    synced_lyrics = serializers.CharField(required=False, allow_blank=True, max_length=MAX_LRC_CHARACTERS)
+    plain_lyrics = serializers.CharField(required=False, allow_blank=True, max_length=MAX_LRC_CHARACTERS)
     is_instrumental = serializers.BooleanField(required=False, default=False)
-    language = serializers.CharField(required=False, allow_blank=True, max_length=10)
+    language = serializers.CharField(required=False, allow_blank=True, max_length=LANGUAGE_MAX_LENGTH)
+
+
+class LyricsSuggestionSerializer(serializers.Serializer):
+    """A provider suggestion the user picked; the provider sends null for what it does not have"""
+    
+    synced_lyrics = serializers.CharField(
+        default='', allow_blank=True, allow_null=True, max_length=MAX_LRC_CHARACTERS, trim_whitespace=False
+    )
+    plain_lyrics = serializers.CharField(
+        default='', allow_blank=True, allow_null=True, max_length=MAX_LRC_CHARACTERS, trim_whitespace=False
+    )
+    instrumental = serializers.BooleanField(default=False)
+    language = serializers.CharField(default='', allow_blank=True, allow_null=True, max_length=LANGUAGE_MAX_LENGTH)
+    track_name = serializers.CharField(
+        default='', allow_blank=True, allow_null=True, max_length=SUGGESTION_NAME_MAX_LENGTH
+    )
+    artist_name = serializers.CharField(
+        default='', allow_blank=True, allow_null=True, max_length=SUGGESTION_NAME_MAX_LENGTH
+    )
+
+    def validate(self, attrs):
+        text_fields = ('synced_lyrics', 'plain_lyrics', 'language', 'track_name', 'artist_name')
+        return {**attrs, **{field: attrs[field] or '' for field in text_fields}}
+
+    def source_label(self):
+        """What the stored lyrics say they came from, cut to what the column holds"""
+        chosen = self.validated_data
+        if not chosen['track_name']:
+            return 'lrclib (manual)'
+        return f"lrclib (manual: {chosen['track_name']} - {chosen['artist_name']})"[:SOURCE_MAX_LENGTH]
 
 
 class LyricsTimingSerializer(serializers.Serializer):

@@ -141,7 +141,7 @@ INVALID_OUTPUT_MARKER = '[invalid_output]'
 
 MULTI_ENTRY_TYPES = {'playlist', 'multi_video'}
 # First URL segments under /api/audio/; a track with one of these IDs could not be reached.
-RESERVED_AUDIO_IDS = {'api', 'list', 'local-audio', 'local-playlists', 'lyrics', 'lyrics-cache', 'quick-sync'}
+RESERVED_AUDIO_IDS = {'api', 'list', 'local-audio', 'local-playlists', 'lyrics', 'lyrics-cache'}
 # 320 kbps: what the highest lossy quality settles at. Actual bytes are settled on publish.
 ESTIMATED_BYTES_PER_SECOND = 40_000
 ESTIMATE_FOR_UNKNOWN_DURATION_BYTES = 100 * 1024 * 1024

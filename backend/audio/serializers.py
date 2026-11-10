@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from audio.export import EXPORT_QUALITIES, SUPPORTED_EXPORT_FORMATS
-from audio.models import Audio, AudioProgress
+from audio.models import HIGHEST_RATING, UNRATED, Audio, AudioProgress
 
 EXPORT_OPTIONS_ERROR = 'Invalid export options. Formats: mp3, flac. Qualities: high, medium, low, original.'
 
@@ -33,12 +33,12 @@ class AudioSerializer(serializers.ModelSerializer):
             'thumbnail_url', 'published_date', 'downloaded_date',
             'view_count', 'like_count', 'audio_format', 'bitrate',
             'chapters', 'loudness_lufs',
-            'play_count', 'last_played', 'is_favorite',
+            'play_count', 'last_played', 'is_favorite', 'rating',
             # Enhanced metadata fields
             'artist', 'album', 'year', 'genre', 'track_number',
             'cover_art_url', 'musicbrainz_id', 'metadata_source', 'metadata_updated'
         ]
-        read_only_fields = ['id', 'downloaded_date', 'play_count', 'last_played', 'chapters', 'loudness_lufs']
+        read_only_fields = ['id', 'downloaded_date', 'play_count', 'last_played', 'chapters', 'loudness_lufs', 'rating']
 
     def to_representation(self, instance):
         # Clients get this server's copy of the artwork; the stored links are where it came from.
@@ -46,6 +46,11 @@ class AudioSerializer(serializers.ModelSerializer):
         data['thumbnail_url'] = instance.artwork_url
         data['cover_art_url'] = instance.cover_artwork_url
         return data
+
+
+class RatingSerializer(serializers.Serializer):
+    """The stars a track is given; UNRATED takes the rating away."""
+    rating = serializers.IntegerField(min_value=UNRATED, max_value=HIGHEST_RATING)
 
 
 class AudioListSerializer(serializers.Serializer):

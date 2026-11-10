@@ -138,20 +138,23 @@ END
 python manage.py collectstatic --noinput 2>/dev/null \
     || echo "Static collection skipped (assets baked at build / read-only rootfs)"
 
-# Run the worker, the scheduler and the web server side by side, and treat them as one unit.
+# Run the workers, the scheduler and the web server side by side, and treat them as one unit.
 # If any of them stops, stop the rest and exit, so the container's restart policy brings the
 # whole thing back clean rather than leaving a healthy web server with nothing doing the work.
 # Their logs go to stdout, where Docker rotates them, so they cannot fill the small /tmp.
 stop_all() {
-    echo "Stopping worker, scheduler and web server..."
-    kill -TERM "$WORKER_PID" "$BEAT_PID" "$WEB_PID" 2>/dev/null
-    wait "$WORKER_PID" "$BEAT_PID" "$WEB_PID" 2>/dev/null
+    echo "Stopping workers, scheduler and web server..."
+    kill -TERM "$WORKER_PID" "$DOWNLOAD_WORKER_PID" "$BEAT_PID" "$WEB_PID" 2>/dev/null
+    wait "$WORKER_PID" "$DOWNLOAD_WORKER_PID" "$BEAT_PID" "$WEB_PID" 2>/dev/null
 }
 trap 'stop_all; exit 0' TERM INT
 
-# Limit concurrency to avoid SQLite locks
+# Two workers, one per queue (the routing is in backend/config/celery.py). Downloads can run
+# for hours, so they get their own: everything else keeps moving while they do.
 echo "Starting Celery worker..."
 celery -A config worker \
+    --hostname=general@%h \
+    --queues=celery \
     --loglevel=info \
     --concurrency=2 \
     --max-tasks-per-child=100 \
@@ -159,6 +162,19 @@ celery -A config worker \
     --soft-time-limit=580 &
 WORKER_PID=$!
 echo "Celery worker started (PID: $WORKER_PID)"
+
+# The download task sets its own time limits. Taking one task at a time keeps a queued
+# download available to whichever process is free instead of reserved behind a long one.
+echo "Starting Celery download worker..."
+celery -A config worker \
+    --hostname=downloads@%h \
+    --queues=downloads \
+    --loglevel=info \
+    --concurrency="${DOWNLOAD_WORKER_CONCURRENCY:-2}" \
+    --prefetch-multiplier=1 \
+    --max-tasks-per-child=100 &
+DOWNLOAD_WORKER_PID=$!
+echo "Celery download worker started (PID: $DOWNLOAD_WORKER_PID)"
 
 # Exactly one scheduler per container: running a second copy of this container would mean a
 # second scheduler, so this deployment is single-replica by design.
@@ -191,7 +207,7 @@ else
 fi
 WEB_PID=$!
 
-wait -n "$WORKER_PID" "$BEAT_PID" "$WEB_PID"
+wait -n "$WORKER_PID" "$DOWNLOAD_WORKER_PID" "$BEAT_PID" "$WEB_PID"
 echo "A SoundWave process stopped unexpectedly (exit code $?); restarting the container."
 stop_all
 exit 1

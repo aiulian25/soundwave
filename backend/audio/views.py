@@ -6,6 +6,7 @@ import subprocess
 from urllib.parse import urlparse
 
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -20,12 +21,15 @@ from audio.serializers import (
     EXPORT_OPTIONS_ERROR,
     ExportOptionsSerializer,
     PlayerSerializer,
+    RatingSerializer,
 )
 from common.search import matching, search_term
 from common.pagination import paginated_response
 from common.authentication import APIKeyAuthentication
 from common.streaming import make_media_ticket, resolve_media_ticket
 from common.views import ApiBaseView, AuthenticatedOwnerAccess
+from playlist.models_smart import forget_counts_of_playlists_using
+from playlist.smart_rules import RATING_FIELD
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +40,8 @@ ALLOWED_ARTWORK_HOST_SCHEMES = {
     'i3.ytimg.com': {'https'},
     'i9.ytimg.com': {'https'},
     'img.youtube.com': {'https'},
+    'yt3.ggpht.com': {'https'},
+    'yt3.googleusercontent.com': {'https'},
     'coverartarchive.org': {'https', 'http'},
     'assets.fanart.tv': {'https'},
     'lastfm.freetls.fastly.net': {'https'},
@@ -73,6 +79,32 @@ def is_safe_artwork_url(url: str) -> bool:
         return False
 
     return parsed.scheme.lower() in allowed_schemes
+
+
+def kept_artwork_response(owner_field, subject):
+    """This server's copy of an item's artwork, or 404 while a worker has still to fetch it.
+
+    Only reads what is kept, so a slow or unreachable host cannot hold a web thread.
+    """
+    from audio.artwork_archive import request_archive, stored_artwork
+    from audio.artwork_images import InvalidArtworkImage, load_artwork_image
+
+    request_archive(owner_field, subject)
+    artwork = stored_artwork(owner_field, subject)
+    if artwork is None:
+        return Response({'error': 'No artwork available'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        image_data, mime_type = load_artwork_image(artwork)
+    except InvalidArtworkImage:
+        logger.warning("[Artwork] Stored artwork %s for %s %s is unreadable", artwork.id, owner_field, subject.id)
+        return Response({'error': 'No artwork available'}, status=status.HTTP_404_NOT_FOUND)
+
+    response = HttpResponse(image_data, content_type=mime_type)
+    # `private`: the response is owner-scoped, so a shared cache must never hand one
+    # user's artwork to another.
+    response['Cache-Control'] = f'private, max-age={ARTWORK_CACHE_MAX_AGE_SECONDS}'
+    return response
 
 
 AUDIO_SEARCH_FIELDS = ('title', 'artist', 'channel_name')
@@ -182,16 +214,31 @@ class AudioDetailView(ApiBaseView):
                 'message': 'Favorite status updated',
                 'is_favorite': audio.is_favorite
             })
+
+        elif action == 'set_rating':
+            return self._set_rating(request, audio)
         
         return Response(
             {'detail': 'Invalid action'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    def _set_rating(self, request, audio):
+        submitted = RatingSerializer(data=request.data)
+        submitted.is_valid(raise_exception=True)
+        audio.rating = submitted.validated_data['rating']
+        audio.save(update_fields=['rating'])
+        forget_counts_of_playlists_using(request.user, RATING_FIELD)
+        return Response({'rating': audio.rating})
+
     def delete(self, request, youtube_id):
-        """Delete audio file"""
+        """Delete the track and its file, and keep subscriptions from downloading it again"""
+        from download.claims import keep_deleted_track_away
+
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
-        audio.delete()
+        with transaction.atomic():
+            audio.delete()
+            keep_deleted_track_away(request.user, youtube_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -747,8 +794,9 @@ class MetadataAutoFetchView(ApiBaseView):
 class ArtworkProxyView(APIView):
     """A track's artwork, served from this server for lists, the player and the Media Session API.
 
-    The image is fetched once from where the track's links point and kept on disk; after that it
-    never depends on, or tells, the original host. Authorization: a session, an API key, or a
+    The image is fetched once, by a worker, from where the track's links point and kept on disk;
+    after that it never depends on, or tells, the original host. This view only reads what is
+    kept, so a slow or unreachable host cannot hold a web thread. Authorization: a session, an API key, or a
     short-lived path-bound media ticket (`?t=`) for clients that send no cookie (OS lock screen,
     media controls, external widgets). The lookup is owner-scoped, so this endpoint cannot be
     used to probe which tracks an instance holds.
@@ -772,27 +820,12 @@ class ArtworkProxyView(APIView):
         return None
 
     def get(self, request, youtube_id):
-        """This server's copy of a track's artwork, kept the first time it is asked for."""
-        from audio.artwork_archive import archive_track_artwork
-        from audio.artwork_images import InvalidArtworkImage, load_artwork_image
+        """This server's copy of a track's artwork. A worker fetches what is not kept yet."""
+        from audio.artwork_archive import TRACK
 
         user = self._authorized_user(request, youtube_id)
         if user is None:
             return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
 
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=user)
-        artwork = archive_track_artwork(audio)
-        if artwork is None:
-            return Response({'error': 'No artwork available'}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            image_data, mime_type = load_artwork_image(artwork)
-        except InvalidArtworkImage:
-            logger.warning("[Artwork] Stored artwork %s for %s is unreadable", artwork.id, youtube_id)
-            return Response({'error': 'No artwork available'}, status=status.HTTP_404_NOT_FOUND)
-
-        response = HttpResponse(image_data, content_type=mime_type)
-        # `private`: the response is owner-scoped, so a shared cache must never hand one
-        # user's artwork to another.
-        response['Cache-Control'] = f'private, max-age={ARTWORK_CACHE_MAX_AGE_SECONDS}'
-        return response
+        return kept_artwork_response(TRACK, audio)

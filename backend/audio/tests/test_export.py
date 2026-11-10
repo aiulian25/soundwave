@@ -14,6 +14,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3
+from mutagen.oggopus import OggOpus
 from rest_framework.test import APIClient
 
 from user.models import Account
@@ -28,6 +29,7 @@ from audio.export import (
     WARNING_TAGS_FAILED,
 )
 from audio.models_lyrics import Lyrics
+from audio.tag_writer import write_metadata_to_file
 from playlist.models import Playlist, PlaylistItem
 
 
@@ -145,6 +147,19 @@ class RealExportTests(TestCase):
         self.audio.file_path = 'source.flac'
 
         self.assertEqual(_probe(self._export(quality='original').path)['codec_name'], 'mp3')
+
+    def test_a_library_file_in_opus_takes_tags_and_exports(self):
+        """Downloads kept in their original codec are usually Opus (SW-112)."""
+        _make_source(self.media / 'source.opus')
+        self.audio.file_path = 'source.opus'
+
+        tagged = write_metadata_to_file('source.opus', title='Kept As Is', artist='Someone')
+        exported = self._export()
+
+        self.assertTrue(tagged)
+        self.assertEqual(OggOpus(self.media / 'source.opus')['title'], ['Kept As Is'])
+        self.assertEqual(_probe(self.media / 'source.opus')['codec_name'], 'opus')
+        self.assertEqual(_probe(exported.path)['codec_name'], 'mp3')
 
     def test_flac_codec_and_tags_read_back(self):
         Lyrics.objects.create(audio=self.audio, plain_lyrics='words', synced_lyrics='[00:01.00]words')

@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 MATCH_ANY = 'any'
+RATING_FIELD = 'rating'
 
 # Stable codes the SPA translates; they are also what the API returns.
 UNSUPPORTED_FIELD = 'unsupported_field'
@@ -182,6 +183,7 @@ FIELD_TYPES = {
     'year': 'numeric',
     'play_count': 'numeric',
     'duration': 'numeric',
+    RATING_FIELD: 'numeric',
     'last_played': 'date',
     'downloaded_date': 'date',
     'is_favorite': 'boolean',

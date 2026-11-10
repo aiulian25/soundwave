@@ -150,7 +150,6 @@ Query parameters:
 ```
 GET    /api/audio/api/metadata/                           # List metadata
 GET    /api/audio/api/metadata/{id}/                      # Get metadata
-POST   /api/audio/api/metadata/                           # Create metadata
 PUT    /api/audio/api/metadata/{id}/                      # Update metadata
 DELETE /api/audio/api/metadata/{id}/                      # Delete metadata
 POST   /api/audio/api/metadata/{id}/fetch_from_lastfm/   # Fetch from Last.fm
@@ -161,7 +160,6 @@ POST   /api/audio/api/metadata/{id}/update_id3_tags/     # Update file ID3 tags
 ```
 GET    /api/audio/api/artist-info/                        # List artist info
 GET    /api/audio/api/artist-info/{id}/                   # Get artist info
-POST   /api/audio/api/artist-info/                        # Create artist info
 PUT    /api/audio/api/artist-info/{id}/                   # Update artist info
 DELETE /api/audio/api/artist-info/{id}/                   # Delete artist info
 POST   /api/audio/api/artist-info/{id}/fetch_from_lastfm/ # Fetch from Last.fm

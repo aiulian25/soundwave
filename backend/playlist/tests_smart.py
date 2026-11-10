@@ -130,6 +130,7 @@ class RuleValidationTests(SmartRuleTestCase):
             _rule('genre', 'contains', 'rock'),
             _rule('artist', 'contains', 'someone'),
             _rule('duration', 'less_than', '180'),
+            _rule('rating', 'greater_equal', '4'),
         ]
         response = self.client.post(LIST_URL, {'name': 'Presets', 'rules': presets}, format='json')
         self.assertEqual(response.status_code, 201, response.data)
@@ -413,6 +414,56 @@ class MatchParityTests(SmartRuleTestCase):
         for body in ({'rules': [{}]}, {'rules': ['nope']}, {'rules': 'nope'}, []):
             with self.subTest(body=body):
                 self.assertEqual(self.client.post(PREVIEW_URL, body, format='json').status_code, 400)
+
+
+class RatingRuleTests(SmartRuleTestCase):
+    """FEAT-111: a playlist of well rated tracks follows the ratings as they change."""
+
+    def setUp(self):
+        super().setUp()
+        self.well_rated = self._playlist([_rule('rating', 'greater_equal', '4')], name='Well rated')
+        self._track('STEADY', rating=5)
+        self._track('MOVING')
+
+    def _rate(self, youtube_id, stars):
+        response = self.client.post(f'/api/audio/{youtube_id}/', {'action': 'set_rating', 'rating': stars}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def _shown(self, playlist=None):
+        playlist = playlist or self.well_rated
+        detail = self.client.get(self._detail_url(playlist)).data
+        listed = next(row for row in self.client.get(LIST_URL).data['data'] if row['id'] == playlist.pk)
+        tracks = self.client.get(self._detail_url(playlist, 'tracks/')).data
+        self.assertEqual(detail['track_count'], listed['track_count'])
+        self.assertEqual(detail['track_count'], len(tracks['data']))
+        return {track['youtube_id'] for track in tracks['data']}
+
+    def test_playlist_and_its_count_follow_each_rating_change_at_once(self):
+        self.assertEqual(self._shown(), {'STEADY'})
+
+        for stars, expected in ((4, {'STEADY', 'MOVING'}), (3, {'STEADY'}), (5, {'STEADY', 'MOVING'}), (0, {'STEADY'})):
+            with self.subTest(stars=stars):
+                self._rate('MOVING', stars)
+                self.assertEqual(self._shown(), expected)
+
+    def test_unrated_tracks_count_as_zero_stars(self):
+        unrated = self._playlist([_rule('rating', 'equals', '0')], name='Not rated yet')
+
+        self.assertEqual(self._shown(unrated), {'MOVING'})
+
+    def test_tracks_can_be_ordered_by_rating(self):
+        self._track('MIDDLE', rating=3)
+        everything = self._playlist([], name='Best first', order_by='-rating')
+
+        tracks = self.client.get(self._detail_url(everything, 'tracks/')).data['data']
+
+        self.assertEqual([track['youtube_id'] for track in tracks], ['STEADY', 'MIDDLE', 'MOVING'])
+
+    def test_ratings_of_another_account_stay_out(self):
+        other = Account.objects.create_user('smart_other', 'smart_other@test.local', 'Otherpw_2026!')
+        self._track('THEIRS', owner=other, rating=5)
+
+        self.assertEqual(self._shown(), {'STEADY'})
 
 
 class TrackPagingTests(SmartRuleTestCase):

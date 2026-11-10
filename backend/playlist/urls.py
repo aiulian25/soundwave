@@ -1,7 +1,14 @@
 """Playlist URL patterns"""
 
 from django.urls import path, include
-from playlist.views import PlaylistListView, PlaylistDetailView, PlaylistItemsView, TrackPlaylistsView, PlaylistExportView
+from playlist.views import (
+    PlaylistArtworkView,
+    PlaylistDetailView,
+    PlaylistExportView,
+    PlaylistItemsView,
+    PlaylistListView,
+    TrackPlaylistsView,
+)
 
 urlpatterns = [
     # Smart playlists
@@ -12,5 +19,6 @@ urlpatterns = [
     path('', PlaylistListView.as_view(), name='playlist-list'),
     path('<str:playlist_id>/', PlaylistDetailView.as_view(), name='playlist-detail'),
     path('<str:playlist_id>/items/', PlaylistItemsView.as_view(), name='playlist-items'),
+    path('<str:playlist_id>/artwork/', PlaylistArtworkView.as_view(), name='playlist-artwork'),
     path('<str:playlist_id>/export/', PlaylistExportView.as_view(), name='playlist-export'),
 ]

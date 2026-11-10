@@ -85,6 +85,12 @@ def _as_int(value, default):
     return value if isinstance(value, int) and not isinstance(value, bool) else default
 
 
+def _as_rating(value):
+    from audio.models import HIGHEST_RATING, UNRATED
+    stars = _as_int(value, UNRATED)
+    return stars if UNRATED <= stars <= HIGHEST_RATING else UNRATED
+
+
 def _as_optional_int(value):
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
@@ -171,6 +177,7 @@ def _serialize_audio(audio):
         'genre': audio.genre,
         'track_number': audio.track_number,
         'is_favorite': audio.is_favorite,
+        'rating': audio.rating,
         'play_count': audio.play_count,
         'last_played': _iso(audio.last_played),
     }
@@ -416,9 +423,17 @@ def _audio_placeholder_defaults(entry):
         'genre': _as_str(entry.get('genre')),
         'track_number': _as_optional_int(entry.get('track_number')),
         'is_favorite': bool(entry.get('is_favorite')),
+        'rating': _as_rating(entry.get('rating')),
         'play_count': _as_int(entry.get('play_count'), 0),
         'last_played': _as_datetime(entry.get('last_played')),
     }
+
+
+def _keep_marks_from_backup(audio_obj, entry):
+    """A track already here gains the backup's favourite and stars; its own are never taken away."""
+    audio_obj.is_favorite = audio_obj.is_favorite or bool(entry.get('is_favorite'))
+    audio_obj.rating = audio_obj.rating or _as_rating(entry.get('rating'))
+    audio_obj.save(update_fields=['is_favorite', 'rating'])
 
 
 def _restore_audio(user, audio_list, summary):
@@ -435,9 +450,8 @@ def _restore_audio(user, audio_list, summary):
         )
         if created:
             summary['audio_created'] += 1
-        elif entry.get('is_favorite') and not audio_obj.is_favorite:
-            audio_obj.is_favorite = True
-            audio_obj.save(update_fields=['is_favorite'])
+        else:
+            _keep_marks_from_backup(audio_obj, entry)
         audio_map[youtube_id] = audio_obj
     return audio_map
 

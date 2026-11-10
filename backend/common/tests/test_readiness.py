@@ -24,6 +24,8 @@ from common.tasks import heartbeat
 from user.models import Account
 
 MEMORY = {'used_memory': 10, 'maxmemory': 100}
+BOTH_WORKERS = [{'general@x': {'ok': 'pong'}}, {'downloads@x': {'ok': 'pong'}}]
+QUEUE_LENGTHS = {'celery': 3, 'downloads': 5}
 
 
 class ReadinessTestCase(TestCase):
@@ -34,8 +36,8 @@ class ReadinessTestCase(TestCase):
         self.redis = redis_patch.start().return_value
         self.addCleanup(redis_patch.stop)
         self.redis.info.return_value = MEMORY
-        self.redis.llen.return_value = 3
-        ping_patch = mock.patch('config.celery.app.control.ping', return_value=[{'worker@x': {'ok': 'pong'}}])
+        self.redis.llen.side_effect = QUEUE_LENGTHS.get
+        ping_patch = mock.patch('config.celery.app.control.ping', return_value=BOTH_WORKERS)
         self.worker_ping = ping_patch.start()
         self.addCleanup(ping_patch.stop)
         record_heartbeat()
@@ -47,7 +49,17 @@ class ReportTests(ReadinessTestCase):
 
         self.assertTrue(report['ready'])
         self.assertEqual(report['checks']['redis']['queued_tasks'], 3)
-        self.assertEqual(report['checks']['worker']['workers'], 1)
+        self.assertEqual(report['checks']['redis']['queued_downloads'], 5)
+        self.assertEqual(report['checks']['worker']['workers'], 2)
+
+    def test_one_of_the_two_workers_missing_is_not_ready(self):
+        """Each queue has its own worker; with one gone, that queue's work just waits."""
+        self.worker_ping.return_value = BOTH_WORKERS[:1]
+
+        report = readiness_report()
+
+        self.assertFalse(report['ready'])
+        self.assertEqual(report['checks']['worker'], {'ok': False, 'workers': 1})
 
     def test_a_silent_worker_is_not_ready(self):
         self.worker_ping.return_value = []
@@ -125,6 +137,22 @@ class ReportTests(ReadinessTestCase):
         heartbeat()
 
         self.assertIsNotNone(cache.get(HEARTBEAT_KEY))
+
+    def test_downloads_have_their_own_queue_and_nothing_else_shares_it(self):
+        """A download can run for hours; it must not hold up the heartbeat or anything else (SW-113)."""
+        from config.celery import DOWNLOAD_QUEUE_NAME, app
+
+        def queue_of(task_name):
+            return app.amqp.router.route({}, task_name)['queue'].name
+
+        self.assertEqual(queue_of('task.tasks.download_audio_task'), DOWNLOAD_QUEUE_NAME)
+        elsewhere = sorted(
+            name for name in app.tasks
+            if not name.startswith('celery.') and name != 'task.tasks.download_audio_task'
+            and queue_of(name) == DOWNLOAD_QUEUE_NAME
+        )
+        self.assertEqual(elsewhere, [])
+        self.assertEqual(queue_of('common.record_heartbeat'), 'celery')
 
     def test_the_heartbeat_is_scheduled_under_a_real_task_name(self):
         from config.celery import app

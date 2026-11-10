@@ -44,6 +44,7 @@ async function stubApi(page: Page) {
     if (url.pathname.endsWith('/lyrics/upload/')) return json(lyricsResponse('uploaded words'));
     if (url.pathname.endsWith('/lyrics/suggestions/')) return json({ suggestions: [SUGGESTION] });
     if (url.pathname === `/api/playlist/${PARTIAL_PLAYLIST_ID}/`) return json(PARTIAL_PLAYLIST);
+    if (url.pathname === `/api/playlist/${PARTIAL_PLAYLIST_ID}/items/`) return json({ data: PARTIAL_PLAYLIST.items, next: null });
     if (url.pathname.endsWith('/lyrics/') && method === 'GET') return json(lyricsResponse('old words'));
     return json({ data: [] });
   });

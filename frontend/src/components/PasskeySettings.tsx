@@ -18,6 +18,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '../utils/formatDate';
 import { userAPI } from '../api/client';
 import { isDismissedPasskeyPrompt, passkeyErrorKey } from '../utils/passkeys';
 
@@ -35,7 +36,6 @@ interface PasskeySettingsProps {
   twoFactorEnabled: boolean;
 }
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString();
 
 export default function PasskeySettings({ twoFactorEnabled }: PasskeySettingsProps) {
   const { t } = useTranslation();

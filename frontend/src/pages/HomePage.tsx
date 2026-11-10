@@ -1,4 +1,5 @@
-import { Box, Typography, IconButton, LinearProgress, Chip, alpha, Tooltip, CircularProgress } from '@mui/material';
+import { Box, Button, Typography, IconButton, LinearProgress, Chip, alpha, Tooltip, CircularProgress } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useEffect, useState, useCallback } from 'react';
@@ -11,6 +12,7 @@ import type { Audio } from '../types';
 import ScrollingText from '../components/ScrollingText';
 import { NowPlayingBadge } from '../components/NowPlayingIndicator';
 import { useIsNowPlaying } from '../context/NowPlayingContext';
+import { useAddMusic } from '../context/AddMusicContext';
 import { nowPlayingArtworkSx, nowPlayingItemSx, nowPlayingTitleSx } from '../theme/nowPlaying';
 
 // Types for homepage data
@@ -91,6 +93,7 @@ const formatTimeLeft = (seconds: number, format: (minutes: number, seconds: numb
 export default function HomePage({ setCurrentAudio }: HomePageProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const openAddMusic = useAddMusic();
   const isNowPlaying = useIsNowPlaying();
   const [data, setData] = useState<HomepageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -755,9 +758,12 @@ export default function HomePage({ setCurrentAudio }: HomePageProps) {
           <Typography variant="h6" sx={{ mb: 1 }}>
             {t('home.empty.title')}
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ mb: 3 }}>
             {t('home.empty.description')}
           </Typography>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => openAddMusic()} data-testid="empty-add-music">
+            {t('addMusic.title')}
+          </Button>
         </Box>
       )}
 

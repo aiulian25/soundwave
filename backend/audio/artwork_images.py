@@ -1,4 +1,4 @@
-"""Reading stored artwork for embedding: every persisted path and file is treated as untrusted."""
+"""Reading and removing stored artwork: every persisted path and file is treated as untrusted."""
 
 from io import BytesIO
 from pathlib import Path
@@ -29,6 +29,15 @@ def _contained_file(local_path):
     if not resolved.is_relative_to(artwork_root) or not resolved.is_file():
         raise InvalidArtworkImage('not a file in the artwork directory')
     return resolved
+
+
+def delete_artwork_file(local_path):
+    """Remove a kept image. Returns True if bytes were removed; a path outside the folder is left."""
+    try:
+        _contained_file(local_path).unlink()
+    except (InvalidArtworkImage, OSError, ValueError):
+        return False
+    return True
 
 
 def _read_bounded(path):

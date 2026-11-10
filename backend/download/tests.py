@@ -34,6 +34,15 @@ from task.tasks import (
 )
 from user.models import Account
 from download.claims import canonical_download_url, claim_download, keep_claim_alive, renew_claim
+from download.cookie_health import (
+    COOKIES_FILE_ACCESS_MARKER,
+    COOKIES_FILE_NOT_ACCESSIBLE,
+    COOKIES_NEED_REFRESH,
+    COOKIES_REFRESH_MARKER,
+    COOKIES_UNKNOWN,
+    COOKIES_WORKING,
+    cookie_health,
+)
 from download.models import DownloadQueue
 
 
@@ -289,7 +298,6 @@ class WorkerTestMixin:
             mock.patch('common.url_security.check_public_http_url', return_value=(True, None)),
             mock.patch('audio.storage_service.shutil.disk_usage', return_value=mock.Mock(free=10 ** 12)),
             mock.patch('task.tasks._resolve_download_quality', return_value='opus'),
-            mock.patch('task.tasks._ext_for_quality', return_value='opus'),
             mock.patch('task.tasks._postprocessor_for_quality', return_value={}),
             mock.patch('task.tasks.link_audio_to_playlists.delay'),
             mock.patch('task.tasks.measure_loudness_task.delay'),
@@ -516,6 +524,58 @@ class QueueIdentityTests(WorkerTestMixin, TestCase):
         self.assertEqual(DownloadQueue.objects.filter(owner=self.owner).count(), 1)
         delay.assert_called_once()
 
+    def _add_again(self):
+        with mock.patch('task.tasks.download_audio_task.delay') as delay, \
+                mock.patch('download.serializers.check_public_http_url', return_value=(True, None)):
+            response = self.client.post('/api/download/', {'urls': [WATCH_URL], 'auto_start': True}, format='json')
+        return response, delay
+
+    def _track(self, file_path):
+        return Audio.objects.create(
+            owner=self.owner, youtube_id=YOUTUBE_ID, title='T', channel_id='UC', channel_name='C',
+            duration=1, file_path=file_path, file_size=1, published_date=timezone.now(),
+        )
+
+    def test_adding_a_link_again_restarts_a_row_that_would_never_produce_the_track(self):
+        """Pasting a link is the owner asking for the track; a stale row must not swallow that (SW-109)."""
+        stale_rows = {
+            'failed': {'status': 'failed', 'error_message': 'Sign in to confirm', 'retry_count': 3},
+            'dismissed': {'status': 'ignored'},
+            'finished but the track is gone': {'status': 'completed', 'completed_date': timezone.now()},
+        }
+        for label, fields in stale_rows.items():
+            with self.subTest(label):
+                DownloadQueue.objects.filter(owner=self.owner).delete()
+                row = self.queue_row(self.owner, **fields)
+
+                response, delay = self._add_again()
+
+                row.refresh_from_db()
+                self.assertEqual(response.status_code, 201, response.content)
+                self.assertEqual((row.status, row.error_message, row.retry_count), ('pending', '', 0))
+                delay.assert_called_once_with(row.pk)
+
+    def test_adding_a_track_that_is_in_the_library_starts_nothing(self):
+        self._track('users/1/kept.opus')
+        row = self.queue_row(self.owner, status='completed')
+
+        response, delay = self._add_again()
+
+        self.assertEqual(response.json()[0]['status'], 'completed')
+        delay.assert_not_called()
+        row.refresh_from_db()
+        self.assertEqual(row.status, 'completed')
+
+    def test_adding_a_link_that_is_already_downloading_starts_nothing(self):
+        for in_progress in ('pending', 'downloading'):
+            with self.subTest(in_progress):
+                DownloadQueue.objects.filter(owner=self.owner).delete()
+                self.queue_row(self.owner, status=in_progress)
+
+                _response, delay = self._add_again()
+
+                delay.assert_not_called()
+
     def test_database_refuses_a_duplicate(self):
         self.queue_row(self.owner)
         with self.assertRaises(IntegrityError), transaction.atomic():
@@ -640,6 +700,55 @@ class PlaylistSyncTombstoneTests(WorkerTestMixin, TestCase):
         self.sync().assert_not_called()
         row.refresh_from_db()
         self.assertEqual(row.status, 'downloading')
+
+    def _delete_downloaded_track(self):
+        Audio.objects.create(
+            owner=self.owner, youtube_id=YOUTUBE_ID, title='Listed', channel_id='UC', channel_name='C',
+            duration=1, file_path='users/x/listed.opus', file_size=1, published_date=timezone.now(),
+        )
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        return client.delete(f'/api/audio/{YOUTUBE_ID}/')
+
+    def test_a_track_the_owner_deleted_does_not_come_back_at_the_next_sync(self):
+        """Deleting used to be undone: sync saw a finished row with no track and fetched it again (SW-110)."""
+        row = self.queue_row(self.owner, status='completed', source_playlist_id='PL_tomb')
+
+        response = self._delete_downloaded_track()
+        started = self.sync()
+
+        self.assertEqual(response.status_code, 204)
+        started.assert_not_called()
+        row.refresh_from_db()
+        self.assertEqual(row.status, 'ignored')
+        self.assertFalse(Audio.objects.filter(owner=self.owner, youtube_id=YOUTUBE_ID).exists())
+
+    def test_a_deleted_track_stays_away_even_when_its_queue_row_was_cleared(self):
+        self._delete_downloaded_track()
+
+        self.sync().assert_not_called()
+
+        self.assertEqual(
+            list(DownloadQueue.objects.filter(owner=self.owner).values_list('url', 'youtube_id', 'status')),
+            [(WATCH_URL, YOUTUBE_ID, 'ignored')],
+        )
+
+    def test_deleting_a_track_stops_a_download_of_it_that_is_running(self):
+        row = self.queue_row(self.owner, status='downloading', claim_token=uuid.uuid4())
+
+        self._delete_downloaded_track()
+
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.claim_token), ('ignored', None))
+
+    def test_another_owners_copy_of_the_same_video_is_untouched(self):
+        other = Account.objects.create_user('tomb_v', 'tomb_v@test.local', 'Tombpw_2026!')
+        theirs = self.queue_row(other, status='completed')
+
+        self._delete_downloaded_track()
+
+        theirs.refresh_from_db()
+        self.assertEqual(theirs.status, 'completed')
 
     def test_new_rows_record_the_playlist_that_queued_them(self):
         self.sync()
@@ -792,3 +901,85 @@ class PostgresConcurrencyTests(WorkerTestMixin, TransactionTestCase):
             with keep_claim_alive(row.pk, token) as claim_lost:
                 DownloadQueue.objects.filter(pk=row.pk).delete()
                 self.assertTrue(claim_lost.wait(5))
+
+
+class CookieHealthTests(TestCase):
+    """Whether YouTube still accepts cookies.txt, read from what downloads did last (FEAT-102)."""
+
+    HEALTH_URL = '/api/download/cookie-health/'
+    SIGN_IN_ERROR = f'{COOKIES_REFRESH_MARKER} ERROR: Sign in to confirm you\'re not a bot'
+    FILE_ERROR = f"{COOKIES_FILE_ACCESS_MARKER} [Errno 13] Permission denied: 'cookies.txt'"
+
+    def setUp(self):
+        self.owner = Account.objects.create_user('cookie_u', 'cookie_u@test.local', 'Cookiepw_2026!')
+        self.now = timezone.now()
+        self.client = APIClient()
+        self.client.force_authenticate(self.owner)
+
+    def _row(self, minutes_ago, owner=None, **fields):
+        happened = self.now - timedelta(minutes=minutes_ago)
+        return DownloadQueue.objects.create(
+            owner=owner or self.owner, url=f'{WATCH_URL}-{DownloadQueue.objects.count()}',
+            started_date=happened, **fields,
+        )
+
+    def _failed(self, minutes_ago, error=None, **fields):
+        return self._row(minutes_ago, status='failed', error_message=error or self.SIGN_IN_ERROR, **fields)
+
+    def _finished(self, minutes_ago, **fields):
+        return self._row(minutes_ago, status='completed', completed_date=self.now - timedelta(minutes=minutes_ago), **fields)
+
+    def _state(self):
+        return self.client.get(self.HEALTH_URL).json()['state']
+
+    def test_nothing_downloaded_yet_is_not_known(self):
+        self.assertEqual(cookie_health(), COOKIES_UNKNOWN)
+
+    def test_a_sign_in_failure_means_new_cookies_are_needed(self):
+        self._finished(minutes_ago=60)
+        self._failed(minutes_ago=5)
+
+        self.assertEqual(self._state(), COOKIES_NEED_REFRESH)
+
+    def test_the_next_successful_download_clears_it(self):
+        self._failed(minutes_ago=30)
+        self._finished(minutes_ago=2)
+
+        self.assertEqual(self._state(), COOKIES_WORKING)
+
+    def test_a_file_the_server_cannot_open_is_told_apart(self):
+        self._failed(minutes_ago=5, error=self.FILE_ERROR)
+
+        self.assertEqual(self._state(), COOKIES_FILE_NOT_ACCESSIBLE)
+
+    def test_the_newest_cookie_failure_decides_which_problem_is_shown(self):
+        self._failed(minutes_ago=40, error=self.FILE_ERROR)
+        self._failed(minutes_ago=5)
+
+        self.assertEqual(self._state(), COOKIES_NEED_REFRESH)
+
+    def test_failures_that_new_cookies_would_not_fix_say_nothing_about_them(self):
+        self._failed(minutes_ago=5, error='ERROR: Video unavailable')
+
+        self.assertEqual(self._state(), COOKIES_UNKNOWN)
+
+    def test_a_retried_failure_keeps_its_marker_behind_the_retry_prefix(self):
+        self._failed(minutes_ago=5, error=f'Retry attempt 2: {self.SIGN_IN_ERROR}')
+
+        self.assertEqual(self._state(), COOKIES_NEED_REFRESH)
+
+    def test_a_dismissed_failure_is_no_longer_reported(self):
+        self._row(minutes_ago=5, status='ignored', error_message=self.SIGN_IN_ERROR)
+
+        self.assertEqual(self._state(), COOKIES_UNKNOWN)
+
+    def test_cookies_belong_to_the_server_so_any_accounts_downloads_count(self):
+        other = Account.objects.create_user('cookie_v', 'cookie_v@test.local', 'Cookiepw_2026!')
+        self._failed(minutes_ago=5, owner=other, title='Private to the other account')
+
+        response = self.client.get(self.HEALTH_URL)
+
+        self.assertEqual(response.json(), {'state': COOKIES_NEED_REFRESH})
+
+    def test_it_is_not_shown_to_someone_who_is_not_signed_in(self):
+        self.assertIn(APIClient().get(self.HEALTH_URL).status_code, (401, 403))

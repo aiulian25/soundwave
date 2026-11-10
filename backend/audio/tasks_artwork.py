@@ -20,7 +20,7 @@ from audio.lastfm_client import LastFMClient
 from audio.fanart_client import FanartClient
 from audio.id3_service import ID3TagService
 from audio.storage_service import ensure_private_file
-from audio.artwork_archive import EXTENSION_BY_MIME_TYPE, THUMBNAIL_TYPE, archive_track_artwork
+from audio.artwork_archive import EXTENSION_BY_MIME_TYPE, THUMBNAIL_TYPE, archive_artwork, archive_track_artwork
 
 logger = get_task_logger(__name__)
 
@@ -549,6 +549,15 @@ def update_id3_tags_from_metadata(audio_id: int):
 # should never look like a crawler.
 ARCHIVE_BATCH_SIZE = 100
 ARCHIVE_PAUSE_SECONDS = 1
+
+
+@shared_task(name='audio.archive_artwork')
+def archive_artwork_task(owner_field: str, subject_id: int):
+    """Keep one track's, playlist's or channel's artwork: a page asked and found an untried link."""
+    subject_model = Artwork._meta.get_field(owner_field).related_model
+    subject = subject_model.objects.filter(pk=subject_id).first()
+    if subject is not None:
+        archive_artwork(owner_field, subject)
 
 
 @shared_task(name='audio.archive_missing_artwork')

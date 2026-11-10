@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import packageJson from '../package.json';
 
@@ -86,6 +86,109 @@ describe('operator documentation and configuration', () => {
   it('the recovery runbook is linked from the README', () => {
     expect(repositoryFile('README.md')).toContain('docs/BACKUP_RESTORE.md');
     expect(repositoryFile('.gitignore')).toContain('!docs/BACKUP_RESTORE.md');
+  });
+});
+
+describe('background workers', () => {
+  const supervisor = repositoryFile('docker_assets/run.sh');
+  const downloadQueue = repositoryFile('backend/config/celery.py').match(/DOWNLOAD_QUEUE_NAME = '([a-z]+)'/)?.[1];
+
+  it('a worker consumes each queue, and no worker consumes both', () => {
+    expect(downloadQueue).toBeDefined();
+    const queueOptions = supervisor.match(/--queues=\S+/g);
+    expect(queueOptions).toEqual(['--queues=celery', `--queues=${downloadQueue}`]);
+  });
+
+  it('the download worker is supervised with the others', () => {
+    const pidLists = supervisor.match(/"\$WORKER_PID".*/g) ?? [];
+    expect(pidLists.length).toBeGreaterThanOrEqual(3);
+    pidLists.forEach((pidList) => expect(pidList).toContain('"$DOWNLOAD_WORKER_PID"'));
+  });
+
+  it('production can size the download worker', () => {
+    expect(repositoryFile('docker-compose.prod.yml')).toContain('- DOWNLOAD_WORKER_CONCURRENCY=');
+  });
+});
+
+describe('installed app', () => {
+  const manifest = JSON.parse(repositoryFile('frontend/public/manifest.json'));
+
+  it('a link shared to the app lands on a page the app has', () => {
+    expect(manifest.share_target.method).toBe('GET');
+    expect(repositoryFile('frontend/src/App.tsx')).toContain(`<Route path="${manifest.share_target.action}"`);
+  });
+});
+
+describe('settings page', () => {
+  it('every switch changes something', () => {
+    const switches = repositoryFile('frontend/src/pages/SettingsPage.tsx').match(/<Switch\b[^]*?\/>/g) ?? [];
+
+    expect(switches.length).toBeGreaterThan(0);
+    expect(switches.filter((control) => !control.includes('onChange='))).toEqual([]);
+  });
+});
+
+describe('questions and notices', () => {
+  const sourceFiles = (readdirSync(resolve(__dirname), { recursive: true }) as string[])
+    .filter((file) => /\.tsx?$/.test(file) && !file.includes('.test.'));
+
+  it('no page falls back to the browser\'s own confirm or alert box', () => {
+    const usingBrowserDialogs = sourceFiles.filter((file) =>
+      /(^|[^.\w])(window\.)?(confirm|alert)\(/.test(readFileSync(join(__dirname, file), 'utf8')));
+
+    expect(sourceFiles.length).toBeGreaterThan(100);
+    expect(usingBrowserDialogs).toEqual([]);
+  });
+});
+
+describe('supply chain', () => {
+  const workflowDirectory = resolve(__dirname, '../../.github/workflows');
+  const workflows = readdirSync(workflowDirectory).map((file) => readFileSync(join(workflowDirectory, file), 'utf8'));
+  // What branch protection on main requires. Renaming one of these jobs without updating the
+  // rule blocks every pull request, which is how eight dependency updates sat open for weeks.
+  const REQUIRED_CHECKS = ['Code, deps & config', 'Backend tests and migration drift', 'e2e'];
+
+  it('every action is pinned to a commit, with its version beside it', () => {
+    const actions = workflows.flatMap((source) => source.match(/uses: \S+.*/g) ?? []).filter((use) => !use.includes('./'));
+
+    expect(actions.length).toBeGreaterThan(20);
+    expect(actions.filter((use) => !/uses: \S+@[0-9a-f]{40} # v\d/.test(use))).toEqual([]);
+  });
+
+  it('the checks branch protection requires are jobs that exist', () => {
+    const jobNames = workflows.flatMap((source) => [
+      ...(source.match(/^ {4}name: (.+)$/gm) ?? []).map((line) => line.replace(/^ {4}name: /, '')),
+      ...(source.match(/^ {2}([\w-]+):$/gm) ?? []).map((line) => line.trim().replace(':', '')),
+    ]);
+
+    expect(REQUIRED_CHECKS.filter((check) => !jobNames.includes(check))).toEqual([]);
+  });
+
+  it.each(['docker-compose.prod.yml', 'docker-compose.yml'])('%s names a major version for every image it pulls', (compose) => {
+    const images = repositoryFile(compose).match(/image: \S+/g) ?? [];
+    const floating = images.filter((image) => !/:(main|latest|\d)/.test(image) || /:(alpine|latest)$/.test(image));
+
+    expect(images.length).toBeGreaterThan(1);
+    expect(floating).toEqual([]);
+  });
+});
+
+describe('maintainability', () => {
+  const MAX_SOURCE_LINES = 1000;
+  const MAX_LINT_WARNINGS = 25;
+
+  it('no source file is longer than a thousand lines', () => {
+    const tooLong = (readdirSync(resolve(__dirname), { recursive: true }) as string[])
+      .filter((file) => /\.tsx?$/.test(file) && !file.includes('.test.'))
+      .filter((file) => readFileSync(join(__dirname, file), 'utf8').split('\n').length > MAX_SOURCE_LINES);
+
+    expect(tooLong).toEqual([]);
+  });
+
+  it('the lint warning allowance only ever goes down', () => {
+    const allowance = Number(packageJson.scripts.lint.match(/--max-warnings (\d+)/)?.[1]);
+
+    expect(allowance).toBeLessThanOrEqual(MAX_LINT_WARNINGS);
   });
 });
 

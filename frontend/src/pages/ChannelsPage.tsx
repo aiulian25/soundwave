@@ -38,6 +38,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../components/ConfirmDialog';
 import { channelAPI } from '../api/client';
 import { fetchAllChannels } from '../utils/fetchAll';
 import { useSettings } from '../context/SettingsContext';
@@ -66,6 +67,7 @@ interface Channel {
 export default function ChannelsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { askToConfirm, confirmDialog } = useConfirm();
   const { getExtraSetting, updateExtraSetting } = useSettings();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +161,8 @@ export default function ChannelsPage() {
   };
 
   const handleUnsubscribe = async (channelId: string) => {
-    if (!confirm(t('channels.confirm.unsubscribeOne'))) return;
+    const unsubscribe = { message: t('channels.confirm.unsubscribeOne'), confirmLabel: t('channels.actions.unsubscribe') };
+    if (!(await askToConfirm(unsubscribe))) return;
     
     try {
       await channelAPI.unsubscribe(channelId);
@@ -172,7 +175,11 @@ export default function ChannelsPage() {
   const handleBulkDelete = async () => {
     if (selectedChannels.size === 0) return;
     
-    if (!confirm(t('channels.confirm.unsubscribeMany', { count: selectedChannels.size }))) return;
+    const unsubscribeAll = {
+      message: t('channels.confirm.unsubscribeMany', { count: selectedChannels.size }),
+      confirmLabel: t('channels.actions.unsubscribe'),
+    };
+    if (!(await askToConfirm(unsubscribeAll))) return;
     
     try {
       // Delete all selected channels
@@ -412,6 +419,7 @@ export default function ChannelsPage() {
       </Snackbar>
       
       <ScrollToTop />
+      {confirmDialog}
     </Box>
   );
 }

@@ -2,7 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import AppWithTheme from './AppWithTheme'
-import { QuickSyncProvider } from './context/QuickSyncContext'
 import { PWAProvider } from './context/PWAContext'
 import { SettingsProvider } from './context/SettingsContext'
 import { RadioProvider } from './context/RadioContext'
@@ -17,19 +16,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <PWAProvider>
-        <QuickSyncProvider>
-          <SettingsProvider>
-            <EqualizerProvider>
-              <RadioProvider>
-                <SleepTimerProvider>
-                    <AchievementNotificationProvider>
-                      <AppWithTheme />
-                    </AchievementNotificationProvider>
-                </SleepTimerProvider>
-              </RadioProvider>
-            </EqualizerProvider>
-          </SettingsProvider>
-        </QuickSyncProvider>
+        <SettingsProvider>
+          <EqualizerProvider>
+            <RadioProvider>
+              <SleepTimerProvider>
+                <AchievementNotificationProvider>
+                  <AppWithTheme />
+                </AchievementNotificationProvider>
+              </SleepTimerProvider>
+            </RadioProvider>
+          </EqualizerProvider>
+        </SettingsProvider>
       </PWAProvider>
     </BrowserRouter>
   </React.StrictMode>,

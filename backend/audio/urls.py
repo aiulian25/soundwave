@@ -29,8 +29,6 @@ urlpatterns = [
     # audio.storage_service.RESERVED_AUDIO_IDS.
     # Local audio endpoints
     path('', include('audio.urls_local')),
-    # Quick Sync endpoints
-    path('', include('audio.urls_quick_sync')),
     # Artwork and metadata endpoints
     path('api/', include('audio.urls_artwork')),
     # Include router URLs for batch operations

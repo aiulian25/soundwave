@@ -12,7 +12,9 @@ useDefault = true
 description = "SoundWave documented false positives and example/template placeholders"
 
 # Files that intentionally contain placeholder/example values, not real secrets.
-#  - .env.example / docs: template & documentation placeholders
+#  - .env.example / docs: template & documentation placeholders. Only two documents are
+#    published now, but older ones with example values are still in the history a
+#    scheduled scan reads, so the whole folder stays listed.
 #  - SmartPlaylistsPage.tsx: a RULE_PRESETS array whose `key: '<presetName>'`
 #    literals trip the generic-api-key rule. These are UI identifiers, not secrets.
 paths = [

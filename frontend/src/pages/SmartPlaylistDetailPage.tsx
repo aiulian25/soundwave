@@ -356,7 +356,13 @@ export default function SmartPlaylistDetailPage({ setCurrentAudio }: SmartPlayli
             { id: 'plays', header: t('library.columns.plays'), width: 72, align: 'right', showFrom: 'md', render: (track) => track.play_count },
           ]}
           actionsWidth={56}
-          renderActions={(track) => <TrackActionsMenu track={track} onTrackUpdate={handleTrackUpdate} />}
+          renderActions={(track) => (
+            <TrackActionsMenu
+              track={track}
+              onTrackUpdate={handleTrackUpdate}
+              onTrackDeleted={(deletedTrack) => setTracks(prev => prev.filter(kept => kept.youtube_id !== deletedTrack.youtube_id))}
+            />
+          )}
         />
       )}
 

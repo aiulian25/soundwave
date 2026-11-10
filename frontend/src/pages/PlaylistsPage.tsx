@@ -34,6 +34,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../components/ConfirmDialog';
 import { playlistAPI } from '../api/client';
 import { fetchAllPlaylists } from '../utils/fetchAll';
 import { usePWA } from '../context/PWAContext';
@@ -64,6 +65,7 @@ interface Playlist {
 export default function PlaylistsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { askToConfirm, confirmDialog } = useConfirm();
   const { isOnline } = usePWA();
   const { getExtraSetting, updateExtraSetting } = useSettings();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -172,8 +174,7 @@ export default function PlaylistsPage() {
       await playlistAPI.create({ url: playlistUrl });
       setPlaylistUrl('');
       setOpenDialog(false);
-      // Show success message
-      alert(t('playlists.messages.subscriptionStarted'));
+      setSnackbar({ open: true, message: t('playlists.messages.subscriptionStarted'), severity: 'success' });
       // Immediately reload to show pending status
       await loadPlaylists();
       setLoading(false);
@@ -246,7 +247,7 @@ export default function PlaylistsPage() {
   };
 
   const handleDelete = async (playlistId: string) => {
-    if (!confirm(t('playlists.confirm.delete'))) return;
+    if (!(await askToConfirm({ message: t('playlists.confirm.delete'), confirmLabel: t('common.remove') }))) return;
     
     try {
       await playlistAPI.delete(playlistId);
@@ -429,6 +430,7 @@ export default function PlaylistsPage() {
       </Snackbar>
       
       <ScrollToTop />
+      {confirmDialog}
     </Box>
   );
 }

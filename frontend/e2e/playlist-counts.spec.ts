@@ -40,6 +40,7 @@ async function stubApi(page: Page) {
     if (url.pathname === '/api/user/config/') return json({ extra_settings: {} });
     if (url.pathname === '/api/playlist/') return json({ data: [PLAYLIST], next: null });
     if (url.pathname === `/api/playlist/${PLAYLIST_ID}/`) return json(PLAYLIST);
+    if (url.pathname === `/api/playlist/${PLAYLIST_ID}/items/`) return json({ data: PLAYLIST.items, next: null });
     return json({ data: [] });
   });
 }

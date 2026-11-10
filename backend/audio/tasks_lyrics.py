@@ -1,10 +1,13 @@
 """Celery tasks for automatic lyrics fetching"""
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 import logging
 
 logger = logging.getLogger(__name__)
+
+AUTOMATIC_LYRICS_OFF = 'Automatic lyrics fetching is turned off (AUTO_FETCH_LYRICS)'
 
 
 def _owned_audio(audio_id, owner_id):
@@ -149,6 +152,8 @@ def auto_fetch_lyrics(limit: int = 50, max_attempts: int = 3):
         limit: Maximum number of tracks to process
         max_attempts: Skip tracks that have been attempted this many times
     """
+    if not settings.AUTO_FETCH_LYRICS:
+        return AUTOMATIC_LYRICS_OFF
     return _fetch_missing_lyrics(_audio_missing_lyrics(max_attempts)[:limit])
 
 
@@ -212,6 +217,9 @@ def refetch_failed_lyrics(days_old: int = 7, limit: int = 20):
     from audio.lyrics_service import LyricsService
     from django.utils import timezone
     from datetime import timedelta
+    
+    if not settings.AUTO_FETCH_LYRICS:
+        return AUTOMATIC_LYRICS_OFF
     
     cutoff_date = timezone.now() - timedelta(days=days_old)
     

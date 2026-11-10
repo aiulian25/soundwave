@@ -3,7 +3,8 @@
 from django.db.models import Count
 from rest_framework import status
 from rest_framework.response import Response
-from download.claims import canonical_download_url
+from download.claims import canonical_download_url, requeue_for_explicit_request
+from download.cookie_health import cookie_health
 from download.models import DownloadQueue
 from download.serializers import DownloadQueueSerializer, AddToDownloadSerializer
 from common.permissions import WithinQuotaLimits
@@ -45,8 +46,8 @@ class DownloadListView(ApiBaseView):
             )
             created_items.append(item)
             
-            # Auto-start download if requested and item is new
-            if auto_start and created and item.status == 'pending':
+            # Start a new row, or one that is stuck in a state that would never produce the track
+            if auto_start and (created or requeue_for_explicit_request(item)):
                 from task.tasks import download_audio_task
                 download_audio_task.delay(item.id)
 
@@ -153,6 +154,13 @@ class IgnoreFailedView(ApiBaseView):
             status='failed',
         ).update(status='ignored')
         return Response({'detail': f'Dismissed {count} downloads', 'count': count})
+
+
+class CookieHealthView(ApiBaseView):
+    """Whether downloads can still sign in to YouTube; says nothing else about anyone's downloads"""
+
+    def get(self, request):
+        return Response({'state': cookie_health()})
 
 
 class DownloadStatusView(ApiBaseView):

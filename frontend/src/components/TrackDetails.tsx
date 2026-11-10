@@ -4,24 +4,29 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import EventOutlinedIcon from '@mui/icons-material/EventOutlined';
 import { useTranslation } from 'react-i18next';
+import TrackRating from './TrackRating';
+import { UNRATED } from '../hooks/useTrackRating';
 
 interface TrackDetailsProps {
   description?: string;
   viewCount?: number;
   likeCount?: number;
   publishedDate?: string;
+  rating?: number;
+  /** Given for tracks the server holds; the stars are shown only then. */
+  onRate?: (stars: number) => void;
 }
 
 const URL_PATTERN = /(https?:\/\/[^\s]+)/g;
 const DESCRIPTION_COLLAPSED_LINE_COUNT = 4;
 const DESCRIPTION_EXPANDABLE_MIN_CHARS = 200;
 
-export function hasTrackDetails({ description, viewCount, likeCount, publishedDate }: TrackDetailsProps): boolean {
+export function hasTrackDetails({ description, viewCount, likeCount, publishedDate, onRate }: TrackDetailsProps): boolean {
   const hasViews = typeof viewCount === 'number' && viewCount > 0;
   const hasLikes = typeof likeCount === 'number' && likeCount > 0;
   const hasDescription = (description?.trim().length ?? 0) > 0;
   const hasPublishedDate = typeof publishedDate === 'string' && publishedDate.trim().length > 0;
-  return hasViews || hasLikes || hasDescription || hasPublishedDate;
+  return hasViews || hasLikes || hasDescription || hasPublishedDate || Boolean(onRate);
 }
 
 function renderDescriptionWithLinks(text: string): React.ReactNode[] {
@@ -58,7 +63,7 @@ function renderDescriptionWithLinks(text: string): React.ReactNode[] {
   return nodes;
 }
 
-export default function TrackDetails({ description, viewCount, likeCount, publishedDate }: TrackDetailsProps) {
+export default function TrackDetails({ description, viewCount, likeCount, publishedDate, rating = UNRATED, onRate }: TrackDetailsProps) {
   const { t, i18n } = useTranslation();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const language = i18n.language;
@@ -85,7 +90,9 @@ export default function TrackDetails({ description, viewCount, likeCount, publis
   const hasPublishedDate = publishedDateLabel.length > 0;
   const hasDescription = trimmedDescription.length > 0;
 
-  if (!hasViews && !hasLikes && !hasPublishedDate && !hasDescription) {
+  const hasStats = hasViews || hasLikes || hasPublishedDate;
+
+  if (!hasStats && !hasDescription && !onRate) {
     return null;
   }
 
@@ -104,6 +111,12 @@ export default function TrackDetails({ description, viewCount, likeCount, publis
 
   return (
     <Box sx={{ px: 2, py: 2 }}>
+      {onRate && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: hasStats || hasDescription ? 2 : 0 }}>
+          <Typography variant="body2" color="text.secondary">{t('trackRating.label')}</Typography>
+          <TrackRating rating={rating} onRate={onRate} size="medium" />
+        </Box>
+      )}
       <Stack
         direction="row"
         spacing={2}

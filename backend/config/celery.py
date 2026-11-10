@@ -10,6 +10,16 @@ app = Celery('soundwave')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
+# A download can run for hours. On its own queue, served by its own worker (docker_assets/run.sh),
+# it cannot hold up lyrics, artwork, syncs, exports or the heartbeat that readiness watches.
+# Everything else stays on Celery's default queue.
+DEFAULT_QUEUE_NAME = 'celery'
+DOWNLOAD_QUEUE_NAME = 'downloads'
+WORKERS_EXPECTED = 2
+app.conf.task_routes = {
+    'task.tasks.download_audio_task': {'queue': DOWNLOAD_QUEUE_NAME},
+}
+
 # Periodic task schedule
 app.conf.beat_schedule = {
     # SMART SYNC: Check for new content in subscriptions every 15 minutes

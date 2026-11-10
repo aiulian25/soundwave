@@ -16,12 +16,14 @@ import tempfile
 from unittest import mock
 
 import requests
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from PIL import Image
 from rest_framework.test import APIClient
 
 from audio.models import Audio
+from audio.tasks_artwork import archive_artwork_task
 from audio.views import artwork_ticket_path
 from common.safe_http import FetchedResponse, FetchRefused, REFUSED_TOO_LARGE
 from common.streaming import make_media_ticket
@@ -71,6 +73,12 @@ class ArtworkProxyAuthTests(TestCase):
         override = override_settings(MEDIA_ROOT=media_root)
         override.enable()
         self.addCleanup(override.disable)
+        cache.clear()
+        self.addCleanup(cache.clear)
+        # Stands in for the worker: what a page queues has run by the time the page reads what is kept.
+        worker = mock.patch('audio.tasks_artwork.archive_artwork_task.delay', side_effect=archive_artwork_task)
+        worker.start()
+        self.addCleanup(worker.stop)
         self.client = APIClient()
 
     def url_for(self, youtube_id):

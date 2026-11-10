@@ -97,6 +97,7 @@ export const audioAPI = {
   delete: (youtubeId: string) => api.delete(`/audio/${youtubeId}/`),
   download: (youtubeId: string) => api.post(`/audio/${youtubeId}/`, { action: 'download' }),
   toggleFavorite: (youtubeId: string) => api.post(`/audio/${youtubeId}/`, { action: 'toggle_favorite' }),
+  setRating: (youtubeId: string, rating: number) => api.post(`/audio/${youtubeId}/`, { action: 'set_rating', rating }),
   downloadFile: async (youtubeId: string) => {
     await ensureCsrfCookie();
     const response = await fetch(`/api/audio/${youtubeId}/download/`, {
@@ -155,13 +156,13 @@ export const channelAPI = {
 export const playlistAPI = {
   list: (params?: any, config?: { signal?: AbortSignal }) => api.get('/playlist/', { params, ...config }),
   get: (playlistId: string) => api.get(`/playlist/${playlistId}/`),
-  getWithItems: (playlistId: string) => api.get(`/playlist/${playlistId}/`, { params: { include_items: 'true' } }),
   create: (data: any) => api.post('/playlist/', data),
   delete: (playlistId: string) => api.delete(`/playlist/${playlistId}/`),
   download: (playlistId: string) => api.post(`/playlist/${playlistId}/`, { action: 'download' }),
   forceRecheck: (playlistId: string) => api.post(`/playlist/${playlistId}/`, { action: 'force_recheck' }),
   // Item management
-  getItems: (playlistId: string) => api.get(`/playlist/${playlistId}/items/`),
+  getItems: (playlistId: string, params?: any, config?: { signal?: AbortSignal }) =>
+    api.get(`/playlist/${playlistId}/items/`, { params, ...config }),
   addItem: (playlistId: string, youtubeId: string) => api.post(`/playlist/${playlistId}/items/`, { youtube_id: youtubeId }),
   removeItem: (playlistId: string, youtubeId: string) => api.delete(`/playlist/${playlistId}/items/`, { data: { youtube_id: youtubeId } }),
   // Find playlists containing a track
@@ -247,6 +248,7 @@ export const downloadAPI = {
   add: (data: any) => api.post('/download/', data),
   clear: (filter?: string) => api.delete('/download/', { params: { filter } }),
   status: () => api.get('/download/status/'),
+  cookieHealth: () => api.get('/download/cookie-health/'),
   retry: (id?: number) => api.post('/download/retry/', id ? { id } : {}),
   ignore: (id?: number) => api.post('/download/ignore/', id ? { id } : {}),
 };

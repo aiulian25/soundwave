@@ -12,7 +12,7 @@ class FanartClient:
     
     # Register for API key at: https://fanart.tv/get-an-api-key/
     API_KEY = getattr(settings, 'FANART_API_KEY', '')
-    BASE_URL = 'http://webservice.fanart.tv/v3'
+    BASE_URL = 'https://webservice.fanart.tv/v3'
     
     def __init__(self, api_key: str = None):
         self.api_key = api_key or self.API_KEY

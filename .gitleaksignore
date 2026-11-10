@@ -1,0 +1,9 @@
+# Findings in git history that are accepted, one fingerprint per line (commit:file:rule:line).
+# All four are the Elasticsearch health-check line of the Compose files; Elasticsearch left
+# the stack in v1.21.0. The two 857dd1c6 entries hold a literal default password: rotate it
+# if it was ever reused anywhere. The other two are variable references, not secrets.
+# History is public and is not rewritten. Never list a finding for a secret still in use.
+857dd1c6417a0a0e8653ea3c1e9a44c78ee9bb08:docker-compose.prod.yml:curl-auth-user:55
+857dd1c6417a0a0e8653ea3c1e9a44c78ee9bb08:docker-compose.yml:curl-auth-user:60
+1c7909644dff17c3afcdcb28f9618dce3618aadb:docker-compose.prod.yml:curl-auth-user:55
+86ee1316e3d61a0ab542a10daa8c78f19c1bb5f2:docker-compose.yml:curl-auth-user:99

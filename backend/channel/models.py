@@ -6,6 +6,9 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
+ARTWORK_PATH_TEMPLATE = '/api/channel/{channel_id}/artwork/'
+
+
 class Channel(models.Model):
     """YouTube channel model"""
     # User isolation
@@ -73,7 +76,10 @@ class Channel(models.Model):
     download_quality = models.CharField(
         max_length=20,
         default='auto',
-        choices=[('auto', 'Auto'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('ultra', 'Ultra')]
+        choices=[
+            ('auto', 'Auto'), ('original', 'Original'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'),
+            ('ultra', 'Ultra'),
+        ]
     )
     sync_depth = models.IntegerField(
         default=50,
@@ -87,6 +93,11 @@ class Channel(models.Model):
             models.Index(fields=['owner', 'channel_id']),
             models.Index(fields=['owner', 'subscribed']),
         ]
+
+    @property
+    def artwork_url(self):
+        """Where clients load the picture: always this server, never the host `channel_thumbnail` names."""
+        return ARTWORK_PATH_TEMPLATE.format(channel_id=self.channel_id) if self.channel_thumbnail else ''
 
     def __str__(self):
         return f"{self.owner.username} - {self.channel_name}"

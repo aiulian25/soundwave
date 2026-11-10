@@ -1,6 +1,12 @@
 """Models for artwork and metadata"""
-from django.db import models
+from functools import partial
+
+from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+
+from audio.artwork_images import delete_artwork_file
 from audio.models import Audio
 from channel.models import Channel
 
@@ -15,6 +21,8 @@ class Artwork(models.Model):
         ('artist_image', 'Artist Image'),
         ('artist_banner', 'Artist Banner'),
         ('artist_logo', 'Artist Logo'),
+        ('playlist_cover', 'Playlist Cover'),
+        ('channel_thumbnail', 'Channel Thumbnail'),
     ]
     
     SOURCE_CHOICES = [
@@ -35,6 +43,14 @@ class Artwork(models.Model):
     )
     channel = models.ForeignKey(
         Channel,
+        on_delete=models.CASCADE,
+        related_name='artworks',
+        null=True,
+        blank=True
+    )
+    
+    playlist = models.ForeignKey(
+        'playlist.Playlist',
         on_delete=models.CASCADE,
         related_name='artworks',
         null=True,
@@ -64,6 +80,7 @@ class Artwork(models.Model):
         indexes = [
             models.Index(fields=['audio', 'artwork_type']),
             models.Index(fields=['channel', 'artwork_type']),
+            models.Index(fields=['playlist', 'artwork_type']),
             models.Index(fields=['is_primary']),
         ]
     
@@ -80,7 +97,26 @@ class Artwork(models.Model):
             return f"{self.artwork_type} for {self.audio.title} ({self.source})"
         elif self.channel:
             return f"{self.artwork_type} for {self.channel.channel_name} ({self.source})"
+        elif self.playlist:
+            return f"{self.artwork_type} for {self.playlist.title} ({self.source})"
         return f"{self.artwork_type} ({self.source})"
+
+
+def remove_image_nothing_keeps(local_path):
+    """Returns True if bytes were removed. Two rows may point at one file, so the last one decides."""
+    if Artwork.objects.filter(local_path=local_path).exists():
+        return False
+    return delete_artwork_file(local_path)
+
+
+@receiver(post_delete, sender=Artwork)
+def remove_kept_image(sender, instance, **kwargs):
+    """Rows go when their track, playlist, channel or user goes; the image must follow.
+
+    After commit, because a rolled-back deletion restores the row but could never restore bytes.
+    """
+    if instance.local_path:
+        transaction.on_commit(partial(remove_image_nothing_keeps, instance.local_path))
 
 
 class MusicMetadata(models.Model):

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 try:
     from mutagen.mp3 import MP3
     from mutagen.mp4 import MP4, MP4Cover
+    from mutagen.oggopus import OggOpus
     from mutagen.oggvorbis import OggVorbis
     from mutagen.flac import FLAC, Picture
     from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TCON, TRCK, APIC, USLT, SYLT, Encoding
@@ -137,7 +138,9 @@ def write_metadata_to_file(
         elif ext in ['.m4a', '.mp4', '.aac']:
             return _write_mp4_tags(full_path, title, artist, album, year, genre, track_number, cover_data, lyrics)
         elif ext == '.ogg':
-            return _write_ogg_tags(full_path, title, artist, album, year, genre, track_number, lyrics)
+            return _write_ogg_tags(OggVorbis(full_path), title, artist, album, year, genre, track_number, lyrics)
+        elif ext == '.opus':
+            return _write_ogg_tags(OggOpus(full_path), title, artist, album, year, genre, track_number, lyrics)
         elif ext == '.flac':
             return _write_flac_tags(full_path, title, artist, album, year, genre, track_number, cover_data, lyrics, synced_lyrics)
         else:
@@ -276,7 +279,7 @@ def _write_mp4_tags(
 
 
 def _write_ogg_tags(
-    file_path: Path,
+    audio,
     title: Optional[str],
     artist: Optional[str],
     album: Optional[str],
@@ -285,9 +288,7 @@ def _write_ogg_tags(
     track_number: Optional[int],
     lyrics: Optional[str] = None,
 ) -> bool:
-    """Write Vorbis comments to OGG file"""
-    audio = OggVorbis(file_path)
-    
+    """Write Vorbis comments to an opened Ogg file; Vorbis and Opus share the comment format"""
     if title:
         audio['title'] = [title]
     if artist:
@@ -304,7 +305,7 @@ def _write_ogg_tags(
         audio['lyrics'] = [lyrics]
     
     audio.save()
-    logger.info("Written OGG tags to %s", file_path)
+    logger.info("Written OGG tags to %s", audio.filename)
     return True
 
 

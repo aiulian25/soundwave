@@ -10,6 +10,9 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+UNRATED = 0
+HIGHEST_RATING = 5
+
 # The canonical address; the same view is also reachable under /api/v1/.
 ARTWORK_PATH_TEMPLATE = '/api/audio/{youtube_id}/artwork/'
 
@@ -74,6 +77,10 @@ class Audio(models.Model):
     
     # Favorites
     is_favorite = models.BooleanField(default=False)
+
+    # ponytail: unrated is stored as 0, so "rating less than 3" also matches unrated tracks,
+    # as in most music libraries. Make the column nullable if those ever need telling apart.
+    rating = models.PositiveSmallIntegerField(default=UNRATED, help_text="The owner's stars, 0 when not rated")
     
     class Meta:
         ordering = ['-published_date']
@@ -83,6 +90,9 @@ class Audio(models.Model):
             models.Index(fields=['owner', 'channel_id']),
             models.Index(fields=['owner', '-published_date']),
             models.Index(fields=['owner', 'is_favorite']),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(rating__lte=HIGHEST_RATING), name='audio_rating_at_most_five'),
         ]
 
     @property

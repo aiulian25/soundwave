@@ -70,7 +70,11 @@ class ChannelSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         queue_rows = DownloadQueue.objects.filter(owner_id=instance.owner_id, channel_name=instance.channel_name)
-        return {**super().to_representation(instance), **outstanding_counts(queue_rows)}
+        return {
+            **super().to_representation(instance),
+            'channel_thumbnail': instance.artwork_url,
+            **outstanding_counts(queue_rows),
+        }
 
 
 class ChannelListSerializer(serializers.Serializer):

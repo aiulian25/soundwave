@@ -63,6 +63,9 @@ services:
       - MAX_DOWNLOAD_BYTES=${MAX_DOWNLOAD_BYTES:-4294967296}
       - EXPORT_MAX_BYTES=${EXPORT_MAX_BYTES:-2147483648}
       - DOWNLOAD_TASK_SOFT_LIMIT_SECONDS=${DOWNLOAD_TASK_SOFT_LIMIT_SECONDS:-14400}
+      - DOWNLOAD_WORKER_CONCURRENCY=${DOWNLOAD_WORKER_CONCURRENCY:-2}
+      - AUTO_FETCH_LYRICS=${AUTO_FETCH_LYRICS:-true}
+      - UPDATE_CHECK_ENABLED=${UPDATE_CHECK_ENABLED:-true}
       - EXPORT_MIN_FREE_BYTES=${EXPORT_MIN_FREE_BYTES:-1073741824}
       - EXPORT_SYNC_MAX_BYTES=${EXPORT_SYNC_MAX_BYTES:-209715200}
       - DJANGO_ENABLE_ADMIN=${DJANGO_ENABLE_ADMIN:-false}
@@ -100,7 +103,7 @@ services:
       retries: 5
 
   soundwave-redis:
-    image: redis:alpine
+    image: redis:8-alpine
     container_name: soundwave-redis
     restart: unless-stopped
     environment:

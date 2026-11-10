@@ -312,8 +312,8 @@ LOGIN_LOCKOUT_DURATION = 60 * 60  # 60 minutes in seconds
 
 # Number of trusted reverse proxies in front of the app (APP-08). Controls how the
 # client IP is derived from X-Forwarded-For for BOTH the custom login lockout and
-# the DRF throttles. Leave unset for direct exposure; set to the proxy hop count
-# (usually 1) behind nginx/Cloudflare/etc. so client IPs cannot be spoofed.
+# the DRF throttles. Unset means no proxy: the header is then the client's own claim and
+# is ignored. Behind nginx/Cloudflare/etc. set it to the proxy hop count (usually 1).
 def _env_int_or_none(name):
     raw = os.environ.get(name, '').strip()
     if raw == '':
@@ -324,13 +324,20 @@ def _env_int_or_none(name):
         return None
 
 
-NUM_PROXIES = _env_int_or_none('NUM_PROXIES')
-if NUM_PROXIES is None and not DEBUG:
+NO_TRUSTED_PROXIES = 0
+_configured_proxies = _env_int_or_none('NUM_PROXIES')
+NUM_PROXIES = NO_TRUSTED_PROXIES if _configured_proxies is None else _configured_proxies
+if _configured_proxies is None and not DEBUG:
     logger.warning(
-        '[Security] NUM_PROXIES is not set, so login lockout and rate limits trust the '
-        'client-supplied X-Forwarded-For and can be evaded. Set it to the number of reverse '
-        'proxies in front of this app, or 0 if there are none.'
+        '[Security] NUM_PROXIES is not set, so X-Forwarded-For is ignored. Behind a reverse '
+        'proxy every client then shares the proxy address for login lockout and rate limits: '
+        'set NUM_PROXIES to the number of reverse proxies in front of this app.'
     )
+
+# What the server contacts on its own, without anyone asking. Both default to on; an operator
+# who wants a quieter instance turns them off. A person asking for lyrics still gets them.
+AUTO_FETCH_LYRICS = _env_bool('AUTO_FETCH_LYRICS', True)
+UPDATE_CHECK_ENABLED = _env_bool('UPDATE_CHECK_ENABLED', True)
 
 # Token expiry settings
 TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY_HOURS', 24 * 7))  # Default: 7 days
@@ -350,6 +357,12 @@ MEDIA_MAX_CONCURRENT_STREAMS_USER = int(os.environ.get('MEDIA_MAX_CONCURRENT_STR
 MEDIA_MAX_CONCURRENT_STREAMS_IP = int(os.environ.get('MEDIA_MAX_CONCURRENT_STREAMS_IP', '30'))
 MEDIA_STREAM_SLOT_TTL = int(os.environ.get('MEDIA_STREAM_SLOT_TTL', '300'))
 REST_FRAMEWORK = {
+    # Without this DRF falls back to session + HTTP Basic, and a Basic header skips the login
+    # lockout, two-factor sign-in and CSRF on every view that declares no classes of its own.
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'common.authentication.CsrfExemptTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],

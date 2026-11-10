@@ -15,6 +15,7 @@ from audio.models_lyrics import Lyrics, LyricsCache
 from audio.serializers_lyrics import (
     LyricsSerializer,
     LyricsUpdateSerializer,
+    LyricsSuggestionSerializer,
     LyricsTimingSerializer,
     LyricsFetchSerializer,
     LyricsCacheSerializer,
@@ -350,22 +351,17 @@ class LyricsViewSet(viewsets.ModelViewSet):
     def apply_suggestion(self, request, youtube_id=None):
         """Apply a selected lyrics suggestion to an audio track"""
         audio = get_object_or_404(Audio, youtube_id=youtube_id, owner=request.user)
+        
+        suggestion_serializer = LyricsSuggestionSerializer(data=request.data)
+        suggestion_serializer.is_valid(raise_exception=True)
+        suggestion = suggestion_serializer.validated_data
+        
         lyrics, created = Lyrics.objects.get_or_create(audio=audio)
-        
-        # Get suggestion data from request
-        synced_lyrics = request.data.get('synced_lyrics', '')
-        plain_lyrics = request.data.get('plain_lyrics', '')
-        instrumental = request.data.get('instrumental', False)
-        language = request.data.get('language', '')
-        track_name = request.data.get('track_name', '')
-        artist_name = request.data.get('artist_name', '')
-        
-        # Update lyrics
-        lyrics.synced_lyrics = synced_lyrics
-        lyrics.plain_lyrics = plain_lyrics
-        lyrics.is_instrumental = instrumental
-        lyrics.language = language
-        lyrics.source = f'lrclib (manual: {track_name} - {artist_name})' if track_name else 'lrclib (manual)'
+        lyrics.synced_lyrics = suggestion['synced_lyrics']
+        lyrics.plain_lyrics = suggestion['plain_lyrics']
+        lyrics.is_instrumental = suggestion['instrumental']
+        lyrics.language = suggestion['language']
+        lyrics.source = suggestion_serializer.source_label()
         lyrics.fetch_attempted = True
         lyrics.save()
         
@@ -458,13 +454,13 @@ class LyricsViewSet(viewsets.ModelViewSet):
 
 
 class LyricsCacheViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for viewing lyrics cache"""
+    """The shared lyrics cache. It holds every user's lookups, so only an admin may read it"""
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AdminOnly]
     serializer_class = LyricsCacheSerializer
     queryset = LyricsCache.objects.all()
     
-    @action(detail=False, methods=['post'], permission_classes=[AdminOnly])
+    @action(detail=False, methods=['post'])
     def cleanup(self, request):
         """Clean up old cache entries; the cache is shared, so this is instance maintenance"""
         cleanup_serializer = LyricsCacheCleanupSerializer(data=request.data)

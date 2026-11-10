@@ -7,7 +7,7 @@ from django.db.models import Case, When
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from playlist.smart_rules import InvalidRule, rule_is_valid, rules_predicate
+from playlist.smart_rules import RATING_FIELD, InvalidRule, rule_is_valid, rules_predicate
 
 User = get_user_model()
 
@@ -30,6 +30,7 @@ class SmartPlaylistRule(models.Model):
         ('last_played', 'Last Played'),
         ('downloaded_date', 'Date Added'),
         ('duration', 'Duration (seconds)'),
+        (RATING_FIELD, 'Rating (stars)'),
         # Boolean fields
         ('is_favorite', 'Is Favorite'),
     ]
@@ -104,6 +105,8 @@ class SmartPlaylist(models.Model):
         ('-duration', 'Duration (Longest first)'),
         ('year', 'Year (Oldest first)'),
         ('-year', 'Year (Newest first)'),
+        ('rating', 'Rating (Lowest first)'),
+        ('-rating', 'Rating (Highest first)'),
         ('random', 'Random'),
     ]
     
@@ -229,6 +232,11 @@ class SmartPlaylist(models.Model):
         self.cached_count = self.get_track_count()
         self.cache_updated = timezone.now()
         self.save(update_fields=['cached_count', 'cache_updated'])
+
+
+def forget_counts_of_playlists_using(owner, field):
+    """A track changed in `field`, so the remembered counts of playlists that test it are stale."""
+    SmartPlaylist.objects.filter(owner=owner, rules__field=field).update(cache_updated=None)
 
 
 def create_system_smart_playlists(user):

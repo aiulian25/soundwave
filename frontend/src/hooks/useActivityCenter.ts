@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { downloadAPI } from '../api/client';
 import { getPollingInterval } from '../utils/networkQuality';
+import { fetchCookieHealth, type CookieHealth } from './useCookieHealth';
 
 export interface DownloadItem {
   id: number;
@@ -16,6 +17,10 @@ export interface DownloadItem {
 }
 
 const BASE_POLL_INTERVAL_MS = 3000;
+const ACTIVITY_CHANGED_EVENT = 'soundwave:activity-changed';
+
+/** Call after starting work somewhere else (adding a link), so the badge shows it without being opened. */
+export const notifyActivityChanged = () => window.dispatchEvent(new Event(ACTIVITY_CHANGED_EVENT));
 
 const isActiveStatus = (item: DownloadItem) => item.status === 'pending' || item.status === 'downloading';
 const canPollNow = () => !document.hidden && navigator.onLine;
@@ -29,6 +34,7 @@ export function useActivityCenter(active: boolean) {
   const [items, setItems] = useState<DownloadItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [cookieHealth, setCookieHealth] = useState<CookieHealth | null>(null);
   const timerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const activeRef = useRef(active);
@@ -48,17 +54,22 @@ export function useActivityCenter(active: boolean) {
     }
     let latest: DownloadItem[] = [];
     let failed = false;
+    const latestCookieHealth = fetchCookieHealth();
     try {
       const response = await downloadAPI.list('all');
       latest = response.data?.data ?? [];
     } catch {
       failed = true;
     }
+    const cookieState = await latestCookieHealth;
     // Bail if the component unmounted during the request — never setState or reschedule.
     if (!mountedRef.current) {
       return;
     }
     setError(failed);
+    if (cookieState !== null) {
+      setCookieHealth(cookieState);
+    }
     if (!failed) {
       setItems(latest);
     }
@@ -83,19 +94,30 @@ export function useActivityCenter(active: boolean) {
     };
   }, [stop]);
 
-  // One seed fetch on mount so the badge reflects state without starting the poll loop.
+  // One fetch on mount, and one whenever work was started elsewhere, so the badge reflects
+  // state without starting the poll loop.
   useEffect(() => {
-    if (!canPollNow()) {
-      return;
-    }
-    downloadAPI
-      .list('all')
-      .then((response) => {
-        if (mountedRef.current) {
-          setItems(response.data?.data ?? []);
+    const showCurrentCount = () => {
+      if (!canPollNow()) {
+        return;
+      }
+      downloadAPI
+        .list('all')
+        .then((response) => {
+          if (mountedRef.current) {
+            setItems(response.data?.data ?? []);
+          }
+        })
+        .catch(() => undefined);
+      fetchCookieHealth().then((cookieState) => {
+        if (mountedRef.current && cookieState !== null) {
+          setCookieHealth(cookieState);
         }
-      })
-      .catch(() => undefined);
+      });
+    };
+    showCurrentCount();
+    window.addEventListener(ACTIVITY_CHANGED_EVENT, showCurrentCount);
+    return () => window.removeEventListener(ACTIVITY_CHANGED_EVENT, showCurrentCount);
   }, []);
 
   // Poll while the popover is open; stop and clean up otherwise and on unmount.
@@ -151,5 +173,5 @@ export function useActivityCenter(active: boolean) {
     start();
   }, [start]);
 
-  return { items, loading, error, refresh: start, retry, retryAll, ignore, ignoreAll };
+  return { items, loading, error, cookieHealth, refresh: start, retry, retryAll, ignore, ignoreAll };
 }

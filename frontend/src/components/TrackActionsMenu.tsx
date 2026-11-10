@@ -10,6 +10,7 @@
  * - Download
  * - Go to Channel
  * - Find in Playlists
+ * - Remove from this playlist, Delete from library (where the page allows it)
  */
 
 import { useState } from 'react';
@@ -46,8 +47,13 @@ import QueueMusicIcon from '@mui/icons-material/QueueMusic';
 import DownloadIcon from '@mui/icons-material/Download';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import FolderIcon from '@mui/icons-material/Folder';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PlaylistRemoveIcon from '@mui/icons-material/PlaylistRemove';
 import StartRadioMenu from './StartRadioMenu';
 import AddToPlaylistDialog from './AddToPlaylistDialog';
+import ConfirmDialog from './ConfirmDialog';
+import TrackRating from './TrackRating';
+import { HIGHEST_RATING, UNRATED, useTrackRating } from '../hooks/useTrackRating';
 import { audioAPI, playlistAPI } from '../api/client';
 import { useTranslation } from 'react-i18next';
 import type { Audio } from '../types';
@@ -70,6 +76,11 @@ interface TrackActionsMenuProps {
   onAddToQueue?: () => void;
   size?: 'small' | 'medium';
   showQueueActions?: boolean;
+  /** Offers "Delete from library"; called once the server has deleted the track. */
+  onTrackDeleted?: (deletedTrack: Audio) => void;
+  /** With `onRemovedFromPlaylist`, offers "Remove from this playlist" for a playlist the user edits. */
+  editablePlaylistId?: string;
+  onRemovedFromPlaylist?: (removedTrack: Audio) => void;
 }
 
 export default function TrackActionsMenu({
@@ -80,6 +91,9 @@ export default function TrackActionsMenu({
   onAddToQueue,
   size = 'small',
   showQueueActions = true,
+  onTrackDeleted,
+  editablePlaylistId,
+  onRemovedFromPlaylist,
 }: TrackActionsMenuProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -90,7 +104,10 @@ export default function TrackActionsMenu({
   const [containingPlaylists, setContainingPlaylists] = useState<ContainingPlaylist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [isFavorite, setIsFavorite] = useState(track.is_favorite);
+  const { rating, rate } = useTrackRating(track.youtube_id, track.rating, (stars) => onTrackUpdate?.({ ...track, rating: stars }));
   const [splitting, setSplitting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'info' | 'error' }>(
     { open: false, message: '', severity: 'success' },
   );
@@ -165,6 +182,13 @@ export default function TrackActionsMenu({
     handleCloseMenu();
   };
   
+  // The stars answer to arrow keys by themselves once one is focused; this covers the menu row.
+  const handleRatingRowKey = (event: React.KeyboardEvent) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'ArrowRight') rate(Math.min(HIGHEST_RATING, rating + 1));
+    if (event.key === 'ArrowLeft') rate(Math.max(UNRATED, rating - 1));
+  };
+
   const handleToggleFavorite = async (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!track.youtube_id) return;
@@ -223,6 +247,43 @@ export default function TrackActionsMenu({
     } finally {
       setLoadingPlaylists(false);
     }
+  };
+
+  const canDelete = Boolean(onTrackDeleted && track.youtube_id);
+  const canRemoveFromPlaylist = Boolean(editablePlaylistId && onRemovedFromPlaylist && track.youtube_id);
+
+  const handleAskToDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setConfirmingDelete(true);
+    handleCloseMenu();
+  };
+
+  const handleDelete = async () => {
+    if (!track.youtube_id || !onTrackDeleted) return;
+    setDeleting(true);
+    try {
+      await audioAPI.delete(track.youtube_id);
+    } catch {
+      setDeleting(false);
+      setConfirmingDelete(false);
+      setSnackbar({ open: true, message: t('trackActionsMenu.delete.error'), severity: 'error' });
+      return;
+    }
+    // The page drops the row, which unmounts this menu: nothing here may run after it.
+    onTrackDeleted(track);
+  };
+
+  const handleRemoveFromPlaylist = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    handleCloseMenu();
+    if (!track.youtube_id || !editablePlaylistId || !onRemovedFromPlaylist) return;
+    try {
+      await playlistAPI.removeItem(editablePlaylistId, track.youtube_id);
+    } catch {
+      setSnackbar({ open: true, message: t('trackActionsMenu.removeFromPlaylist.error'), severity: 'error' });
+      return;
+    }
+    onRemovedFromPlaylist(track);
   };
 
   const handleGoToPlaylist = (playlistId: string) => {
@@ -298,6 +359,17 @@ export default function TrackActionsMenu({
           </ListItemText>
         </MenuItem>
         
+        {track.youtube_id && (
+          <MenuItem
+            disableRipple
+            aria-label={`${t('trackRating.label')}: ${t('trackRating.stars', { count: rating })}`}
+            onKeyDown={handleRatingRowKey}
+            sx={{ cursor: 'default' }}
+          >
+            <TrackRating rating={rating} onRate={rate} size="medium" />
+          </MenuItem>
+        )}
+
         {/* Add to Playlist - Always shown */}
         <MenuItem onClick={handleAddToPlaylist}>
           <ListItemIcon>
@@ -348,7 +420,37 @@ export default function TrackActionsMenu({
             <ListItemText>{t('trackActionsMenu.actions.findInPlaylists')}</ListItemText>
           </MenuItem>
         )}
+
+        {(canRemoveFromPlaylist || canDelete) && <Divider sx={{ my: 0.5 }} />}
+
+        {canRemoveFromPlaylist && (
+          <MenuItem onClick={handleRemoveFromPlaylist} data-testid="track-remove-from-playlist">
+            <ListItemIcon>
+              <PlaylistRemoveIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>{t('trackActionsMenu.actions.removeFromPlaylist')}</ListItemText>
+          </MenuItem>
+        )}
+
+        {canDelete && (
+          <MenuItem onClick={handleAskToDelete} data-testid="track-delete">
+            <ListItemIcon>
+              <DeleteOutlineIcon fontSize="small" sx={{ color: 'error.main' }} />
+            </ListItemIcon>
+            <ListItemText sx={{ color: 'error.main' }}>{t('trackActionsMenu.actions.deleteFromLibrary')}</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={t('trackActionsMenu.delete.title')}
+        message={t('trackActionsMenu.delete.message', { title: track.title })}
+        confirmLabel={t('common.delete')}
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
       
       {/* Radio Sub-menu */}
       <StartRadioMenu

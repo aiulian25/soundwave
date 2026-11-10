@@ -25,6 +25,7 @@ import BlockIcon from '@mui/icons-material/Block';
 import { useTranslation } from 'react-i18next';
 import { useActivityCenter } from '../hooks/useActivityCenter';
 import { describeDownloadError } from '../utils/downloadErrors';
+import CookieHealthNotice from './CookieHealthNotice';
 
 type ActivityStatus = 'downloading' | 'pending' | 'failed' | 'completed';
 const STATUS_ORDER: ActivityStatus[] = ['downloading', 'pending', 'failed', 'completed'];
@@ -33,7 +34,7 @@ export default function ActivityCenter() {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
-  const { items, loading, error, retry, retryAll, ignore, ignoreAll, refresh } = useActivityCenter(open);
+  const { items, loading, error, cookieHealth, retry, retryAll, ignore, ignoreAll, refresh } = useActivityCenter(open);
 
   const attentionCount = items.filter(
     (item) => item.status === 'pending' || item.status === 'downloading' || item.status === 'failed',
@@ -96,6 +97,8 @@ export default function ActivityCenter() {
           </Box>
         </Box>
         <Divider />
+
+        <CookieHealthNotice state={cookieHealth} />
 
         {error && (
           <Box sx={{ px: 2, py: 1 }}>

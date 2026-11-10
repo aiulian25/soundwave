@@ -298,7 +298,6 @@ class RepairAndCancelTests(MediaLifecycleTestCase):
                 mock.patch('common.url_security.check_public_http_url', return_value=(True, None)), \
                 mock.patch('audio.storage_service.shutil.disk_usage', return_value=mock.Mock(free=10 ** 12)), \
                 mock.patch('task.tasks._resolve_download_quality', return_value='opus'), \
-                mock.patch('task.tasks._ext_for_quality', return_value='opus'), \
                 mock.patch('task.tasks._postprocessor_for_quality', return_value={}), \
                 mock.patch('task.tasks.link_audio_to_playlists.delay'), \
                 mock.patch('task.tasks.measure_loudness_task.delay'), \
